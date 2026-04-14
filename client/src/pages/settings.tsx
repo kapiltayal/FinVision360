@@ -1,0 +1,451 @@
+import { useState, useEffect } from "react";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import { useToast } from "@/hooks/use-toast";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import { useAuth } from "@/hooks/use-auth";
+import {
+  User, Lock, Save, PiggyBank, CreditCard, Shield,
+  KeyRound, BadgeCheck, SlidersHorizontal,
+} from "lucide-react";
+
+function DollarInput({
+  id,
+  label,
+  value,
+  onChange,
+  placeholder = "e.g. 5000",
+}: {
+  id: string;
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+}) {
+  return (
+    <div className="space-y-1.5">
+      <Label htmlFor={id} className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{label}</Label>
+      <div className="relative">
+        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm font-medium">$</span>
+        <Input
+          id={id}
+          type="number"
+          min="0"
+          step="100"
+          className="pl-7"
+          placeholder={placeholder}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+        />
+      </div>
+    </div>
+  );
+}
+
+type RecommendationFields = {
+  checkingThreshold: string;
+  savingsThreshold: string;
+  cdsThreshold: string;
+  studentLoanThreshold: string;
+  creditCardThreshold: string;
+  autoLoanThreshold: string;
+  personalLoanThreshold: string;
+  mortgageThreshold: string;
+  autoInsuranceThreshold: string;
+  homeInsuranceThreshold: string;
+  lifeInsuranceThreshold: string;
+  otherInsuranceThreshold: string;
+};
+
+const DEFAULT_REC: RecommendationFields = {
+  checkingThreshold: "",
+  savingsThreshold: "",
+  cdsThreshold: "",
+  studentLoanThreshold: "",
+  creditCardThreshold: "",
+  autoLoanThreshold: "",
+  personalLoanThreshold: "",
+  mortgageThreshold: "",
+  autoInsuranceThreshold: "",
+  homeInsuranceThreshold: "",
+  lifeInsuranceThreshold: "",
+  otherInsuranceThreshold: "",
+};
+
+function numericToStr(v: string | null | undefined): string {
+  return v != null && v !== "" ? String(v) : "";
+}
+
+function getInitials(name: string | undefined | null, username: string | undefined | null): string {
+  if (name && name.trim()) {
+    const parts = name.trim().split(" ");
+    return parts.length >= 2
+      ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+      : parts[0].slice(0, 2).toUpperCase();
+  }
+  return (username || "U").slice(0, 2).toUpperCase();
+}
+
+export default function SettingsPage() {
+  const { user } = useAuth();
+  const { toast } = useToast();
+
+  const [profile, setProfile] = useState({ fullName: "", email: "" });
+  useEffect(() => {
+    if (user) setProfile({ fullName: user.fullName || "", email: user.email || "" });
+  }, [user]);
+
+  const [passwords, setPasswords] = useState({
+    currentPassword: "",
+    newPassword: "",
+    confirmPassword: "",
+  });
+
+  const updateProfileMutation = useMutation({
+    mutationFn: (data: any) => apiRequest("PATCH", "/api/auth/user", data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      toast({ title: "Profile updated" });
+    },
+    onError: (e: any) => toast({ title: "Failed", description: e.message, variant: "destructive" }),
+  });
+
+  const changePasswordMutation = useMutation({
+    mutationFn: (data: any) => apiRequest("POST", "/api/auth/change-password", data),
+    onSuccess: () => {
+      toast({ title: "Password changed" });
+      setPasswords({ currentPassword: "", newPassword: "", confirmPassword: "" });
+    },
+    onError: (e: any) => toast({ title: "Failed", description: e.message, variant: "destructive" }),
+  });
+
+  const handleProfileSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    updateProfileMutation.mutate(profile);
+  };
+
+  const handlePasswordSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (passwords.newPassword !== passwords.confirmPassword) {
+      toast({ title: "Passwords don't match", variant: "destructive" });
+      return;
+    }
+    if (passwords.newPassword.length < 6) {
+      toast({ title: "Password too short", description: "Minimum 6 characters", variant: "destructive" });
+      return;
+    }
+    changePasswordMutation.mutate({
+      currentPassword: passwords.currentPassword,
+      newPassword: passwords.newPassword,
+    });
+  };
+
+  const [rec, setRec] = useState<RecommendationFields>(DEFAULT_REC);
+
+  const { data: recData } = useQuery({
+    queryKey: ["/api/recommendation-settings"],
+    queryFn: () => apiRequest("GET", "/api/recommendation-settings").then((r) => r.json()),
+  });
+
+  useEffect(() => {
+    if (recData) {
+      setRec({
+        checkingThreshold: numericToStr(recData.checkingThreshold),
+        savingsThreshold: numericToStr(recData.savingsThreshold),
+        cdsThreshold: numericToStr(recData.cdsThreshold),
+        studentLoanThreshold: numericToStr(recData.studentLoanThreshold),
+        creditCardThreshold: numericToStr(recData.creditCardThreshold),
+        autoLoanThreshold: numericToStr(recData.autoLoanThreshold),
+        personalLoanThreshold: numericToStr(recData.personalLoanThreshold),
+        mortgageThreshold: numericToStr(recData.mortgageThreshold),
+        autoInsuranceThreshold: numericToStr(recData.autoInsuranceThreshold),
+        homeInsuranceThreshold: numericToStr(recData.homeInsuranceThreshold),
+        lifeInsuranceThreshold: numericToStr(recData.lifeInsuranceThreshold),
+        otherInsuranceThreshold: numericToStr(recData.otherInsuranceThreshold),
+      });
+    }
+  }, [recData]);
+
+  const saveRecMutation = useMutation({
+    mutationFn: (data: any) => apiRequest("PUT", "/api/recommendation-settings", data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/recommendation-settings"] });
+      toast({ title: "Recommendation settings saved" });
+    },
+    onError: (e: any) => toast({ title: "Failed to save", description: e.message, variant: "destructive" }),
+  });
+
+  const handleRecSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const payload: Record<string, string | null> = {};
+    for (const [k, v] of Object.entries(rec)) {
+      payload[k] = v === "" ? null : v;
+    }
+    saveRecMutation.mutate(payload);
+  };
+
+  const setRecField = (field: keyof RecommendationFields) => (v: string) =>
+    setRec((prev) => ({ ...prev, [field]: v }));
+
+  const initials = getInitials(user?.fullName, user?.username);
+
+  return (
+    <div className="p-6 space-y-8 max-w-3xl">
+      {/* Page Header */}
+      <div>
+        <h1 className="text-2xl font-bold" data-testid="text-settings-title">Settings</h1>
+        <p className="text-muted-foreground">Manage your account and recommendation preferences</p>
+      </div>
+
+      {/* User Identity Banner */}
+      <Card className="border-primary/20 bg-gradient-to-r from-primary/5 via-primary/3 to-transparent">
+        <CardContent className="p-5">
+          <div className="flex items-center gap-4">
+            <div className="h-14 w-14 rounded-full bg-primary flex items-center justify-center shrink-0 text-primary-foreground font-bold text-lg shadow-md">
+              {initials}
+            </div>
+            <div className="min-w-0">
+              <p className="font-semibold text-base truncate">{user?.fullName || user?.username}</p>
+              <p className="text-sm text-muted-foreground truncate">{user?.email || "No email set"}</p>
+              <div className="flex items-center gap-2 mt-1">
+                <Badge variant="secondary" className="text-xs gap-1">
+                  <BadgeCheck className="h-3 w-3" />
+                  {(user as any)?.isAdmin ? "Admin" : "Member"}
+                </Badge>
+                <span className="text-xs text-muted-foreground">@{user?.username}</span>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Tabs defaultValue="profile" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-2 h-11">
+          <TabsTrigger value="profile" className="flex items-center gap-2 text-sm">
+            <User className="h-4 w-4" />
+            Profile & Security
+          </TabsTrigger>
+          <TabsTrigger value="recommendations" className="flex items-center gap-2 text-sm">
+            <SlidersHorizontal className="h-4 w-4" />
+            Recommendations
+          </TabsTrigger>
+        </TabsList>
+
+        {/* Profile Settings Tab */}
+        <TabsContent value="profile" className="space-y-5">
+
+          {/* Profile Information */}
+          <Card>
+            <CardHeader className="pb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-md bg-blue-500/10">
+                  <User className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                </div>
+                <div>
+                  <CardTitle className="text-base">Profile Information</CardTitle>
+                  <CardDescription>Update your name and email address</CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <Separator />
+            <CardContent className="pt-5">
+              <form onSubmit={handleProfileSubmit} className="space-y-4">
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Username</Label>
+                    <Input value={user?.username || ""} disabled className="bg-muted text-muted-foreground" />
+                    <p className="text-xs text-muted-foreground">Username cannot be changed</p>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="fullName" className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Full Name</Label>
+                    <Input
+                      id="fullName"
+                      data-testid="input-settings-fullname"
+                      value={profile.fullName}
+                      onChange={(e) => setProfile({ ...profile, fullName: e.target.value })}
+                      placeholder="Your full name"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="email" className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Email Address</Label>
+                  <Input
+                    id="email"
+                    data-testid="input-settings-email"
+                    type="email"
+                    value={profile.email}
+                    onChange={(e) => setProfile({ ...profile, email: e.target.value })}
+                    placeholder="your@email.com"
+                  />
+                </div>
+                <div className="flex justify-end pt-1">
+                  <Button type="submit" disabled={updateProfileMutation.isPending} data-testid="button-save-profile">
+                    <Save className="h-4 w-4 mr-2" />
+                    {updateProfileMutation.isPending ? "Saving..." : "Save Profile"}
+                  </Button>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
+
+          {/* Change Password */}
+          <Card>
+            <CardHeader className="pb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-md bg-amber-500/10">
+                  <KeyRound className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                </div>
+                <div>
+                  <CardTitle className="text-base">Change Password</CardTitle>
+                  <CardDescription>Update your account password to keep it secure</CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <Separator />
+            <CardContent className="pt-5">
+              <form onSubmit={handlePasswordSubmit} className="space-y-4">
+                <div className="space-y-1.5">
+                  <Label htmlFor="currentPwd" className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Current Password</Label>
+                  <Input
+                    id="currentPwd"
+                    data-testid="input-current-password"
+                    type="password"
+                    value={passwords.currentPassword}
+                    onChange={(e) => setPasswords({ ...passwords, currentPassword: e.target.value })}
+                    placeholder="Enter current password"
+                    required
+                  />
+                </div>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="newPwd" className="text-xs font-medium text-muted-foreground uppercase tracking-wide">New Password</Label>
+                    <Input
+                      id="newPwd"
+                      data-testid="input-new-password"
+                      type="password"
+                      value={passwords.newPassword}
+                      onChange={(e) => setPasswords({ ...passwords, newPassword: e.target.value })}
+                      placeholder="Min. 6 characters"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="confirmPwd" className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Confirm Password</Label>
+                    <Input
+                      id="confirmPwd"
+                      data-testid="input-confirm-password"
+                      type="password"
+                      value={passwords.confirmPassword}
+                      onChange={(e) => setPasswords({ ...passwords, confirmPassword: e.target.value })}
+                      placeholder="Re-enter new password"
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="flex justify-end pt-1">
+                  <Button type="submit" variant="outline" disabled={changePasswordMutation.isPending} data-testid="button-change-password">
+                    <Lock className="h-4 w-4 mr-2" />
+                    {changePasswordMutation.isPending ? "Changing..." : "Change Password"}
+                  </Button>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Recommendation Settings Tab */}
+        <TabsContent value="recommendations">
+          <form onSubmit={handleRecSubmit} className="space-y-5">
+            <Card className="border-blue-200 dark:border-blue-900 bg-blue-50/50 dark:bg-blue-950/20">
+              <CardContent className="p-4 flex items-start gap-3">
+                <SlidersHorizontal className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5 shrink-0" />
+                <p className="text-sm text-blue-800 dark:text-blue-200">
+                  Set dollar thresholds for each category. When <strong>FinVision360</strong> finds potential savings above your threshold, it will surface a personalized recommendation.
+                </p>
+              </CardContent>
+            </Card>
+
+            {/* Savings */}
+            <Card>
+              <CardHeader className="pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-md bg-emerald-500/10">
+                    <PiggyBank className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-base">Savings Accounts</CardTitle>
+                    <CardDescription>Trigger thresholds for savings-related accounts</CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <Separator />
+              <CardContent className="pt-5 grid gap-4 sm:grid-cols-3">
+                <DollarInput id="checkingThreshold" label="Checking" value={rec.checkingThreshold} onChange={setRecField("checkingThreshold")} />
+                <DollarInput id="savingsThreshold" label="Savings" value={rec.savingsThreshold} onChange={setRecField("savingsThreshold")} />
+                <DollarInput id="cdsThreshold" label="CDs" value={rec.cdsThreshold} onChange={setRecField("cdsThreshold")} />
+              </CardContent>
+            </Card>
+
+            {/* Borrowing */}
+            <Card>
+              <CardHeader className="pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-md bg-red-500/10">
+                    <CreditCard className="h-4 w-4 text-red-600 dark:text-red-400" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-base">Borrowing & Debt</CardTitle>
+                    <CardDescription>Trigger thresholds for debt and loan balances</CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <Separator />
+              <CardContent className="pt-5 grid gap-4 sm:grid-cols-2">
+                <DollarInput id="studentLoanThreshold" label="Student Loan" value={rec.studentLoanThreshold} onChange={setRecField("studentLoanThreshold")} />
+                <DollarInput id="creditCardThreshold" label="Credit Card" value={rec.creditCardThreshold} onChange={setRecField("creditCardThreshold")} />
+                <DollarInput id="autoLoanThreshold" label="Auto Loan" value={rec.autoLoanThreshold} onChange={setRecField("autoLoanThreshold")} />
+                <DollarInput id="personalLoanThreshold" label="Personal Loan" value={rec.personalLoanThreshold} onChange={setRecField("personalLoanThreshold")} />
+                <DollarInput id="mortgageThreshold" label="Mortgage" value={rec.mortgageThreshold} onChange={setRecField("mortgageThreshold")} />
+              </CardContent>
+            </Card>
+
+            {/* Insurance */}
+            <Card>
+              <CardHeader className="pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-md bg-purple-500/10">
+                    <Shield className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-base">Insurance Coverage</CardTitle>
+                    <CardDescription>Trigger thresholds for insurance coverage amounts</CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <Separator />
+              <CardContent className="pt-5 grid gap-4 sm:grid-cols-2">
+                <DollarInput id="autoInsuranceThreshold" label="Auto Insurance" value={rec.autoInsuranceThreshold} onChange={setRecField("autoInsuranceThreshold")} />
+                <DollarInput id="homeInsuranceThreshold" label="Home Insurance" value={rec.homeInsuranceThreshold} onChange={setRecField("homeInsuranceThreshold")} />
+                <DollarInput id="lifeInsuranceThreshold" label="Life Insurance" value={rec.lifeInsuranceThreshold} onChange={setRecField("lifeInsuranceThreshold")} />
+                <DollarInput id="otherInsuranceThreshold" label="Other Insurance" value={rec.otherInsuranceThreshold} onChange={setRecField("otherInsuranceThreshold")} />
+              </CardContent>
+            </Card>
+
+            <div className="flex justify-end">
+              <Button type="submit" disabled={saveRecMutation.isPending} className="gap-2">
+                <Save className="h-4 w-4" />
+                {saveRecMutation.isPending ? "Saving..." : "Save Recommendation Settings"}
+              </Button>
+            </div>
+          </form>
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}
