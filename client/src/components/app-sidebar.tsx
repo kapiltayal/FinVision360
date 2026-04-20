@@ -11,7 +11,7 @@ import {
   Moon,
   Landmark,
 } from "lucide-react";
-import logoPath from "@assets/FinSmart360_Logo_(transparent)_1773266678003.png";
+import logoPath from "@assets/colored-logo_1776714262826.png";
 import {
   Sidebar,
   SidebarContent,
@@ -51,11 +51,8 @@ export function AppSidebar() {
   return (
     <Sidebar>
       <SidebarHeader className="p-4">
-        <div className="flex items-center gap-2">
-          <img src={logoPath} alt="FinVision360" className="h-12 w-auto" />
-          <div>
-            <p className="text-xs text-muted-foreground">Financial Tracker</p>
-          </div>
+        <div className="flex items-center">
+          <img src={logoPath} alt="FinVision360" className="h-16 w-auto" />
         </div>
       </SidebarHeader>
       <SidebarContent>

@@ -16,7 +16,7 @@ import {
   Landmark,
   ShieldAlert,
 } from "lucide-react";
-import logoPath from "@assets/FinVision360_logo_transparent.png";
+import logoPath from "@assets/colored-logo_1776714262826.png";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,

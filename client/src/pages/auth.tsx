@@ -7,7 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useLogin, useRegister } from "@/hooks/use-auth";
 import { Eye, EyeOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import logoPath from "@assets/FinSmart360_Logo_(transparent)_1773266678003.png";
+import logoPath from "@assets/colored-logo_1776714262826.png";
 
 export default function AuthPage() {
   const [loginData, setLoginData] = useState({ username: "", password: "" });
