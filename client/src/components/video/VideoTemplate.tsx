@@ -1,5 +1,6 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { useVideoPlayer } from '@/lib/video/hooks';
+import { VideoRecorder } from './VideoRecorder';
 import { Scene1 } from './video_scenes/Scene1';
 import { Scene2 } from './video_scenes/Scene2';
 import { Scene3 } from './video_scenes/Scene3';
@@ -14,7 +15,7 @@ const SCENE_DURATIONS = {
   close: 6000
 };
 
-export default function VideoTemplate() {
+function VideoContent() {
   const { currentScene } = useVideoPlayer({ durations: SCENE_DURATIONS });
 
   return (
@@ -56,5 +57,13 @@ export default function VideoTemplate() {
         {currentScene === 4 && <Scene5 key="close" />}
       </AnimatePresence>
     </div>
+  );
+}
+
+export default function VideoTemplate() {
+  return (
+    <VideoRecorder>
+      <VideoContent />
+    </VideoRecorder>
   );
 }
