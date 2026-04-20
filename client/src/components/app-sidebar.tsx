@@ -11,7 +11,7 @@ import {
   Moon,
   Landmark,
 } from "lucide-react";
-import logoPath from "@assets/colored-logo_1776714262826.png";
+import logoPath from "@assets/FinVision360_Logo_H_(transparent)_1776714495394.png";
 import {
   Sidebar,
   SidebarContent,
@@ -52,7 +52,7 @@ export function AppSidebar() {
     <Sidebar>
       <SidebarHeader className="p-4">
         <div className="flex items-center">
-          <img src={logoPath} alt="FinVision360" className="h-16 w-auto" />
+          <img src={logoPath} alt="FinVision360" className="h-9 w-auto" />
         </div>
       </SidebarHeader>
       <SidebarContent>

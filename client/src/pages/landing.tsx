@@ -27,7 +27,7 @@ import {
   LayoutDashboard,
   ChevronDown,
 } from "lucide-react";
-import logoPath from "@assets/colored-logo_1776714262826.png";
+import logoPath from "@assets/FinVision360_Logo_H_(transparent)_1776714495394.png";
 import { useTheme } from "@/components/theme-provider";
 import { useLogout } from "@/hooks/use-auth";
 import {
