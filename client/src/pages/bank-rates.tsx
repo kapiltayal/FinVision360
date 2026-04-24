@@ -89,7 +89,7 @@ const RATE_TYPE_LABELS: Record<string, string> = {
 };
 
 const RATE_TYPE_COLORS: Record<string, string> = {
-  checking: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
+  checking: "bg-[#1C91D4]/15 text-[#1475A8] dark:bg-[#1C91D4]/20 dark:text-[#7EC8ED]",
   savings: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
   cd: "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200",
 };

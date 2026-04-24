@@ -33,7 +33,7 @@ import {
 type TabType = "auto" | "home" | "life" | "annuity" | "health" | "other";
 
 const TABS: { key: TabType; label: string; icon: any; color: string; bg: string; hex: string }[] = [
-  { key: "auto",    label: "Auto",      icon: Car,            color: "text-blue-500",    bg: "bg-blue-500/10",    hex: "#3b82f6" },
+  { key: "auto",    label: "Auto",      icon: Car,            color: "text-[#1C91D4]",    bg: "bg-[#1C91D4]/10",    hex: "#1C91D4" },
   { key: "home",    label: "Home",      icon: Home,           color: "text-amber-500",   bg: "bg-amber-500/10",   hex: "#f59e0b" },
   { key: "life",    label: "Life",      icon: Heart,          color: "text-rose-500",    bg: "bg-rose-500/10",    hex: "#f43f5e" },
   { key: "health",  label: "Health",    icon: Stethoscope,    color: "text-teal-500",    bg: "bg-teal-500/10",    hex: "#14b8a6" },
@@ -864,7 +864,7 @@ export default function InsurancePage() {
   }));
 
   const annuityTypeColors: Record<string, string> = {
-    fixed: "#10b981", variable: "#3b82f6", indexed: "#f59e0b", immediate: "#a855f7",
+    fixed: "#10b981", variable: "#1C91D4", indexed: "#f59e0b", immediate: "#a855f7",
   };
   const annuityChartData = ["fixed", "variable", "indexed", "immediate"].map((type) => ({
     name: type.charAt(0).toUpperCase() + type.slice(1),
@@ -900,8 +900,8 @@ export default function InsurancePage() {
         />
         <SummaryCard
           icon={ShieldCheck}
-          iconClass="text-blue-500"
-          iconBg="bg-blue-500/10"
+          iconClass="text-[#1C91D4]"
+          iconBg="bg-[#1C91D4]/10"
           label="Total Coverage"
           value={formatCurrency(totalCoverage)}
           expanded={expandedCard === "coverage"}

@@ -184,12 +184,12 @@ export default function Retirement401kPage() {
         <Card>
           <CardContent className="p-5">
             <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-md bg-blue-500/10 flex items-center justify-center">
-                <BarChart3 className="h-5 w-5 text-blue-500" />
+              <div className="h-10 w-10 rounded-md bg-[#1C91D4]/10 flex items-center justify-center">
+                <BarChart3 className="h-5 w-5 text-[#1C91D4]" />
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Investment Growth</p>
-                <p className="text-lg font-bold text-blue-600 dark:text-blue-400">{formatCurrency(growthAmount)}</p>
+                <p className="text-lg font-bold text-[#1475A8] dark:text-[#49AEE3]">{formatCurrency(growthAmount)}</p>
               </div>
             </div>
           </CardContent>

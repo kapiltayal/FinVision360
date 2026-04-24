@@ -70,8 +70,8 @@ const SS_FACTORS = [
   {
     icon: Briefcase,
     title: "Still Working?",
-    color: "text-blue-500",
-    bg: "bg-blue-500/10",
+    color: "text-[#1C91D4]",
+    bg: "bg-[#1C91D4]/10",
     points: [
       "Before FRA: benefits reduced $1 for every $2 earned above $22,320 (2024)",
       "Year you reach FRA: reduced $1 for every $3 above $59,520",
@@ -264,7 +264,7 @@ export default function SocialSecurityPage() {
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-muted-foreground">Benefit at FRA</span>
-                  <span className="text-sm font-semibold text-blue-600 dark:text-blue-400" data-testid="text-benefit-fra">
+                  <span className="text-sm font-semibold text-[#1475A8] dark:text-[#49AEE3]" data-testid="text-benefit-fra">
                     {formatCurrency(monthlyAtFRA)}/mo
                   </span>
                 </div>
@@ -335,13 +335,13 @@ export default function SocialSecurityPage() {
               </p>
             </CardContent>
           </Card>
-          <Card className="border-blue-200 dark:border-blue-800">
+          <Card className="border-[#1C91D4]/30 dark:border-[#1C91D4]/30">
             <CardContent className="p-4">
               <div className="flex items-center gap-2 mb-2">
-                <div className="h-3 w-3 rounded-full bg-blue-500" />
+                <div className="h-3 w-3 rounded-full bg-[#1C91D4]" />
                 <p className="text-sm font-semibold">Claim at FRA ({fraLabel})</p>
               </div>
-              <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{formatCurrency(monthlyAtFRA)}<span className="text-sm font-normal text-muted-foreground">/mo</span></p>
+              <p className="text-2xl font-bold text-[#1475A8] dark:text-[#49AEE3]">{formatCurrency(monthlyAtFRA)}<span className="text-sm font-normal text-muted-foreground">/mo</span></p>
               <p className="text-xs text-muted-foreground mt-1">Annual: {formatCurrency(monthlyAtFRA * 12)}</p>
               <p className="text-xs text-muted-foreground mt-2">
                 Full benefit, no reduction. Break-even vs. 62: {breakEvenFRAvsEarly ? `~age ${breakEvenFRAvsEarly.toFixed(1)}` : "N/A"}

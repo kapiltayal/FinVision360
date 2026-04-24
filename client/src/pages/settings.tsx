@@ -244,8 +244,8 @@ export default function SettingsPage() {
           <Card>
             <CardHeader className="pb-4">
               <div className="flex items-center gap-3">
-                <div className="p-2 rounded-md bg-blue-500/10">
-                  <User className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                <div className="p-2 rounded-md bg-[#1C91D4]/10">
+                  <User className="h-4 w-4 text-[#1475A8] dark:text-[#49AEE3]" />
                 </div>
                 <div>
                   <CardTitle className="text-base">Profile Information</CardTitle>
@@ -362,10 +362,10 @@ export default function SettingsPage() {
         {/* Recommendation Settings Tab */}
         <TabsContent value="recommendations">
           <form onSubmit={handleRecSubmit} className="space-y-5">
-            <Card className="border-blue-200 dark:border-blue-900 bg-blue-50/50 dark:bg-blue-950/20">
+            <Card className="border-[#1C91D4]/30 dark:border-[#1C91D4]/30 bg-[#1C91D4]/5 dark:bg-[#1C91D4]/5">
               <CardContent className="p-4 flex items-start gap-3">
-                <SlidersHorizontal className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5 shrink-0" />
-                <p className="text-sm text-blue-800 dark:text-blue-200">
+                <SlidersHorizontal className="h-4 w-4 text-[#1475A8] dark:text-[#49AEE3] mt-0.5 shrink-0" />
+                <p className="text-sm text-[#1475A8] dark:text-[#7EC8ED]">
                   Set dollar thresholds for each category. When <strong>FinVision360</strong> finds potential savings above your threshold, it will surface a personalized recommendation.
                 </p>
               </CardContent>

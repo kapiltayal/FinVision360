@@ -185,8 +185,8 @@ const features = [
     icon: Wallet,
     title: "Daily Finance Management",
     desc: "Track every account — checking, savings, cash — in one place. Know your real balance at all times.",
-    color: "text-blue-500",
-    bg: "bg-blue-500/10",
+    color: "text-[#1C91D4]",
+    bg: "bg-[#1C91D4]/10",
   },
   {
     icon: BarChart3,
@@ -368,7 +368,7 @@ export default function LandingPage() {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
               {[
                 { label: "Net Worth", value: "$421,300", color: "text-emerald-500" },
-                { label: "Total Assets", value: "$732,300", color: "text-blue-500" },
+                { label: "Total Assets", value: "$732,300", color: "text-[#1C91D4]" },
                 { label: "Total Liabilities", value: "$311,000", color: "text-red-500" },
                 { label: "Interest Spread", value: "+3.21%", color: "text-violet-500" },
               ].map((stat) => (
