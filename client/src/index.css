@@ -175,6 +175,63 @@
   }
 }
 
+/* 3D summary/stat card effect */
+.stat-card-3d {
+  background: linear-gradient(165deg, #ffffff 0%, #f1f4f8 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.95),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.04),
+    0 1px 3px rgba(0, 0, 0, 0.05),
+    0 6px 14px rgba(0, 0, 0, 0.09),
+    0 14px 28px rgba(0, 0, 0, 0.05);
+  border-color: rgba(206, 216, 230, 0.85) !important;
+  transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.22s ease;
+}
+.stat-card-3d:hover {
+  transform: translateY(-3px) scale(1.005);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.95),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.04),
+    0 3px 7px rgba(0, 0, 0, 0.07),
+    0 12px 26px rgba(0, 0, 0, 0.11),
+    0 26px 44px rgba(0, 0, 0, 0.06);
+}
+.dark .stat-card-3d {
+  background: linear-gradient(165deg, hsl(220 14% 13%) 0%, hsl(220 15% 8%) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.07),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.25),
+    0 1px 3px rgba(0, 0, 0, 0.45),
+    0 6px 14px rgba(0, 0, 0, 0.35),
+    0 14px 28px rgba(0, 0, 0, 0.22);
+  border-color: rgba(255, 255, 255, 0.07) !important;
+}
+.dark .stat-card-3d:hover {
+  transform: translateY(-3px) scale(1.005);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.07),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.25),
+    0 3px 7px rgba(0, 0, 0, 0.55),
+    0 12px 26px rgba(0, 0, 0, 0.42),
+    0 26px 44px rgba(0, 0, 0, 0.28);
+}
+.stat-card-3d-green {
+  background: linear-gradient(165deg, #f2fdf6 0%, #ddf6e8 100%);
+  border-color: rgba(167, 220, 186, 0.75) !important;
+}
+.dark .stat-card-3d-green {
+  background: linear-gradient(165deg, hsl(150 18% 12%) 0%, hsl(150 20% 8%) 100%);
+  border-color: rgba(52, 160, 100, 0.25) !important;
+}
+.stat-card-3d-red {
+  background: linear-gradient(165deg, #fff2f2 0%, #ffe0e0 100%);
+  border-color: rgba(220, 167, 167, 0.75) !important;
+}
+.dark .stat-card-3d-red {
+  background: linear-gradient(165deg, hsl(0 18% 12%) 0%, hsl(0 20% 8%) 100%);
+  border-color: rgba(180, 60, 60, 0.3) !important;
+}
+
 /**
  * Using the elevate system.
  * Automatic contrast adjustment.

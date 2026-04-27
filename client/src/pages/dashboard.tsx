@@ -56,19 +56,19 @@ function StatCard({
     color === "green" ? "text-emerald-600 dark:text-emerald-400" :
     color === "red" ? "text-red-600 dark:text-red-400" :
     "text-primary";
-  const valueBg =
-    color === "green" ? "bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800" :
-    color === "red" ? "bg-red-50 dark:bg-red-950/40 border-red-200 dark:border-red-800" :
-    "";
   const valueColor =
     color === "green" ? "text-emerald-700 dark:text-emerald-300" :
     color === "red" ? "text-red-700 dark:text-red-300" :
     "";
+  const cardVariant =
+    color === "green" ? "stat-card-3d stat-card-3d-green border" :
+    color === "red" ? "stat-card-3d stat-card-3d-red border" :
+    "stat-card-3d";
 
   return (
     <Card
       data-testid={testId}
-      className={`${color && color !== "default" ? `border ${valueBg}` : ""} ${onClick ? "cursor-pointer transition-all hover:shadow-md select-none" : ""} ${isExpanded ? "ring-2 ring-primary/30" : ""}`}
+      className={`${cardVariant} ${onClick ? "cursor-pointer select-none" : ""} ${isExpanded ? "ring-2 ring-primary/30" : ""}`}
       onClick={onClick}
     >
       <CardContent className="p-5">

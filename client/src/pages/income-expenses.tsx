@@ -97,15 +97,16 @@ function StatCard({
   const iconColor =
     color === "green" ? "text-emerald-600 dark:text-emerald-400" :
     color === "red" ? "text-red-600 dark:text-red-400" : "text-primary";
-  const cardBorder =
-    color === "green" ? "border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/40" :
-    color === "red" ? "border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/40" : "";
   const valueColor =
     color === "green" ? "text-emerald-700 dark:text-emerald-300" :
     color === "red" ? "text-red-700 dark:text-red-300" : "";
+  const cardVariant =
+    color === "green" ? "stat-card-3d stat-card-3d-green border" :
+    color === "red" ? "stat-card-3d stat-card-3d-red border" :
+    "stat-card-3d";
 
   return (
-    <Card data-testid={testId} className={cardBorder ? `border ${cardBorder}` : ""}>
+    <Card data-testid={testId} className={cardVariant}>
       <CardContent className="p-5">
         <div className="flex items-start justify-between gap-1">
           <div className="space-y-1">

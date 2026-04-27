@@ -560,7 +560,7 @@ function SummaryCard({
 
   return (
     <Card
-      className={`cursor-pointer transition-shadow ${expanded ? "shadow-md ring-1 ring-primary/20" : "hover:shadow-md"}`}
+      className={`stat-card-3d cursor-pointer ${expanded ? "ring-2 ring-primary/30" : ""}`}
       onClick={onToggle}
     >
       <CardContent className="p-5">
