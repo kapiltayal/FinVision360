@@ -224,7 +224,7 @@ export default function LiabilitiesPage() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card>
+        <Card className="stat-card-3d stat-card-3d-red border">
           <CardContent className="p-5">
             <div className="flex items-center gap-3">
               <div className="h-10 w-10 rounded-md bg-destructive/10 flex items-center justify-center">
@@ -237,7 +237,7 @@ export default function LiabilitiesPage() {
             </div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="stat-card-3d stat-card-3d-red border">
           <CardContent className="p-5">
             <div className="flex items-center gap-3">
               <div className="h-10 w-10 rounded-md bg-destructive/10 flex items-center justify-center">
@@ -250,7 +250,7 @@ export default function LiabilitiesPage() {
             </div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="stat-card-3d stat-card-3d-red border">
           <CardContent className="p-5">
             <div className="flex items-center gap-3">
               <div className="h-10 w-10 rounded-md bg-destructive/10 flex items-center justify-center">

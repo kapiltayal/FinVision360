@@ -106,7 +106,7 @@ export default function RetirementPlannerPage() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
+        <Card className="stat-card-3d">
           <CardContent className="p-5">
             <div className="flex items-center gap-3">
               <div className="h-10 w-10 rounded-md bg-primary/10 flex items-center justify-center">
@@ -119,7 +119,7 @@ export default function RetirementPlannerPage() {
             </div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="stat-card-3d">
           <CardContent className="p-5">
             <div className="flex items-center gap-3">
               <div className="h-10 w-10 rounded-md bg-primary/10 flex items-center justify-center">
@@ -132,11 +132,11 @@ export default function RetirementPlannerPage() {
             </div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className={`stat-card-3d border ${shortfall <= 0 ? "stat-card-3d-green" : "stat-card-3d-red"}`}>
           <CardContent className="p-5">
             <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-md bg-primary/10 flex items-center justify-center">
-                <Target className="h-5 w-5 text-primary" />
+              <div className={`h-10 w-10 rounded-md flex items-center justify-center ${shortfall <= 0 ? "bg-emerald-500/10" : "bg-red-500/10"}`}>
+                <Target className={`h-5 w-5 ${shortfall <= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`} />
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">{shortfall <= 0 ? "Surplus" : "Shortfall"}</p>
@@ -147,7 +147,7 @@ export default function RetirementPlannerPage() {
             </div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="stat-card-3d">
           <CardContent className="p-5">
             <div className="flex items-center gap-3">
               <div className="h-10 w-10 rounded-md bg-primary/10 flex items-center justify-center">

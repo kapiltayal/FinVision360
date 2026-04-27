@@ -211,7 +211,7 @@ export default function AssetsPage() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card>
+        <Card className="stat-card-3d">
           <CardContent className="p-5">
             <div className="flex items-center gap-3">
               <div className="h-10 w-10 rounded-md bg-primary/10 flex items-center justify-center">
@@ -224,11 +224,11 @@ export default function AssetsPage() {
             </div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="stat-card-3d stat-card-3d-green border">
           <CardContent className="p-5">
             <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-md bg-primary/10 flex items-center justify-center">
-                <TrendingUp className="h-5 w-5 text-primary" />
+              <div className="h-10 w-10 rounded-md bg-emerald-500/10 flex items-center justify-center">
+                <TrendingUp className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Avg Rate of Return</p>
@@ -237,7 +237,7 @@ export default function AssetsPage() {
             </div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="stat-card-3d">
           <CardContent className="p-5">
             <div className="flex items-center gap-3">
               <div className="h-10 w-10 rounded-md bg-primary/10 flex items-center justify-center">
