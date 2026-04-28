@@ -10,10 +10,10 @@ export function PublicPageLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen flex flex-col bg-background text-foreground">
-      <header className="border-b sticky top-0 bg-background/95 backdrop-blur z-10">
-        <div className="max-w-4xl mx-auto px-4 h-14 flex items-center justify-between">
+      <header className="border-b sticky top-0 bg-background/95 backdrop-blur z-50">
+        <div className="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between">
           <Link href="/">
-            <img src={logoPath} alt="FinVision360" className="h-8 w-auto cursor-pointer" />
+            <img src={logoPath} alt="FinVision360" className="h-11 w-auto cursor-pointer" />
           </Link>
           <div className="flex items-center gap-2">
             <Button
@@ -41,7 +41,7 @@ export function PublicPageLayout({ children }: { children: React.ReactNode }) {
       </main>
 
       <footer className="border-t py-8 mt-12">
-        <div className="max-w-4xl mx-auto px-4">
+        <div className="max-w-6xl mx-auto px-4">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
             <img src={logoPath} alt="FinVision360" className="h-7 w-auto" />
             <div className="flex flex-wrap justify-center gap-x-6 gap-y-1 text-xs text-muted-foreground">
