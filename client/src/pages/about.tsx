@@ -1,5 +1,127 @@
+import { useState } from "react";
 import { PublicPageLayout } from "@/components/public-page-layout";
-import { MapPin, Mail, Building2, Target, ShieldCheck, Brain } from "lucide-react";
+import { MapPin, Building2, Target, ShieldCheck, Brain, Send, CheckCircle2, Loader2 } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+
+function ContactForm() {
+  const [form, setForm] = useState({ name: "", email: "", subject: "", message: "" });
+  const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
+  const [errorMsg, setErrorMsg] = useState("");
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setStatus("loading");
+    setErrorMsg("");
+    try {
+      const res = await fetch("/api/contact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setErrorMsg(data.message || "Something went wrong. Please try again.");
+        setStatus("error");
+      } else {
+        setStatus("success");
+      }
+    } catch {
+      setErrorMsg("Network error. Please check your connection and try again.");
+      setStatus("error");
+    }
+  };
+
+  if (status === "success") {
+    return (
+      <div className="flex flex-col items-center justify-center py-10 gap-4 text-center">
+        <div className="h-14 w-14 rounded-full bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center">
+          <CheckCircle2 className="h-7 w-7 text-emerald-600 dark:text-emerald-400" />
+        </div>
+        <div className="space-y-1">
+          <p className="font-semibold text-lg">Message sent!</p>
+          <p className="text-sm text-muted-foreground">Thanks for reaching out. We'll get back to you soon.</p>
+        </div>
+        <Button variant="outline" size="sm" onClick={() => { setStatus("idle"); setForm({ name: "", email: "", subject: "", message: "" }); }}>
+          Send another message
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="space-y-1.5">
+          <Label htmlFor="contact-name">Name</Label>
+          <Input
+            id="contact-name"
+            name="name"
+            placeholder="Your name"
+            value={form.name}
+            onChange={handleChange}
+            required
+            disabled={status === "loading"}
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="contact-email">Email</Label>
+          <Input
+            id="contact-email"
+            name="email"
+            type="email"
+            placeholder="you@example.com"
+            value={form.email}
+            onChange={handleChange}
+            required
+            disabled={status === "loading"}
+          />
+        </div>
+      </div>
+      <div className="space-y-1.5">
+        <Label htmlFor="contact-subject">Subject</Label>
+        <Input
+          id="contact-subject"
+          name="subject"
+          placeholder="What's this about?"
+          value={form.subject}
+          onChange={handleChange}
+          required
+          disabled={status === "loading"}
+        />
+      </div>
+      <div className="space-y-1.5">
+        <Label htmlFor="contact-message">Message</Label>
+        <Textarea
+          id="contact-message"
+          name="message"
+          placeholder="Tell us how we can help..."
+          rows={5}
+          value={form.message}
+          onChange={handleChange}
+          required
+          disabled={status === "loading"}
+        />
+      </div>
+      {status === "error" && (
+        <p className="text-sm text-red-600 dark:text-red-400">{errorMsg}</p>
+      )}
+      <Button type="submit" disabled={status === "loading"} className="w-full sm:w-auto gap-2">
+        {status === "loading" ? (
+          <><Loader2 className="h-4 w-4 animate-spin" /> Sending…</>
+        ) : (
+          <><Send className="h-4 w-4" /> Send Message</>
+        )}
+      </Button>
+    </form>
+  );
+}
 
 export default function AboutPage() {
   return (
@@ -93,21 +215,18 @@ export default function AboutPage() {
           </ul>
         </div>
 
-        <div className="rounded-xl border bg-card p-6 space-y-3">
-          <h2 className="text-lg font-semibold">Contact Us</h2>
-          <p className="text-sm text-muted-foreground">
-            Have questions or feedback? We'd love to hear from you.
-          </p>
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Mail className="h-4 w-4 shrink-0" />
-            <a href="mailto:hello@finvision360.com" className="hover:text-foreground transition-colors">
-              hello@finvision360.com
-            </a>
+        <div className="rounded-xl border bg-card p-6 space-y-5">
+          <div className="space-y-1">
+            <h2 className="text-lg font-semibold">Contact Us</h2>
+            <p className="text-sm text-muted-foreground">
+              Have questions or feedback? Fill out the form and we'll get back to you.
+            </p>
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground pt-1">
+              <MapPin className="h-3.5 w-3.5 shrink-0" />
+              <span>Tooothy LLC · Northbrook, IL</span>
+            </div>
           </div>
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <MapPin className="h-4 w-4 shrink-0" />
-            <span>Tooothy LLC · Northbrook, IL</span>
-          </div>
+          <ContactForm />
         </div>
       </div>
     </PublicPageLayout>

@@ -483,5 +483,18 @@ Use markdown formatting with headers and bold key numbers.`;
     res.json(settings);
   });
 
+  app.post("/api/contact", async (req, res) => {
+    const { name, email, subject, message } = req.body;
+    if (!name || !email || !subject || !message) {
+      return res.status(400).json({ message: "All fields are required." });
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ message: "Please enter a valid email address." });
+    }
+    console.log(`[contact] New submission from ${name} <${email}> | Subject: ${subject}`);
+    res.json({ message: "Thank you! We've received your message and will be in touch soon." });
+  });
+
   return httpServer;
 }
