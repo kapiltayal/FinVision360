@@ -4,6 +4,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AppHeader } from "@/components/app-header";
+import { AppFooter } from "@/components/app-footer";
 import { ThemeProvider } from "@/components/theme-provider";
 import { useAuth } from "@/hooks/use-auth";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -29,21 +30,26 @@ function AuthenticatedApp() {
     <div className="flex flex-col h-screen w-full">
       <AppHeader />
       <main className="flex-1 min-h-0 overflow-y-auto">
-        <Switch>
-          <Route path="/" component={DashboardPage} />
-          <Route path="/home" component={LandingPage} />
-          <Route path="/assets" component={AssetsPage} />
-          <Route path="/liabilities" component={LiabilitiesPage} />
-          <Route path="/retirement" component={RetirementPage} />
-          <Route path="/retirement/social-security" component={RetirementPage} />
-          <Route path="/retirement/401k" component={RetirementPage} />
-          <Route path="/income-expenses" component={IncomeExpensesPage} />
-          <Route path="/insurance" component={InsurancePage} />
-          <Route path="/ai-advisor" component={AIAdvisorPage} />
-          <Route path="/settings" component={SettingsPage} />
-          <Route path="/bank-rates" component={BankRatesPage} />
-          <Route component={NotFound} />
-        </Switch>
+        <div className="min-h-full flex flex-col">
+          <div className="flex-1">
+            <Switch>
+              <Route path="/" component={DashboardPage} />
+              <Route path="/home" component={LandingPage} />
+              <Route path="/assets" component={AssetsPage} />
+              <Route path="/liabilities" component={LiabilitiesPage} />
+              <Route path="/retirement" component={RetirementPage} />
+              <Route path="/retirement/social-security" component={RetirementPage} />
+              <Route path="/retirement/401k" component={RetirementPage} />
+              <Route path="/income-expenses" component={IncomeExpensesPage} />
+              <Route path="/insurance" component={InsurancePage} />
+              <Route path="/ai-advisor" component={AIAdvisorPage} />
+              <Route path="/settings" component={SettingsPage} />
+              <Route path="/bank-rates" component={BankRatesPage} />
+              <Route component={NotFound} />
+            </Switch>
+          </div>
+          <AppFooter />
+        </div>
       </main>
     </div>
   );
