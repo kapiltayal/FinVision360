@@ -232,6 +232,19 @@
   border-color: rgba(180, 60, 60, 0.3) !important;
 }
 
+.stat-card-accent-primary {
+  border-top-color: hsl(var(--primary)) !important;
+  border-top-width: 3px !important;
+}
+.stat-card-accent-red {
+  border-top-color: rgb(239 68 68) !important;
+  border-top-width: 3px !important;
+}
+.stat-card-accent-violet {
+  border-top-color: rgb(139 92 246) !important;
+  border-top-width: 3px !important;
+}
+
 /**
  * Using the elevate system.
  * Automatic contrast adjustment.

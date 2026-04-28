@@ -481,7 +481,7 @@ export default function DashboardPage() {
           testId="card-total-assets"
           onClick={() => toggleSection("assets")}
           isExpanded={openSection === "assets"}
-          expandedAccent="ring-2 ring-primary/50 border-t-[3px] border-t-primary"
+          expandedAccent="ring-2 ring-primary/50 stat-card-accent-primary"
           infoText={
             <div className="space-y-1.5">
               <p className="font-semibold">How Total Assets is calculated</p>
@@ -499,7 +499,7 @@ export default function DashboardPage() {
           testId="card-total-liabilities"
           onClick={() => toggleSection("liabilities")}
           isExpanded={openSection === "liabilities"}
-          expandedAccent="ring-2 ring-red-400/50 border-t-[3px] border-t-red-500"
+          expandedAccent="ring-2 ring-red-400/50 stat-card-accent-red"
           infoText={
             <div className="space-y-1.5">
               <p className="font-semibold">How Total Liabilities is calculated</p>
@@ -524,7 +524,7 @@ export default function DashboardPage() {
           testId="card-interest-spread"
           onClick={() => toggleSection("interest")}
           isExpanded={openSection === "interest"}
-          expandedAccent="ring-2 ring-violet-400/50 border-t-[3px] border-t-violet-500"
+          expandedAccent="ring-2 ring-violet-400/50 stat-card-accent-violet"
           infoText={
             <div className="space-y-1.5">
               <p className="font-semibold">How Rate of Return Spread is calculated</p>
