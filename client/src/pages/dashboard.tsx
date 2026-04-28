@@ -34,7 +34,7 @@ import { formatCurrency, formatPercent, getCategoryLabel } from "@/lib/format";
 type OpenSection = "assets" | "liabilities" | "interest" | null;
 
 function StatCard({
-  title, value, extraLine, subtitle, icon: Icon, trend, testId, color, onClick, isExpanded, infoText,
+  title, value, extraLine, subtitle, icon: Icon, trend, testId, color, onClick, isExpanded, infoText, expandedAccent,
 }: {
   title: string;
   value: string;
@@ -47,6 +47,7 @@ function StatCard({
   onClick?: () => void;
   isExpanded?: boolean;
   infoText?: React.ReactNode;
+  expandedAccent?: string;
 }) {
   const iconBg =
     color === "green" ? "bg-emerald-500/10" :
@@ -68,7 +69,7 @@ function StatCard({
   return (
     <Card
       data-testid={testId}
-      className={`${cardVariant} ${onClick ? "cursor-pointer select-none" : ""} ${isExpanded ? "ring-2 ring-primary/30" : ""}`}
+      className={`${cardVariant} ${onClick ? "cursor-pointer select-none" : ""} ${isExpanded ? (expandedAccent ?? "ring-2 ring-primary/30") : ""}`}
       onClick={onClick}
     >
       <CardContent className="p-5">
@@ -480,6 +481,7 @@ export default function DashboardPage() {
           testId="card-total-assets"
           onClick={() => toggleSection("assets")}
           isExpanded={openSection === "assets"}
+          expandedAccent="ring-2 ring-primary/50 border-t-[3px] border-t-primary"
           infoText={
             <div className="space-y-1.5">
               <p className="font-semibold">How Total Assets is calculated</p>
@@ -497,6 +499,7 @@ export default function DashboardPage() {
           testId="card-total-liabilities"
           onClick={() => toggleSection("liabilities")}
           isExpanded={openSection === "liabilities"}
+          expandedAccent="ring-2 ring-red-400/50 border-t-[3px] border-t-red-500"
           infoText={
             <div className="space-y-1.5">
               <p className="font-semibold">How Total Liabilities is calculated</p>
@@ -521,6 +524,7 @@ export default function DashboardPage() {
           testId="card-interest-spread"
           onClick={() => toggleSection("interest")}
           isExpanded={openSection === "interest"}
+          expandedAccent="ring-2 ring-violet-400/50 border-t-[3px] border-t-violet-500"
           infoText={
             <div className="space-y-1.5">
               <p className="font-semibold">How Rate of Return Spread is calculated</p>
@@ -534,9 +538,15 @@ export default function DashboardPage() {
 
       {/* Collapsible: Asset Allocation */}
       <CollapsibleSection open={openSection === "assets"}>
-        <Card data-testid="card-asset-breakdown" className="mt-1">
+        <Card data-testid="card-asset-breakdown" className="mt-1 border-t-[3px] border-t-primary overflow-hidden">
           <CardHeader className="pb-2">
-            <CardTitle className="text-base">Asset Allocation</CardTitle>
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <CardTitle className="text-base">Asset Allocation</CardTitle>
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-0.5 text-xs font-medium text-primary border border-primary/20">
+                <Wallet className="h-3 w-3" />
+                Total Assets
+              </span>
+            </div>
           </CardHeader>
           <CardContent>
             {assetsByCategory.length === 0 && includedAssets.length === 0 ? (
@@ -601,9 +611,15 @@ export default function DashboardPage() {
 
       {/* Collapsible: Liability Breakdown */}
       <CollapsibleSection open={openSection === "liabilities"}>
-        <Card data-testid="card-liability-breakdown" className="mt-1">
+        <Card data-testid="card-liability-breakdown" className="mt-1 border-t-[3px] border-t-red-500 overflow-hidden">
           <CardHeader className="pb-2">
-            <CardTitle className="text-base">Liability Breakdown</CardTitle>
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <CardTitle className="text-base">Liability Breakdown</CardTitle>
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-red-50 dark:bg-red-950/40 px-3 py-0.5 text-xs font-medium text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800">
+                <CreditCard className="h-3 w-3" />
+                Total Liabilities
+              </span>
+            </div>
           </CardHeader>
           <CardContent>
             {liabilitiesByCategory.length === 0 && includedLiabilities.length === 0 ? (
@@ -668,9 +684,15 @@ export default function DashboardPage() {
 
       {/* Collapsible: Interest Spread Detail */}
       <CollapsibleSection open={openSection === "interest"}>
-        <Card data-testid="card-interest-detail" className="mt-1">
+        <Card data-testid="card-interest-detail" className="mt-1 border-t-[3px] border-t-violet-500 overflow-hidden">
           <CardHeader className="pb-2">
-            <CardTitle className="text-base">Rate of Return by Source (Annual)</CardTitle>
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <CardTitle className="text-base">Rate of Return by Source (Annual)</CardTitle>
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-violet-50 dark:bg-violet-950/40 px-3 py-0.5 text-xs font-medium text-violet-600 dark:text-violet-400 border border-violet-200 dark:border-violet-800">
+                <Percent className="h-3 w-3" />
+                Rate of Return Spread
+              </span>
+            </div>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
