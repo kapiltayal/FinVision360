@@ -548,6 +548,7 @@ export default function LandingPage() {
               <div className="space-y-2">
                 <p className="font-medium text-xs uppercase tracking-wide text-muted-foreground">Contact</p>
                 <div className="space-y-1.5">
+                  <div><Link href="/contact" className="text-xs text-muted-foreground hover:text-foreground transition-colors">Contact Us</Link></div>
                   <div><a href="mailto:hello@finvision360.com" className="text-xs text-muted-foreground hover:text-foreground transition-colors">hello@finvision360.com</a></div>
                 </div>
               </div>

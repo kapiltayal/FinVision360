@@ -49,6 +49,7 @@ export function PublicPageLayout({ children }: { children: React.ReactNode }) {
               <Link href="/privacy" className="hover:text-foreground transition-colors">Privacy Policy</Link>
               <Link href="/terms" className="hover:text-foreground transition-colors">Terms & Conditions</Link>
               <Link href="/faq" className="hover:text-foreground transition-colors">FAQ</Link>
+              <Link href="/contact" className="hover:text-foreground transition-colors">Contact Us</Link>
             </div>
             <p className="text-xs text-muted-foreground">© {new Date().getFullYear()} Tooothy LLC</p>
           </div>

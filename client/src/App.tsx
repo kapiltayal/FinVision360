@@ -22,6 +22,7 @@ import AboutPage from "@/pages/about";
 import PrivacyPage from "@/pages/privacy";
 import TermsPage from "@/pages/terms";
 import FAQPage from "@/pages/faq";
+import ContactPage from "@/pages/contact";
 
 function AuthenticatedApp() {
   return (
@@ -68,6 +69,7 @@ function AppRouter() {
       <Route path="/privacy" component={PrivacyPage} />
       <Route path="/terms" component={TermsPage} />
       <Route path="/faq" component={FAQPage} />
+      <Route path="/contact" component={ContactPage} />
       <Route>
         {user ? <AuthenticatedApp /> : <LandingPage />}
       </Route>
