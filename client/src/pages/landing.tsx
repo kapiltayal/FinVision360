@@ -518,10 +518,45 @@ export default function LandingPage() {
       </section>
 
       {/* Footer */}
-      <footer className="border-t py-8">
-        <div className="max-w-6xl mx-auto px-4 flex items-center justify-between flex-wrap gap-4">
-          <img src={logoPath} alt="FinVision360" className="h-9 w-auto" />
-          <p className="text-xs text-muted-foreground">Your personal finance intelligence for every stage of life.</p>
+      <footer className="border-t py-10">
+        <div className="max-w-6xl mx-auto px-4 space-y-6">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
+            <div className="space-y-2">
+              <img src={logoPath} alt="FinVision360" className="h-9 w-auto" />
+              <p className="text-xs text-muted-foreground max-w-xs">
+                Your personal finance intelligence for every stage of life.
+              </p>
+              <p className="text-xs text-muted-foreground">
+                A product of <strong>Tooothy LLC</strong> · Northbrook, IL
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-x-8 gap-y-4 text-sm">
+              <div className="space-y-2">
+                <p className="font-medium text-xs uppercase tracking-wide text-muted-foreground">Company</p>
+                <div className="space-y-1.5">
+                  <div><Link href="/about" className="text-xs text-muted-foreground hover:text-foreground transition-colors">About Us</Link></div>
+                  <div><Link href="/faq" className="text-xs text-muted-foreground hover:text-foreground transition-colors">FAQ</Link></div>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <p className="font-medium text-xs uppercase tracking-wide text-muted-foreground">Legal</p>
+                <div className="space-y-1.5">
+                  <div><Link href="/privacy" className="text-xs text-muted-foreground hover:text-foreground transition-colors">Privacy Policy</Link></div>
+                  <div><Link href="/terms" className="text-xs text-muted-foreground hover:text-foreground transition-colors">Terms & Conditions</Link></div>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <p className="font-medium text-xs uppercase tracking-wide text-muted-foreground">Contact</p>
+                <div className="space-y-1.5">
+                  <div><a href="mailto:hello@finvision360.com" className="text-xs text-muted-foreground hover:text-foreground transition-colors">hello@finvision360.com</a></div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="border-t pt-4 flex flex-col sm:flex-row items-center justify-between gap-2">
+            <p className="text-xs text-muted-foreground">© {new Date().getFullYear()} Tooothy LLC. All rights reserved.</p>
+            <p className="text-xs text-muted-foreground">FinVision360 is for informational purposes only — not financial advice.</p>
+          </div>
         </div>
       </footer>
 

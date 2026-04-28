@@ -18,6 +18,10 @@ import AIAdvisorPage from "@/pages/ai-advisor";
 import SettingsPage from "@/pages/settings";
 import IncomeExpensesPage from "@/pages/income-expenses";
 import BankRatesPage from "@/pages/bank-rates";
+import AboutPage from "@/pages/about";
+import PrivacyPage from "@/pages/privacy";
+import TermsPage from "@/pages/terms";
+import FAQPage from "@/pages/faq";
 
 function AuthenticatedApp() {
   return (
@@ -58,11 +62,17 @@ function AppRouter() {
     );
   }
 
-  if (!user) {
-    return <LandingPage />;
-  }
-
-  return <AuthenticatedApp />;
+  return (
+    <Switch>
+      <Route path="/about" component={AboutPage} />
+      <Route path="/privacy" component={PrivacyPage} />
+      <Route path="/terms" component={TermsPage} />
+      <Route path="/faq" component={FAQPage} />
+      <Route>
+        {user ? <AuthenticatedApp /> : <LandingPage />}
+      </Route>
+    </Switch>
+  );
 }
 
 function App() {
