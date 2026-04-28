@@ -1,4 +1,4 @@
-import { Switch, Route } from "wouter";
+import { Switch, Route, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -26,6 +26,9 @@ import FAQPage from "@/pages/faq";
 import ContactPage from "@/pages/contact";
 
 function AuthenticatedApp() {
+  const [location] = useLocation();
+  const showFooter = location !== "/home";
+
   return (
     <div className="flex flex-col h-screen w-full">
       <AppHeader />
@@ -48,7 +51,7 @@ function AuthenticatedApp() {
               <Route component={NotFound} />
             </Switch>
           </div>
-          <AppFooter />
+          {showFooter && <AppFooter />}
         </div>
       </main>
     </div>
