@@ -496,6 +496,9 @@ export default function SocialSecurityPage() {
                         Based on expected life: age {lifeAge}
                       </Badge>
                     </div>
+                    <p className="text-[11px] text-muted-foreground/70 mt-3 leading-relaxed border-t pt-3">
+                      This recommendation is based purely on numerical break-even analysis. Personal circumstances — including health, employment, spousal benefits, and tax situation — can significantly affect the optimal decision. Please consult a qualified financial advisor before making your claiming choice.
+                    </p>
                   </div>
                 </CardContent>
               </Card>
