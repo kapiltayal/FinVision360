@@ -4,7 +4,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import {
-  ShieldCheck, Heart, DollarSign, Briefcase, Users, Clock, Info, ChevronDown,
+  ShieldCheck, Heart, DollarSign, Briefcase, Users, Clock, ChevronDown,
+  TrendingUp, AlertTriangle, CheckCircle2,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/format";
 import {
@@ -117,6 +118,7 @@ export default function SocialSecurityPage() {
   const currentYear = new Date().getFullYear();
   const [birthYear, setBirthYear] = useState(1965);
   const [fraMonthlyBenefit, setFraMonthlyBenefit] = useState("2000");
+  const [expectedLifeAge, setExpectedLifeAge] = useState("85");
   const [openFactor, setOpenFactor] = useState<string | null>(null);
 
   const toggleFactor = (title: string) =>
@@ -126,6 +128,7 @@ export default function SocialSecurityPage() {
   const fraLabel = getFRALabel(birthYear);
   const currentAge = currentYear - birthYear;
   const benefit = parseFloat(fraMonthlyBenefit) || 0;
+  const lifeAge = parseFloat(expectedLifeAge) || 85;
 
   const monthlyAt62 = getBenefitAt62(benefit, fra);
   const monthlyAtFRA = benefit;
@@ -149,6 +152,41 @@ export default function SocialSecurityPage() {
     return fra + monthsDelay / 12 + (monthlyAtFRA * monthsDelay) / (monthlyAt70 - monthlyAtFRA) / 12;
   }, [monthlyAtFRA, monthlyAt70, fra]);
 
+  const recommendation = useMemo(() => {
+    if (!breakEvenFRAvsEarly || !breakEven70vsFRA) return null;
+    if (lifeAge < breakEvenFRAvsEarly) {
+      return {
+        label: "Claim at 62",
+        color: "text-amber-600 dark:text-amber-400",
+        border: "border-amber-300 dark:border-amber-700",
+        bg: "bg-amber-50 dark:bg-amber-950/40",
+        icon: AlertTriangle,
+        iconColor: "text-amber-500",
+        message: `Based on your expected life of age ${lifeAge}, claiming at 62 maximizes your total lifetime benefits. You would not live long enough for the higher FRA or age-70 payments to surpass the head start from claiming early.`,
+      };
+    }
+    if (lifeAge < breakEven70vsFRA) {
+      return {
+        label: `Claim at FRA (${fraLabel})`,
+        color: "text-[#1475A8] dark:text-[#49AEE3]",
+        border: "border-[#1C91D4]/40 dark:border-[#1C91D4]/40",
+        bg: "bg-blue-50 dark:bg-blue-950/40",
+        icon: TrendingUp,
+        iconColor: "text-[#1C91D4]",
+        message: `Based on your expected life of age ${lifeAge}, claiming at your Full Retirement Age (${fraLabel}) is the sweet spot — FRA beats 62 after age ${breakEvenFRAvsEarly.toFixed(1)}, and you won't quite reach the break-even needed for age 70 to surpass it.`,
+      };
+    }
+    return {
+      label: "Claim at 70 (Maximum)",
+      color: "text-emerald-600 dark:text-emerald-400",
+      border: "border-emerald-300 dark:border-emerald-700",
+      bg: "bg-emerald-50 dark:bg-emerald-950/40",
+      icon: CheckCircle2,
+      iconColor: "text-emerald-500",
+      message: `Based on your expected life of age ${lifeAge}, waiting until 70 maximizes your total lifetime benefits. After age ${breakEven70vsFRA.toFixed(1)}, the higher monthly payment from delaying surpasses what FRA would have paid — and the gap keeps growing.`,
+    };
+  }, [lifeAge, breakEvenFRAvsEarly, breakEven70vsFRA, fraLabel]);
+
   const cumulativeData = useMemo(() => {
     const data = [];
     let cum62 = 0, cumFRA = 0, cum70 = 0;
@@ -168,51 +206,53 @@ export default function SocialSecurityPage() {
         <p className="text-muted-foreground">Understand your benefits and find the optimal time to claim</p>
       </div>
 
-      <Card>
+      {/* Key Factors — 3D card */}
+      <Card className="stat-card-3d">
         <CardHeader className="pb-2">
           <CardTitle className="text-base">Key Factors to Consider</CardTitle>
           <p className="text-xs text-muted-foreground">Click any topic to expand details</p>
         </CardHeader>
         <CardContent>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-        {SS_FACTORS.map((factor) => {
-          const isOpen = openFactor === factor.title;
-          return (
-            <div key={factor.title} className="rounded-lg border overflow-hidden">
-              <button
-                onClick={() => toggleFactor(factor.title)}
-                data-testid={`accordion-${factor.title.toLowerCase().replace(/\s+/g, "-")}`}
-                className="w-full flex items-center justify-between p-3.5 hover:bg-muted/80 transition-colors text-left"
-              >
-                <div className="flex items-center gap-2">
-                  <div className={`h-8 w-8 rounded-md ${factor.bg} flex items-center justify-center shrink-0`}>
-                    <factor.icon className={`h-4 w-4 ${factor.color}`} />
-                  </div>
-                  <span className="text-sm font-semibold">{factor.title}</span>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {SS_FACTORS.map((factor) => {
+              const isOpen = openFactor === factor.title;
+              return (
+                <div key={factor.title} className="rounded-lg border overflow-hidden">
+                  <button
+                    onClick={() => toggleFactor(factor.title)}
+                    data-testid={`accordion-${factor.title.toLowerCase().replace(/\s+/g, "-")}`}
+                    className="w-full flex items-center justify-between p-3.5 hover:bg-muted/80 transition-colors text-left"
+                  >
+                    <div className="flex items-center gap-2">
+                      <div className={`h-8 w-8 rounded-md ${factor.bg} flex items-center justify-center shrink-0`}>
+                        <factor.icon className={`h-4 w-4 ${factor.color}`} />
+                      </div>
+                      <span className="text-sm font-semibold">{factor.title}</span>
+                    </div>
+                    <ChevronDown
+                      className={`h-4 w-4 text-muted-foreground shrink-0 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}
+                    />
+                  </button>
+                  {isOpen && (
+                    <div className="px-4 pb-4 border-t pt-3 bg-muted/60">
+                      <ul className="space-y-2">
+                        {factor.points.map((point, i) => (
+                          <li key={i} className="text-xs text-muted-foreground flex items-start gap-1.5">
+                            <span className="mt-1.5 h-1.5 w-1.5 rounded-full bg-muted-foreground/50 shrink-0" />
+                            {point}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                 </div>
-                <ChevronDown
-                  className={`h-4 w-4 text-muted-foreground shrink-0 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}
-                />
-              </button>
-              {isOpen && (
-                <div className="px-4 pb-4 border-t pt-3 bg-muted/60">
-                  <ul className="space-y-2">
-                    {factor.points.map((point, i) => (
-                      <li key={i} className="text-xs text-muted-foreground flex items-start gap-1.5">
-                        <span className="mt-1.5 h-1.5 w-1.5 rounded-full bg-muted-foreground/50 shrink-0" />
-                        {point}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
+              );
+            })}
+          </div>
         </CardContent>
       </Card>
 
+      {/* Benefit Calculator */}
       <div>
         <h2 className="text-lg font-semibold mb-1">Benefit Calculator</h2>
         <p className="text-sm text-muted-foreground mb-6">
@@ -220,6 +260,7 @@ export default function SocialSecurityPage() {
         </p>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Inputs */}
           <Card className="lg:col-span-1">
             <CardHeader>
               <CardTitle className="text-base">Your Information</CardTitle>
@@ -246,9 +287,20 @@ export default function SocialSecurityPage() {
                   onChange={(e) => setFraMonthlyBenefit(e.target.value)}
                   placeholder="2000"
                 />
-                <p className="text-xs text-muted-foreground">
-                  Find this at ssa.gov/myaccount
-                </p>
+                <p className="text-xs text-muted-foreground">Find this at ssa.gov/myaccount</p>
+              </div>
+              <div className="space-y-2">
+                <Label>Expected Life Age</Label>
+                <Input
+                  data-testid="input-ss-life-age"
+                  type="number"
+                  value={expectedLifeAge}
+                  min={63}
+                  max={110}
+                  onChange={(e) => setExpectedLifeAge(e.target.value)}
+                  placeholder="85"
+                />
+                <p className="text-xs text-muted-foreground">Used to personalize the recommendation below</p>
               </div>
 
               <div className="pt-2 space-y-3 border-t">
@@ -278,6 +330,7 @@ export default function SocialSecurityPage() {
             </CardContent>
           </Card>
 
+          {/* Chart */}
           <Card className="lg:col-span-2">
             <CardHeader>
               <CardTitle className="text-base">Cumulative Benefits by Start Age</CardTitle>
@@ -321,66 +374,155 @@ export default function SocialSecurityPage() {
           </Card>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
-          <Card className="border-amber-200 dark:border-amber-800">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="h-3 w-3 rounded-full bg-amber-500" />
-                <p className="text-sm font-semibold">Claim at 62 (Earliest)</p>
-              </div>
-              <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">{formatCurrency(monthlyAt62)}<span className="text-sm font-normal text-muted-foreground">/mo</span></p>
-              <p className="text-xs text-muted-foreground mt-1">Annual: {formatCurrency(monthlyAt62 * 12)}</p>
-              <p className="text-xs text-muted-foreground mt-2">
-                {((1 - monthlyAt62 / (monthlyAtFRA || 1)) * 100).toFixed(1)}% reduction from FRA. Best if health concerns or financial need.
-              </p>
-            </CardContent>
-          </Card>
-          <Card className="border-[#1C91D4]/30 dark:border-[#1C91D4]/30">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="h-3 w-3 rounded-full bg-[#1C91D4]" />
-                <p className="text-sm font-semibold">Claim at FRA ({fraLabel})</p>
-              </div>
-              <p className="text-2xl font-bold text-[#1475A8] dark:text-[#49AEE3]">{formatCurrency(monthlyAtFRA)}<span className="text-sm font-normal text-muted-foreground">/mo</span></p>
-              <p className="text-xs text-muted-foreground mt-1">Annual: {formatCurrency(monthlyAtFRA * 12)}</p>
-              <p className="text-xs text-muted-foreground mt-2">
-                Full benefit, no reduction. Break-even vs. 62: {breakEvenFRAvsEarly ? `~age ${breakEvenFRAvsEarly.toFixed(1)}` : "N/A"}
-              </p>
-            </CardContent>
-          </Card>
-          <Card className="border-emerald-200 dark:border-emerald-800">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="h-3 w-3 rounded-full bg-emerald-500" />
-                <p className="text-sm font-semibold">Claim at 70 (Maximum)</p>
-              </div>
-              <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{formatCurrency(monthlyAt70)}<span className="text-sm font-normal text-muted-foreground">/mo</span></p>
-              <p className="text-xs text-muted-foreground mt-1">Annual: {formatCurrency(monthlyAt70 * 12)}</p>
-              <p className="text-xs text-muted-foreground mt-2">
-                {(((monthlyAt70 / (monthlyAtFRA || 1)) - 1) * 100).toFixed(1)}% more than FRA. Break-even vs. 62: {breakEven70vsEarly ? `~age ${breakEven70vsEarly.toFixed(1)}` : "N/A"}
-              </p>
-            </CardContent>
-          </Card>
-        </div>
+        {/* Break-Even Summary */}
+        <div className="mt-6">
+          <h3 className="text-base font-semibold mb-1">Break-Even Summary</h3>
+          <p className="text-sm text-muted-foreground mb-4">
+            At what age does each strategy overtake the others in total lifetime benefits?
+          </p>
 
-        {breakEven70vsFRA && (
-          <Card className="bg-muted/70 mt-4">
-            <CardContent className="p-4">
-              <div className="flex items-start gap-3">
-                <Info className="h-4 w-4 text-primary mt-0.5 shrink-0" />
-                <div className="text-sm space-y-1">
-                  <p className="font-semibold">Break-Even Summary</p>
-                  <p className="text-muted-foreground">
-                    Live past <strong>age {breakEvenFRAvsEarly?.toFixed(1)}</strong> → FRA beats 62.{" "}
-                    Live past <strong>age {breakEven70vsEarly?.toFixed(1)}</strong> → age 70 beats 62.{" "}
-                    Live past <strong>age {breakEven70vsFRA?.toFixed(1)}</strong> → age 70 beats FRA.{" "}
-                    The average American lives to ~79; those in good health at 62 often live well into their 80s — making delayed claiming a strong choice.
-                  </p>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Box 1 — Claim at 62 */}
+            <Card className="border-amber-200 dark:border-amber-800 overflow-hidden">
+              <div className="h-1 bg-amber-400" />
+              <CardContent className="p-5">
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="h-8 w-8 rounded-full bg-amber-100 dark:bg-amber-900/50 flex items-center justify-center shrink-0">
+                    <span className="text-xs font-bold text-amber-600 dark:text-amber-400">62</span>
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold leading-tight">If you claim at 62</p>
+                    <p className="text-xs text-muted-foreground">{formatCurrency(monthlyAt62)}/mo · Annual: {formatCurrency(monthlyAt62 * 12)}</p>
+                  </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
+                <div className="space-y-3 pt-3 border-t">
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-1">Break-even vs FRA</p>
+                    <p className="text-lg font-bold text-amber-600 dark:text-amber-400">
+                      {breakEvenFRAvsEarly ? `Age ${breakEvenFRAvsEarly.toFixed(1)}` : "—"}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      FRA beats 62 if you live past this age
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-1">Break-even vs Age 70</p>
+                    <p className="text-lg font-bold text-amber-600 dark:text-amber-400">
+                      {breakEven70vsEarly ? `Age ${breakEven70vsEarly.toFixed(1)}` : "—"}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Age 70 beats 62 if you live past this age
+                    </p>
+                  </div>
+                  <div className="pt-1">
+                    <Badge variant="outline" className="text-xs border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-400">
+                      {((1 - monthlyAt62 / (monthlyAtFRA || 1)) * 100).toFixed(1)}% reduction from FRA
+                    </Badge>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Box 2 — Claim at FRA */}
+            <Card className="border-[#1C91D4]/30 dark:border-[#1C91D4]/30 overflow-hidden">
+              <div className="h-1 bg-[#1C91D4]" />
+              <CardContent className="p-5">
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="h-8 w-8 rounded-full bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center shrink-0">
+                    <span className="text-[10px] font-bold text-[#1475A8] dark:text-[#49AEE3] leading-none text-center">FRA</span>
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold leading-tight">If you claim at FRA ({fraLabel})</p>
+                    <p className="text-xs text-muted-foreground">{formatCurrency(monthlyAtFRA)}/mo · Annual: {formatCurrency(monthlyAtFRA * 12)}</p>
+                  </div>
+                </div>
+                <div className="space-y-3 pt-3 border-t">
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-1">Break-even vs Age 62</p>
+                    <p className="text-lg font-bold text-[#1475A8] dark:text-[#49AEE3]">
+                      {breakEvenFRAvsEarly ? `Age ${breakEvenFRAvsEarly.toFixed(1)}` : "—"}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      FRA wins over 62 after this age
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-1">Break-even vs Age 70</p>
+                    <p className="text-lg font-bold text-[#1475A8] dark:text-[#49AEE3]">
+                      {breakEven70vsFRA ? `Age ${breakEven70vsFRA.toFixed(1)}` : "—"}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Age 70 beats FRA if you live past this age
+                    </p>
+                  </div>
+                  <div className="pt-1">
+                    <Badge variant="outline" className="text-xs border-[#1C91D4]/40 text-[#1475A8] dark:text-[#49AEE3]">
+                      Full benefit · no reduction
+                    </Badge>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Box 3 — Personalized Recommendation */}
+            {recommendation ? (
+              <Card className={`overflow-hidden border ${recommendation.border}`}>
+                <div className={`h-1 ${recommendation.label.startsWith("Claim at 62") ? "bg-amber-400" : recommendation.label.startsWith("Claim at FRA") ? "bg-[#1C91D4]" : "bg-emerald-500"}`} />
+                <CardContent className={`p-5 h-full ${recommendation.bg}`}>
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="h-8 w-8 rounded-full bg-white/70 dark:bg-black/20 flex items-center justify-center shrink-0 border">
+                      <recommendation.icon className={`h-4 w-4 ${recommendation.iconColor}`} />
+                    </div>
+                    <div>
+                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Your Recommendation</p>
+                      <p className={`text-sm font-bold ${recommendation.color}`}>{recommendation.label}</p>
+                    </div>
+                  </div>
+                  <div className="pt-3 border-t border-current/10">
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      {recommendation.message}
+                    </p>
+                    <div className="mt-3">
+                      <Badge
+                        className={`text-xs ${
+                          recommendation.label.startsWith("Claim at 62")
+                            ? "bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300 border-amber-200 dark:border-amber-700"
+                            : recommendation.label.startsWith("Claim at FRA")
+                            ? "bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300 border-blue-200 dark:border-blue-700"
+                            : "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300 border-emerald-200 dark:border-emerald-700"
+                        }`}
+                        variant="outline"
+                      >
+                        Based on expected life: age {lifeAge}
+                      </Badge>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : (
+              <Card className="border-emerald-200 dark:border-emerald-800 overflow-hidden">
+                <div className="h-1 bg-emerald-500" />
+                <CardContent className="p-5">
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="h-8 w-8 rounded-full bg-emerald-100 dark:bg-emerald-900/50 flex items-center justify-center shrink-0">
+                      <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">70</span>
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold leading-tight">If you claim at 70</p>
+                      <p className="text-xs text-muted-foreground">{formatCurrency(monthlyAt70)}/mo · Annual: {formatCurrency(monthlyAt70 * 12)}</p>
+                    </div>
+                  </div>
+                  <div className="space-y-2 pt-3 border-t">
+                    <p className="text-xs text-muted-foreground">Enter your information above to see a personalized recommendation.</p>
+                    <Badge variant="outline" className="text-xs border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-400">
+                      {(((monthlyAt70 / (monthlyAtFRA || 1)) - 1) * 100).toFixed(1)}% more than FRA
+                    </Badge>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );
