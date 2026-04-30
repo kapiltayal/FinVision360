@@ -19,7 +19,7 @@ export function useLogin() {
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      queryClient.clear();
       setLocation("/");
     },
   });
@@ -33,7 +33,7 @@ export function useRegister() {
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      queryClient.clear();
       setLocation("/");
     },
   });
@@ -46,8 +46,8 @@ export function useLogout() {
       await apiRequest("POST", "/api/auth/logout");
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
-      setLocation("/auth");
+      queryClient.clear();
+      setLocation("/");
     },
   });
 }
