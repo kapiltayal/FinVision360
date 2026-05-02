@@ -23,7 +23,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   Car, Home, Heart, TrendingUp, Plus, Pencil, Trash2,
   ShieldCheck, DollarSign, Calendar, FileText, Stethoscope, MoreHorizontal,
-  ChevronDown, ChevronUp, X,
+  ChevronDown, ChevronUp, X, Clock,
 } from "lucide-react";
 import { type InsurancePolicy } from "@shared/schema";
 import { formatCurrency } from "@/lib/format";

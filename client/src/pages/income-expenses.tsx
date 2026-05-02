@@ -39,6 +39,7 @@ import {
   ArrowDownRight,
   ShoppingBag,
   Home,
+  Clock,
 } from "lucide-react";
 import {
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip,
