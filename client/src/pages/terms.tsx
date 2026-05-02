@@ -1,4 +1,5 @@
 import { PublicPageLayout } from "@/components/public-page-layout";
+import { useSEO } from "@/hooks/use-seo";
 
 const LAST_UPDATED = "January 1, 2025";
 
@@ -12,6 +13,11 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 }
 
 export default function TermsPage() {
+  useSEO({
+    title: "Terms & Conditions | FinVision360 by Tooothy LLC",
+    description: "Read the FinVision360 Terms and Conditions. By using our personal finance platform, you agree to these terms set by Tooothy LLC, Northbrook, IL.",
+    canonical: "https://finvision360.com/terms",
+  });
   return (
     <PublicPageLayout>
       <div className="space-y-10">

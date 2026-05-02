@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useLocation, Link } from "wouter";
+import { useSEO } from "@/hooks/use-seo";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -235,6 +236,11 @@ const benefits = [
 ];
 
 export default function LandingPage() {
+  useSEO({
+    title: "FinVision360 — AI-Powered Personal Finance Intelligence",
+    description: "FinVision360 gives you a complete 360° view of your finances. Track net worth, assets, liabilities, retirement, income & expenses, and get AI-powered financial guidance — all in one free app.",
+    canonical: "https://finvision360.com/",
+  });
   const [authOpen, setAuthOpen] = useState(false);
   const [authTab, setAuthTab] = useState<"login" | "register">("login");
   const [userOpen, setUserOpen] = useState(false);

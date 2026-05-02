@@ -2,8 +2,32 @@ import { Link } from "wouter";
 import { PublicPageLayout } from "@/components/public-page-layout";
 import { MapPin, Mail, Building2, Target, ShieldCheck, Brain, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useSEO, useJsonLd } from "@/hooks/use-seo";
 
 export default function AboutPage() {
+  useSEO({
+    title: "About FinVision360 — AI-Powered Personal Finance by Tooothy LLC",
+    description: "Learn about FinVision360, the AI-powered personal finance intelligence platform built by Tooothy LLC in Northbrook, IL. Our mission is to give everyone a complete 360° view of their financial life.",
+    canonical: "https://finvision360.com/about",
+  });
+  useJsonLd({
+    "@context": "https://schema.org",
+    "@type": "AboutPage",
+    "name": "About FinVision360",
+    "url": "https://finvision360.com/about",
+    "description": "FinVision360 is an AI-powered personal finance platform built by Tooothy LLC, a Northbrook, IL based company. We help users track net worth, plan retirement, manage debt, and get AI-powered financial guidance.",
+    "publisher": {
+      "@type": "Organization",
+      "name": "Tooothy LLC",
+      "address": {
+        "@type": "PostalAddress",
+        "addressLocality": "Northbrook",
+        "addressRegion": "IL",
+        "addressCountry": "US"
+      },
+      "email": "hello@finvision360.com"
+    }
+  });
   return (
     <PublicPageLayout>
       <div className="space-y-12">

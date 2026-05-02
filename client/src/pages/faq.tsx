@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { PublicPageLayout } from "@/components/public-page-layout";
 import { ChevronDown, ChevronUp } from "lucide-react";
+import { useSEO, useJsonLd } from "@/hooks/use-seo";
 
 const faqs = [
   {
@@ -138,6 +139,27 @@ function FAQItem({ question, answer }: { question: string; answer: string }) {
 }
 
 export default function FAQPage() {
+  useSEO({
+    title: "FAQ — Frequently Asked Questions | FinVision360",
+    description: "Find answers about FinVision360: how to track net worth, use the AI advisor, plan retirement, manage debt, and keep your financial data secure. Personal finance help from Tooothy LLC.",
+    canonical: "https://finvision360.com/faq",
+  });
+  useJsonLd({
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "name": "FinVision360 Frequently Asked Questions",
+    "url": "https://finvision360.com/faq",
+    "mainEntity": faqs.flatMap(section =>
+      section.items.map(item => ({
+        "@type": "Question",
+        "name": item.q,
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": item.a,
+        },
+      }))
+    ),
+  });
   return (
     <PublicPageLayout>
       <div className="space-y-12">

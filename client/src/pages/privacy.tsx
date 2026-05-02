@@ -1,4 +1,5 @@
 import { PublicPageLayout } from "@/components/public-page-layout";
+import { useSEO } from "@/hooks/use-seo";
 
 const LAST_UPDATED = "January 1, 2025";
 
@@ -12,6 +13,11 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 }
 
 export default function PrivacyPage() {
+  useSEO({
+    title: "Privacy Policy | FinVision360 by Tooothy LLC",
+    description: "Read the FinVision360 Privacy Policy. Learn how Tooothy LLC collects, uses, and protects your personal and financial data when you use our personal finance platform.",
+    canonical: "https://finvision360.com/privacy",
+  });
   return (
     <PublicPageLayout>
       <div className="space-y-10">

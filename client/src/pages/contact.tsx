@@ -5,8 +5,14 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { useSEO } from "@/hooks/use-seo";
 
 export default function ContactPage() {
+  useSEO({
+    title: "Contact FinVision360 — Get in Touch with Tooothy LLC",
+    description: "Have a question or feedback about FinVision360? Contact the team at Tooothy LLC in Northbrook, IL. We'd love to hear from you.",
+    canonical: "https://finvision360.com/contact",
+  });
   const [form, setForm] = useState({ name: "", email: "", subject: "", message: "" });
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
