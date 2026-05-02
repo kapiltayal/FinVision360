@@ -77,7 +77,7 @@ export function AppHeader() {
               variant="outline"
               size="sm"
               className="gap-2 text-white border-0 hover:text-white hover:opacity-90 transition-opacity"
-              style={{ background: "linear-gradient(135deg, #0d3a5c 0%, #1565a8 50%, #1c91d4 100%)" }}
+              style={{ background: "linear-gradient(135deg, #1565a8 0%, #1c91d4 55%, #42b8ed 100%)" }}
               data-testid="button-nav-menu"
             >
               {currentPage ? (
@@ -120,7 +120,7 @@ export function AppHeader() {
                 variant="outline"
                 size="sm"
                 className="gap-2 text-white border-0 hover:text-white hover:opacity-90 transition-opacity"
-                style={{ background: "linear-gradient(135deg, #0d3a5c 0%, #1565a8 50%, #1c91d4 100%)" }}
+                style={{ background: "linear-gradient(135deg, #1565a8 0%, #1c91d4 55%, #42b8ed 100%)" }}
                 data-testid="button-admin-menu"
               >
                 {currentAdminPage ? (
@@ -177,15 +177,16 @@ export function AppHeader() {
         <DropdownMenu open={userOpen} onOpenChange={setUserOpen}>
           <DropdownMenuTrigger asChild>
             <Button
-              variant="ghost"
+              variant="outline"
               size="sm"
-              className="gap-2"
+              className="gap-2 text-white border-0 hover:text-white hover:opacity-90 transition-opacity"
+              style={{ background: "linear-gradient(135deg, #1565a8 0%, #1c91d4 55%, #42b8ed 100%)" }}
               data-testid="button-user-menu"
             >
               <span className="hidden sm:inline text-sm truncate max-w-[100px]">
                 {user?.fullName || user?.username}
               </span>
-              <ChevronDown className="h-4 w-4 opacity-50" />
+              <ChevronDown className="h-4 w-4 opacity-70" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-48">
