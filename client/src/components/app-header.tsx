@@ -29,7 +29,7 @@ import { useTheme } from "@/components/theme-provider";
 import { useAuth, useLogout } from "@/hooks/use-auth";
 
 const baseNavItems = [
-  { title: "Dashboard", url: "/", icon: LayoutDashboard },
+  { title: "Net Worth", url: "/", icon: LayoutDashboard },
   { title: "Assets", url: "/assets", icon: Wallet },
   { title: "Liabilities", url: "/liabilities", icon: CreditCard },
   { title: "Income & Expenses", url: "/income-expenses", icon: ArrowLeftRight },

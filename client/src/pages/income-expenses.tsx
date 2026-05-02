@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useLastUpdated } from "@/hooks/use-last-updated";
+import { ExportMenu } from "@/components/export-menu";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -258,14 +259,48 @@ export default function IncomeExpensesPage() {
   const needs = expenseList.filter((e) => e.type === "need");
   const wants = expenseList.filter((e) => e.type === "want");
 
+  const exportData = {
+    filename: "Income and Expenses",
+    sheets: [
+      {
+        name: "Income",
+        columns: ["Name", "Category", "Amount ($)", "Frequency", "Monthly Equiv ($)", "Notes"],
+        rows: incomeList.map((e) => [
+          e.name,
+          getCategoryLabel(e.category, INCOME_CATEGORIES),
+          parseFloat(e.amount || "0"),
+          e.frequency,
+          Math.round(toMonthly(e.amount, e.frequency) * 100) / 100,
+          e.notes || "",
+        ]),
+      },
+      {
+        name: "Expenses",
+        columns: ["Name", "Category", "Type", "Amount ($)", "Frequency", "Monthly Equiv ($)", "Notes"],
+        rows: expenseList.map((e) => [
+          e.name,
+          getCategoryLabel(e.category, EXPENSE_CATEGORIES),
+          e.type,
+          parseFloat(e.amount || "0"),
+          e.frequency,
+          Math.round(toMonthly(e.amount, e.frequency) * 100) / 100,
+          e.notes || "",
+        ]),
+      },
+    ],
+  };
+
   return (
     <div className="p-6 space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold" data-testid="text-income-expenses-title">Income &amp; Expenses</h1>
-        <p className="text-muted-foreground">Track your monthly cash flow and net savings</p>
-        <p className="flex items-center gap-1 text-xs text-muted-foreground mt-1" data-testid="text-income-expenses-last-updated">
-          <Clock className="h-3 w-3" /> Last updated: {formattedDate}
-        </p>
+      <div className="flex items-start justify-between gap-2 flex-wrap">
+        <div>
+          <h1 className="text-2xl font-bold" data-testid="text-income-expenses-title">Income &amp; Expenses</h1>
+          <p className="text-muted-foreground">Track your monthly cash flow and net savings</p>
+          <p className="flex items-center gap-1 text-xs text-muted-foreground mt-1" data-testid="text-income-expenses-last-updated">
+            <Clock className="h-3 w-3" /> Last updated: {formattedDate}
+          </p>
+        </div>
+        <ExportMenu data={exportData} />
       </div>
 
       {isLoading ? (

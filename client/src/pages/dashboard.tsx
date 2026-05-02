@@ -30,6 +30,7 @@ import {
 } from "recharts";
 import { type Asset, type Liability, ASSET_CATEGORIES, LIABILITY_CATEGORIES } from "@shared/schema";
 import { formatCurrency, formatPercent, getCategoryLabel } from "@/lib/format";
+import { ExportMenu } from "@/components/export-menu";
 
 type OpenSection = "assets" | "liabilities" | "interest" | null;
 
@@ -433,25 +434,71 @@ export default function DashboardPage() {
 
   const spreadPct = weightedAssetRate - weightedLiabilityRate;
 
+  const exportData = {
+    filename: "Net Worth Summary",
+    sheets: [
+      {
+        name: "Summary",
+        columns: ["Metric", "Value"],
+        rows: [
+          ["Net Worth", formatCurrency(netWorth)],
+          ["Total Assets", formatCurrency(totalAssets)],
+          ["Total Liabilities", formatCurrency(totalLiabilities)],
+          ["Weighted Asset Rate", formatPercent(weightedAssetRate)],
+          ["Weighted Liability Rate", formatPercent(weightedLiabilityRate)],
+          ["Interest Spread", `${spreadPct.toFixed(2)}%`],
+        ],
+      },
+      {
+        name: "Assets",
+        columns: ["Name", "Category", "Value ($)", "Interest Rate (%)", "Institution", "Notes"],
+        rows: assets.map((a) => [
+          a.name,
+          getCategoryLabel(ASSET_CATEGORIES, a.category),
+          parseFloat(a.value || "0"),
+          parseFloat(a.interestRate || "0"),
+          a.institution || "",
+          a.notes || "",
+        ]),
+      },
+      {
+        name: "Liabilities",
+        columns: ["Name", "Category", "Balance ($)", "Interest Rate (%)", "Min Payment ($)", "Institution", "Notes"],
+        rows: liabilities.map((l) => [
+          l.name,
+          getCategoryLabel(LIABILITY_CATEGORIES, l.category),
+          parseFloat(l.balance || "0"),
+          parseFloat(l.interestRate || "0"),
+          parseFloat(l.minimumPayment || "0"),
+          l.institution || "",
+          l.notes || "",
+        ]),
+      },
+    ],
+  };
+
   return (
     <div className="p-6 space-y-4">
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-2xl font-bold" data-testid="text-dashboard-title">Net Worth Dashboard</h1>
+          <h1 className="text-2xl font-bold" data-testid="text-dashboard-title">Net Worth</h1>
           <p className="text-muted-foreground">Your complete financial overview</p>
         </div>
-        {anyExcluded && (
-          <div className="flex items-center gap-2 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg px-3 py-2">
-            <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
-            <span className="text-xs text-amber-700 dark:text-amber-300">
-              {excludedAssetIds.size + excludedLiabilityIds.size} item{excludedAssetIds.size + excludedLiabilityIds.size !== 1 ? "s" : ""} excluded from calculations
-            </span>
-            <Button size="sm" variant="outline" className="h-6 text-xs px-2 border-amber-300 dark:border-amber-700" onClick={resetAll}>
-              <RotateCcw className="h-3 w-3 mr-1" />
-              Reset All
-            </Button>
-          </div>
-        )}
+        <div className="flex items-center gap-2 flex-wrap">
+          <ExportMenu data={exportData} />
+          {anyExcluded && (
+            <div className="flex items-center gap-2 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg px-3 py-2">
+              <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
+              <span className="text-xs text-amber-700 dark:text-amber-300">
+                {excludedAssetIds.size + excludedLiabilityIds.size} item{excludedAssetIds.size + excludedLiabilityIds.size !== 1 ? "s" : ""} excluded from calculations
+              </span>
+              <Button size="sm" variant="outline" className="h-6 text-xs px-2 border-amber-300 dark:border-amber-700" onClick={resetAll}>
+                <RotateCcw className="h-3 w-3 mr-1" />
+                Reset All
+              </Button>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Top 4 Stat Cards */}

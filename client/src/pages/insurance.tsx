@@ -3,6 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useLastUpdated } from "@/hooks/use-last-updated";
+import { ExportMenu } from "@/components/export-menu";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -883,6 +884,26 @@ export default function InsurancePage() {
   const toggleCard = (card: "premiums" | "coverage" | "annuity") =>
     setExpandedCard((prev) => (prev === card ? null : card));
 
+  const exportData = {
+    filename: "Insurance Policies",
+    sheets: [{
+      name: "Policies",
+      columns: ["Name", "Type", "Provider", "Annual Premium ($)", "Coverage Amount ($)", "Status", "Policy Number", "Deductible ($)", "Beneficiary", "Notes"],
+      rows: policies.map((p) => [
+        p.name,
+        p.type,
+        p.provider || "",
+        Math.round(annualPremium(p) * 100) / 100,
+        parseFloat(p.coverageAmount || p.deathBenefit || "0"),
+        p.status || "",
+        p.policyNumber || "",
+        parseFloat(p.deductible || "0"),
+        p.beneficiary || "",
+        p.notes || "",
+      ]),
+    }],
+  };
+
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -893,6 +914,7 @@ export default function InsurancePage() {
             <Clock className="h-3 w-3" /> Last updated: {formattedDate}
           </p>
         </div>
+        <ExportMenu data={exportData} />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

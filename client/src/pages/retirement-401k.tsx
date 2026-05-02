@@ -11,6 +11,7 @@ import { Info, TrendingUp, DollarSign, Percent, BarChart3, Save, Clock } from "l
 import { formatCurrency } from "@/lib/format";
 import { useToast } from "@/hooks/use-toast";
 import { useLastUpdated } from "@/hooks/use-last-updated";
+import { ExportMenu } from "@/components/export-menu";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { type Retirement401kGoal } from "@shared/schema";
 import {
@@ -155,10 +156,37 @@ export default function Retirement401kPage() {
             <Clock className="h-3 w-3" /> Last updated: {formattedDate}
           </p>
         </div>
-        <Button onClick={() => saveMutation.mutate(form)} disabled={saveMutation.isPending} data-testid="button-save-401k">
-          <Save className="h-4 w-4 mr-2" />
-          {saveMutation.isPending ? "Saving..." : "Save Plan"}
-        </Button>
+        <div className="flex items-center gap-2">
+          <ExportMenu data={{
+            filename: "401k Projections",
+            sheets: [
+              {
+                name: "Settings",
+                columns: ["Setting", "Value"],
+                rows: [
+                  ["Current Age", form.currentAge],
+                  ["Retirement Age", form.retirementAge],
+                  ["Current Balance ($)", parseFloat(form.currentBalance || "0")],
+                  ["Annual Salary ($)", parseFloat(form.annualSalary || "0")],
+                  ["Contribution (%)", form.contributionPct],
+                  ["Employer Match (%)", form.employerMatchPct],
+                  ["Employer Match Limit (%)", form.employerMatchLimit],
+                  ["Expected Return (%)", form.expectedReturn],
+                  ["Tax Bracket (%)", form.taxBracket],
+                ],
+              },
+              {
+                name: "Projections",
+                columns: ["Age", "Traditional Balance ($)", "Roth Balance ($)", "Traditional After-Tax ($)", "Roth After-Tax ($)", "Total Contributions ($)"],
+                rows: projectionData.map((d) => [d.age, d.traditional, d.roth, d.tradAfterTax, d.rothAfterTax, d.contributions]),
+              },
+            ],
+          }} />
+          <Button onClick={() => saveMutation.mutate(form)} disabled={saveMutation.isPending} data-testid="button-save-401k">
+            <Save className="h-4 w-4 mr-2" />
+            {saveMutation.isPending ? "Saving..." : "Save Plan"}
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">

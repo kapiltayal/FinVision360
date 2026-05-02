@@ -8,6 +8,7 @@ import { Slider } from "@/components/ui/slider";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { useLastUpdated } from "@/hooks/use-last-updated";
+import { ExportMenu } from "@/components/export-menu";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Target, TrendingUp, Calendar, DollarSign, Save, Clock } from "lucide-react";
 import { type RetirementGoal } from "@shared/schema";
@@ -106,10 +107,35 @@ export default function RetirementPlannerPage() {
             <Clock className="h-3 w-3" /> Last updated: {formattedDate}
           </p>
         </div>
-        <Button onClick={() => saveMutation.mutate(form)} disabled={saveMutation.isPending} data-testid="button-save-retirement">
-          <Save className="h-4 w-4 mr-2" />
-          {saveMutation.isPending ? "Saving..." : "Save Plan"}
-        </Button>
+        <div className="flex items-center gap-2">
+          <ExportMenu data={{
+            filename: "Retirement Plan Projections",
+            sheets: [
+              {
+                name: "Settings",
+                columns: ["Setting", "Value"],
+                rows: [
+                  ["Current Age", form.currentAge],
+                  ["Retirement Age", form.retirementAge],
+                  ["Current Savings ($)", parseFloat(form.currentSavings || "0")],
+                  ["Monthly Contribution ($)", parseFloat(form.monthlyContribution || "0")],
+                  ["Expected Return (%)", parseFloat(form.expectedReturn || "0")],
+                  ["Inflation Rate (%)", parseFloat(form.inflationRate || "0")],
+                  ["Target Amount ($)", parseFloat(form.targetAmount || "0")],
+                ],
+              },
+              {
+                name: "Projections",
+                columns: ["Age", "Nominal Value ($)", "Real Value (Inflation-Adj $)"],
+                rows: projectionData.map((d) => [d.year, d.nominal, d.real]),
+              },
+            ],
+          }} />
+          <Button onClick={() => saveMutation.mutate(form)} disabled={saveMutation.isPending} data-testid="button-save-retirement">
+            <Save className="h-4 w-4 mr-2" />
+            {saveMutation.isPending ? "Saving..." : "Save Plan"}
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">

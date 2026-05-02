@@ -14,11 +14,15 @@ A comprehensive personal finance application that helps users track assets, liab
 - User authentication (register/login)
 - Asset management (bank accounts, savings, investments, property, cash, retirement funds)
 - Liability management (credit cards, mortgage, personal/student/auto loans)
-- Financial dashboard with charts (net worth, asset allocation, liability breakdown, interest rates)
-- Retirement planning with interactive projections
+- Net Worth dashboard with charts (net worth, asset allocation, liability breakdown, interest rates)
+- Income & Expenses tracking with cash flow analysis
+- Insurance & Annuities policy management
+- Retirement planning with interactive projections (Retirement Planner + 401k Calculator)
 - AI-powered financial advisor (scenario planning, debt reduction strategies, net worth forecasting)
 - Account settings (profile, password change)
 - Dark mode support
+- "Last updated" timestamps on all data-entry pages
+- CSV / Excel / PDF export on all data pages (Net Worth, Assets, Liabilities, Income & Expenses, Insurance, Retirement Planner, 401k Calculator)
 
 ## Data Model
 - `users` - User accounts with auth
@@ -37,9 +41,9 @@ A comprehensive personal finance application that helps users track assets, liab
 - `server/seed.ts` - Demo data seeder
 - `server/db.ts` - Database connection
 - `client/src/pages/` - Page components (dashboard, assets, liabilities, retirement, ai-advisor, settings, auth)
-- `client/src/components/` - Reusable components (app-sidebar, theme-provider)
+- `client/src/components/` - Reusable components (app-header, theme-provider, export-menu)
 - `client/src/hooks/` - Custom hooks (use-auth, use-toast)
-- `client/src/lib/` - Utilities (queryClient, format helpers)
+- `client/src/lib/` - Utilities (queryClient, format helpers, export: CSV/Excel/PDF via xlsx + jspdf)
 
 ## Environment
 - `DATABASE_URL` - PostgreSQL connection (auto-configured by Replit)

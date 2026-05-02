@@ -11,6 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useLastUpdated } from "@/hooks/use-last-updated";
+import { ExportMenu } from "@/components/export-menu";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Plus, Pencil, Trash2, Wallet, TrendingUp, ChevronDown, Clock } from "lucide-react";
 import { type Asset, ASSET_CATEGORIES } from "@shared/schema";
@@ -195,6 +196,22 @@ export default function AssetsPage() {
     );
   }
 
+  const exportData = {
+    filename: "Assets",
+    sheets: [{
+      name: "Assets",
+      columns: ["Name", "Category", "Value ($)", "Interest Rate (%)", "Institution", "Notes"],
+      rows: assets.map((a) => [
+        a.name,
+        getCategoryLabel(ASSET_CATEGORIES, a.category),
+        parseFloat(a.value || "0"),
+        parseFloat(a.interestRate || "0"),
+        a.institution || "",
+        a.notes || "",
+      ]),
+    }],
+  };
+
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between gap-1 flex-wrap">
@@ -205,7 +222,9 @@ export default function AssetsPage() {
             <Clock className="h-3 w-3" /> Last updated: {formattedDate}
           </p>
         </div>
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <div className="flex items-center gap-2">
+          <ExportMenu data={exportData} />
+          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
             <Button onClick={openCreate} data-testid="button-add-asset">
               <Plus className="h-4 w-4 mr-2" /> Add Asset
@@ -218,6 +237,7 @@ export default function AssetsPage() {
             <AssetForm asset={editingAsset} onClose={() => setDialogOpen(false)} onUpdated={markUpdated} />
           </DialogContent>
         </Dialog>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

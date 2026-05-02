@@ -283,7 +283,7 @@ export default function LandingPage() {
                     data-testid="nav-dashboard"
                   >
                     <LayoutDashboard className="h-4 w-4" />
-                    <span>Dashboard</span>
+                    <span>Net Worth</span>
                   </a>
                   <a
                     href="/#/settings"
@@ -337,7 +337,7 @@ export default function LandingPage() {
         {user ? (
           <Link href="/" className="inline-block">
             <Button size="lg" data-testid="button-hero-dashboard">
-              Go to Dashboard <ArrowRight className="ml-2 h-4 w-4" />
+              Go to Net Worth <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
           </Link>
         ) : (
@@ -363,7 +363,7 @@ export default function LandingPage() {
               <div className="h-3 w-3 rounded-full bg-red-400" />
               <div className="h-3 w-3 rounded-full bg-yellow-400" />
               <div className="h-3 w-3 rounded-full bg-emerald-400" />
-              <span className="ml-2 text-xs text-muted-foreground">Net Worth Dashboard</span>
+              <span className="ml-2 text-xs text-muted-foreground">Net Worth</span>
             </div>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
               {[
@@ -499,9 +499,9 @@ export default function LandingPage() {
             ))}
           </div>
           {user ? (
-            <Link href="/dashboard">
+            <Link href="/">
               <Button size="lg" variant="secondary" data-testid="button-ai-cta">
-                Go to Dashboard <ArrowRight className="ml-2 h-4 w-4" />
+                Go to Net Worth <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             </Link>
           ) : (
