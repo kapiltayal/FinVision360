@@ -247,7 +247,7 @@ export default function SnapshotPage() {
       {/* ── Hero Header ── */}
       <div
         className="relative overflow-hidden"
-        style={{ background: "linear-gradient(135deg, #0f172a 0%, #1e3a5f 45%, #1a1040 100%)" }}
+        style={{ background: "linear-gradient(135deg, #071a2b 0%, #0d2e47 45%, #091f36 100%)" }}
       >
         <div className="absolute inset-0 pointer-events-none overflow-hidden">
           <div className="absolute -top-32 -right-32 w-[480px] h-[480px] rounded-full"
