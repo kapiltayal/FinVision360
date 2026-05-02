@@ -24,7 +24,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   Car, Home, Heart, TrendingUp, Plus, Pencil, Trash2,
   ShieldCheck, DollarSign, Calendar, FileText, Stethoscope, MoreHorizontal,
-  ChevronDown, ChevronUp, X, Clock,
+  ChevronDown, ChevronUp, X, Clock, AlertTriangle,
 } from "lucide-react";
 import { type InsurancePolicy } from "@shared/schema";
 import { formatCurrency } from "@/lib/format";
@@ -510,6 +510,18 @@ function PolicyForm({ form, onChange }: { form: typeof EMPTY_FORM; onChange: (f:
   );
 }
 
+function getPolicyStatus(policy: InsurancePolicy): "expired" | "expiring_soon" | "active" {
+  if (!policy.renewalDate) return "active";
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const renewal = new Date(policy.renewalDate);
+  if (renewal < today) return "expired";
+  const in30 = new Date(today);
+  in30.setDate(in30.getDate() + 30);
+  if (renewal <= in30) return "expiring_soon";
+  return "active";
+}
+
 function annualPremium(policy: InsurancePolicy): number {
   const p = parseFloat(policy.premium || "0");
   if (!p) return 0;
@@ -652,9 +664,20 @@ function PolicyCard({
     : policy.coverageAmount;
 
   const allVehicles = policy.type === "auto" ? getAllVehicles(policy) : [];
+  const status = getPolicyStatus(policy);
 
   return (
-    <Card className="hover:shadow-md transition-shadow" data-testid={`card-policy-${policy.id}`}>
+    <Card
+      className="transition-shadow"
+      style={{
+        boxShadow: status === "expired"
+          ? "0 0 0 2px rgba(239,68,68,0.35)"
+          : status === "expiring_soon"
+          ? "0 0 0 2px rgba(245,158,11,0.35)"
+          : undefined,
+      }}
+      data-testid={`card-policy-${policy.id}`}
+    >
       <CardContent className="p-4 space-y-3">
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-center gap-2 min-w-0">
@@ -675,6 +698,23 @@ function PolicyCard({
             </Button>
           </div>
         </div>
+
+        {status !== "active" && (
+          <div
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-semibold"
+            style={{
+              background: status === "expired" ? "rgba(239,68,68,0.08)" : "rgba(245,158,11,0.08)",
+              border: `1px solid ${status === "expired" ? "rgba(239,68,68,0.3)" : "rgba(245,158,11,0.3)"}`,
+              color: status === "expired" ? "#dc2626" : "#d97706",
+            }}
+            data-testid={`status-policy-expiry-${policy.id}`}
+          >
+            <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+            {status === "expired"
+              ? `Policy Expired${policy.renewalDate ? ` · ${policy.renewalDate}` : ""} — Please renew`
+              : `Expiring Soon${policy.renewalDate ? ` · ${policy.renewalDate}` : ""} — Renewal needed`}
+          </div>
+        )}
 
         <div className="grid grid-cols-2 gap-2">
           {mainValue && (
@@ -850,6 +890,9 @@ export default function InsurancePage() {
   const tabPolicies = policies.filter((p) => p.type === activeTab);
   const currentTab = TABS.find((t) => t.key === activeTab)!;
 
+  const expiredPolicies = policies.filter((p) => getPolicyStatus(p) === "expired");
+  const expiringSoonPolicies = policies.filter((p) => getPolicyStatus(p) === "expiring_soon");
+
   const totalAnnualPremium = policies.reduce((sum, p) => sum + annualPremium(p), 0);
   const totalCoverage = policies
     .filter((p) => p.type !== "annuity")
@@ -918,6 +961,45 @@ export default function InsurancePage() {
         </div>
         <ExportMenu data={exportData} />
       </div>
+
+      {(expiredPolicies.length > 0 || expiringSoonPolicies.length > 0) && (
+        <div className="space-y-2">
+          {expiredPolicies.length > 0 && (
+            <div
+              className="flex items-start gap-3 px-4 py-3 rounded-lg text-sm"
+              style={{ background: "rgba(239,68,68,0.07)", border: "1px solid rgba(239,68,68,0.25)" }}
+              data-testid="banner-expired-policies"
+            >
+              <AlertTriangle className="h-4 w-4 text-red-500 shrink-0 mt-0.5" />
+              <div>
+                <p className="font-semibold text-red-600 dark:text-red-400">
+                  {expiredPolicies.length} {expiredPolicies.length === 1 ? "policy has" : "policies have"} expired
+                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {expiredPolicies.map((p) => `${p.name} (${p.renewalDate})`).join(" · ")}
+                </p>
+              </div>
+            </div>
+          )}
+          {expiringSoonPolicies.length > 0 && (
+            <div
+              className="flex items-start gap-3 px-4 py-3 rounded-lg text-sm"
+              style={{ background: "rgba(245,158,11,0.07)", border: "1px solid rgba(245,158,11,0.25)" }}
+              data-testid="banner-expiring-soon-policies"
+            >
+              <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
+              <div>
+                <p className="font-semibold text-amber-600 dark:text-amber-400">
+                  {expiringSoonPolicies.length} {expiringSoonPolicies.length === 1 ? "policy is" : "policies are"} expiring within 30 days
+                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {expiringSoonPolicies.map((p) => `${p.name} (${p.renewalDate})`).join(" · ")}
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <SummaryCard

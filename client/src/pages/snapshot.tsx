@@ -355,18 +355,58 @@ export default function SnapshotPage() {
           <div className="grid grid-cols-3 gap-3">
             {INSURANCE_TYPES.map(({ key, label, Icon }) => {
               const typePolicies = coverageMap[key] || [];
-              const covered = typePolicies.length > 0;
-              const tooltipContent = covered
-                ? typePolicies.map(p => `${p.name}${p.provider ? ` · ${p.provider}` : ""}`).join("\n")
-                : `No ${label.toLowerCase()} coverage`;
+              const today = new Date(); today.setHours(0, 0, 0, 0);
+              const in30 = new Date(today); in30.setDate(in30.getDate() + 30);
 
-              const tileColor = covered ? "#22c55e" : "#ef4444";
-              const tileShadowBase = covered
-                ? "0 1px 0 rgba(255,255,255,0.6) inset, 0 2px 4px rgba(34,197,94,0.12), 0 4px 10px rgba(34,197,94,0.1), 0 6px 0 rgba(34,197,94,0.18), 0 7px 2px rgba(0,0,0,0.08)"
-                : "0 1px 0 rgba(255,255,255,0.6) inset, 0 2px 4px rgba(239,68,68,0.12), 0 4px 10px rgba(239,68,68,0.1), 0 6px 0 rgba(239,68,68,0.18), 0 7px 2px rgba(0,0,0,0.08)";
-              const tileShadowHover = covered
-                ? "0 1px 0 rgba(255,255,255,0.6) inset, 0 4px 8px rgba(34,197,94,0.18), 0 8px 20px rgba(34,197,94,0.14), 0 10px 0 rgba(34,197,94,0.22), 0 12px 4px rgba(0,0,0,0.1)"
-                : "0 1px 0 rgba(255,255,255,0.6) inset, 0 4px 8px rgba(239,68,68,0.18), 0 8px 20px rgba(239,68,68,0.14), 0 10px 0 rgba(239,68,68,0.22), 0 12px 4px rgba(0,0,0,0.1)";
+              const expired = typePolicies.filter(p => p.renewalDate && new Date(p.renewalDate) < today);
+              const expiring = typePolicies.filter(p => {
+                if (!p.renewalDate) return false;
+                const d = new Date(p.renewalDate);
+                return d >= today && d <= in30;
+              });
+              const active = typePolicies.filter(p => !p.renewalDate || new Date(p.renewalDate) > in30);
+
+              const allExpired = typePolicies.length > 0 && expired.length === typePolicies.length;
+              const hasWarning = expiring.length > 0 || (expired.length > 0 && active.length > 0);
+              const covered = active.length > 0 || expiring.length > 0;
+
+              const tileState: "ok" | "warn" | "expired" | "none" =
+                typePolicies.length === 0 ? "none"
+                : allExpired ? "expired"
+                : hasWarning ? "warn"
+                : "ok";
+
+              const tileColor =
+                tileState === "ok" ? "#22c55e"
+                : tileState === "warn" ? "#f59e0b"
+                : "#ef4444";
+
+              const shadowRgb =
+                tileState === "ok" ? "34,197,94"
+                : tileState === "warn" ? "245,158,11"
+                : "239,68,68";
+
+              const tileShadowBase = `0 1px 0 rgba(255,255,255,0.6) inset, 0 2px 4px rgba(${shadowRgb},0.12), 0 4px 10px rgba(${shadowRgb},0.1), 0 6px 0 rgba(${shadowRgb},0.18), 0 7px 2px rgba(0,0,0,0.08)`;
+              const tileShadowHover = `0 1px 0 rgba(255,255,255,0.6) inset, 0 4px 8px rgba(${shadowRgb},0.18), 0 8px 20px rgba(${shadowRgb},0.14), 0 10px 0 rgba(${shadowRgb},0.22), 0 12px 4px rgba(0,0,0,0.1)`;
+
+              const tileBg =
+                tileState === "ok" ? "linear-gradient(160deg, rgba(240,255,244,1) 0%, rgba(220,252,231,0.8) 100%)"
+                : tileState === "warn" ? "linear-gradient(160deg, rgba(255,251,235,1) 0%, rgba(254,243,199,0.8) 100%)"
+                : "linear-gradient(160deg, rgba(255,241,241,1) 0%, rgba(254,226,226,0.8) 100%)";
+
+              const tileBorder =
+                tileState === "ok" ? "rgba(34,197,94,0.35)"
+                : tileState === "warn" ? "rgba(245,158,11,0.35)"
+                : "rgba(239,68,68,0.3)";
+
+              const tooltipLines: string[] = [];
+              if (typePolicies.length === 0) {
+                tooltipLines.push(`No ${label.toLowerCase()} coverage`);
+              } else {
+                active.forEach(p => tooltipLines.push(`✓ ${p.name}${p.provider ? ` · ${p.provider}` : ""}${p.renewalDate ? ` (renews ${p.renewalDate})` : ""}`));
+                expiring.forEach(p => tooltipLines.push(`⚠ Expiring soon: ${p.name} · ${p.renewalDate}`));
+                expired.forEach(p => tooltipLines.push(`✗ Expired: ${p.name} · ${p.renewalDate}`));
+              }
 
               return (
                 <Tooltip key={key}>
@@ -374,10 +414,8 @@ export default function SnapshotPage() {
                     <div
                       className="flex flex-col items-center gap-1.5 p-3 rounded-xl border cursor-default select-none"
                       style={{
-                        borderColor: covered ? "rgba(34,197,94,0.35)" : "rgba(239,68,68,0.3)",
-                        background: covered
-                          ? "linear-gradient(160deg, rgba(240,255,244,1) 0%, rgba(220,252,231,0.8) 100%)"
-                          : "linear-gradient(160deg, rgba(255,241,241,1) 0%, rgba(254,226,226,0.8) 100%)",
+                        borderColor: tileBorder,
+                        background: tileBg,
                         boxShadow: tileShadowBase,
                         transition: "transform 0.18s ease, box-shadow 0.18s ease",
                       }}
@@ -401,17 +439,31 @@ export default function SnapshotPage() {
                         />
                       </div>
                       <span className="text-[10px] font-semibold leading-none" style={{ color: tileColor }}>{label}</span>
+                      {(tileState === "expired" || tileState === "warn") && (
+                        <span className="text-[9px] font-bold leading-none" style={{ color: tileColor }}>
+                          {tileState === "expired" ? "EXPIRED" : "EXPIRING"}
+                        </span>
+                      )}
                     </div>
                   </TooltipTrigger>
                   <TooltipContent side="top" className="max-w-xs text-xs whitespace-pre-line">
-                    {tooltipContent}
+                    {tooltipLines.join("\n")}
                   </TooltipContent>
                 </Tooltip>
               );
             })}
           </div>
           <p className="text-xs text-muted-foreground mt-4 text-center">
-            {Object.keys(coverageMap).length} of {INSURANCE_TYPES.length} types covered · hover for details
+            {Object.keys(coverageMap).filter(k => {
+              const ps = coverageMap[k] || [];
+              const today = new Date(); today.setHours(0,0,0,0);
+              return ps.some(p => !p.renewalDate || new Date(p.renewalDate) >= today);
+            }).length} of {INSURANCE_TYPES.length} types active · hover for details
+            {policies.filter(p => p.renewalDate && new Date(p.renewalDate) < new Date()).length > 0 && (
+              <span className="ml-1 font-semibold text-red-500">
+                · {policies.filter(p => p.renewalDate && new Date(p.renewalDate) < new Date()).length} expired
+              </span>
+            )}
           </p>
         </SnapshotCard>
 
