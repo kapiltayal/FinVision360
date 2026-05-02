@@ -360,25 +360,47 @@ export default function SnapshotPage() {
                 ? typePolicies.map(p => `${p.name}${p.provider ? ` · ${p.provider}` : ""}`).join("\n")
                 : `No ${label.toLowerCase()} coverage`;
 
+              const tileColor = covered ? "#22c55e" : "#ef4444";
+              const tileShadowBase = covered
+                ? "0 1px 0 rgba(255,255,255,0.6) inset, 0 2px 4px rgba(34,197,94,0.12), 0 4px 10px rgba(34,197,94,0.1), 0 6px 0 rgba(34,197,94,0.18), 0 7px 2px rgba(0,0,0,0.08)"
+                : "0 1px 0 rgba(255,255,255,0.6) inset, 0 2px 4px rgba(239,68,68,0.12), 0 4px 10px rgba(239,68,68,0.1), 0 6px 0 rgba(239,68,68,0.18), 0 7px 2px rgba(0,0,0,0.08)";
+              const tileShadowHover = covered
+                ? "0 1px 0 rgba(255,255,255,0.6) inset, 0 4px 8px rgba(34,197,94,0.18), 0 8px 20px rgba(34,197,94,0.14), 0 10px 0 rgba(34,197,94,0.22), 0 12px 4px rgba(0,0,0,0.1)"
+                : "0 1px 0 rgba(255,255,255,0.6) inset, 0 4px 8px rgba(239,68,68,0.18), 0 8px 20px rgba(239,68,68,0.14), 0 10px 0 rgba(239,68,68,0.22), 0 12px 4px rgba(0,0,0,0.1)";
+
               return (
                 <Tooltip key={key}>
                   <TooltipTrigger asChild>
                     <div
-                      className="flex flex-col items-center gap-1.5 p-3 rounded-xl border transition-colors cursor-default"
+                      className="flex flex-col items-center gap-1.5 p-3 rounded-xl border cursor-default select-none"
                       style={{
-                        borderColor: covered ? "rgba(34,197,94,0.3)" : "rgba(239,68,68,0.25)",
-                        background: covered ? "rgba(34,197,94,0.05)" : "rgba(239,68,68,0.04)",
+                        borderColor: covered ? "rgba(34,197,94,0.35)" : "rgba(239,68,68,0.3)",
+                        background: covered
+                          ? "linear-gradient(160deg, rgba(240,255,244,1) 0%, rgba(220,252,231,0.8) 100%)"
+                          : "linear-gradient(160deg, rgba(255,241,241,1) 0%, rgba(254,226,226,0.8) 100%)",
+                        boxShadow: tileShadowBase,
+                        transition: "transform 0.18s ease, box-shadow 0.18s ease",
                       }}
                       data-testid={`indicator-insurance-${key}`}
+                      onMouseEnter={e => {
+                        const el = e.currentTarget as HTMLElement;
+                        el.style.transform = "translateY(-4px)";
+                        el.style.boxShadow = tileShadowHover;
+                      }}
+                      onMouseLeave={e => {
+                        const el = e.currentTarget as HTMLElement;
+                        el.style.transform = "translateY(0)";
+                        el.style.boxShadow = tileShadowBase;
+                      }}
                     >
                       <div className="relative">
-                        <Icon className="h-5 w-5" style={{ color: covered ? "#22c55e" : "#ef4444" }} />
+                        <Icon className="h-5 w-5" style={{ color: tileColor }} />
                         <span
-                          className="absolute -top-1 -right-1 h-2 w-2 rounded-full border border-white dark:border-slate-900"
-                          style={{ background: covered ? "#22c55e" : "#ef4444" }}
+                          className="absolute -top-1 -right-1 h-2 w-2 rounded-full border-2 border-white dark:border-slate-900"
+                          style={{ background: tileColor }}
                         />
                       </div>
-                      <span className="text-[10px] font-medium text-muted-foreground leading-none">{label}</span>
+                      <span className="text-[10px] font-semibold leading-none" style={{ color: tileColor }}>{label}</span>
                     </div>
                   </TooltipTrigger>
                   <TooltipContent side="top" className="max-w-xs text-xs whitespace-pre-line">
