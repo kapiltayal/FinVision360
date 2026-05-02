@@ -1,6 +1,13 @@
 import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import logoUrl from "@assets/FinVision360_Logo_H_(transparent)_1776714495394.png";
+
+const BRAND: [number, number, number] = [28, 145, 212];
+const DARK: [number, number, number] = [13, 58, 92];
+const GRAY: [number, number, number] = [130, 130, 130];
+const LIGHT_BG: [number, number, number] = [244, 250, 255];
+const HEADER_H = 20;
 
 export type ExportSheet = {
   name: string;
@@ -13,28 +20,62 @@ export type ExportData = {
   sheets: ExportSheet[];
 };
 
+async function loadLogoDataUrl(): Promise<string | null> {
+  try {
+    const res = await fetch(logoUrl);
+    const blob = await res.blob();
+    return await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  } catch {
+    return null;
+  }
+}
+
 export function exportCSV(data: ExportData) {
   const lines: string[] = [];
+  lines.push(`# FinVision360 — ${data.filename}`);
+  lines.push(`# Generated: ${new Date().toLocaleString()}`);
+  lines.push(`# finvision360.replit.app`);
+  lines.push("");
   for (let i = 0; i < data.sheets.length; i++) {
     const sheet = data.sheets[i];
     if (data.sheets.length > 1) {
       if (i > 0) lines.push("");
-      lines.push(`# ${sheet.name}`);
+      lines.push(`## ${sheet.name}`);
     }
     lines.push(sheet.columns.map(quoteCell).join(","));
     for (const row of sheet.rows) {
       lines.push(row.map((c) => quoteCell(String(c ?? ""))).join(","));
     }
   }
-  download(new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8;" }), `${data.filename}.csv`);
+  download(
+    new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8;" }),
+    `${data.filename}.csv`
+  );
 }
 
 export function exportExcel(data: ExportData) {
   const wb = XLSX.utils.book_new();
   for (const sheet of data.sheets) {
-    const ws = XLSX.utils.aoa_to_sheet([sheet.columns, ...sheet.rows]);
+    const metaRows: (string | number | null | undefined)[][] = [
+      ["FinVision360"],
+      [sheet.name],
+      [`Generated: ${new Date().toLocaleString()}`],
+      [],
+      sheet.columns,
+      ...sheet.rows.map((r) => r.map((c) => c ?? "")),
+    ];
+    const ws = XLSX.utils.aoa_to_sheet(metaRows);
     const colWidths = sheet.columns.map((col, ci) => ({
-      wch: Math.max(col.length, ...sheet.rows.map((r) => String(r[ci] ?? "").length), 10),
+      wch: Math.max(
+        col.length + 2,
+        ...sheet.rows.map((r) => String(r[ci] ?? "").length),
+        12
+      ),
     }));
     ws["!cols"] = colWidths;
     XLSX.utils.book_append_sheet(wb, ws, sheet.name.slice(0, 31));
@@ -42,46 +83,95 @@ export function exportExcel(data: ExportData) {
   XLSX.writeFile(wb, `${data.filename}.xlsx`);
 }
 
-export function exportPDF(data: ExportData) {
+export async function exportPDF(data: ExportData): Promise<void> {
   const doc = new jsPDF({ orientation: "landscape" });
-  const BRAND: [number, number, number] = [28, 145, 212];
+  const pageW = doc.internal.pageSize.getWidth();
+  const pageH = doc.internal.pageSize.getHeight();
 
-  let y = 16;
-  doc.setFontSize(16);
-  doc.setFont("helvetica", "bold");
-  doc.setTextColor(...BRAND);
-  doc.text(data.filename, 14, y);
+  const logoDataUrl = await loadLogoDataUrl();
 
-  y += 7;
-  doc.setFontSize(8);
-  doc.setFont("helvetica", "normal");
-  doc.setTextColor(120, 120, 120);
-  doc.text(`Exported ${new Date().toLocaleString()}`, 14, y);
-  y += 5;
+  const drawPageHeader = () => {
+    doc.setFillColor(...DARK);
+    doc.rect(0, 0, pageW, HEADER_H, "F");
+
+    if (logoDataUrl) {
+      doc.addImage(logoDataUrl, "PNG", 7, 3, 42, 14);
+    } else {
+      doc.setFontSize(13);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(255, 255, 255);
+      doc.text("FinVision360", 10, 13);
+    }
+
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(255, 255, 255);
+    doc.text(data.filename, pageW - 12, 12, { align: "right" });
+  };
+
+  drawPageHeader();
+  let y = HEADER_H + 6;
 
   for (let i = 0; i < data.sheets.length; i++) {
     const sheet = data.sheets[i];
 
     if (data.sheets.length > 1) {
-      y += 4;
       doc.setFontSize(11);
       doc.setFont("helvetica", "bold");
-      doc.setTextColor(40, 40, 40);
+      doc.setTextColor(...DARK);
       doc.text(sheet.name, 14, y);
-      y += 4;
+      y += 6;
     }
 
     autoTable(doc, {
       startY: y,
       head: [sheet.columns],
       body: sheet.rows.map((r) => r.map((c) => String(c ?? ""))),
-      styles: { fontSize: 8, cellPadding: 2.5, overflow: "linebreak" },
-      headStyles: { fillColor: BRAND, textColor: 255, fontStyle: "bold" },
-      alternateRowStyles: { fillColor: [245, 251, 255] },
-      margin: { left: 14, right: 14 },
+      styles: {
+        fontSize: 8.5,
+        cellPadding: 3,
+        overflow: "linebreak",
+        textColor: [30, 30, 30],
+      },
+      headStyles: {
+        fillColor: BRAND,
+        textColor: 255,
+        fontStyle: "bold",
+        fontSize: 9,
+        cellPadding: 3.5,
+      },
+      alternateRowStyles: { fillColor: LIGHT_BG },
+      tableLineColor: [210, 225, 235],
+      tableLineWidth: 0.2,
+      margin: { left: 14, right: 14, top: HEADER_H + 4, bottom: 14 },
+      didDrawPage: (_hookData) => {
+        drawPageHeader();
+      },
     });
 
-    y = (doc as any).lastAutoTable.finalY + 8;
+    y = (doc as any).lastAutoTable.finalY + 12;
+  }
+
+  const totalPages = (doc as any).internal.getNumberOfPages();
+  for (let p = 1; p <= totalPages; p++) {
+    doc.setPage(p);
+    doc.setFontSize(7.5);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(...GRAY);
+    doc.text(
+      `Generated by FinVision360 · ${new Date().toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" })}`,
+      14,
+      pageH - 5
+    );
+    doc.text(
+      `Page ${p} of ${totalPages}`,
+      pageW - 14,
+      pageH - 5,
+      { align: "right" }
+    );
+    doc.setDrawColor(...GRAY);
+    doc.setLineWidth(0.3);
+    doc.line(14, pageH - 9, pageW - 14, pageH - 9);
   }
 
   doc.save(`${data.filename}.pdf`);
