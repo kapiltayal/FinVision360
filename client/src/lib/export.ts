@@ -91,22 +91,23 @@ export async function exportPDF(data: ExportData): Promise<void> {
   const logoDataUrl = await loadLogoDataUrl();
 
   const drawPageHeader = () => {
-    doc.setFillColor(...DARK);
-    doc.rect(0, 0, pageW, HEADER_H, "F");
-
     if (logoDataUrl) {
       doc.addImage(logoDataUrl, "PNG", 7, 3, 42, 14);
     } else {
       doc.setFontSize(13);
       doc.setFont("helvetica", "bold");
-      doc.setTextColor(255, 255, 255);
+      doc.setTextColor(...DARK);
       doc.text("FinVision360", 10, 13);
     }
 
     doc.setFontSize(10);
     doc.setFont("helvetica", "bold");
-    doc.setTextColor(255, 255, 255);
+    doc.setTextColor(...DARK);
     doc.text(data.filename, pageW - 12, 12, { align: "right" });
+
+    doc.setDrawColor(...BRAND);
+    doc.setLineWidth(0.6);
+    doc.line(7, HEADER_H, pageW - 7, HEADER_H);
   };
 
   drawPageHeader();
