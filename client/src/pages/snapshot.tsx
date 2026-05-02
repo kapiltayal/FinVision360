@@ -386,8 +386,8 @@ export default function SnapshotPage() {
                 : tileState === "warn" ? "245,158,11"
                 : "239,68,68";
 
-              const tileShadowBase = `0 1px 0 rgba(255,255,255,0.6) inset, 0 2px 4px rgba(${shadowRgb},0.12), 0 4px 10px rgba(${shadowRgb},0.1), 0 6px 0 rgba(${shadowRgb},0.18), 0 7px 2px rgba(0,0,0,0.08)`;
-              const tileShadowHover = `0 1px 0 rgba(255,255,255,0.6) inset, 0 4px 8px rgba(${shadowRgb},0.18), 0 8px 20px rgba(${shadowRgb},0.14), 0 10px 0 rgba(${shadowRgb},0.22), 0 12px 4px rgba(0,0,0,0.1)`;
+              const tileShadowBase = `0 1px 0 rgba(255,255,255,0.5) inset, 0 1px 3px rgba(${shadowRgb},0.1), 0 3px 0 rgba(${shadowRgb},0.12), 0 4px 1px rgba(0,0,0,0.05)`;
+              const tileShadowHover = `0 1px 0 rgba(255,255,255,0.5) inset, 0 2px 6px rgba(${shadowRgb},0.15), 0 5px 0 rgba(${shadowRgb},0.16), 0 6px 2px rgba(0,0,0,0.07)`;
 
               const tileBg =
                 tileState === "ok" ? "linear-gradient(160deg, rgba(240,255,244,1) 0%, rgba(220,252,231,0.8) 100%)"
