@@ -220,7 +220,7 @@ export const FREQUENCIES = [
 ] as const;
 
 export const ASSET_CATEGORIES = [
-  { value: "bank_account", label: "Bank Account" },
+  { value: "bank_account", label: "Checking Account" },
   { value: "savings_account", label: "Savings Account" },
   { value: "investment", label: "Investment" },
   { value: "property", label: "Property" },
