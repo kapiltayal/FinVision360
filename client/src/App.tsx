@@ -11,6 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import NotFound from "@/pages/not-found";
 import LandingPage from "@/pages/landing";
 import DashboardPage from "@/pages/dashboard";
+import SnapshotPage from "@/pages/snapshot";
 import AssetsPage from "@/pages/assets";
 import LiabilitiesPage from "@/pages/liabilities";
 import RetirementPage from "@/pages/retirement";
@@ -36,6 +37,7 @@ function AuthenticatedApp() {
         <div className="min-h-full flex flex-col">
           <div className="flex-1">
             <Switch>
+              <Route path="/snapshot" component={SnapshotPage} />
               <Route path="/" component={DashboardPage} />
               <Route path="/home" component={LandingPage} />
               <Route path="/assets" component={AssetsPage} />

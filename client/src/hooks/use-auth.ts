@@ -25,7 +25,7 @@ export function useLogin() {
       queryClient.removeQueries({
         predicate: (query) => query.queryKey[0] !== "/api/auth/user",
       });
-      setLocation("/");
+      setLocation("/snapshot");
     },
   });
 }
@@ -42,7 +42,7 @@ export function useRegister() {
       queryClient.removeQueries({
         predicate: (query) => query.queryKey[0] !== "/api/auth/user",
       });
-      setLocation("/");
+      setLocation("/snapshot");
     },
   });
 }
