@@ -7,9 +7,10 @@ import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Info, TrendingUp, DollarSign, Percent, BarChart3, Save } from "lucide-react";
+import { Info, TrendingUp, DollarSign, Percent, BarChart3, Save, Clock } from "lucide-react";
 import { formatCurrency } from "@/lib/format";
 import { useToast } from "@/hooks/use-toast";
+import { useLastUpdated } from "@/hooks/use-last-updated";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { type Retirement401kGoal } from "@shared/schema";
 import {
@@ -54,10 +55,13 @@ export default function Retirement401kPage() {
     }
   }, [goal]);
 
+  const { formattedDate, markUpdated } = useLastUpdated("retirement-401k");
+
   const saveMutation = useMutation({
     mutationFn: (data: any) => apiRequest("POST", "/api/retirement/401k", data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/retirement/401k"] });
+      markUpdated();
       toast({ title: "401k plan saved" });
     },
     onError: (e: any) => toast({ title: "Failed to save", description: e.message, variant: "destructive" }),
@@ -147,6 +151,11 @@ export default function Retirement401kPage() {
         <div>
           <h1 className="text-2xl font-bold">401k Calculator & Forecast</h1>
           <p className="text-muted-foreground">Model your 401k growth, employer match, and compare Traditional vs. Roth</p>
+          {formattedDate && (
+            <p className="flex items-center gap-1 text-xs text-muted-foreground mt-1" data-testid="text-401k-last-updated">
+              <Clock className="h-3 w-3" /> Last updated: {formattedDate}
+            </p>
+          )}
         </div>
         <Button onClick={() => saveMutation.mutate(form)} disabled={saveMutation.isPending} data-testid="button-save-401k">
           <Save className="h-4 w-4 mr-2" />

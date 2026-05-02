@@ -10,17 +10,20 @@ import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import { useLastUpdated } from "@/hooks/use-last-updated";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { Plus, Pencil, Trash2, CreditCard, TrendingDown, ChevronDown } from "lucide-react";
+import { Plus, Pencil, Trash2, CreditCard, TrendingDown, ChevronDown, Clock } from "lucide-react";
 import { type Liability, LIABILITY_CATEGORIES } from "@shared/schema";
 import { formatCurrency, formatPercent, getCategoryLabel } from "@/lib/format";
 
 function LiabilityForm({
   liability,
   onClose,
+  onUpdated,
 }: {
   liability?: Liability;
   onClose: () => void;
+  onUpdated?: () => void;
 }) {
   const { toast } = useToast();
   const [form, setForm] = useState({
@@ -38,6 +41,7 @@ function LiabilityForm({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/liabilities"] });
       toast({ title: "Liability created" });
+      onUpdated?.();
       onClose();
     },
     onError: (e: any) => toast({ title: "Failed", description: e.message, variant: "destructive" }),
@@ -48,6 +52,7 @@ function LiabilityForm({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/liabilities"] });
       toast({ title: "Liability updated" });
+      onUpdated?.();
       onClose();
     },
     onError: (e: any) => toast({ title: "Failed", description: e.message, variant: "destructive" }),
@@ -163,6 +168,7 @@ export default function LiabilitiesPage() {
   const [editingLiability, setEditingLiability] = useState<Liability | undefined>();
   const [openCategory, setOpenCategory] = useState<string | null>(null);
   const { toast } = useToast();
+  const { formattedDate, markUpdated } = useLastUpdated("liabilities");
   const { data: liabilities = [], isLoading } = useQuery<Liability[]>({ queryKey: ["/api/liabilities"] });
 
   const deleteMutation = useMutation({
@@ -170,6 +176,7 @@ export default function LiabilitiesPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/liabilities"] });
       toast({ title: "Liability deleted" });
+      markUpdated();
     },
   });
 
@@ -207,6 +214,11 @@ export default function LiabilitiesPage() {
         <div>
           <h1 className="text-2xl font-bold" data-testid="text-liabilities-title">Liabilities</h1>
           <p className="text-muted-foreground">Track your debts and obligations</p>
+          {formattedDate && (
+            <p className="flex items-center gap-1 text-xs text-muted-foreground mt-1" data-testid="text-liabilities-last-updated">
+              <Clock className="h-3 w-3" /> Last updated: {formattedDate}
+            </p>
+          )}
         </div>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
@@ -218,7 +230,7 @@ export default function LiabilitiesPage() {
             <DialogHeader>
               <DialogTitle>{editingLiability ? "Edit Liability" : "Add New Liability"}</DialogTitle>
             </DialogHeader>
-            <LiabilityForm liability={editingLiability} onClose={() => setDialogOpen(false)} />
+            <LiabilityForm liability={editingLiability} onClose={() => setDialogOpen(false)} onUpdated={markUpdated} />
           </DialogContent>
         </Dialog>
       </div>

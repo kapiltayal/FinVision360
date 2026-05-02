@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { useLastUpdated } from "@/hooks/use-last-updated";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -181,30 +182,32 @@ export default function IncomeExpensesPage() {
 
   const savingsRate = totalMonthlyIncome > 0 ? ((netMonthly / totalMonthlyIncome) * 100).toFixed(1) : "0.0";
 
+  const { formattedDate, markUpdated } = useLastUpdated("income-expenses");
+
   const createIncome = useMutation({
     mutationFn: (data: IncomeForm) => apiRequest("POST", "/api/income", { ...data, amount: data.amount }),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/income"] }); setIncomeDialog(false); setIncomeForm(defaultIncomeForm); toast({ title: "Income added" }); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/income"] }); setIncomeDialog(false); setIncomeForm(defaultIncomeForm); markUpdated(); toast({ title: "Income added" }); },
   });
   const updateIncome = useMutation({
     mutationFn: (data: IncomeForm) => apiRequest("PUT", `/api/income/${editingIncome!.id}`, { ...data, amount: data.amount }),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/income"] }); setIncomeDialog(false); setEditingIncome(null); toast({ title: "Income updated" }); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/income"] }); setIncomeDialog(false); setEditingIncome(null); markUpdated(); toast({ title: "Income updated" }); },
   });
   const deleteIncome = useMutation({
     mutationFn: (id: number) => apiRequest("DELETE", `/api/income/${id}`),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/income"] }); toast({ title: "Income removed" }); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/income"] }); markUpdated(); toast({ title: "Income removed" }); },
   });
 
   const createExpense = useMutation({
     mutationFn: (data: ExpenseForm) => apiRequest("POST", "/api/expenses", { ...data, amount: data.amount }),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/expenses"] }); setExpenseDialog(false); setExpenseForm(defaultExpenseForm); toast({ title: "Expense added" }); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/expenses"] }); setExpenseDialog(false); setExpenseForm(defaultExpenseForm); markUpdated(); toast({ title: "Expense added" }); },
   });
   const updateExpense = useMutation({
     mutationFn: (data: ExpenseForm) => apiRequest("PUT", `/api/expenses/${editingExpense!.id}`, { ...data, amount: data.amount }),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/expenses"] }); setExpenseDialog(false); setEditingExpense(null); toast({ title: "Expense updated" }); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/expenses"] }); setExpenseDialog(false); setEditingExpense(null); markUpdated(); toast({ title: "Expense updated" }); },
   });
   const deleteExpense = useMutation({
     mutationFn: (id: number) => apiRequest("DELETE", `/api/expenses/${id}`),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/expenses"] }); toast({ title: "Expense removed" }); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/expenses"] }); markUpdated(); toast({ title: "Expense removed" }); },
   });
 
   function openAddIncome() {
@@ -259,6 +262,11 @@ export default function IncomeExpensesPage() {
       <div>
         <h1 className="text-2xl font-bold" data-testid="text-income-expenses-title">Income &amp; Expenses</h1>
         <p className="text-muted-foreground">Track your monthly cash flow and net savings</p>
+        {formattedDate && (
+          <p className="flex items-center gap-1 text-xs text-muted-foreground mt-1" data-testid="text-income-expenses-last-updated">
+            <Clock className="h-3 w-3" /> Last updated: {formattedDate}
+          </p>
+        )}
       </div>
 
       {isLoading ? (

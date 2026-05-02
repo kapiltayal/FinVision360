@@ -7,8 +7,9 @@ import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
+import { useLastUpdated } from "@/hooks/use-last-updated";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { Target, TrendingUp, Calendar, DollarSign, Save } from "lucide-react";
+import { Target, TrendingUp, Calendar, DollarSign, Save, Clock } from "lucide-react";
 import { type RetirementGoal } from "@shared/schema";
 import { formatCurrency } from "@/lib/format";
 import {
@@ -44,10 +45,13 @@ export default function RetirementPlannerPage() {
     }
   }, [goal]);
 
+  const { formattedDate, markUpdated } = useLastUpdated("retirement-planner");
+
   const saveMutation = useMutation({
     mutationFn: (data: any) => apiRequest("POST", "/api/retirement", data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/retirement"] });
+      markUpdated();
       toast({ title: "Retirement plan saved" });
     },
     onError: (e: any) => toast({ title: "Failed", description: e.message, variant: "destructive" }),
@@ -98,6 +102,11 @@ export default function RetirementPlannerPage() {
         <div>
           <h1 className="text-2xl font-bold" data-testid="text-retirement-title">Retirement Planner</h1>
           <p className="text-muted-foreground">Project your savings and plan your path to financial freedom</p>
+          {formattedDate && (
+            <p className="flex items-center gap-1 text-xs text-muted-foreground mt-1" data-testid="text-retirement-last-updated">
+              <Clock className="h-3 w-3" /> Last updated: {formattedDate}
+            </p>
+          )}
         </div>
         <Button onClick={() => saveMutation.mutate(form)} disabled={saveMutation.isPending} data-testid="button-save-retirement">
           <Save className="h-4 w-4 mr-2" />

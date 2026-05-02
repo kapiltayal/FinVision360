@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useLastUpdated } from "@/hooks/use-last-updated";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -782,11 +783,14 @@ export default function InsurancePage() {
     queryKey: ["/api/insurance"],
   });
 
+  const { formattedDate, markUpdated } = useLastUpdated("insurance");
+
   const createMutation = useMutation({
     mutationFn: (data: any) => apiRequest("POST", "/api/insurance", data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/insurance"] });
       toast({ title: "Policy added" });
+      markUpdated();
       setDialogOpen(false);
     },
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
@@ -797,6 +801,7 @@ export default function InsurancePage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/insurance"] });
       toast({ title: "Policy updated" });
+      markUpdated();
       setDialogOpen(false);
       setEditingPolicy(null);
     },
@@ -808,6 +813,7 @@ export default function InsurancePage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/insurance"] });
       toast({ title: "Policy deleted" });
+      markUpdated();
       setDeleteTarget(null);
     },
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
@@ -883,6 +889,11 @@ export default function InsurancePage() {
         <div>
           <h1 className="text-2xl font-bold" data-testid="text-insurance-title">Insurance & Annuities</h1>
           <p className="text-muted-foreground">Track all your insurance policies and annuities</p>
+          {formattedDate && (
+            <p className="flex items-center gap-1 text-xs text-muted-foreground mt-1" data-testid="text-insurance-last-updated">
+              <Clock className="h-3 w-3" /> Last updated: {formattedDate}
+            </p>
+          )}
         </div>
       </div>
 

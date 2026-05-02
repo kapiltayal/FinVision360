@@ -8,11 +8,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
+import { useLastUpdated } from "@/hooks/use-last-updated";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
 import {
   User, Lock, Save, PiggyBank, CreditCard, Shield,
-  KeyRound, BadgeCheck, SlidersHorizontal,
+  KeyRound, BadgeCheck, SlidersHorizontal, Clock,
 } from "lucide-react";
 
 function DollarInput({
@@ -107,10 +108,13 @@ export default function SettingsPage() {
     confirmPassword: "",
   });
 
+  const { formattedDate, markUpdated } = useLastUpdated("settings");
+
   const updateProfileMutation = useMutation({
     mutationFn: (data: any) => apiRequest("PATCH", "/api/auth/user", data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      markUpdated();
       toast({ title: "Profile updated" });
     },
     onError: (e: any) => toast({ title: "Failed", description: e.message, variant: "destructive" }),
@@ -119,6 +123,7 @@ export default function SettingsPage() {
   const changePasswordMutation = useMutation({
     mutationFn: (data: any) => apiRequest("POST", "/api/auth/change-password", data),
     onSuccess: () => {
+      markUpdated();
       toast({ title: "Password changed" });
       setPasswords({ currentPassword: "", newPassword: "", confirmPassword: "" });
     },
@@ -176,6 +181,7 @@ export default function SettingsPage() {
     mutationFn: (data: any) => apiRequest("PUT", "/api/recommendation-settings", data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/recommendation-settings"] });
+      markUpdated();
       toast({ title: "Recommendation settings saved" });
     },
     onError: (e: any) => toast({ title: "Failed to save", description: e.message, variant: "destructive" }),
@@ -201,6 +207,11 @@ export default function SettingsPage() {
       <div>
         <h1 className="text-2xl font-bold" data-testid="text-settings-title">Settings</h1>
         <p className="text-muted-foreground">Manage your account and recommendation preferences</p>
+        {formattedDate && (
+          <p className="flex items-center gap-1 text-xs text-muted-foreground mt-1" data-testid="text-settings-last-updated">
+            <Clock className="h-3 w-3" /> Last updated: {formattedDate}
+          </p>
+        )}
       </div>
 
       {/* User Identity Banner */}

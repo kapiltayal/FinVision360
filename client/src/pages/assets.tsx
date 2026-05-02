@@ -10,17 +10,20 @@ import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import { useLastUpdated } from "@/hooks/use-last-updated";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { Plus, Pencil, Trash2, Wallet, TrendingUp, ChevronDown } from "lucide-react";
+import { Plus, Pencil, Trash2, Wallet, TrendingUp, ChevronDown, Clock } from "lucide-react";
 import { type Asset, ASSET_CATEGORIES } from "@shared/schema";
 import { formatCurrency, formatPercent, getCategoryLabel } from "@/lib/format";
 
 function AssetForm({
   asset,
   onClose,
+  onUpdated,
 }: {
   asset?: Asset;
   onClose: () => void;
+  onUpdated?: () => void;
 }) {
   const { toast } = useToast();
   const [form, setForm] = useState({
@@ -37,6 +40,7 @@ function AssetForm({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/assets"] });
       toast({ title: "Asset created" });
+      onUpdated?.();
       onClose();
     },
     onError: (e: any) => toast({ title: "Failed", description: e.message, variant: "destructive" }),
@@ -47,6 +51,7 @@ function AssetForm({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/assets"] });
       toast({ title: "Asset updated" });
+      onUpdated?.();
       onClose();
     },
     onError: (e: any) => toast({ title: "Failed", description: e.message, variant: "destructive" }),
@@ -151,6 +156,7 @@ export default function AssetsPage() {
   const [editingAsset, setEditingAsset] = useState<Asset | undefined>();
   const [openCategory, setOpenCategory] = useState<string | null>(null);
   const { toast } = useToast();
+  const { formattedDate, markUpdated } = useLastUpdated("assets");
   const { data: assets = [], isLoading } = useQuery<Asset[]>({ queryKey: ["/api/assets"] });
 
   const deleteMutation = useMutation({
@@ -158,6 +164,7 @@ export default function AssetsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/assets"] });
       toast({ title: "Asset deleted" });
+      markUpdated();
     },
   });
 
@@ -194,6 +201,11 @@ export default function AssetsPage() {
         <div>
           <h1 className="text-2xl font-bold" data-testid="text-assets-title">Assets</h1>
           <p className="text-muted-foreground">Manage your financial assets</p>
+          {formattedDate && (
+            <p className="flex items-center gap-1 text-xs text-muted-foreground mt-1" data-testid="text-assets-last-updated">
+              <Clock className="h-3 w-3" /> Last updated: {formattedDate}
+            </p>
+          )}
         </div>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
@@ -205,7 +217,7 @@ export default function AssetsPage() {
             <DialogHeader>
               <DialogTitle>{editingAsset ? "Edit Asset" : "Add New Asset"}</DialogTitle>
             </DialogHeader>
-            <AssetForm asset={editingAsset} onClose={() => setDialogOpen(false)} />
+            <AssetForm asset={editingAsset} onClose={() => setDialogOpen(false)} onUpdated={markUpdated} />
           </DialogContent>
         </Dialog>
       </div>
