@@ -341,9 +341,9 @@ export default function LandingPage() {
           AI-powered guidance — all in one place.
         </p>
         {user ? (
-          <Link href="/" className="inline-block">
+          <Link href="/snapshot" className="inline-block">
             <Button size="lg" data-testid="button-hero-dashboard">
-              Go to Net Worth <ArrowRight className="ml-2 h-4 w-4" />
+              Your Financial Snapshot <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
           </Link>
         ) : (
@@ -505,9 +505,9 @@ export default function LandingPage() {
             ))}
           </div>
           {user ? (
-            <Link href="/">
+            <Link href="/snapshot">
               <Button size="lg" variant="secondary" data-testid="button-ai-cta">
-                Go to Net Worth <ArrowRight className="ml-2 h-4 w-4" />
+                Your Financial Snapshot <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             </Link>
           ) : (
