@@ -149,7 +149,7 @@ export default function SnapshotPage() {
 
   const emergencyFunds = useMemo(() =>
     assets
-      .filter(a => ["savings_account", "cash"].includes(a.category))
+      .filter(a => ["savings_account", "cash", "bank_account"].includes(a.category))
       .reduce((s, a) => s + parseFloat(a.value || "0"), 0),
     [assets]);
 
