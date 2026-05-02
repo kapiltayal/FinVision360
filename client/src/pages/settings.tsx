@@ -207,11 +207,9 @@ export default function SettingsPage() {
       <div>
         <h1 className="text-2xl font-bold" data-testid="text-settings-title">Settings</h1>
         <p className="text-muted-foreground">Manage your account and recommendation preferences</p>
-        {formattedDate && (
-          <p className="flex items-center gap-1 text-xs text-muted-foreground mt-1" data-testid="text-settings-last-updated">
-            <Clock className="h-3 w-3" /> Last updated: {formattedDate}
-          </p>
-        )}
+        <p className="flex items-center gap-1 text-xs text-muted-foreground mt-1" data-testid="text-settings-last-updated">
+          <Clock className="h-3 w-3" /> Last updated: {formattedDate}
+        </p>
       </div>
 
       {/* User Identity Banner */}

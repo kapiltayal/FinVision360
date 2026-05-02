@@ -151,11 +151,9 @@ export default function Retirement401kPage() {
         <div>
           <h1 className="text-2xl font-bold">401k Calculator & Forecast</h1>
           <p className="text-muted-foreground">Model your 401k growth, employer match, and compare Traditional vs. Roth</p>
-          {formattedDate && (
-            <p className="flex items-center gap-1 text-xs text-muted-foreground mt-1" data-testid="text-401k-last-updated">
-              <Clock className="h-3 w-3" /> Last updated: {formattedDate}
-            </p>
-          )}
+          <p className="flex items-center gap-1 text-xs text-muted-foreground mt-1" data-testid="text-401k-last-updated">
+            <Clock className="h-3 w-3" /> Last updated: {formattedDate}
+          </p>
         </div>
         <Button onClick={() => saveMutation.mutate(form)} disabled={saveMutation.isPending} data-testid="button-save-401k">
           <Save className="h-4 w-4 mr-2" />

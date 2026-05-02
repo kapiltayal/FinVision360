@@ -889,11 +889,9 @@ export default function InsurancePage() {
         <div>
           <h1 className="text-2xl font-bold" data-testid="text-insurance-title">Insurance & Annuities</h1>
           <p className="text-muted-foreground">Track all your insurance policies and annuities</p>
-          {formattedDate && (
-            <p className="flex items-center gap-1 text-xs text-muted-foreground mt-1" data-testid="text-insurance-last-updated">
-              <Clock className="h-3 w-3" /> Last updated: {formattedDate}
-            </p>
-          )}
+          <p className="flex items-center gap-1 text-xs text-muted-foreground mt-1" data-testid="text-insurance-last-updated">
+            <Clock className="h-3 w-3" /> Last updated: {formattedDate}
+          </p>
         </div>
       </div>
 

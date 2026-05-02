@@ -214,11 +214,9 @@ export default function LiabilitiesPage() {
         <div>
           <h1 className="text-2xl font-bold" data-testid="text-liabilities-title">Liabilities</h1>
           <p className="text-muted-foreground">Track your debts and obligations</p>
-          {formattedDate && (
-            <p className="flex items-center gap-1 text-xs text-muted-foreground mt-1" data-testid="text-liabilities-last-updated">
-              <Clock className="h-3 w-3" /> Last updated: {formattedDate}
-            </p>
-          )}
+          <p className="flex items-center gap-1 text-xs text-muted-foreground mt-1" data-testid="text-liabilities-last-updated">
+            <Clock className="h-3 w-3" /> Last updated: {formattedDate}
+          </p>
         </div>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>

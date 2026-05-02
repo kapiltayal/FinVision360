@@ -262,11 +262,9 @@ export default function IncomeExpensesPage() {
       <div>
         <h1 className="text-2xl font-bold" data-testid="text-income-expenses-title">Income &amp; Expenses</h1>
         <p className="text-muted-foreground">Track your monthly cash flow and net savings</p>
-        {formattedDate && (
-          <p className="flex items-center gap-1 text-xs text-muted-foreground mt-1" data-testid="text-income-expenses-last-updated">
-            <Clock className="h-3 w-3" /> Last updated: {formattedDate}
-          </p>
-        )}
+        <p className="flex items-center gap-1 text-xs text-muted-foreground mt-1" data-testid="text-income-expenses-last-updated">
+          <Clock className="h-3 w-3" /> Last updated: {formattedDate}
+        </p>
       </div>
 
       {isLoading ? (

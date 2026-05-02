@@ -31,7 +31,7 @@ export function useLastUpdated(pageKey: string) {
         hour: "numeric",
         minute: "2-digit",
       })
-    : null;
+    : "Not yet updated";
 
   return { formattedDate, markUpdated };
 }

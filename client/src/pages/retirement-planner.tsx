@@ -102,11 +102,9 @@ export default function RetirementPlannerPage() {
         <div>
           <h1 className="text-2xl font-bold" data-testid="text-retirement-title">Retirement Planner</h1>
           <p className="text-muted-foreground">Project your savings and plan your path to financial freedom</p>
-          {formattedDate && (
-            <p className="flex items-center gap-1 text-xs text-muted-foreground mt-1" data-testid="text-retirement-last-updated">
-              <Clock className="h-3 w-3" /> Last updated: {formattedDate}
-            </p>
-          )}
+          <p className="flex items-center gap-1 text-xs text-muted-foreground mt-1" data-testid="text-retirement-last-updated">
+            <Clock className="h-3 w-3" /> Last updated: {formattedDate}
+          </p>
         </div>
         <Button onClick={() => saveMutation.mutate(form)} disabled={saveMutation.isPending} data-testid="button-save-retirement">
           <Save className="h-4 w-4 mr-2" />
