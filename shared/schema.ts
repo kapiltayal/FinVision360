@@ -92,7 +92,7 @@ export const insurancePolicies = pgTable("insurance_policies", {
   provider: text("provider"),
   policyNumber: text("policy_number"),
   premium: numeric("premium", { precision: 10, scale: 2 }),
-  premiumFrequency: text("premium_frequency").default("monthly"), // monthly | quarterly | annual
+  premiumFrequency: text("premium_frequency").default("monthly"), // monthly | quarterly | semi-annual | annual
   coverageAmount: numeric("coverage_amount", { precision: 15, scale: 2 }),
   deductible: numeric("deductible", { precision: 10, scale: 2 }),
   renewalDate: text("renewal_date"),

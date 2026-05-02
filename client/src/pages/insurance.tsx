@@ -320,6 +320,7 @@ function PolicyForm({ form, onChange }: { form: typeof EMPTY_FORM; onChange: (f:
             <SelectContent>
               <SelectItem value="monthly">Monthly</SelectItem>
               <SelectItem value="quarterly">Quarterly</SelectItem>
+              <SelectItem value="semi-annual">Semi-Annual</SelectItem>
               <SelectItem value="annual">Annual</SelectItem>
             </SelectContent>
           </Select>
@@ -514,6 +515,7 @@ function annualPremium(policy: InsurancePolicy): number {
   if (!p) return 0;
   if (policy.premiumFrequency === "monthly") return p * 12;
   if (policy.premiumFrequency === "quarterly") return p * 4;
+  if (policy.premiumFrequency === "semi-annual") return p * 2;
   return p;
 }
 
