@@ -147,7 +147,7 @@ export default function Retirement401kPage() {
   }, [projectionData, currentBalance, annualContribution, employerMatch, form.currentAge, totalAnnualContribution]);
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 space-y-6 max-w-6xl mx-auto">
       <div className="flex items-center justify-between gap-1 flex-wrap">
         <div>
           <h1 className="text-2xl font-bold">401k Calculator & Forecast</h1>

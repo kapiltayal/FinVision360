@@ -276,7 +276,7 @@ export default function SnapshotPage() {
       </div>
 
       {/* ── Cards Grid ── */}
-      <div className="p-4 md:p-6 grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-5 max-w-7xl mx-auto">
+      <div className="p-4 md:p-6 grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-5 max-w-6xl mx-auto">
 
         {/* ── Net Worth ── */}
         <SnapshotCard title="Net Worth" accent="#1C91D4" icon={Wallet} href="/">
