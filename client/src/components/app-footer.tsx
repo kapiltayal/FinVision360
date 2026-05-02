@@ -3,7 +3,7 @@ import { Link } from "wouter";
 export function AppFooter() {
   return (
     <footer className="border-t mt-8">
-      <div className="max-w-6xl mx-auto px-4 py-5 flex flex-col sm:flex-row items-center justify-between gap-3">
+      <div className="max-w-7xl mx-auto px-4 py-5 flex flex-col sm:flex-row items-center justify-between gap-3">
         <p className="text-xs text-muted-foreground">
           © {new Date().getFullYear()} <strong>Tooothy LLC</strong> · Northbrook, IL · All rights reserved.
         </p>

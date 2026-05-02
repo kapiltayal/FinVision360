@@ -200,7 +200,7 @@ export default function SocialSecurityPage() {
   }, [monthlyAt62, monthlyAtFRA, monthlyAt70, fra]);
 
   return (
-    <div className="p-6 space-y-8 max-w-6xl mx-auto">
+    <div className="p-6 space-y-8 max-w-7xl mx-auto">
       <div>
         <h1 className="text-2xl font-bold">Social Security Planning</h1>
         <p className="text-muted-foreground">Understand your benefits and find the optimal time to claim</p>

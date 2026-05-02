@@ -291,7 +291,7 @@ export default function IncomeExpensesPage() {
   };
 
   return (
-    <div className="p-6 space-y-6 max-w-6xl mx-auto">
+    <div className="p-6 space-y-6 max-w-7xl mx-auto">
       <div className="flex items-start justify-between gap-2 flex-wrap">
         <div>
           <h1 className="text-2xl font-bold" data-testid="text-income-expenses-title">Income &amp; Expenses</h1>
