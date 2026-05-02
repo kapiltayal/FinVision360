@@ -82,7 +82,7 @@ function SnapshotCard({
       onMouseEnter={(e) => href && ((e.currentTarget as HTMLElement).style.boxShadow = CARD_SHADOW_HOVER)}
       onMouseLeave={(e) => href && ((e.currentTarget as HTMLElement).style.boxShadow = CARD_SHADOW)}
     >
-      <div className="absolute top-0 left-0 right-0 h-1 rounded-t-2xl" style={{ background: accent }} />
+      <div className="absolute top-0 left-0 right-0 h-1 rounded-t-2xl" style={{ background: "linear-gradient(90deg, #0d2e47 0%, #1C91D4 40%, #38bdf8 70%, #1C91D4 100%)" }} />
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <div className="h-8 w-8 rounded-lg flex items-center justify-center" style={{ background: `${accent}18` }}>
