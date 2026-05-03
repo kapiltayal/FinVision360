@@ -17,6 +17,7 @@ import {
   ShieldAlert,
   Sparkles,
   Link2,
+  UserCircle,
 } from "lucide-react";
 import logoPath from "@assets/FinVision360_Logo_H_(transparent)_1776714495394.png";
 import { Button } from "@/components/ui/button";
@@ -184,7 +185,8 @@ export function AppHeader() {
               style={{ background: "linear-gradient(135deg, #1565a8 0%, #1c91d4 55%, #42b8ed 100%)" }}
               data-testid="button-user-menu"
             >
-              <span className="hidden sm:inline text-sm truncate max-w-[100px]">
+              <UserCircle className="h-4 w-4" />
+              <span className="hidden sm:inline truncate max-w-[100px]">
                 {user?.fullName || user?.username}
               </span>
               <ChevronDown className="h-4 w-4 opacity-70" />
