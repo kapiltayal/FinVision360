@@ -201,7 +201,7 @@ export default function SocialSecurityPage() {
 
   return (
     <div className="p-6 space-y-8 max-w-7xl mx-auto">
-      <div>
+      <div className="bg-gradient-to-r from-blue-50 via-sky-50 to-blue-50/40 dark:from-blue-950/30 dark:via-sky-950/20 dark:to-blue-950/10 border border-blue-100 dark:border-blue-900/40 rounded-xl px-5 py-4">
         <h1 className="text-2xl font-bold">Social Security Planning</h1>
         <p className="text-muted-foreground">Understand your benefits and find the optimal time to claim</p>
       </div>

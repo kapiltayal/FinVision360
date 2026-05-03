@@ -171,7 +171,7 @@ export default function ConnectedAccountsPage() {
   return (
     <div className="max-w-7xl mx-auto p-4 md:p-6 space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-gradient-to-r from-blue-50 via-sky-50 to-blue-50/40 dark:from-blue-950/30 dark:via-sky-950/20 dark:to-blue-950/10 border border-blue-100 dark:border-blue-900/40 rounded-xl px-5 py-4">
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">
             <Link2 className="h-6 w-6 text-primary" />
