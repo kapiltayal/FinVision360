@@ -367,7 +367,7 @@ export default function BankRatesPage() {
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-6">
-      <div className="flex items-center justify-between mb-6 bg-gradient-to-r from-blue-50 via-sky-50 to-blue-50/40 dark:from-blue-950/30 dark:via-sky-950/20 dark:to-blue-950/10 border border-blue-100 dark:border-blue-900/40 rounded-xl px-5 py-4">
+      <div className="flex items-center justify-between mb-6 page-header-gradient">
         <div className="flex items-center gap-3">
           <Landmark className="h-7 w-7 text-primary" />
           <div>

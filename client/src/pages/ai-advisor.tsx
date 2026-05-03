@@ -224,7 +224,7 @@ export default function AIAdvisorPage() {
 
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
-      <div className="bg-gradient-to-r from-blue-50 via-sky-50 to-blue-50/40 dark:from-blue-950/30 dark:via-sky-950/20 dark:to-blue-950/10 border border-blue-100 dark:border-blue-900/40 rounded-xl px-5 py-4">
+      <div className="page-header-gradient">
         <h1 className="text-2xl font-bold" data-testid="text-ai-title">AI Finance Intelligence</h1>
         <p className="text-muted-foreground">Get personalized insights powered by AI</p>
       </div>
