@@ -933,14 +933,14 @@ export default function InsurancePage() {
     filename: "Insurance Policies",
     sheets: [{
       name: "Policies",
-      columns: ["Name", "Type", "Provider", "Annual Premium ($)", "Coverage Amount ($)", "Status", "Policy Number", "Deductible ($)", "Beneficiary", "Notes"],
+      columns: ["Name", "Type", "Provider", "Annual Premium ($)", "Coverage Amount ($)", "Premium Frequency", "Policy Number", "Deductible ($)", "Beneficiary", "Notes"],
       rows: policies.map((p) => [
         p.name,
         p.type,
         p.provider || "",
         Math.round(annualPremium(p) * 100) / 100,
         parseFloat(p.coverageAmount || p.deathBenefit || "0"),
-        p.status || "",
+        p.premiumFrequency || "",
         p.policyNumber || "",
         parseFloat(p.deductible || "0"),
         p.beneficiary || "",

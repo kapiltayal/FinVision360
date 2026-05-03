@@ -6,7 +6,7 @@ import { useTheme } from "@/components/theme-provider";
 import { Sun, Moon } from "lucide-react";
 
 export function PublicPageLayout({ children }: { children: React.ReactNode }) {
-  const { theme, setTheme } = useTheme();
+  const { theme, toggleTheme } = useTheme();
 
   return (
     <div className="min-h-screen flex flex-col bg-background text-foreground">
@@ -19,7 +19,7 @@ export function PublicPageLayout({ children }: { children: React.ReactNode }) {
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+              onClick={toggleTheme}
               className="h-8 w-8"
             >
               {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
