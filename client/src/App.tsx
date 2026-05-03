@@ -20,6 +20,7 @@ import AIAdvisorPage from "@/pages/ai-advisor";
 import SettingsPage from "@/pages/settings";
 import IncomeExpensesPage from "@/pages/income-expenses";
 import BankRatesPage from "@/pages/bank-rates";
+import ConnectedAccountsPage from "@/pages/connected-accounts";
 import AboutPage from "@/pages/about";
 import PrivacyPage from "@/pages/privacy";
 import TermsPage from "@/pages/terms";
@@ -50,6 +51,7 @@ function AuthenticatedApp() {
               <Route path="/ai-advisor" component={AIAdvisorPage} />
               <Route path="/settings" component={SettingsPage} />
               <Route path="/bank-rates" component={BankRatesPage} />
+              <Route path="/connected-accounts" component={ConnectedAccountsPage} />
               <Route component={NotFound} />
             </Switch>
           </div>

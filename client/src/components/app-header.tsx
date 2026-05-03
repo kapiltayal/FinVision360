@@ -16,6 +16,7 @@ import {
   Landmark,
   ShieldAlert,
   Sparkles,
+  Link2,
 } from "lucide-react";
 import logoPath from "@assets/FinVision360_Logo_H_(transparent)_1776714495394.png";
 import { Button } from "@/components/ui/button";
@@ -38,6 +39,7 @@ const baseNavItems = [
   { title: "Retirement", url: "/retirement", icon: Target },
   { title: "Insurance", url: "/insurance", icon: ShieldCheck },
   { title: "AI Advisor", url: "/ai-advisor", icon: Brain },
+  { title: "Connected Accounts", url: "/connected-accounts", icon: Link2 },
 ];
 
 const adminNavItems = [

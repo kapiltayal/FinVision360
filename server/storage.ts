@@ -12,8 +12,10 @@ import {
   type RecommendationSettings, type InsertRecommendationSettings,
   type BankConfig, type InsertBankConfig,
   type BankRate, type InsertBankRate,
+  type PlaidItem, type InsertPlaidItem,
+  type PlaidAccount, type InsertPlaidAccount,
   users, assets, liabilities, retirementGoals, retirement401kGoals, insurancePolicies, incomeEntries, expenseEntries, recommendationSettings,
-  bankConfigs, bankRates,
+  bankConfigs, bankRates, plaidItems, plaidAccounts,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -69,6 +71,17 @@ export interface IStorage {
   createBankRate(data: InsertBankRate): Promise<BankRate>;
   deleteBankRate(id: number): Promise<void>;
   deleteBankRatesByConfig(configId: number): Promise<void>;
+
+  getPlaidItems(userId: string): Promise<PlaidItem[]>;
+  getPlaidItemByItemId(itemId: string): Promise<PlaidItem | undefined>;
+  createPlaidItem(data: InsertPlaidItem): Promise<PlaidItem>;
+  deletePlaidItem(id: number, userId: string): Promise<void>;
+
+  getPlaidAccounts(userId: string): Promise<PlaidAccount[]>;
+  getPlaidAccountsByItem(plaidItemId: number): Promise<PlaidAccount[]>;
+  upsertPlaidAccount(data: InsertPlaidAccount): Promise<PlaidAccount>;
+  deletePlaidAccountsByItem(plaidItemId: number): Promise<void>;
+  updatePlaidItem(id: number, data: Partial<PlaidItem>): Promise<PlaidItem | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -280,6 +293,59 @@ export class DatabaseStorage implements IStorage {
 
   async deleteBankRatesByConfig(configId: number): Promise<void> {
     await db.delete(bankRates).where(eq(bankRates.configId, configId));
+  }
+
+  async getPlaidItems(userId: string): Promise<PlaidItem[]> {
+    return db.select().from(plaidItems).where(eq(plaidItems.userId, userId));
+  }
+
+  async getPlaidItemByItemId(itemId: string): Promise<PlaidItem | undefined> {
+    const [item] = await db.select().from(plaidItems).where(eq(plaidItems.itemId, itemId));
+    return item;
+  }
+
+  async createPlaidItem(data: InsertPlaidItem): Promise<PlaidItem> {
+    const [created] = await db.insert(plaidItems).values(data).returning();
+    return created;
+  }
+
+  async deletePlaidItem(id: number, userId: string): Promise<void> {
+    await db.delete(plaidItems).where(and(eq(plaidItems.id, id), eq(plaidItems.userId, userId)));
+  }
+
+  async updatePlaidItem(id: number, data: Partial<PlaidItem>): Promise<PlaidItem | undefined> {
+    const [updated] = await db.update(plaidItems).set(data).where(eq(plaidItems.id, id)).returning();
+    return updated;
+  }
+
+  async getPlaidAccounts(userId: string): Promise<PlaidAccount[]> {
+    return db.select().from(plaidAccounts).where(eq(plaidAccounts.userId, userId));
+  }
+
+  async getPlaidAccountsByItem(plaidItemId: number): Promise<PlaidAccount[]> {
+    return db.select().from(plaidAccounts).where(eq(plaidAccounts.plaidItemId, plaidItemId));
+  }
+
+  async upsertPlaidAccount(data: InsertPlaidAccount): Promise<PlaidAccount> {
+    const [result] = await db
+      .insert(plaidAccounts)
+      .values({ ...data, lastUpdated: new Date() })
+      .onConflictDoUpdate({
+        target: plaidAccounts.plaidAccountId,
+        set: {
+          name: data.name,
+          officialName: data.officialName,
+          currentBalance: data.currentBalance,
+          availableBalance: data.availableBalance,
+          lastUpdated: new Date(),
+        },
+      })
+      .returning();
+    return result;
+  }
+
+  async deletePlaidAccountsByItem(plaidItemId: number): Promise<void> {
+    await db.delete(plaidAccounts).where(eq(plaidAccounts.plaidItemId, plaidItemId));
   }
 }
 

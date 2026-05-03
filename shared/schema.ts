@@ -281,6 +281,41 @@ export const insertBankRateSchema = createInsertSchema(bankRates).omit({ id: tru
 export type InsertBankRate = z.infer<typeof insertBankRateSchema>;
 export type BankRate = typeof bankRates.$inferSelect;
 
+export const plaidItems = pgTable("plaid_items", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  accessToken: text("access_token").notNull(),
+  itemId: text("item_id").notNull().unique(),
+  institutionId: text("institution_id"),
+  institutionName: text("institution_name"),
+  createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
+  lastSynced: timestamp("last_synced"),
+});
+
+export const insertPlaidItemSchema = createInsertSchema(plaidItems).omit({ id: true, createdAt: true });
+export type InsertPlaidItem = z.infer<typeof insertPlaidItemSchema>;
+export type PlaidItem = typeof plaidItems.$inferSelect;
+
+export const plaidAccounts = pgTable("plaid_accounts", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  plaidItemId: integer("plaid_item_id").notNull().references(() => plaidItems.id, { onDelete: "cascade" }),
+  plaidAccountId: text("plaid_account_id").notNull().unique(),
+  name: text("name").notNull(),
+  officialName: text("official_name"),
+  type: text("type").notNull(),
+  subtype: text("subtype"),
+  currentBalance: numeric("current_balance", { precision: 15, scale: 2 }),
+  availableBalance: numeric("available_balance", { precision: 15, scale: 2 }),
+  linkedAssetId: integer("linked_asset_id"),
+  linkedLiabilityId: integer("linked_liability_id"),
+  lastUpdated: timestamp("last_updated").default(sql`CURRENT_TIMESTAMP`).notNull(),
+});
+
+export const insertPlaidAccountSchema = createInsertSchema(plaidAccounts).omit({ id: true, lastUpdated: true });
+export type InsertPlaidAccount = z.infer<typeof insertPlaidAccountSchema>;
+export type PlaidAccount = typeof plaidAccounts.$inferSelect;
+
 export const LIABILITY_CATEGORIES = [
   { value: "credit_card", label: "Credit Card" },
   { value: "mortgage", label: "Mortgage" },

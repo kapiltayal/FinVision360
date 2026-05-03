@@ -4,6 +4,20 @@ import { storage } from "./storage";
 import { setupAuth, requireAuth, requireAdmin } from "./auth";
 import OpenAI from "openai";
 import { scrapeBank, DEFAULT_BANK_CONFIGS, type BankSelectorConfig } from "./scraper";
+import { PlaidApi, PlaidEnvironments, Configuration, Products, CountryCode } from "plaid";
+
+function getPlaidClient(): PlaidApi {
+  const configuration = new Configuration({
+    basePath: PlaidEnvironments.sandbox,
+    baseOptions: {
+      headers: {
+        "PLAID-CLIENT-ID": process.env.PLAID_CLIENT_ID,
+        "PLAID-SECRET": process.env.PLAID_SECRET,
+      },
+    },
+  });
+  return new PlaidApi(configuration);
+}
 
 function getOpenAIClient(): OpenAI {
   const apiKey = process.env.AI_INTEGRATIONS_OPENAI_API_KEY || process.env.OPENAI_API_KEY;
@@ -481,6 +495,135 @@ Use markdown formatting with headers and bold key numbers.`;
     const userId = (req.user as any).id;
     const settings = await storage.upsertRecommendationSettings({ userId, ...req.body });
     res.json(settings);
+  });
+
+  // ── Plaid routes ────────────────────────────────────────────────────────────
+
+  app.post("/api/plaid/create-link-token", requireAuth, async (req, res) => {
+    try {
+      const userId = (req.user as any).id;
+      const plaid = getPlaidClient();
+      const response = await plaid.linkTokenCreate({
+        user: { client_user_id: userId },
+        client_name: "FinVision360",
+        products: [Products.Transactions],
+        country_codes: [CountryCode.Us],
+        language: "en",
+      });
+      res.json({ link_token: response.data.link_token });
+    } catch (err: any) {
+      console.error("[plaid] create-link-token error:", err?.response?.data || err.message);
+      res.status(500).json({ message: "Failed to create Plaid link token" });
+    }
+  });
+
+  app.post("/api/plaid/exchange-token", requireAuth, async (req, res) => {
+    try {
+      const userId = (req.user as any).id;
+      const { public_token, institution } = req.body;
+      if (!public_token) return res.status(400).json({ message: "public_token required" });
+
+      const plaid = getPlaidClient();
+      const exchangeRes = await plaid.itemPublicTokenExchange({ public_token });
+      const { access_token, item_id } = exchangeRes.data;
+
+      const plaidItem = await storage.createPlaidItem({
+        userId,
+        accessToken: access_token,
+        itemId: item_id,
+        institutionId: institution?.institution_id ?? null,
+        institutionName: institution?.name ?? null,
+        lastSynced: null,
+      });
+
+      // Immediately fetch and store accounts
+      const accountsRes = await plaid.accountsGet({ access_token });
+      for (const acct of accountsRes.data.accounts) {
+        await storage.upsertPlaidAccount({
+          userId,
+          plaidItemId: plaidItem.id,
+          plaidAccountId: acct.account_id,
+          name: acct.name,
+          officialName: acct.official_name ?? null,
+          type: acct.type,
+          subtype: acct.subtype ?? null,
+          currentBalance: acct.balances.current?.toString() ?? null,
+          availableBalance: acct.balances.available?.toString() ?? null,
+          linkedAssetId: null,
+          linkedLiabilityId: null,
+        });
+      }
+
+      await storage.updatePlaidItem(plaidItem.id, { lastSynced: new Date() });
+
+      res.json({ success: true, institution: plaidItem.institutionName });
+    } catch (err: any) {
+      console.error("[plaid] exchange-token error:", err?.response?.data || err.message);
+      res.status(500).json({ message: "Failed to connect account" });
+    }
+  });
+
+  app.get("/api/plaid/accounts", requireAuth, async (req, res) => {
+    const userId = (req.user as any).id;
+    const accounts = await storage.getPlaidAccounts(userId);
+    const items = await storage.getPlaidItems(userId);
+    res.json({ accounts, items });
+  });
+
+  app.post("/api/plaid/sync/:itemId", requireAuth, async (req, res) => {
+    try {
+      const userId = (req.user as any).id;
+      const itemId = parseInt(req.params.itemId);
+      const items = await storage.getPlaidItems(userId);
+      const item = items.find((i) => i.id === itemId);
+      if (!item) return res.status(404).json({ message: "Item not found" });
+
+      const plaid = getPlaidClient();
+      const accountsRes = await plaid.accountsGet({ access_token: item.accessToken });
+      for (const acct of accountsRes.data.accounts) {
+        await storage.upsertPlaidAccount({
+          userId,
+          plaidItemId: item.id,
+          plaidAccountId: acct.account_id,
+          name: acct.name,
+          officialName: acct.official_name ?? null,
+          type: acct.type,
+          subtype: acct.subtype ?? null,
+          currentBalance: acct.balances.current?.toString() ?? null,
+          availableBalance: acct.balances.available?.toString() ?? null,
+          linkedAssetId: null,
+          linkedLiabilityId: null,
+        });
+      }
+      await storage.updatePlaidItem(item.id, { lastSynced: new Date() });
+      const accounts = await storage.getPlaidAccountsByItem(item.id);
+      res.json({ accounts, lastSynced: new Date() });
+    } catch (err: any) {
+      console.error("[plaid] sync error:", err?.response?.data || err.message);
+      res.status(500).json({ message: "Failed to sync accounts" });
+    }
+  });
+
+  app.delete("/api/plaid/items/:id", requireAuth, async (req, res) => {
+    try {
+      const userId = (req.user as any).id;
+      const id = parseInt(req.params.id);
+      const items = await storage.getPlaidItems(userId);
+      const item = items.find((i) => i.id === id);
+      if (!item) return res.status(404).json({ message: "Item not found" });
+
+      try {
+        const plaid = getPlaidClient();
+        await plaid.itemRemove({ access_token: item.accessToken });
+      } catch (_) {}
+
+      await storage.deletePlaidAccountsByItem(id);
+      await storage.deletePlaidItem(id, userId);
+      res.status(204).send();
+    } catch (err: any) {
+      console.error("[plaid] delete error:", err.message);
+      res.status(500).json({ message: "Failed to disconnect account" });
+    }
   });
 
   app.post("/api/contact", async (req, res) => {
