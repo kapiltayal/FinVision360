@@ -499,7 +499,7 @@ Use markdown formatting with headers and bold key numbers.`;
 
   // ── Plaid routes ────────────────────────────────────────────────────────────
 
-  app.post("/api/plaid/create-link-token", requireAuth, async (req, res) => {
+  app.get("/api/plaid/create-link-token", requireAuth, async (req, res) => {
     try {
       const userId = (req.user as any).id;
       const plaid = getPlaidClient();
