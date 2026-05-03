@@ -9,8 +9,6 @@ import {
   Brain,
   Settings,
   LogOut,
-  Sun,
-  Moon,
   ChevronDown,
   ArrowLeftRight,
   Landmark,
@@ -28,7 +26,6 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
-import { useTheme } from "@/components/theme-provider";
 import { useAuth, useLogout } from "@/hooks/use-auth";
 
 const baseNavItems = [
@@ -51,7 +48,6 @@ export function AppHeader() {
   const [navOpen, setNavOpen] = useState(false);
   const [adminOpen, setAdminOpen] = useState(false);
   const [userOpen, setUserOpen] = useState(false);
-  const { theme, toggleTheme } = useTheme();
   const { user } = useAuth();
   const logout = useLogout();
   const isAdmin = (user as any)?.isAdmin;
@@ -161,19 +157,8 @@ export function AppHeader() {
           </DropdownMenu>
         )}
 
-        {/* Theme Toggle */}
-        <Button
-          size="icon"
-          variant="ghost"
-          onClick={toggleTheme}
-          data-testid="button-theme-toggle"
-        >
-          {theme === "light" ? (
-            <Moon className="h-4 w-4" />
-          ) : (
-            <Sun className="h-4 w-4" />
-          )}
-        </Button>
+        {/* Divider */}
+        <div className="h-6 w-px bg-gradient-to-b from-transparent via-blue-200 dark:via-blue-800/60 to-transparent mx-1" aria-hidden="true" />
 
         {/* User Menu */}
         <DropdownMenu open={userOpen} onOpenChange={setUserOpen}>
