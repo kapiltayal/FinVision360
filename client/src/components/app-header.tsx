@@ -39,7 +39,6 @@ const baseNavItems = [
   { title: "Retirement", url: "/retirement", icon: Target },
   { title: "Insurance", url: "/insurance", icon: ShieldCheck },
   { title: "AI Advisor", url: "/ai-advisor", icon: Brain },
-  { title: "Connected Accounts", url: "/connected-accounts", icon: Link2 },
 ];
 
 const adminNavItems = [
@@ -197,6 +196,15 @@ export function AppHeader() {
               <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
             </div>
             <div className="h-px bg-border my-1" />
+            <Link
+              href="/connected-accounts"
+              onClick={() => setUserOpen(false)}
+              className="flex items-center gap-2 px-2 py-2 text-sm hover:bg-accent rounded cursor-pointer"
+              data-testid="nav-connected-accounts"
+            >
+              <Link2 className="h-4 w-4" />
+              <span>Connected Accounts</span>
+            </Link>
             <Link
               href="/settings"
               onClick={() => setUserOpen(false)}
