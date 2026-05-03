@@ -499,6 +499,77 @@ Use markdown formatting with headers and bold key numbers.`;
 
   // ── Plaid routes ────────────────────────────────────────────────────────────
 
+  type PlaidBookMapping =
+    | { kind: "asset"; category: string }
+    | { kind: "liability"; category: string }
+    | { kind: "skip" };
+
+  function mapPlaidToBook(type: string, subtype: string | null): PlaidBookMapping {
+    const st = (subtype ?? "").toLowerCase();
+    if (type === "depository") {
+      if (st === "savings" || st === "money market" || st === "cd") return { kind: "asset", category: "savings_account" };
+      return { kind: "asset", category: "bank_account" };
+    }
+    if (type === "investment" || type === "brokerage") {
+      if (st.includes("401k") || st.includes("ira") || st.includes("roth") || st.includes("retirement") || st.includes("403b") || st.includes("pension"))
+        return { kind: "asset", category: "retirement_fund" };
+      return { kind: "asset", category: "investment" };
+    }
+    if (type === "credit") return { kind: "liability", category: "credit_card" };
+    if (type === "loan") {
+      if (st === "mortgage" || st === "home equity") return { kind: "liability", category: "mortgage" };
+      if (st === "auto") return { kind: "liability", category: "auto_loan" };
+      if (st === "student") return { kind: "liability", category: "student_loan" };
+      return { kind: "liability", category: "personal_loan" };
+    }
+    return { kind: "skip" };
+  }
+
+  async function syncPlaidAccountToBook(
+    userId: string,
+    plaidAcct: { id: number; name: string; type: string; subtype: string | null; currentBalance: string | null; linkedAssetId: number | null; linkedLiabilityId: number | null },
+    institutionName: string | null,
+  ) {
+    const mapping = mapPlaidToBook(plaidAcct.type, plaidAcct.subtype);
+    if (mapping.kind === "skip") return;
+
+    const balance = plaidAcct.currentBalance ?? "0";
+    const absBalance = Math.abs(parseFloat(balance) || 0).toFixed(2);
+
+    if (mapping.kind === "asset") {
+      if (plaidAcct.linkedAssetId) {
+        await storage.updateAsset(plaidAcct.linkedAssetId, userId, { value: absBalance, name: plaidAcct.name, institution: institutionName ?? undefined });
+      } else {
+        const created = await storage.createAsset({
+          userId,
+          name: plaidAcct.name,
+          category: mapping.category,
+          value: absBalance,
+          interestRate: "0",
+          institution: institutionName ?? null,
+          notes: "Synced from Plaid",
+        });
+        await storage.updatePlaidAccount(plaidAcct.id, { linkedAssetId: created.id });
+      }
+    } else {
+      if (plaidAcct.linkedLiabilityId) {
+        await storage.updateLiability(plaidAcct.linkedLiabilityId, userId, { balance: absBalance, name: plaidAcct.name, institution: institutionName ?? undefined });
+      } else {
+        const created = await storage.createLiability({
+          userId,
+          name: plaidAcct.name,
+          category: mapping.category,
+          balance: absBalance,
+          interestRate: "0",
+          minimumPayment: "0",
+          institution: institutionName ?? null,
+          notes: "Synced from Plaid",
+        });
+        await storage.updatePlaidAccount(plaidAcct.id, { linkedLiabilityId: created.id });
+      }
+    }
+  }
+
   app.get("/api/plaid/create-link-token", requireAuth, async (req, res) => {
     try {
       const userId = (req.user as any).id;
@@ -536,10 +607,10 @@ Use markdown formatting with headers and bold key numbers.`;
         lastSynced: null,
       });
 
-      // Immediately fetch and store accounts
+      // Immediately fetch and store accounts, plus mirror them into assets/liabilities
       const accountsRes = await plaid.accountsGet({ access_token });
       for (const acct of accountsRes.data.accounts) {
-        await storage.upsertPlaidAccount({
+        const stored = await storage.upsertPlaidAccount({
           userId,
           plaidItemId: plaidItem.id,
           plaidAccountId: acct.account_id,
@@ -552,6 +623,7 @@ Use markdown formatting with headers and bold key numbers.`;
           linkedAssetId: null,
           linkedLiabilityId: null,
         });
+        await syncPlaidAccountToBook(userId, stored, plaidItem.institutionName);
       }
 
       await storage.updatePlaidItem(plaidItem.id, { lastSynced: new Date() });
@@ -581,7 +653,7 @@ Use markdown formatting with headers and bold key numbers.`;
       const plaid = getPlaidClient();
       const accountsRes = await plaid.accountsGet({ access_token: item.accessToken });
       for (const acct of accountsRes.data.accounts) {
-        await storage.upsertPlaidAccount({
+        const stored = await storage.upsertPlaidAccount({
           userId,
           plaidItemId: item.id,
           plaidAccountId: acct.account_id,
@@ -594,6 +666,7 @@ Use markdown formatting with headers and bold key numbers.`;
           linkedAssetId: null,
           linkedLiabilityId: null,
         });
+        await syncPlaidAccountToBook(userId, stored, item.institutionName);
       }
       await storage.updatePlaidItem(item.id, { lastSynced: new Date() });
       const accounts = await storage.getPlaidAccountsByItem(item.id);
@@ -617,6 +690,11 @@ Use markdown formatting with headers and bold key numbers.`;
         await plaid.itemRemove({ access_token: item.accessToken });
       } catch (_) {}
 
+      const linkedAccounts = await storage.getPlaidAccountsByItem(id);
+      for (const a of linkedAccounts) {
+        if (a.linkedAssetId) await storage.deleteAsset(a.linkedAssetId, userId);
+        if (a.linkedLiabilityId) await storage.deleteLiability(a.linkedLiabilityId, userId);
+      }
       await storage.deletePlaidAccountsByItem(id);
       await storage.deletePlaidItem(id, userId);
       res.status(204).send();

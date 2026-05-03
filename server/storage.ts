@@ -80,6 +80,7 @@ export interface IStorage {
   getPlaidAccounts(userId: string): Promise<PlaidAccount[]>;
   getPlaidAccountsByItem(plaidItemId: number): Promise<PlaidAccount[]>;
   upsertPlaidAccount(data: InsertPlaidAccount): Promise<PlaidAccount>;
+  updatePlaidAccount(id: number, data: Partial<PlaidAccount>): Promise<PlaidAccount | undefined>;
   deletePlaidAccountsByItem(plaidItemId: number): Promise<void>;
   updatePlaidItem(id: number, data: Partial<PlaidItem>): Promise<PlaidItem | undefined>;
 }
@@ -342,6 +343,11 @@ export class DatabaseStorage implements IStorage {
       })
       .returning();
     return result;
+  }
+
+  async updatePlaidAccount(id: number, data: Partial<PlaidAccount>): Promise<PlaidAccount | undefined> {
+    const [updated] = await db.update(plaidAccounts).set(data).where(eq(plaidAccounts.id, id)).returning();
+    return updated;
   }
 
   async deletePlaidAccountsByItem(plaidItemId: number): Promise<void> {

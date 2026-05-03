@@ -70,7 +70,9 @@ function PlaidLinkButton({ onSuccess }: { onSuccess: () => void }) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/plaid/accounts"] });
       queryClient.invalidateQueries({ queryKey: ["/api/plaid/create-link-token"] });
-      toast({ title: "Account connected!", description: "Your bank accounts are now synced." });
+      queryClient.invalidateQueries({ queryKey: ["/api/assets"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/liabilities"] });
+      toast({ title: "Account connected!", description: "Your accounts now appear under Assets and Liabilities." });
       onSuccess();
     },
     onError: () => {
@@ -137,6 +139,8 @@ export default function ConnectedAccountsPage() {
     mutationFn: (itemId: number) => apiRequest("POST", `/api/plaid/sync/${itemId}`, {}),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/plaid/accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/assets"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/liabilities"] });
       toast({ title: "Synced!", description: "Balances have been updated." });
       setSyncingId(null);
     },
@@ -150,7 +154,9 @@ export default function ConnectedAccountsPage() {
     mutationFn: (id: number) => apiRequest("DELETE", `/api/plaid/items/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/plaid/accounts"] });
-      toast({ title: "Disconnected", description: "Bank connection removed." });
+      queryClient.invalidateQueries({ queryKey: ["/api/assets"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/liabilities"] });
+      toast({ title: "Disconnected", description: "Bank connection and synced entries removed." });
     },
     onError: () => {
       toast({ title: "Error", description: "Could not disconnect account.", variant: "destructive" });
