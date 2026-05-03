@@ -158,7 +158,7 @@ export function AppHeader() {
         )}
 
         {/* Divider */}
-        <div className="h-6 w-px bg-gradient-to-b from-transparent via-blue-200 dark:via-blue-800/60 to-transparent mx-1" aria-hidden="true" />
+        <div className="h-7 w-px bg-gradient-to-b from-transparent via-blue-400 dark:via-blue-500 to-transparent mx-2" aria-hidden="true" />
 
         {/* User Menu */}
         <DropdownMenu open={userOpen} onOpenChange={setUserOpen}>
