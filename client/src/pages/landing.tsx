@@ -354,7 +354,7 @@ export default function LandingPage() {
               </Button>
             </div>
             <p className="text-xs text-muted-foreground mt-4">
-              No credit card required · Demo account available
+              No credit card required
             </p>
           </>
         )}
