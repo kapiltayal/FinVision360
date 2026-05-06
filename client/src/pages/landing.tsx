@@ -121,9 +121,6 @@ function AuthModal({
               <Button type="submit" className="w-full" disabled={login.isPending} data-testid="button-login">
                 {login.isPending ? "Signing in…" : "Sign In"}
               </Button>
-              <p className="text-xs text-center text-muted-foreground">
-                Demo: <span className="font-mono">demo</span> / <span className="font-mono">demo123</span>
-              </p>
             </form>
           </TabsContent>
           <TabsContent value="register">
