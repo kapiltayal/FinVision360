@@ -13,8 +13,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useLastUpdated } from "@/hooks/use-last-updated";
 import { ExportMenu } from "@/components/export-menu";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { Plus, Pencil, Trash2, CreditCard, TrendingDown, ChevronDown, Clock } from "lucide-react";
-import { type Liability, LIABILITY_CATEGORIES } from "@shared/schema";
+import { Plus, Pencil, Trash2, CreditCard, TrendingDown, ChevronDown, Clock, Link2 } from "lucide-react";
+import { type Liability, type PlaidAccount, LIABILITY_CATEGORIES } from "@shared/schema";
 import { formatCurrency, formatPercent, getCategoryLabel } from "@/lib/format";
 
 function LiabilityForm({
@@ -171,6 +171,8 @@ export default function LiabilitiesPage() {
   const { toast } = useToast();
   const { formattedDate, markUpdated } = useLastUpdated("liabilities");
   const { data: liabilities = [], isLoading } = useQuery<Liability[]>({ queryKey: ["/api/liabilities"] });
+  const { data: plaidAccounts = [] } = useQuery<PlaidAccount[]>({ queryKey: ["/api/plaid/accounts"] });
+  const plaidLinkedLiabilityIds = new Set(plaidAccounts.map((a) => a.linkedLiabilityId).filter(Boolean));
 
   const deleteMutation = useMutation({
     mutationFn: (id: number) => apiRequest("DELETE", `/api/liabilities/${id}`),
@@ -365,7 +367,12 @@ export default function LiabilitiesPage() {
                             <CardContent className="p-5">
                               <div className="flex items-start justify-between gap-1 mb-3">
                                 <div className="min-w-0">
-                                  <h3 className="font-semibold truncate">{liability.name}</h3>
+                                  <div className="flex items-center gap-1.5">
+                                    <h3 className="font-semibold truncate">{liability.name}</h3>
+                                    {plaidLinkedLiabilityIds.has(liability.id) && (
+                                      <Link2 className="h-3.5 w-3.5 shrink-0 text-blue-500" title="Synced via Plaid" />
+                                    )}
+                                  </div>
                                   {liability.institution && (
                                     <p className="text-xs text-muted-foreground mt-0.5 truncate">{liability.institution}</p>
                                   )}

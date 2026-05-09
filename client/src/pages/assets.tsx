@@ -13,8 +13,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useLastUpdated } from "@/hooks/use-last-updated";
 import { ExportMenu } from "@/components/export-menu";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { Plus, Pencil, Trash2, Wallet, TrendingUp, ChevronDown, Clock } from "lucide-react";
-import { type Asset, ASSET_CATEGORIES } from "@shared/schema";
+import { Plus, Pencil, Trash2, Wallet, TrendingUp, ChevronDown, Clock, Link2 } from "lucide-react";
+import { type Asset, type PlaidAccount, ASSET_CATEGORIES } from "@shared/schema";
 import { formatCurrency, formatPercent, getCategoryLabel } from "@/lib/format";
 
 function AssetForm({
@@ -159,6 +159,8 @@ export default function AssetsPage() {
   const { toast } = useToast();
   const { formattedDate, markUpdated } = useLastUpdated("assets");
   const { data: assets = [], isLoading } = useQuery<Asset[]>({ queryKey: ["/api/assets"] });
+  const { data: plaidAccounts = [] } = useQuery<PlaidAccount[]>({ queryKey: ["/api/plaid/accounts"] });
+  const plaidLinkedAssetIds = new Set(plaidAccounts.map((a) => a.linkedAssetId).filter(Boolean));
 
   const deleteMutation = useMutation({
     mutationFn: (id: number) => apiRequest("DELETE", `/api/assets/${id}`),
@@ -345,7 +347,12 @@ export default function AssetsPage() {
                             <CardContent className="p-5">
                               <div className="flex items-start justify-between gap-1 mb-3">
                                 <div className="min-w-0">
-                                  <h3 className="font-semibold truncate">{asset.name}</h3>
+                                  <div className="flex items-center gap-1.5">
+                                    <h3 className="font-semibold truncate">{asset.name}</h3>
+                                    {plaidLinkedAssetIds.has(asset.id) && (
+                                      <Link2 className="h-3.5 w-3.5 shrink-0 text-blue-500" title="Synced via Plaid" />
+                                    )}
+                                  </div>
                                   {asset.institution && (
                                     <p className="text-xs text-muted-foreground mt-0.5 truncate">{asset.institution}</p>
                                   )}
