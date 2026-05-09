@@ -159,8 +159,8 @@ export default function AssetsPage() {
   const { toast } = useToast();
   const { formattedDate, markUpdated } = useLastUpdated("assets");
   const { data: assets = [], isLoading } = useQuery<Asset[]>({ queryKey: ["/api/assets"] });
-  const { data: plaidAccounts = [] } = useQuery<PlaidAccount[]>({ queryKey: ["/api/plaid/accounts"] });
-  const plaidLinkedAssetIds = new Set(plaidAccounts.map((a) => a.linkedAssetId).filter(Boolean));
+  const { data: plaidData } = useQuery<{ accounts: PlaidAccount[]; items: any[] }>({ queryKey: ["/api/plaid/accounts"] });
+  const plaidLinkedAssetIds = new Set((plaidData?.accounts ?? []).map((a) => a.linkedAssetId).filter(Boolean));
 
   const deleteMutation = useMutation({
     mutationFn: (id: number) => apiRequest("DELETE", `/api/assets/${id}`),

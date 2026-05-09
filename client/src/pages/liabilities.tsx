@@ -171,8 +171,8 @@ export default function LiabilitiesPage() {
   const { toast } = useToast();
   const { formattedDate, markUpdated } = useLastUpdated("liabilities");
   const { data: liabilities = [], isLoading } = useQuery<Liability[]>({ queryKey: ["/api/liabilities"] });
-  const { data: plaidAccounts = [] } = useQuery<PlaidAccount[]>({ queryKey: ["/api/plaid/accounts"] });
-  const plaidLinkedLiabilityIds = new Set(plaidAccounts.map((a) => a.linkedLiabilityId).filter(Boolean));
+  const { data: plaidData } = useQuery<{ accounts: PlaidAccount[]; items: any[] }>({ queryKey: ["/api/plaid/accounts"] });
+  const plaidLinkedLiabilityIds = new Set((plaidData?.accounts ?? []).map((a) => a.linkedLiabilityId).filter(Boolean));
 
   const deleteMutation = useMutation({
     mutationFn: (id: number) => apiRequest("DELETE", `/api/liabilities/${id}`),
