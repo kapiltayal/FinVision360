@@ -16,6 +16,7 @@ import {
   Sparkles,
   Link2,
   UserCircle,
+  ScrollText,
 } from "lucide-react";
 import logoPath from "@assets/FinVision360_Logo_H_(transparent)_1776714495394.png";
 import { Button } from "@/components/ui/button";
@@ -36,6 +37,7 @@ const baseNavItems = [
   { title: "Income & Expenses", url: "/income-expenses", icon: ArrowLeftRight },
   { title: "Retirement", url: "/retirement", icon: Target },
   { title: "Insurance", url: "/insurance", icon: ShieldCheck },
+  { title: "Estate & Legacy", url: "/estate-planning", icon: ScrollText },
   { title: "AI Advisor", url: "/ai-advisor", icon: Brain },
 ];
 

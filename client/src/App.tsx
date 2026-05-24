@@ -17,6 +17,7 @@ import LiabilitiesPage from "@/pages/liabilities";
 import RetirementPage from "@/pages/retirement";
 import InsurancePage from "@/pages/insurance";
 import AIAdvisorPage from "@/pages/ai-advisor";
+import EstatePlanningPage from "@/pages/estate-planning";
 import SettingsPage from "@/pages/settings";
 import IncomeExpensesPage from "@/pages/income-expenses";
 import BankRatesPage from "@/pages/bank-rates";
@@ -48,6 +49,7 @@ function AuthenticatedApp() {
               <Route path="/retirement/401k" component={RetirementPage} />
               <Route path="/income-expenses" component={IncomeExpensesPage} />
               <Route path="/insurance" component={InsurancePage} />
+              <Route path="/estate-planning" component={EstatePlanningPage} />
               <Route path="/ai-advisor" component={AIAdvisorPage} />
               <Route path="/settings" component={SettingsPage} />
               <Route path="/bank-rates" component={BankRatesPage} />

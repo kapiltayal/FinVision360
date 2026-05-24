@@ -14,8 +14,12 @@ import {
   type BankRate, type InsertBankRate,
   type PlaidItem, type InsertPlaidItem,
   type PlaidAccount, type InsertPlaidAccount,
+  type EstateBeneficiary, type InsertEstateBeneficiary,
+  type EstateDocument, type InsertEstateDocument,
+  type EstateContact, type InsertEstateContact,
   users, assets, liabilities, retirementGoals, retirement401kGoals, insurancePolicies, incomeEntries, expenseEntries, recommendationSettings,
   bankConfigs, bankRates, plaidItems, plaidAccounts,
+  estateBeneficiaries, estateDocuments, estateContacts,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -83,6 +87,17 @@ export interface IStorage {
   updatePlaidAccount(id: number, data: Partial<PlaidAccount>): Promise<PlaidAccount | undefined>;
   deletePlaidAccountsByItem(plaidItemId: number): Promise<void>;
   updatePlaidItem(id: number, data: Partial<PlaidItem>): Promise<PlaidItem | undefined>;
+
+  getEstateBeneficiaries(userId: string): Promise<EstateBeneficiary[]>;
+  upsertEstateBeneficiary(data: InsertEstateBeneficiary): Promise<EstateBeneficiary>;
+
+  getEstateDocuments(userId: string): Promise<EstateDocument[]>;
+  upsertEstateDocument(data: InsertEstateDocument): Promise<EstateDocument>;
+
+  getEstateContacts(userId: string): Promise<EstateContact[]>;
+  createEstateContact(data: InsertEstateContact): Promise<EstateContact>;
+  updateEstateContact(id: number, userId: string, data: Partial<InsertEstateContact>): Promise<EstateContact | undefined>;
+  deleteEstateContact(id: number, userId: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -352,6 +367,58 @@ export class DatabaseStorage implements IStorage {
 
   async deletePlaidAccountsByItem(plaidItemId: number): Promise<void> {
     await db.delete(plaidAccounts).where(eq(plaidAccounts.plaidItemId, plaidItemId));
+  }
+
+  async getEstateBeneficiaries(userId: string): Promise<EstateBeneficiary[]> {
+    return db.select().from(estateBeneficiaries).where(eq(estateBeneficiaries.userId, userId));
+  }
+
+  async upsertEstateBeneficiary(data: InsertEstateBeneficiary): Promise<EstateBeneficiary> {
+    const existing = await db.select().from(estateBeneficiaries)
+      .where(and(eq(estateBeneficiaries.userId, data.userId), eq(estateBeneficiaries.assetId, data.assetId)));
+    if (existing.length > 0) {
+      const [updated] = await db.update(estateBeneficiaries).set(data)
+        .where(eq(estateBeneficiaries.id, existing[0].id)).returning();
+      return updated;
+    }
+    const [created] = await db.insert(estateBeneficiaries).values(data).returning();
+    return created;
+  }
+
+  async getEstateDocuments(userId: string): Promise<EstateDocument[]> {
+    return db.select().from(estateDocuments).where(eq(estateDocuments.userId, userId));
+  }
+
+  async upsertEstateDocument(data: InsertEstateDocument): Promise<EstateDocument> {
+    const existing = await db.select().from(estateDocuments)
+      .where(and(eq(estateDocuments.userId, data.userId), eq(estateDocuments.documentType, data.documentType)));
+    if (existing.length > 0) {
+      const [updated] = await db.update(estateDocuments)
+        .set({ ...data, updatedAt: new Date() })
+        .where(eq(estateDocuments.id, existing[0].id)).returning();
+      return updated;
+    }
+    const [created] = await db.insert(estateDocuments).values({ ...data, updatedAt: new Date() }).returning();
+    return created;
+  }
+
+  async getEstateContacts(userId: string): Promise<EstateContact[]> {
+    return db.select().from(estateContacts).where(eq(estateContacts.userId, userId));
+  }
+
+  async createEstateContact(data: InsertEstateContact): Promise<EstateContact> {
+    const [created] = await db.insert(estateContacts).values(data).returning();
+    return created;
+  }
+
+  async updateEstateContact(id: number, userId: string, data: Partial<InsertEstateContact>): Promise<EstateContact | undefined> {
+    const [updated] = await db.update(estateContacts).set(data)
+      .where(and(eq(estateContacts.id, id), eq(estateContacts.userId, userId))).returning();
+    return updated;
+  }
+
+  async deleteEstateContact(id: number, userId: string): Promise<void> {
+    await db.delete(estateContacts).where(and(eq(estateContacts.id, id), eq(estateContacts.userId, userId)));
   }
 }
 

@@ -472,6 +472,62 @@ Use markdown formatting with headers and bold key numbers.`;
     res.json({ ok: true });
   });
 
+  // ── Estate & Legacy Planning routes ─────────────────────────────────────────
+
+  app.get("/api/estate/beneficiaries", requireAuth, async (req, res) => {
+    const userId = (req.user as any).id;
+    res.json(await storage.getEstateBeneficiaries(userId));
+  });
+
+  app.put("/api/estate/beneficiaries", requireAuth, async (req, res) => {
+    const userId = (req.user as any).id;
+    const { assetId, hasBeneficiary, beneficiaryName, notes } = req.body;
+    if (!assetId) return res.status(400).json({ message: "assetId is required" });
+    const record = await storage.upsertEstateBeneficiary({ userId, assetId, hasBeneficiary: !!hasBeneficiary, beneficiaryName, notes });
+    res.json(record);
+  });
+
+  app.get("/api/estate/documents", requireAuth, async (req, res) => {
+    const userId = (req.user as any).id;
+    res.json(await storage.getEstateDocuments(userId));
+  });
+
+  app.put("/api/estate/documents", requireAuth, async (req, res) => {
+    const userId = (req.user as any).id;
+    const { documentType, isComplete, notes } = req.body;
+    if (!documentType) return res.status(400).json({ message: "documentType is required" });
+    const record = await storage.upsertEstateDocument({ userId, documentType, isComplete: !!isComplete, notes });
+    res.json(record);
+  });
+
+  app.get("/api/estate/contacts", requireAuth, async (req, res) => {
+    const userId = (req.user as any).id;
+    res.json(await storage.getEstateContacts(userId));
+  });
+
+  app.post("/api/estate/contacts", requireAuth, async (req, res) => {
+    const userId = (req.user as any).id;
+    const { name, role, phone, email, firm, notes } = req.body;
+    if (!name || !role) return res.status(400).json({ message: "Name and role are required" });
+    const contact = await storage.createEstateContact({ userId, name, role, phone, email, firm, notes });
+    res.status(201).json(contact);
+  });
+
+  app.put("/api/estate/contacts/:id", requireAuth, async (req, res) => {
+    const userId = (req.user as any).id;
+    const id = parseInt(req.params.id);
+    const contact = await storage.updateEstateContact(id, userId, req.body);
+    if (!contact) return res.status(404).json({ message: "Contact not found" });
+    res.json(contact);
+  });
+
+  app.delete("/api/estate/contacts/:id", requireAuth, async (req, res) => {
+    const userId = (req.user as any).id;
+    const id = parseInt(req.params.id);
+    await storage.deleteEstateContact(id, userId);
+    res.status(204).send();
+  });
+
   // Seed default bank configs if none exist
   app.post("/api/bank-configs/seed-defaults", requireAdmin, async (_req, res) => {
     const existing = await storage.getBankConfigs();

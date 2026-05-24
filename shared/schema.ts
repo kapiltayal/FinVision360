@@ -324,3 +324,67 @@ export const LIABILITY_CATEGORIES = [
   { value: "auto_loan", label: "Auto Loan" },
   { value: "other", label: "Other" },
 ] as const;
+
+// ── Estate & Legacy Planning ─────────────────────────────────────────────────
+
+export const estateBeneficiaries = pgTable("estate_beneficiaries", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  assetId: integer("asset_id").notNull().references(() => assets.id, { onDelete: "cascade" }),
+  hasBeneficiary: boolean("has_beneficiary").default(false).notNull(),
+  beneficiaryName: text("beneficiary_name"),
+  notes: text("notes"),
+});
+
+export const insertEstateBeneficiarySchema = createInsertSchema(estateBeneficiaries).omit({ id: true });
+export type InsertEstateBeneficiary = z.infer<typeof insertEstateBeneficiarySchema>;
+export type EstateBeneficiary = typeof estateBeneficiaries.$inferSelect;
+
+export const estateDocuments = pgTable("estate_documents", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  documentType: text("document_type").notNull(),
+  isComplete: boolean("is_complete").default(false).notNull(),
+  notes: text("notes"),
+  updatedAt: timestamp("updated_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
+});
+
+export const insertEstateDocumentSchema = createInsertSchema(estateDocuments).omit({ id: true, updatedAt: true });
+export type InsertEstateDocument = z.infer<typeof insertEstateDocumentSchema>;
+export type EstateDocument = typeof estateDocuments.$inferSelect;
+
+export const estateContacts = pgTable("estate_contacts", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  role: text("role").notNull(),
+  phone: text("phone"),
+  email: text("email"),
+  firm: text("firm"),
+  notes: text("notes"),
+});
+
+export const insertEstateContactSchema = createInsertSchema(estateContacts).omit({ id: true });
+export type InsertEstateContact = z.infer<typeof insertEstateContactSchema>;
+export type EstateContact = typeof estateContacts.$inferSelect;
+
+export const ESTATE_DOCUMENT_TYPES = [
+  { key: "will", label: "Last Will & Testament" },
+  { key: "trust", label: "Revocable Living Trust" },
+  { key: "poa_financial", label: "Durable Power of Attorney (Financial)" },
+  { key: "poa_healthcare", label: "Healthcare Power of Attorney" },
+  { key: "living_will", label: "Living Will / Advance Directive" },
+  { key: "hipaa", label: "HIPAA Authorization" },
+  { key: "beneficiary_designations", label: "Beneficiary Designations Updated" },
+  { key: "letter_of_intent", label: "Letter of Intent / Final Instructions" },
+] as const;
+
+export const ESTATE_CONTACT_ROLES = [
+  { value: "attorney", label: "Estate Attorney" },
+  { value: "executor", label: "Executor / Personal Representative" },
+  { value: "trustee", label: "Trustee" },
+  { value: "financial_advisor", label: "Financial Advisor" },
+  { value: "accountant", label: "Accountant / CPA" },
+  { value: "guardian", label: "Guardian (for minors)" },
+  { value: "other", label: "Other" },
+] as const;

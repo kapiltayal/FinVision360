@@ -19,6 +19,7 @@ A comprehensive personal finance application that helps users track assets, liab
 - Insurance & Annuities policy management
 - Retirement planning with interactive projections (Retirement Planner + 401k Calculator)
 - AI-powered financial advisor (scenario planning, debt reduction strategies, net worth forecasting)
+- Estate & Legacy Planning (beneficiary designations per asset, document checklist, key contacts)
 - Account settings (profile, password change)
 - Dark mode support
 - "Last updated" timestamps on all data-entry pages
@@ -29,6 +30,9 @@ A comprehensive personal finance application that helps users track assets, liab
 - `assets` - Financial assets with categories, values, interest rates
 - `liabilities` - Debts with categories, balances, interest rates, minimum payments
 - `retirement_goals` - Retirement planning parameters per user
+- `estate_beneficiaries` - Per-asset beneficiary designation records
+- `estate_documents` - Estate planning document checklist (8 document types)
+- `estate_contacts` - Key estate contacts (attorney, executor, advisor, etc.)
 
 ## Demo Account
 - Username: `demo` / Password: `demo123`

@@ -27,8 +27,11 @@ import {
   Target,
   ShieldCheck,
   Banknote,
+  ScrollText,
+  UserCheck,
+  Users,
 } from "lucide-react";
-import { type Asset, type Liability, type IncomeEntry, type ExpenseEntry, type InsurancePolicy, type RetirementGoal, type Retirement401kGoal } from "@shared/schema";
+import { type Asset, type Liability, type IncomeEntry, type ExpenseEntry, type InsurancePolicy, type RetirementGoal, type Retirement401kGoal, type EstateBeneficiary, type EstateDocument, type EstateContact, ESTATE_DOCUMENT_TYPES } from "@shared/schema";
 
 const FREQ: Record<string, number> = {
   weekly: 52 / 12, biweekly: 26 / 12, monthly: 1, quarterly: 1 / 3, annual: 1 / 12,
@@ -119,6 +122,9 @@ export default function SnapshotPage() {
   const { data: policies = [], isLoading: pL } = useQuery<InsurancePolicy[]>({ queryKey: ["/api/insurance"] });
   const { data: retGoal } = useQuery<RetirementGoal | null>({ queryKey: ["/api/retirement"] });
   const { data: goal401k } = useQuery<Retirement401kGoal | null>({ queryKey: ["/api/retirement/401k"] });
+  const { data: estateBeneficiaries = [] } = useQuery<EstateBeneficiary[]>({ queryKey: ["/api/estate/beneficiaries"] });
+  const { data: estateDocuments = [] } = useQuery<EstateDocument[]>({ queryKey: ["/api/estate/documents"] });
+  const { data: estateContacts = [] } = useQuery<EstateContact[]>({ queryKey: ["/api/estate/contacts"] });
 
   const isLoading = aL || lL || iL || eL || pL;
 
@@ -525,8 +531,56 @@ export default function SnapshotPage() {
           </div>
         </SnapshotCard>
 
+        {/* ── Estate & Legacy ── */}
+        <SnapshotCard title="Estate & Legacy" accent="#0d9488" icon={ScrollText} href="/estate-planning">
+          {(() => {
+            const docsComplete = ESTATE_DOCUMENT_TYPES.filter(d => estateDocuments.find(r => r.documentType === d.key && r.isComplete)).length;
+            const totalDocs = ESTATE_DOCUMENT_TYPES.length;
+            const assetsWithBen = estateBeneficiaries.filter(b => b.hasBeneficiary).length;
+            const totalAssetCount = assets.length;
+            const docPct = totalDocs > 0 ? Math.round((docsComplete / totalDocs) * 100) : 0;
+            const benPct = totalAssetCount > 0 ? Math.round((assetsWithBen / totalAssetCount) * 100) : 0;
+            const overallPct = Math.round((docPct + benPct) / 2);
+
+            return (
+              <div className="space-y-4">
+                <div className="text-center mb-2">
+                  <p className="text-3xl font-bold tabular-nums leading-none text-teal-500" data-testid="text-snapshot-estate-pct">
+                    {overallPct}%
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">Overall readiness</p>
+                </div>
+                <div className="space-y-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+                  <div>
+                    <div className="flex justify-between text-xs mb-1">
+                      <span className="text-muted-foreground flex items-center gap-1"><CheckCircle2 className="h-3 w-3" /> Documents</span>
+                      <span className="font-medium">{docsComplete}/{totalDocs}</span>
+                    </div>
+                    <div className="h-1.5 rounded-full bg-slate-100 dark:bg-slate-800">
+                      <div className="h-full rounded-full bg-teal-500 transition-all duration-500" style={{ width: `${docPct}%` }} />
+                    </div>
+                  </div>
+                  <div>
+                    <div className="flex justify-between text-xs mb-1">
+                      <span className="text-muted-foreground flex items-center gap-1"><UserCheck className="h-3 w-3" /> Beneficiaries</span>
+                      <span className="font-medium">{assetsWithBen}/{totalAssetCount}</span>
+                    </div>
+                    <div className="h-1.5 rounded-full bg-slate-100 dark:bg-slate-800">
+                      <div className="h-full rounded-full bg-blue-500 transition-all duration-500" style={{ width: `${benPct}%` }} />
+                    </div>
+                  </div>
+                  <div className="flex justify-between text-xs pt-1">
+                    <span className="text-muted-foreground flex items-center gap-1"><Users className="h-3 w-3" /> Key Contacts</span>
+                    <span className="font-medium">{estateContacts.length} added</span>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+        </SnapshotCard>
+
         {/* ── Recommendations ── */}
-        <SnapshotCard title="Financial Recommendations" accent="#6366f1" icon={Lightbulb}>
+        <SnapshotCard title="Financial Recommendations" accent="#6366f1" icon={Lightbulb} className="md:col-span-3">
           <div className="space-y-3">
             {recommendations.map((rec, i) => (
               <div
