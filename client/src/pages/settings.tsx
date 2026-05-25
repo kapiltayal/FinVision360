@@ -65,18 +65,18 @@ type RecommendationFields = {
 };
 
 const DEFAULT_REC: RecommendationFields = {
-  checkingThreshold: "",
-  savingsThreshold: "",
-  cdsThreshold: "",
-  studentLoanThreshold: "",
-  creditCardThreshold: "",
-  autoLoanThreshold: "",
-  personalLoanThreshold: "",
-  mortgageThreshold: "",
-  autoInsuranceThreshold: "",
-  homeInsuranceThreshold: "",
-  lifeInsuranceThreshold: "",
-  otherInsuranceThreshold: "",
+  checkingThreshold: "200",
+  savingsThreshold: "200",
+  cdsThreshold: "200",
+  studentLoanThreshold: "200",
+  creditCardThreshold: "200",
+  autoLoanThreshold: "200",
+  personalLoanThreshold: "200",
+  mortgageThreshold: "200",
+  autoInsuranceThreshold: "100",
+  homeInsuranceThreshold: "100",
+  lifeInsuranceThreshold: "100",
+  otherInsuranceThreshold: "100",
 };
 
 function numericToStr(v: string | null | undefined): string {
