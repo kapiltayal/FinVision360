@@ -61,29 +61,28 @@ app.use((req, res, next) => {
 });
 
 (async () => {
-  // Ensure estate planning tables exist on every startup (safe on existing DBs)
+  // Ensure estate planning tables exist on every startup (safe on existing DBs).
+  // No FK constraints here so this works on a fresh DB before db:push has run.
   await pool.query(`
     CREATE TABLE IF NOT EXISTS estate_beneficiaries (
       id SERIAL PRIMARY KEY,
-      user_id VARCHAR NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      asset_id INTEGER NOT NULL REFERENCES assets(id) ON DELETE CASCADE,
+      user_id VARCHAR NOT NULL,
+      asset_id INTEGER NOT NULL,
       has_beneficiary BOOLEAN NOT NULL DEFAULT false,
       beneficiary_name TEXT,
-      notes TEXT,
-      CONSTRAINT estate_beneficiaries_user_asset_unique UNIQUE (user_id, asset_id)
+      notes TEXT
     );
     CREATE TABLE IF NOT EXISTS estate_documents (
       id SERIAL PRIMARY KEY,
-      user_id VARCHAR NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      user_id VARCHAR NOT NULL,
       document_type TEXT NOT NULL,
       is_complete BOOLEAN NOT NULL DEFAULT false,
       notes TEXT,
-      updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      CONSTRAINT estate_documents_user_type_unique UNIQUE (user_id, document_type)
+      updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
     CREATE TABLE IF NOT EXISTS estate_contacts (
       id SERIAL PRIMARY KEY,
-      user_id VARCHAR NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      user_id VARCHAR NOT NULL,
       name TEXT NOT NULL,
       role TEXT NOT NULL,
       phone TEXT,
@@ -92,6 +91,24 @@ app.use((req, res, next) => {
       notes TEXT
     );
   `).catch((e) => console.error("Estate table init error:", e));
+
+  // Add unique constraints if missing (needed for ON CONFLICT upserts).
+  await pool.query(`
+    DO $$ BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'estate_beneficiaries_user_asset_unique'
+      ) THEN
+        ALTER TABLE estate_beneficiaries ADD CONSTRAINT estate_beneficiaries_user_asset_unique UNIQUE (user_id, asset_id);
+      END IF;
+    END $$;
+    DO $$ BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'estate_documents_user_type_unique'
+      ) THEN
+        ALTER TABLE estate_documents ADD CONSTRAINT estate_documents_user_type_unique UNIQUE (user_id, document_type);
+      END IF;
+    END $$;
+  `).catch((e) => console.error("Estate constraint init error:", e));
 
   if (process.env.NODE_ENV !== "production") {
     const { seedDatabase } = await import("./seed");
