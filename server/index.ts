@@ -2,6 +2,7 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
+import { pool } from "./db";
 
 const app = express();
 const httpServer = createServer(app);
@@ -60,6 +61,38 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  // Ensure estate planning tables exist on every startup (safe on existing DBs)
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS estate_beneficiaries (
+      id SERIAL PRIMARY KEY,
+      user_id VARCHAR NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      asset_id INTEGER NOT NULL REFERENCES assets(id) ON DELETE CASCADE,
+      has_beneficiary BOOLEAN NOT NULL DEFAULT false,
+      beneficiary_name TEXT,
+      notes TEXT,
+      CONSTRAINT estate_beneficiaries_user_asset_unique UNIQUE (user_id, asset_id)
+    );
+    CREATE TABLE IF NOT EXISTS estate_documents (
+      id SERIAL PRIMARY KEY,
+      user_id VARCHAR NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      document_type TEXT NOT NULL,
+      is_complete BOOLEAN NOT NULL DEFAULT false,
+      notes TEXT,
+      updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT estate_documents_user_type_unique UNIQUE (user_id, document_type)
+    );
+    CREATE TABLE IF NOT EXISTS estate_contacts (
+      id SERIAL PRIMARY KEY,
+      user_id VARCHAR NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      name TEXT NOT NULL,
+      role TEXT NOT NULL,
+      phone TEXT,
+      email TEXT,
+      firm TEXT,
+      notes TEXT
+    );
+  `).catch((e) => console.error("Estate table init error:", e));
+
   if (process.env.NODE_ENV !== "production") {
     const { seedDatabase } = await import("./seed");
     await seedDatabase().catch((e) => console.error("Seed error:", e));
