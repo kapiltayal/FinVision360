@@ -38,7 +38,7 @@ function DollarInput({
           id={id}
           type="number"
           min="0"
-          step="100"
+          step="1"
           className="pl-7"
           placeholder={placeholder}
           value={value}
