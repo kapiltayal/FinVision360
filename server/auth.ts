@@ -80,6 +80,21 @@ export function setupAuth(app: Express) {
       }
       const hashedPassword = await hashPassword(password);
       const user = await storage.createUser({ username, password: hashedPassword, fullName, email });
+      await storage.upsertRecommendationSettings({
+        userId: user.id,
+        checkingThreshold: "200",
+        savingsThreshold: "200",
+        cdsThreshold: "200",
+        studentLoanThreshold: "200",
+        creditCardThreshold: "200",
+        autoLoanThreshold: "200",
+        personalLoanThreshold: "200",
+        mortgageThreshold: "200",
+        autoInsuranceThreshold: "100",
+        homeInsuranceThreshold: "100",
+        lifeInsuranceThreshold: "100",
+        otherInsuranceThreshold: "100",
+      });
       req.login(user, (err) => {
         if (err) return res.status(500).json({ message: "Login failed after registration" });
         const { password: _, ...safeUser } = user;

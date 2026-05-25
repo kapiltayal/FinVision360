@@ -53,5 +53,21 @@ export async function seedDatabase() {
     targetAmount: "2000000",
   });
 
+  await storage.upsertRecommendationSettings({
+    userId: user.id,
+    checkingThreshold: "200",
+    savingsThreshold: "200",
+    cdsThreshold: "200",
+    studentLoanThreshold: "200",
+    creditCardThreshold: "200",
+    autoLoanThreshold: "200",
+    personalLoanThreshold: "200",
+    mortgageThreshold: "200",
+    autoInsuranceThreshold: "100",
+    homeInsuranceThreshold: "100",
+    lifeInsuranceThreshold: "100",
+    otherInsuranceThreshold: "100",
+  });
+
   console.log("Seed data created: demo/demo123");
 }
