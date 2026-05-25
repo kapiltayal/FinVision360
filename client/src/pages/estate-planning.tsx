@@ -151,6 +151,7 @@ export default function EstatePlanningPage() {
   const [contactDialogOpen, setContactDialogOpen] = useState(false);
   const [editingContact, setEditingContact] = useState<EstateContact | undefined>();
   const [openBeneficiaryAsset, setOpenBeneficiaryAsset] = useState<number | null>(null);
+  const [benEdits, setBenEdits] = useState<Record<number, { name: string; notes: string }>>({});
 
   const { data: assets = [], isLoading: aLoading } = useQuery<Asset[]>({ queryKey: ["/api/assets"] });
   const { data: beneficiaries = [], isLoading: bLoading } = useQuery<EstateBeneficiary[]>({ queryKey: ["/api/estate/beneficiaries"] });
@@ -167,7 +168,10 @@ export default function EstatePlanningPage() {
 
   const upsertBeneficiaryMutation = useMutation({
     mutationFn: (data: any) => apiRequest("PUT", "/api/estate/beneficiaries", data),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/estate/beneficiaries"] }),
+    onSuccess: (_, vars) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/estate/beneficiaries"] });
+      if (vars.beneficiaryName !== undefined) toast({ title: "Beneficiary saved" });
+    },
     onError: () => toast({ title: "Failed to save", variant: "destructive" }),
   });
 
@@ -252,6 +256,30 @@ export default function EstatePlanningPage() {
                 const hasBen = ben?.hasBeneficiary ?? false;
                 const isExpanded = openBeneficiaryAsset === asset.id;
 
+                const localEdit = benEdits[asset.id];
+
+                const handleExpand = (open: boolean) => {
+                  setOpenBeneficiaryAsset(open ? asset.id : null);
+                  if (open) {
+                    setBenEdits((prev) => ({
+                      ...prev,
+                      [asset.id]: {
+                        name: ben?.beneficiaryName || "",
+                        notes: ben?.notes || "",
+                      },
+                    }));
+                  }
+                };
+
+                const handleSaveBeneficiary = () => {
+                  upsertBeneficiaryMutation.mutate({
+                    assetId: asset.id,
+                    hasBeneficiary: hasBen,
+                    beneficiaryName: localEdit?.name || null,
+                    notes: localEdit?.notes || null,
+                  });
+                };
+
                 return (
                   <div key={asset.id} data-testid={`beneficiary-row-${asset.id}`}>
                     <div className="flex items-center justify-between py-3 px-1 gap-3">
@@ -281,55 +309,57 @@ export default function EstatePlanningPage() {
                               beneficiaryName: ben?.beneficiaryName || null,
                               notes: ben?.notes || null,
                             });
-                            if (checked) setOpenBeneficiaryAsset(asset.id);
+                            if (checked) handleExpand(true);
                           }}
                         />
                         <Button
                           size="icon"
                           variant="ghost"
                           className="h-7 w-7"
-                          onClick={() => setOpenBeneficiaryAsset(isExpanded ? null : asset.id)}
+                          onClick={() => handleExpand(!isExpanded)}
                           data-testid={`button-expand-beneficiary-${asset.id}`}
                         >
                           {isExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
                         </Button>
                       </div>
                     </div>
-                    {isExpanded && (
-                      <div className="pb-3 px-1 grid grid-cols-1 sm:grid-cols-2 gap-3 bg-muted/30 rounded-lg p-3 mb-2">
-                        <div className="space-y-1.5">
-                          <Label className="text-xs">Beneficiary Name</Label>
-                          <Input
-                            data-testid={`input-beneficiary-name-${asset.id}`}
-                            defaultValue={ben?.beneficiaryName || ""}
-                            placeholder="e.g., John Doe"
-                            className="h-8 text-sm"
-                            onBlur={(e) => {
-                              upsertBeneficiaryMutation.mutate({
-                                assetId: asset.id,
-                                hasBeneficiary: hasBen,
-                                beneficiaryName: e.target.value || null,
-                                notes: ben?.notes || null,
-                              });
-                            }}
-                          />
+                    {isExpanded && localEdit && (
+                      <div className="pb-3 px-1 mb-2">
+                        <div className="bg-muted/30 rounded-lg p-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div className="space-y-1.5">
+                            <Label className="text-xs">Beneficiary Name</Label>
+                            <Input
+                              data-testid={`input-beneficiary-name-${asset.id}`}
+                              value={localEdit.name}
+                              onChange={(e) =>
+                                setBenEdits((prev) => ({ ...prev, [asset.id]: { ...prev[asset.id], name: e.target.value } }))
+                              }
+                              placeholder="e.g., John Doe"
+                              className="h-8 text-sm"
+                            />
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label className="text-xs">Notes</Label>
+                            <Input
+                              data-testid={`input-beneficiary-notes-${asset.id}`}
+                              value={localEdit.notes}
+                              onChange={(e) =>
+                                setBenEdits((prev) => ({ ...prev, [asset.id]: { ...prev[asset.id], notes: e.target.value } }))
+                              }
+                              placeholder="e.g., 50% to each"
+                              className="h-8 text-sm"
+                            />
+                          </div>
                         </div>
-                        <div className="space-y-1.5">
-                          <Label className="text-xs">Notes</Label>
-                          <Input
-                            data-testid={`input-beneficiary-notes-${asset.id}`}
-                            defaultValue={ben?.notes || ""}
-                            placeholder="e.g., 50% to each"
-                            className="h-8 text-sm"
-                            onBlur={(e) => {
-                              upsertBeneficiaryMutation.mutate({
-                                assetId: asset.id,
-                                hasBeneficiary: hasBen,
-                                beneficiaryName: ben?.beneficiaryName || null,
-                                notes: e.target.value || null,
-                              });
-                            }}
-                          />
+                        <div className="flex justify-end mt-2">
+                          <Button
+                            size="sm"
+                            onClick={handleSaveBeneficiary}
+                            disabled={upsertBeneficiaryMutation.isPending}
+                            data-testid={`button-save-beneficiary-${asset.id}`}
+                          >
+                            {upsertBeneficiaryMutation.isPending ? "Saving..." : "Save"}
+                          </Button>
                         </div>
                       </div>
                     )}
