@@ -40,7 +40,7 @@ function AuthenticatedApp() {
           <div className="flex-1">
             <Switch>
               <Route path="/snapshot" component={SnapshotPage} />
-              <Route path="/" component={SnapshotPage} />
+              <Route path="/" component={DashboardPage} />
               <Route path="/home" component={LandingPage} />
               <Route path="/assets" component={AssetsPage} />
               <Route path="/liabilities" component={LiabilitiesPage} />
