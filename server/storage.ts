@@ -1,5 +1,5 @@
 import { eq, and, desc } from "drizzle-orm";
-import { db } from "./db";
+import { db, pool } from "./db";
 import {
   type User, type InsertUser,
   type Asset, type InsertAsset,
@@ -370,55 +370,83 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getEstateBeneficiaries(userId: string): Promise<EstateBeneficiary[]> {
-    return db.select().from(estateBeneficiaries).where(eq(estateBeneficiaries.userId, userId));
+    const res = await pool.query(
+      `SELECT id, user_id AS "userId", asset_id AS "assetId", has_beneficiary AS "hasBeneficiary", beneficiary_name AS "beneficiaryName", notes
+       FROM estate_beneficiaries WHERE user_id = $1`,
+      [userId]
+    );
+    return res.rows;
   }
 
   async upsertEstateBeneficiary(data: InsertEstateBeneficiary): Promise<EstateBeneficiary> {
-    const existing = await db.select().from(estateBeneficiaries)
-      .where(and(eq(estateBeneficiaries.userId, data.userId), eq(estateBeneficiaries.assetId, data.assetId)));
-    if (existing.length > 0) {
-      const [updated] = await db.update(estateBeneficiaries).set(data)
-        .where(eq(estateBeneficiaries.id, existing[0].id)).returning();
-      return updated;
-    }
-    const [created] = await db.insert(estateBeneficiaries).values(data).returning();
-    return created;
+    const res = await pool.query(
+      `INSERT INTO estate_beneficiaries (user_id, asset_id, has_beneficiary, beneficiary_name, notes)
+       VALUES ($1, $2, $3, $4, $5)
+       ON CONFLICT (user_id, asset_id) DO UPDATE
+         SET has_beneficiary = EXCLUDED.has_beneficiary,
+             beneficiary_name = EXCLUDED.beneficiary_name,
+             notes = EXCLUDED.notes
+       RETURNING id, user_id AS "userId", asset_id AS "assetId", has_beneficiary AS "hasBeneficiary", beneficiary_name AS "beneficiaryName", notes`,
+      [data.userId, data.assetId, data.hasBeneficiary, data.beneficiaryName ?? null, data.notes ?? null]
+    );
+    return res.rows[0];
   }
 
   async getEstateDocuments(userId: string): Promise<EstateDocument[]> {
-    return db.select().from(estateDocuments).where(eq(estateDocuments.userId, userId));
+    const res = await pool.query(
+      `SELECT id, user_id AS "userId", document_type AS "documentType", is_complete AS "isComplete", notes, updated_at AS "updatedAt"
+       FROM estate_documents WHERE user_id = $1`,
+      [userId]
+    );
+    return res.rows;
   }
 
   async upsertEstateDocument(data: InsertEstateDocument): Promise<EstateDocument> {
-    const existing = await db.select().from(estateDocuments)
-      .where(and(eq(estateDocuments.userId, data.userId), eq(estateDocuments.documentType, data.documentType)));
-    if (existing.length > 0) {
-      const [updated] = await db.update(estateDocuments)
-        .set({ ...data, updatedAt: new Date() })
-        .where(eq(estateDocuments.id, existing[0].id)).returning();
-      return updated;
-    }
-    const [created] = await db.insert(estateDocuments).values({ ...data, updatedAt: new Date() }).returning();
-    return created;
+    const res = await pool.query(
+      `INSERT INTO estate_documents (user_id, document_type, is_complete, notes, updated_at)
+       VALUES ($1, $2, $3, $4, NOW())
+       ON CONFLICT (user_id, document_type) DO UPDATE
+         SET is_complete = EXCLUDED.is_complete,
+             notes = EXCLUDED.notes,
+             updated_at = NOW()
+       RETURNING id, user_id AS "userId", document_type AS "documentType", is_complete AS "isComplete", notes, updated_at AS "updatedAt"`,
+      [data.userId, data.documentType, data.isComplete, data.notes ?? null]
+    );
+    return res.rows[0];
   }
 
   async getEstateContacts(userId: string): Promise<EstateContact[]> {
-    return db.select().from(estateContacts).where(eq(estateContacts.userId, userId));
+    const res = await pool.query(
+      `SELECT id, user_id AS "userId", name, role, phone, email, firm, notes
+       FROM estate_contacts WHERE user_id = $1 ORDER BY id`,
+      [userId]
+    );
+    return res.rows;
   }
 
   async createEstateContact(data: InsertEstateContact): Promise<EstateContact> {
-    const [created] = await db.insert(estateContacts).values(data).returning();
-    return created;
+    const res = await pool.query(
+      `INSERT INTO estate_contacts (user_id, name, role, phone, email, firm, notes)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       RETURNING id, user_id AS "userId", name, role, phone, email, firm, notes`,
+      [data.userId, data.name, data.role, data.phone ?? null, data.email ?? null, data.firm ?? null, data.notes ?? null]
+    );
+    return res.rows[0];
   }
 
   async updateEstateContact(id: number, userId: string, data: Partial<InsertEstateContact>): Promise<EstateContact | undefined> {
-    const [updated] = await db.update(estateContacts).set(data)
-      .where(and(eq(estateContacts.id, id), eq(estateContacts.userId, userId))).returning();
-    return updated;
+    const res = await pool.query(
+      `UPDATE estate_contacts
+       SET name = COALESCE($3, name), role = COALESCE($4, role), phone = $5, email = $6, firm = $7, notes = $8
+       WHERE id = $1 AND user_id = $2
+       RETURNING id, user_id AS "userId", name, role, phone, email, firm, notes`,
+      [id, userId, data.name ?? null, data.role ?? null, data.phone ?? null, data.email ?? null, data.firm ?? null, data.notes ?? null]
+    );
+    return res.rows[0];
   }
 
   async deleteEstateContact(id: number, userId: string): Promise<void> {
-    await db.delete(estateContacts).where(and(eq(estateContacts.id, id), eq(estateContacts.userId, userId)));
+    await pool.query(`DELETE FROM estate_contacts WHERE id = $1 AND user_id = $2`, [id, userId]);
   }
 }
 
