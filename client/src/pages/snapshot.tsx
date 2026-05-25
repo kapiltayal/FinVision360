@@ -553,20 +553,20 @@ export default function SnapshotPage() {
                 <div className="space-y-3 pt-3 border-t border-slate-100 dark:border-slate-800">
                   <div>
                     <div className="flex justify-between text-xs mb-1">
-                      <span className="text-muted-foreground flex items-center gap-1"><CheckCircle2 className="h-3 w-3" /> Documents</span>
-                      <span className="font-medium">{docsComplete}/{totalDocs}</span>
-                    </div>
-                    <div className="h-1.5 rounded-full bg-slate-100 dark:bg-slate-800">
-                      <div className="h-full rounded-full bg-teal-500 transition-all duration-500" style={{ width: `${docPct}%` }} />
-                    </div>
-                  </div>
-                  <div>
-                    <div className="flex justify-between text-xs mb-1">
                       <span className="text-muted-foreground flex items-center gap-1"><UserCheck className="h-3 w-3" /> Beneficiaries</span>
                       <span className="font-medium">{assetsWithBen}/{totalAssetCount}</span>
                     </div>
                     <div className="h-1.5 rounded-full bg-slate-100 dark:bg-slate-800">
                       <div className="h-full rounded-full bg-blue-500 transition-all duration-500" style={{ width: `${benPct}%` }} />
+                    </div>
+                  </div>
+                  <div>
+                    <div className="flex justify-between text-xs mb-1">
+                      <span className="text-muted-foreground flex items-center gap-1"><CheckCircle2 className="h-3 w-3" /> Documents</span>
+                      <span className="font-medium">{docsComplete}/{totalDocs}</span>
+                    </div>
+                    <div className="h-1.5 rounded-full bg-slate-100 dark:bg-slate-800">
+                      <div className="h-full rounded-full bg-teal-500 transition-all duration-500" style={{ width: `${docPct}%` }} />
                     </div>
                   </div>
                   <div className="flex justify-between text-xs pt-1">
