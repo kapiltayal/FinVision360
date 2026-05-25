@@ -79,8 +79,8 @@ const DEFAULT_REC: RecommendationFields = {
   otherInsuranceThreshold: "100",
 };
 
-function numericToStr(v: string | null | undefined): string {
-  return v != null && v !== "" ? String(v) : "";
+function numericToStr(v: string | null | undefined, fallback = ""): string {
+  return v != null && v !== "" ? String(v) : fallback;
 }
 
 function getInitials(name: string | undefined | null, username: string | undefined | null): string {
@@ -161,18 +161,18 @@ export default function SettingsPage() {
   useEffect(() => {
     if (recData) {
       setRec({
-        checkingThreshold: numericToStr(recData.checkingThreshold),
-        savingsThreshold: numericToStr(recData.savingsThreshold),
-        cdsThreshold: numericToStr(recData.cdsThreshold),
-        studentLoanThreshold: numericToStr(recData.studentLoanThreshold),
-        creditCardThreshold: numericToStr(recData.creditCardThreshold),
-        autoLoanThreshold: numericToStr(recData.autoLoanThreshold),
-        personalLoanThreshold: numericToStr(recData.personalLoanThreshold),
-        mortgageThreshold: numericToStr(recData.mortgageThreshold),
-        autoInsuranceThreshold: numericToStr(recData.autoInsuranceThreshold),
-        homeInsuranceThreshold: numericToStr(recData.homeInsuranceThreshold),
-        lifeInsuranceThreshold: numericToStr(recData.lifeInsuranceThreshold),
-        otherInsuranceThreshold: numericToStr(recData.otherInsuranceThreshold),
+        checkingThreshold: numericToStr(recData.checkingThreshold, DEFAULT_REC.checkingThreshold),
+        savingsThreshold: numericToStr(recData.savingsThreshold, DEFAULT_REC.savingsThreshold),
+        cdsThreshold: numericToStr(recData.cdsThreshold, DEFAULT_REC.cdsThreshold),
+        studentLoanThreshold: numericToStr(recData.studentLoanThreshold, DEFAULT_REC.studentLoanThreshold),
+        creditCardThreshold: numericToStr(recData.creditCardThreshold, DEFAULT_REC.creditCardThreshold),
+        autoLoanThreshold: numericToStr(recData.autoLoanThreshold, DEFAULT_REC.autoLoanThreshold),
+        personalLoanThreshold: numericToStr(recData.personalLoanThreshold, DEFAULT_REC.personalLoanThreshold),
+        mortgageThreshold: numericToStr(recData.mortgageThreshold, DEFAULT_REC.mortgageThreshold),
+        autoInsuranceThreshold: numericToStr(recData.autoInsuranceThreshold, DEFAULT_REC.autoInsuranceThreshold),
+        homeInsuranceThreshold: numericToStr(recData.homeInsuranceThreshold, DEFAULT_REC.homeInsuranceThreshold),
+        lifeInsuranceThreshold: numericToStr(recData.lifeInsuranceThreshold, DEFAULT_REC.lifeInsuranceThreshold),
+        otherInsuranceThreshold: numericToStr(recData.otherInsuranceThreshold, DEFAULT_REC.otherInsuranceThreshold),
       });
     }
   }, [recData]);
