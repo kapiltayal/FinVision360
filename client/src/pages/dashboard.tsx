@@ -162,7 +162,7 @@ function InterestTooltip({ active, payload }: any) {
 }
 
 function DonutChartWithLegend({
-  data, colors, label, emptyText, testId, accentColor, rateNote,
+  data, colors, label, emptyText, testId, accentColor, rateNote, weightedAvgRate,
 }: {
   data: { name: string; value: number; rate: number }[];
   colors: string[];
@@ -171,12 +171,9 @@ function DonutChartWithLegend({
   testId: string;
   accentColor: "emerald" | "red";
   rateNote?: string;
+  weightedAvgRate?: number;
 }) {
   const totalInterest = data.reduce((sum, d) => sum + d.value, 0);
-  const weightedRate =
-    totalInterest > 0
-      ? data.reduce((sum, d) => sum + d.value * (d.rate ?? 0), 0) / totalInterest
-      : 0;
 
   const headerValueClass = accentColor === "emerald"
     ? "text-emerald-600 dark:text-emerald-400"
@@ -192,7 +189,9 @@ function DonutChartWithLegend({
           <div className="flex items-center justify-center gap-3 mb-3">
             <div className="text-center">
               <p className={`text-lg font-bold leading-tight ${headerValueClass}`}>{formatCurrency(totalInterest)}/yr</p>
-              <p className="text-xs text-muted-foreground">Effective rate: {weightedRate.toFixed(2)}%</p>
+              {weightedAvgRate !== undefined && (
+                <p className="text-xs text-muted-foreground">Weighted avg. rate: {weightedAvgRate.toFixed(2)}%</p>
+              )}
             </div>
           </div>
           <div className="flex items-center gap-3">
@@ -556,28 +555,28 @@ export default function DashboardPage() {
           }
         />
         <StatCard
-          title="Rate of Return Spread"
-          value={`${spreadPct.toFixed(2)}%`}
+          title="Net Return on Assets"
+          value={`${netAnnualReturn >= 0 ? "+" : ""}${formatCurrency(netAnnualReturn)}/yr`}
           extraLine={
             <div className="flex items-center gap-1.5 mt-0.5">
-              <span className={`text-sm font-semibold ${netAnnualReturn >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
-                {netAnnualReturn >= 0 ? "+" : ""}{formatCurrency(netAnnualReturn)}/yr net
+              <span className={`text-sm font-semibold ${spreadPct >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
+                {spreadPct >= 0 ? "+" : ""}{spreadPct.toFixed(2)}% spread
               </span>
             </div>
           }
-          subtitle={`Earning ${weightedAssetRate.toFixed(2)}% / Paying ${weightedLiabilityRate.toFixed(2)}% · click to expand`}
+          subtitle={`Earning ${formatCurrency(earnedAnnual)} (${weightedAssetRate.toFixed(2)}%) · Paying ${formatCurrency(paidAnnual)} (${weightedLiabilityRate.toFixed(2)}%) · click to expand`}
           icon={Percent}
-          trend={weightedAssetRate >= weightedLiabilityRate ? "up" : "down"}
+          trend={netAnnualReturn >= 0 ? "up" : "down"}
           testId="card-interest-spread"
           onClick={() => toggleSection("interest")}
           isExpanded={openSection === "interest"}
           expandedAccent="ring-2 ring-violet-400/50 stat-card-accent-violet"
           infoText={
             <div className="space-y-1.5">
-              <p className="font-semibold">How Rate of Return Spread is calculated</p>
-              <p><strong>Spread %</strong> = Weighted avg. asset return rate − Weighted avg. liability interest rate</p>
+              <p className="font-semibold">How Net Return on Assets is calculated</p>
               <p><strong>Net $/yr</strong> = (Σ asset value × its rate) − (Σ liability balance × its rate)</p>
-              <p className="text-muted-foreground">Each rate is weighted by the balance of that account. A positive spread means your money is earning more than your debt costs you.</p>
+              <p><strong>Spread %</strong> = Weighted avg. asset return rate − Weighted avg. liability interest rate</p>
+              <p className="text-muted-foreground">Each rate is weighted by the balance of that account. A positive figure means your money is earning more than your debt costs you.</p>
             </div>
           }
         />
@@ -734,10 +733,10 @@ export default function DashboardPage() {
         <Card data-testid="card-interest-detail" className="mt-1 border-t-[3px] border-t-violet-500 overflow-hidden">
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between flex-wrap gap-2">
-              <CardTitle className="text-base">Rate of Return by Source (Annual)</CardTitle>
+              <CardTitle className="text-base">Net Return on Assets — Annual Breakdown</CardTitle>
               <span className="inline-flex items-center gap-1.5 rounded-full bg-violet-50 dark:bg-violet-950/40 px-3 py-0.5 text-xs font-medium text-violet-600 dark:text-violet-400 border border-violet-200 dark:border-violet-800">
                 <Percent className="h-3 w-3" />
-                Rate of Return Spread
+                Net Return on Assets
               </span>
             </div>
           </CardHeader>
@@ -750,6 +749,7 @@ export default function DashboardPage() {
                 emptyText="No assets with a rate of return"
                 testId="chart-interest-earned"
                 accentColor="emerald"
+                weightedAvgRate={weightedAssetRate}
                 rateNote="% shown is the rate of return for that asset"
               />
               <DonutChartWithLegend
@@ -759,6 +759,7 @@ export default function DashboardPage() {
                 emptyText="No interest-bearing liabilities"
                 testId="chart-interest-paid"
                 accentColor="red"
+                weightedAvgRate={weightedLiabilityRate}
                 rateNote="% shown is the interest rate for that liability"
               />
             </div>
