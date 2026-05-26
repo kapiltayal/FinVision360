@@ -225,6 +225,7 @@ export const ASSET_CATEGORIES = [
   { value: "investment", label: "Investment" },
   { value: "property", label: "Property" },
   { value: "cash", label: "Cash" },
+  { value: "crypto", label: "Crypto" },
   { value: "retirement_fund", label: "Retirement Fund" },
   { value: "other", label: "Other" },
 ] as const;
