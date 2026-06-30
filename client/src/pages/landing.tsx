@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useLocation, Link } from "wouter";
 import { useSEO } from "@/hooks/use-seo";
 import { Button } from "@/components/ui/button";
@@ -38,8 +38,6 @@ import {
   DropdownMenuContent,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-
-const DISCLAIMER_KEY = "finvision360_disclaimer_accepted";
 
 function DisclaimerModal({ open, onAccept, onDecline }: { open: boolean; onAccept: () => void; onDecline: () => void }) {
   return (
@@ -316,29 +314,16 @@ export default function LandingPage() {
   const { user } = useAuth();
   const logout = useLogout();
 
-  useEffect(() => {
-    if (!user && !localStorage.getItem(DISCLAIMER_KEY)) {
-      setDisclaimerOpen(true);
-    }
-  }, [user]);
-
-  const openLogin = () => {
-    if (localStorage.getItem(DISCLAIMER_KEY)) { setAuthTab("login"); setAuthOpen(true); }
-    else { setPendingAuthTab("login"); setDisclaimerOpen(true); }
-  };
-  const openRegister = () => {
-    if (localStorage.getItem(DISCLAIMER_KEY)) { setAuthTab("register"); setAuthOpen(true); }
-    else { setPendingAuthTab("register"); setDisclaimerOpen(true); }
-  };
+  const openLogin = () => { setPendingAuthTab("login"); setDisclaimerOpen(true); };
+  const openRegister = () => { setPendingAuthTab("register"); setDisclaimerOpen(true); };
 
   const handleDisclaimerAccept = () => {
-    localStorage.setItem(DISCLAIMER_KEY, "true");
     setDisclaimerOpen(false);
     if (pendingAuthTab) { setAuthTab(pendingAuthTab); setAuthOpen(true); setPendingAuthTab(null); }
   };
   const handleDisclaimerDecline = () => {
     setDisclaimerOpen(false);
-    window.location.href = "https://www.google.com";
+    setPendingAuthTab(null);
   };
 
   return (
