@@ -1,13 +1,15 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation, Link } from "wouter";
 import { useSEO } from "@/hooks/use-seo";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useLogin, useRegister, useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
+import { AlertTriangle, X } from "lucide-react";
 import {
   ShieldCheck,
   PiggyBank,
@@ -36,6 +38,73 @@ import {
   DropdownMenuContent,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+
+const DISCLAIMER_KEY = "finvision360_disclaimer_accepted";
+
+function DisclaimerModal({ open, onAccept, onDecline }: { open: boolean; onAccept: () => void; onDecline: () => void }) {
+  return (
+    <Dialog open={open} onOpenChange={() => {}}>
+      <DialogContent
+        className="max-w-lg [&>button.absolute]:hidden"
+        onInteractOutside={(e) => e.preventDefault()}
+        onEscapeKeyDown={(e) => e.preventDefault()}
+        data-testid="dialog-disclaimer"
+      >
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 text-amber-600 dark:text-amber-400">
+            <AlertTriangle className="h-5 w-5 shrink-0" />
+            Important Disclaimer — Please Read Before Continuing
+          </DialogTitle>
+        </DialogHeader>
+
+        <ScrollArea className="max-h-[340px] pr-2">
+          <div className="space-y-4 text-sm text-muted-foreground leading-relaxed">
+            <p>
+              <span className="font-semibold text-foreground">FinVision360 is currently under active development.</span> This platform is being made available to the public solely to gauge interest in this type of financial planning solution and to collect feedback on features that can be improved or added.
+            </p>
+
+            <div className="rounded-md border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 p-3 space-y-2">
+              <p className="font-semibold text-foreground text-xs uppercase tracking-wide">By continuing, you acknowledge that:</p>
+              <ul className="space-y-1.5 list-none">
+                {[
+                  "Do not enter any personal, sensitive, or real financial information. Use fictional or placeholder data only.",
+                  "We make no representations as to the correctness, accuracy, or completeness of any information or calculations provided by this platform.",
+                  "We are not responsible for any loss, damage, or harm arising from your use of this platform or reliance on its outputs.",
+                  "Your data is not guaranteed to be protected, secure, or retained. Do not store passwords or financial details you use elsewhere.",
+                  "Some features may be incomplete, non-functional, or may change without notice.",
+                  "This platform does not constitute financial, investment, legal, or tax advice.",
+                ].map((point, i) => (
+                  <li key={i} className="flex items-start gap-2">
+                    <span className="mt-0.5 h-4 w-4 shrink-0 rounded-full bg-amber-400/30 text-amber-700 dark:text-amber-400 text-[10px] font-bold flex items-center justify-center">{i + 1}</span>
+                    <span>{point}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <p className="text-xs">
+              Tooothy LLC and its affiliates expressly disclaim all liability for any direct, indirect, incidental, or consequential damages arising from your use of this platform. This disclaimer constitutes part of the Terms & Conditions governing your use of FinVision360.
+            </p>
+          </div>
+        </ScrollArea>
+
+        <div className="flex flex-col-reverse sm:flex-row gap-2 pt-2">
+          <Button variant="outline" className="sm:flex-1" onClick={onDecline} data-testid="button-disclaimer-decline">
+            <X className="h-4 w-4 mr-1.5" />
+            Decline & Leave
+          </Button>
+          <Button
+            className="sm:flex-1 bg-gradient-to-r from-[#1565a8] via-[#1c91d4] to-[#42b8ed] text-white border-0 hover:opacity-90"
+            onClick={onAccept}
+            data-testid="button-disclaimer-accept"
+          >
+            I Understand & Accept
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 function AuthModal({
   open,
@@ -241,12 +310,36 @@ export default function LandingPage() {
   const [authOpen, setAuthOpen] = useState(false);
   const [authTab, setAuthTab] = useState<"login" | "register">("login");
   const [userOpen, setUserOpen] = useState(false);
+  const [disclaimerOpen, setDisclaimerOpen] = useState(false);
+  const [pendingAuthTab, setPendingAuthTab] = useState<"login" | "register" | null>(null);
   const { theme, toggleTheme } = useTheme();
   const { user } = useAuth();
   const logout = useLogout();
 
-  const openLogin = () => { setAuthTab("login"); setAuthOpen(true); };
-  const openRegister = () => { setAuthTab("register"); setAuthOpen(true); };
+  useEffect(() => {
+    if (!user && !localStorage.getItem(DISCLAIMER_KEY)) {
+      setDisclaimerOpen(true);
+    }
+  }, [user]);
+
+  const openLogin = () => {
+    if (localStorage.getItem(DISCLAIMER_KEY)) { setAuthTab("login"); setAuthOpen(true); }
+    else { setPendingAuthTab("login"); setDisclaimerOpen(true); }
+  };
+  const openRegister = () => {
+    if (localStorage.getItem(DISCLAIMER_KEY)) { setAuthTab("register"); setAuthOpen(true); }
+    else { setPendingAuthTab("register"); setDisclaimerOpen(true); }
+  };
+
+  const handleDisclaimerAccept = () => {
+    localStorage.setItem(DISCLAIMER_KEY, "true");
+    setDisclaimerOpen(false);
+    if (pendingAuthTab) { setAuthTab(pendingAuthTab); setAuthOpen(true); setPendingAuthTab(null); }
+  };
+  const handleDisclaimerDecline = () => {
+    setDisclaimerOpen(false);
+    window.location.href = "https://www.google.com";
+  };
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -565,6 +658,7 @@ export default function LandingPage() {
       </footer>
 
       <AuthModal open={authOpen} onOpenChange={setAuthOpen} defaultTab={authTab} />
+      <DisclaimerModal open={disclaimerOpen} onAccept={handleDisclaimerAccept} onDecline={handleDisclaimerDecline} />
     </div>
   );
 }
