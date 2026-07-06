@@ -17,9 +17,10 @@ import {
   type EstateBeneficiary, type InsertEstateBeneficiary,
   type EstateDocument, type InsertEstateDocument,
   type EstateContact, type InsertEstateContact,
+  type Feedback, type InsertFeedback,
   users, assets, liabilities, retirementGoals, retirement401kGoals, insurancePolicies, incomeEntries, expenseEntries, recommendationSettings,
   bankConfigs, bankRates, plaidItems, plaidAccounts,
-  estateBeneficiaries, estateDocuments, estateContacts,
+  estateBeneficiaries, estateDocuments, estateContacts, feedback,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -98,6 +99,9 @@ export interface IStorage {
   createEstateContact(data: InsertEstateContact): Promise<EstateContact>;
   updateEstateContact(id: number, userId: string, data: Partial<InsertEstateContact>): Promise<EstateContact | undefined>;
   deleteEstateContact(id: number, userId: string): Promise<void>;
+
+  getFeedback(): Promise<(Feedback & { username: string })[]>;
+  createFeedback(data: InsertFeedback): Promise<Feedback>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -447,6 +451,20 @@ export class DatabaseStorage implements IStorage {
 
   async deleteEstateContact(id: number, userId: string): Promise<void> {
     await pool.query(`DELETE FROM estate_contacts WHERE id = $1 AND user_id = $2`, [id, userId]);
+  }
+
+  async getFeedback(): Promise<(Feedback & { username: string })[]> {
+    const res = await pool.query(
+      `SELECT f.id, f.user_id AS "userId", f.message, f.created_at AS "createdAt", u.username
+       FROM feedback f JOIN users u ON u.id = f.user_id
+       ORDER BY f.created_at DESC`
+    );
+    return res.rows;
+  }
+
+  async createFeedback(data: InsertFeedback): Promise<Feedback> {
+    const [created] = await db.insert(feedback).values(data).returning();
+    return created;
   }
 }
 

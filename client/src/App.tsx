@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AppHeader } from "@/components/app-header";
 import { AppFooter } from "@/components/app-footer";
+import { FeedbackButton } from "@/components/feedback-button";
 import { ThemeProvider } from "@/components/theme-provider";
 import { useAuth } from "@/hooks/use-auth";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -60,6 +61,7 @@ function AuthenticatedApp() {
           {showFooter && <AppFooter />}
         </div>
       </main>
+      <FeedbackButton />
     </div>
   );
 }

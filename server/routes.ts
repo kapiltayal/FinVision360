@@ -528,6 +528,18 @@ Use markdown formatting with headers and bold key numbers.`;
     res.status(204).send();
   });
 
+  app.post("/api/feedback", requireAuth, async (req, res) => {
+    const userId = (req.user as any).id;
+    const { message } = req.body;
+    if (!message || !message.trim()) return res.status(400).json({ message: "Feedback message is required" });
+    const created = await storage.createFeedback({ userId, message: message.trim() });
+    res.status(201).json(created);
+  });
+
+  app.get("/api/feedback", requireAdmin, async (_req, res) => {
+    res.json(await storage.getFeedback());
+  });
+
   // Seed default bank configs if none exist
   app.post("/api/bank-configs/seed-defaults", requireAdmin, async (_req, res) => {
     const existing = await storage.getBankConfigs();

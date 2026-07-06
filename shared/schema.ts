@@ -380,6 +380,20 @@ export const ESTATE_DOCUMENT_TYPES = [
   { key: "letter_of_intent", label: "Letter of Intent / Final Instructions" },
 ] as const;
 
+export const feedback = pgTable("feedback", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  message: text("message").notNull(),
+  createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
+});
+
+export const insertFeedbackSchema = createInsertSchema(feedback).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertFeedback = z.infer<typeof insertFeedbackSchema>;
+export type Feedback = typeof feedback.$inferSelect;
+
 export const ESTATE_CONTACT_ROLES = [
   { value: "attorney", label: "Estate Attorney" },
   { value: "executor", label: "Executor / Personal Representative" },
