@@ -37,12 +37,13 @@ export function FeedbackButton() {
     <>
       <Button
         onClick={() => setOpen(true)}
-        className="fixed bottom-6 right-6 z-40 gap-2 rounded-full shadow-lg px-4 py-6 text-white border-0 hover:opacity-90 transition-opacity"
+        size="icon"
+        className="fixed bottom-5 right-5 z-40 h-10 w-10 rounded-full shadow-md text-white border-0 hover:opacity-90 transition-opacity"
         style={{ background: "linear-gradient(135deg, #1565a8 0%, #1c91d4 55%, #42b8ed 100%)" }}
+        title="Share feedback"
         data-testid="button-feedback-open"
       >
-        <MessageSquarePlus className="h-5 w-5" />
-        <span className="hidden sm:inline">Feedback</span>
+        <MessageSquarePlus className="h-4 w-4" />
       </Button>
 
       <Dialog open={open} onOpenChange={setOpen}>
