@@ -39,8 +39,17 @@ export function FeedbackButton() {
       <Button
         onClick={() => setOpen(true)}
         size="icon"
-        className="fixed bottom-5 right-5 z-[9999] h-10 w-10 rounded-full shadow-md text-white border-0 hover:opacity-90 transition-opacity"
-        style={{ background: "linear-gradient(135deg, #1565a8 0%, #1c91d4 55%, #42b8ed 100%)" }}
+        className="rounded-full shadow-md text-white border-0 hover:opacity-90 transition-opacity"
+        style={{
+          position: "fixed",
+          bottom: "20px",
+          left: "20px",
+          zIndex: 9999,
+          width: "40px",
+          height: "40px",
+          minWidth: "40px",
+          background: "linear-gradient(135deg, #1565a8 0%, #1c91d4 55%, #42b8ed 100%)",
+        }}
         title="Share feedback"
         data-testid="button-feedback-open"
       >
