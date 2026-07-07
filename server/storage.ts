@@ -20,7 +20,8 @@ import {
   type Feedback, type InsertFeedback,
   users, assets, liabilities, retirementGoals, retirement401kGoals, insurancePolicies, incomeEntries, expenseEntries, recommendationSettings,
   bankConfigs, bankRates, plaidItems, plaidAccounts,
-  estateBeneficiaries, estateDocuments, estateContacts, feedback,
+  estateBeneficiaries, estateDocuments, estateContacts, feedback, contactus,
+  type InsertContactus, type Contactus,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -102,6 +103,8 @@ export interface IStorage {
 
   getFeedback(): Promise<(Feedback & { username: string })[]>;
   createFeedback(data: InsertFeedback): Promise<Feedback>;
+  createContactSubmission(data: InsertContactus): Promise<Contactus>;
+  getContactSubmissions(): Promise<Contactus[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -465,6 +468,15 @@ export class DatabaseStorage implements IStorage {
   async createFeedback(data: InsertFeedback): Promise<Feedback> {
     const [created] = await db.insert(feedback).values(data).returning();
     return created;
+  }
+
+  async createContactSubmission(data: InsertContactus): Promise<Contactus> {
+    const [created] = await db.insert(contactus).values(data).returning();
+    return created;
+  }
+
+  async getContactSubmissions(): Promise<Contactus[]> {
+    return db.select().from(contactus).orderBy(contactus.createdAt);
   }
 }
 

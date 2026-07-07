@@ -781,8 +781,13 @@ Use markdown formatting with headers and bold key numbers.`;
     if (!emailRegex.test(email)) {
       return res.status(400).json({ message: "Please enter a valid email address." });
     }
-    console.log(`[contact] New submission from ${name} <${email}> | Subject: ${subject}`);
+    await storage.createContactSubmission({ name, email, subject, message });
+    console.log(`[contact] New submission saved from ${name} <${email}> | Subject: ${subject}`);
     res.json({ message: "Thank you! We've received your message and will be in touch soon." });
+  });
+
+  app.get("/api/contact", requireAdmin, async (_req, res) => {
+    res.json(await storage.getContactSubmissions());
   });
 
   return httpServer;

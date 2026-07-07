@@ -394,6 +394,22 @@ export const insertFeedbackSchema = createInsertSchema(feedback).omit({
 export type InsertFeedback = z.infer<typeof insertFeedbackSchema>;
 export type Feedback = typeof feedback.$inferSelect;
 
+export const contactus = pgTable("contactus", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  email: text("email").notNull(),
+  subject: text("subject").notNull(),
+  message: text("message").notNull(),
+  createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
+});
+
+export const insertContactusSchema = createInsertSchema(contactus).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertContactus = z.infer<typeof insertContactusSchema>;
+export type Contactus = typeof contactus.$inferSelect;
+
 export const ESTATE_CONTACT_ROLES = [
   { value: "attorney", label: "Estate Attorney" },
   { value: "executor", label: "Executor / Personal Representative" },
