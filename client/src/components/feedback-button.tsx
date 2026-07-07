@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import { MessageSquarePlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -33,12 +34,12 @@ export function FeedbackButton() {
     submitFeedback.mutate();
   };
 
-  return (
+  return createPortal(
     <>
       <Button
         onClick={() => setOpen(true)}
         size="icon"
-        className="fixed bottom-5 right-5 z-40 h-10 w-10 rounded-full shadow-md text-white border-0 hover:opacity-90 transition-opacity"
+        className="fixed bottom-5 right-5 z-[9999] h-10 w-10 rounded-full shadow-md text-white border-0 hover:opacity-90 transition-opacity"
         style={{ background: "linear-gradient(135deg, #1565a8 0%, #1c91d4 55%, #42b8ed 100%)" }}
         title="Share feedback"
         data-testid="button-feedback-open"
@@ -81,6 +82,7 @@ export function FeedbackButton() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </>
+    </>,
+    document.body
   );
 }
