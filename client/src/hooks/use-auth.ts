@@ -71,6 +71,15 @@ export function useRegister() {
         options: { data: { full_name: fullName } },
       });
       if (error) throw new Error(error.message);
+      // Provision the local users row immediately after signup so it exists
+      // even when email confirmation is required (no session yet)
+      if (data.user) {
+        try {
+          await apiRequest("POST", "/api/auth/provision", { supabaseId: data.user.id });
+        } catch {
+          // Non-fatal — middleware will create the row on first authenticated request
+        }
+      }
       return data;
     },
     onSuccess: async (data) => {

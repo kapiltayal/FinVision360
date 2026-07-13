@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation, Link } from "wouter";
 import { useSEO } from "@/hooks/use-seo";
 import { Button } from "@/components/ui/button";
@@ -118,6 +118,17 @@ function AuthModal({
   const [showPassword, setShowPassword] = useState(false);
   const [resetMode, setResetMode] = useState(false);
   const [resetEmail, setResetEmail] = useState("");
+
+  // Clear all form fields whenever the modal is closed
+  useEffect(() => {
+    if (!open) {
+      setLoginData({ email: "", password: "" });
+      setRegisterData({ email: "", password: "", fullName: "" });
+      setShowPassword(false);
+      setResetMode(false);
+      setResetEmail("");
+    }
+  }, [open]);
   const [resetSent, setResetSent] = useState(false);
   const [resetLoading, setResetLoading] = useState(false);
   const login = useLogin();
