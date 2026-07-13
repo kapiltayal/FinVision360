@@ -7,7 +7,7 @@ import { AppHeader } from "@/components/app-header";
 import { AppFooter } from "@/components/app-footer";
 import { FeedbackButton } from "@/components/feedback-button";
 import { ThemeProvider } from "@/components/theme-provider";
-import { useAuth } from "@/hooks/use-auth";
+import { useAuth, useSupabaseSession } from "@/hooks/use-auth";
 import { Skeleton } from "@/components/ui/skeleton";
 import NotFound from "@/pages/not-found";
 import LandingPage from "@/pages/landing";
@@ -69,6 +69,7 @@ function AuthenticatedApp() {
 
 function AppRouter() {
   const { user, isLoading } = useAuth();
+  useSupabaseSession(); // global auth state listener — clears cache on signout/token expiry
 
   if (isLoading) {
     return (

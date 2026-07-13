@@ -62,7 +62,12 @@ async function fetchConfig(): Promise<SupabaseClient> {
 
 export function getSupabase(): Promise<SupabaseClient> {
   if (supabaseInstance) return Promise.resolve(supabaseInstance);
-  if (!configPromise) configPromise = fetchConfig();
+  if (!configPromise) {
+    configPromise = fetchConfig().catch((err) => {
+      configPromise = null; // allow retry on next call
+      throw err;
+    });
+  }
   return configPromise;
 }
 

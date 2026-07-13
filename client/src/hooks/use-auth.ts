@@ -86,10 +86,19 @@ export function useLogout() {
   const [, setLocation] = useLocation();
   return useMutation({
     mutationFn: async () => {
-      const sb = await getSupabase();
-      await sb.auth.signOut();
+      try {
+        const sb = await getSupabase();
+        await sb.auth.signOut();
+      } catch {
+        // Remote signout failed — still clear local session
+      }
     },
     onSuccess: () => {
+      queryClient.setQueryData(["/api/auth/user"], null);
+      queryClient.clear();
+      setLocation("/");
+    },
+    onError: () => {
       queryClient.setQueryData(["/api/auth/user"], null);
       queryClient.clear();
       setLocation("/");
