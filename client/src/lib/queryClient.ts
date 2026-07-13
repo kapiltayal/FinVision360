@@ -9,8 +9,12 @@ async function throwIfResNotOk(res: Response) {
 }
 
 async function getAuthHeaders(): Promise<HeadersInit> {
-  const token = await getAccessToken();
-  return token ? { Authorization: `Bearer ${token}` } : {};
+  try {
+    const token = await getAccessToken();
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  } catch {
+    return {};
+  }
 }
 
 export async function apiRequest(
