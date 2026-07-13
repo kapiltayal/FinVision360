@@ -6,10 +6,11 @@ import { z } from "zod";
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   username: text("username").notNull().unique(),
-  password: text("password").notNull(),
+  password: text("password"),
   fullName: text("full_name"),
   email: text("email"),
   isAdmin: boolean("is_admin").default(false).notNull(),
+  supabaseId: text("supabase_id").unique(),
 });
 
 export const insertUserSchema = createInsertSchema(users).pick({
@@ -17,7 +18,8 @@ export const insertUserSchema = createInsertSchema(users).pick({
   password: true,
   fullName: true,
   email: true,
-});
+  supabaseId: true,
+}).partial({ password: true, supabaseId: true });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;

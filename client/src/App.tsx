@@ -28,6 +28,7 @@ import PrivacyPage from "@/pages/privacy";
 import TermsPage from "@/pages/terms";
 import FAQPage from "@/pages/faq";
 import ContactPage from "@/pages/contact";
+import ResetPasswordPage from "@/pages/reset-password";
 
 function AuthenticatedApp() {
   const [location] = useLocation();
@@ -82,6 +83,7 @@ function AppRouter() {
 
   return (
     <Switch>
+      <Route path="/reset-password" component={ResetPasswordPage} />
       <Route path="/about" component={AboutPage} />
       <Route path="/privacy" component={PrivacyPage} />
       <Route path="/terms" component={TermsPage} />

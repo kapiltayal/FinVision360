@@ -10,7 +10,7 @@ import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { useLastUpdated } from "@/hooks/use-last-updated";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { useAuth } from "@/hooks/use-auth";
+import { useAuth, useChangePassword } from "@/hooks/use-auth";
 import {
   User, Lock, Save, PiggyBank, CreditCard, Shield,
   KeyRound, BadgeCheck, SlidersHorizontal, Clock,
@@ -103,7 +103,6 @@ export default function SettingsPage() {
   }, [user]);
 
   const [passwords, setPasswords] = useState({
-    currentPassword: "",
     newPassword: "",
     confirmPassword: "",
   });
@@ -120,15 +119,7 @@ export default function SettingsPage() {
     onError: (e: any) => toast({ title: "Failed", description: e.message, variant: "destructive" }),
   });
 
-  const changePasswordMutation = useMutation({
-    mutationFn: (data: any) => apiRequest("POST", "/api/auth/change-password", data),
-    onSuccess: () => {
-      markUpdated();
-      toast({ title: "Password changed" });
-      setPasswords({ currentPassword: "", newPassword: "", confirmPassword: "" });
-    },
-    onError: (e: any) => toast({ title: "Failed", description: e.message, variant: "destructive" }),
-  });
+  const changePasswordMutation = useChangePassword();
 
   const handleProfileSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -145,9 +136,13 @@ export default function SettingsPage() {
       toast({ title: "Password too short", description: "Minimum 6 characters", variant: "destructive" });
       return;
     }
-    changePasswordMutation.mutate({
-      currentPassword: passwords.currentPassword,
-      newPassword: passwords.newPassword,
+    changePasswordMutation.mutate({ newPassword: passwords.newPassword }, {
+      onSuccess: () => {
+        markUpdated();
+        toast({ title: "Password changed" });
+        setPasswords({ newPassword: "", confirmPassword: "" });
+      },
+      onError: (e: any) => toast({ title: "Failed", description: e.message, variant: "destructive" }),
     });
   };
 
@@ -319,18 +314,6 @@ export default function SettingsPage() {
             <Separator />
             <CardContent className="pt-5">
               <form onSubmit={handlePasswordSubmit} className="space-y-4">
-                <div className="space-y-1.5">
-                  <Label htmlFor="currentPwd" className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Current Password</Label>
-                  <Input
-                    id="currentPwd"
-                    data-testid="input-current-password"
-                    type="password"
-                    value={passwords.currentPassword}
-                    onChange={(e) => setPasswords({ ...passwords, currentPassword: e.target.value })}
-                    placeholder="Enter current password"
-                    required
-                  />
-                </div>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-1.5">
                     <Label htmlFor="newPwd" className="text-xs font-medium text-muted-foreground uppercase tracking-wide">New Password</Label>

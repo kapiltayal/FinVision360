@@ -113,9 +113,13 @@ function AuthModal({
   onOpenChange: (open: boolean) => void;
   defaultTab: "login" | "register";
 }) {
-  const [loginData, setLoginData] = useState({ username: "", password: "" });
-  const [registerData, setRegisterData] = useState({ username: "", password: "", fullName: "", email: "" });
+  const [loginData, setLoginData] = useState({ email: "", password: "" });
+  const [registerData, setRegisterData] = useState({ email: "", password: "", fullName: "" });
   const [showPassword, setShowPassword] = useState(false);
+  const [resetMode, setResetMode] = useState(false);
+  const [resetEmail, setResetEmail] = useState("");
+  const [resetSent, setResetSent] = useState(false);
+  const [resetLoading, setResetLoading] = useState(false);
   const login = useLogin();
   const register = useRegister();
   const { toast } = useToast();
@@ -123,7 +127,7 @@ function AuthModal({
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     login.mutate(loginData, {
-      onError: (error: any) => toast({ title: "Login failed", description: error.message, variant: "destructive" }),
+      onError: (error: any) => toast({ title: "Sign in failed", description: error.message, variant: "destructive" }),
     });
   };
 
@@ -135,7 +139,31 @@ function AuthModal({
     }
     register.mutate(registerData, {
       onError: (error: any) => toast({ title: "Registration failed", description: error.message, variant: "destructive" }),
+      onSuccess: (data: any) => {
+        if (!data.session) {
+          toast({ title: "Check your email", description: "We sent a confirmation link. Verify your email to continue." });
+          onOpenChange(false);
+        }
+      },
     });
+  };
+
+  const handleReset = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setResetLoading(true);
+    try {
+      const { getSupabase } = await import("@/lib/supabase");
+      const sb = await getSupabase();
+      const { error } = await sb.auth.resetPasswordForEmail(resetEmail, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+      if (error) throw error;
+      setResetSent(true);
+    } catch (err: any) {
+      toast({ title: "Reset failed", description: err.message, variant: "destructive" });
+    } finally {
+      setResetLoading(false);
+    }
   };
 
   return (
@@ -146,100 +174,134 @@ function AuthModal({
             <img src={logoPath} alt="FinVision360" className="h-9 w-auto" />
           </DialogTitle>
         </DialogHeader>
-        <Tabs defaultValue={defaultTab}>
-          <TabsList className="grid w-full grid-cols-2 mb-4">
-            <TabsTrigger value="login" data-testid="tab-login">Sign In</TabsTrigger>
-            <TabsTrigger value="register" data-testid="tab-register">Create Account</TabsTrigger>
-          </TabsList>
-          <TabsContent value="login">
-            <form onSubmit={handleLogin} className="space-y-4">
-              <div className="space-y-2">
-                <Label>Username</Label>
-                <Input
-                  data-testid="input-login-username"
-                  value={loginData.username}
-                  onChange={(e) => setLoginData({ ...loginData, username: e.target.value })}
-                  placeholder="Enter your username"
-                  required
-                />
+
+        {resetMode ? (
+          <div className="space-y-4 pt-2">
+            {resetSent ? (
+              <div className="text-center space-y-3 py-4">
+                <p className="text-sm text-muted-foreground">
+                  Reset link sent to <strong>{resetEmail}</strong>. Check your inbox.
+                </p>
+                <Button variant="ghost" className="w-full" onClick={() => { setResetMode(false); setResetSent(false); }}>
+                  Back to sign in
+                </Button>
               </div>
-              <div className="space-y-2">
-                <Label>Password</Label>
-                <div className="relative">
-                  <Input
-                    data-testid="input-login-password"
-                    type={showPassword ? "text" : "password"}
-                    value={loginData.password}
-                    onChange={(e) => setLoginData({ ...loginData, password: e.target.value })}
-                    placeholder="Enter your password"
-                    required
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="absolute right-0 top-0"
-                    onClick={() => setShowPassword(!showPassword)}
-                  >
-                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </Button>
-                </div>
-              </div>
-              <Button type="submit" className="w-full" disabled={login.isPending} data-testid="button-login">
-                {login.isPending ? "Signing in…" : "Sign In"}
-              </Button>
-            </form>
-          </TabsContent>
-          <TabsContent value="register">
-            <form onSubmit={handleRegister} className="space-y-4">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2">
-                  <Label>Full Name</Label>
-                  <Input
-                    data-testid="input-register-fullname"
-                    value={registerData.fullName}
-                    onChange={(e) => setRegisterData({ ...registerData, fullName: e.target.value })}
-                    placeholder="Jane Doe"
-                  />
-                </div>
+            ) : (
+              <form onSubmit={handleReset} className="space-y-4">
+                <p className="text-sm text-muted-foreground">Enter your email and we'll send a reset link.</p>
                 <div className="space-y-2">
                   <Label>Email</Label>
                   <Input
-                    data-testid="input-register-email"
                     type="email"
-                    value={registerData.email}
-                    onChange={(e) => setRegisterData({ ...registerData, email: e.target.value })}
-                    placeholder="jane@email.com"
+                    data-testid="input-reset-email"
+                    value={resetEmail}
+                    onChange={(e) => setResetEmail(e.target.value)}
+                    placeholder="you@example.com"
+                    required
                   />
                 </div>
-              </div>
-              <div className="space-y-2">
-                <Label>Username</Label>
-                <Input
-                  data-testid="input-register-username"
-                  value={registerData.username}
-                  onChange={(e) => setRegisterData({ ...registerData, username: e.target.value })}
-                  placeholder="Choose a username"
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Password</Label>
-                <Input
-                  data-testid="input-register-password"
-                  type="password"
-                  value={registerData.password}
-                  onChange={(e) => setRegisterData({ ...registerData, password: e.target.value })}
-                  placeholder="Min 6 characters"
-                  required
-                />
-              </div>
-              <Button type="submit" className="w-full" disabled={register.isPending} data-testid="button-register">
-                {register.isPending ? "Creating account…" : "Create Free Account"}
-              </Button>
-            </form>
-          </TabsContent>
-        </Tabs>
+                <Button type="submit" className="w-full" disabled={resetLoading} data-testid="button-reset">
+                  {resetLoading ? "Sending..." : "Send Reset Link"}
+                </Button>
+                <Button type="button" variant="ghost" className="w-full" onClick={() => setResetMode(false)}>
+                  Back to sign in
+                </Button>
+              </form>
+            )}
+          </div>
+        ) : (
+          <Tabs defaultValue={defaultTab}>
+            <TabsList className="grid w-full grid-cols-2 mb-4">
+              <TabsTrigger value="login" data-testid="tab-login">Sign In</TabsTrigger>
+              <TabsTrigger value="register" data-testid="tab-register">Create Account</TabsTrigger>
+            </TabsList>
+            <TabsContent value="login">
+              <form onSubmit={handleLogin} className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Email</Label>
+                  <Input
+                    data-testid="input-login-email"
+                    type="email"
+                    value={loginData.email}
+                    onChange={(e) => setLoginData({ ...loginData, email: e.target.value })}
+                    placeholder="you@example.com"
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label>Password</Label>
+                    <button type="button" className="text-xs text-primary hover:underline" onClick={() => setResetMode(true)}>
+                      Forgot password?
+                    </button>
+                  </div>
+                  <div className="relative">
+                    <Input
+                      data-testid="input-login-password"
+                      type={showPassword ? "text" : "password"}
+                      value={loginData.password}
+                      onChange={(e) => setLoginData({ ...loginData, password: e.target.value })}
+                      placeholder="Enter your password"
+                      required
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="absolute right-0 top-0"
+                      onClick={() => setShowPassword(!showPassword)}
+                    >
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </Button>
+                  </div>
+                </div>
+                <Button type="submit" className="w-full" disabled={login.isPending} data-testid="button-login">
+                  {login.isPending ? "Signing in…" : "Sign In"}
+                </Button>
+              </form>
+            </TabsContent>
+            <TabsContent value="register">
+              <form onSubmit={handleRegister} className="space-y-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label>Full Name</Label>
+                    <Input
+                      data-testid="input-register-fullname"
+                      value={registerData.fullName}
+                      onChange={(e) => setRegisterData({ ...registerData, fullName: e.target.value })}
+                      placeholder="Jane Doe"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Email</Label>
+                    <Input
+                      data-testid="input-register-email"
+                      type="email"
+                      value={registerData.email}
+                      onChange={(e) => setRegisterData({ ...registerData, email: e.target.value })}
+                      placeholder="jane@email.com"
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label>Password</Label>
+                  <Input
+                    data-testid="input-register-password"
+                    type="password"
+                    value={registerData.password}
+                    onChange={(e) => setRegisterData({ ...registerData, password: e.target.value })}
+                    placeholder="Min 6 characters"
+                    required
+                  />
+                </div>
+                <Button type="submit" className="w-full" disabled={register.isPending} data-testid="button-register">
+                  {register.isPending ? "Creating account…" : "Create Free Account"}
+                </Button>
+              </form>
+            </TabsContent>
+          </Tabs>
+        )}
       </DialogContent>
     </Dialog>
   );

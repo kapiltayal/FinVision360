@@ -1,0 +1,1 @@
+- [Supabase Auth Migration](supabase-auth.md) — Passport.js fully replaced; JWT middleware on backend, Supabase client on frontend.

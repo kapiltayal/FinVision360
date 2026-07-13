@@ -27,7 +27,9 @@ import {
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
+  getUserBySupabaseId(supabaseId: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
+  createUserFromSupabase(supabaseId: string, email: string, fullName?: string): Promise<User>;
   updateUser(id: string, data: Partial<InsertUser>): Promise<User | undefined>;
 
   getAssets(userId: string): Promise<Asset[]>;
@@ -118,8 +120,26 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
+  async getUserBySupabaseId(supabaseId: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.supabaseId, supabaseId));
+    return user;
+  }
+
   async createUser(insertUser: InsertUser): Promise<User> {
     const [user] = await db.insert(users).values(insertUser).returning();
+    return user;
+  }
+
+  async createUserFromSupabase(supabaseId: string, email: string, fullName?: string): Promise<User> {
+    const emailPrefix = email.split("@")[0].replace(/[^a-zA-Z0-9_]/g, "_");
+    const suffix = Math.random().toString(36).slice(2, 7);
+    const username = `${emailPrefix}_${suffix}`;
+    const [user] = await db.insert(users).values({
+      username,
+      supabaseId,
+      email,
+      fullName: fullName || null,
+    }).returning();
     return user;
   }
 
