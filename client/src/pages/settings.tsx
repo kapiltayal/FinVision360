@@ -97,9 +97,9 @@ export default function SettingsPage() {
   const { user } = useAuth();
   const { toast } = useToast();
 
-  const [profile, setProfile] = useState({ fullName: "", email: "" });
+  const [profile, setProfile] = useState({ fullName: "" });
   useEffect(() => {
-    if (user) setProfile({ fullName: user.fullName || "", email: user.email || "" });
+    if (user) setProfile({ fullName: user.fullName || "" });
   }, [user]);
 
   const [passwords, setPasswords] = useState({
@@ -253,40 +253,33 @@ export default function SettingsPage() {
                 </div>
                 <div>
                   <CardTitle className="text-base">Profile Information</CardTitle>
-                  <CardDescription>Update your name and email address</CardDescription>
+                  <CardDescription>Update your display name</CardDescription>
                 </div>
               </div>
             </CardHeader>
             <Separator />
             <CardContent className="pt-5">
               <form onSubmit={handleProfileSubmit} className="space-y-4">
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Username</Label>
-                    <Input value={user?.username || ""} disabled className="bg-muted text-muted-foreground" />
-                    <p className="text-xs text-muted-foreground">Username cannot be changed</p>
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="fullName" className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Full Name</Label>
-                    <Input
-                      id="fullName"
-                      data-testid="input-settings-fullname"
-                      value={profile.fullName}
-                      onChange={(e) => setProfile({ ...profile, fullName: e.target.value })}
-                      placeholder="Your full name"
-                    />
-                  </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="fullName" className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Full Name</Label>
+                  <Input
+                    id="fullName"
+                    data-testid="input-settings-fullname"
+                    value={profile.fullName}
+                    onChange={(e) => setProfile({ ...profile, fullName: e.target.value })}
+                    placeholder="Your full name"
+                  />
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="email" className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Email Address</Label>
+                  <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Email Address</Label>
                   <Input
-                    id="email"
                     data-testid="input-settings-email"
                     type="email"
-                    value={profile.email}
-                    onChange={(e) => setProfile({ ...profile, email: e.target.value })}
-                    placeholder="your@email.com"
+                    value={user?.email || ""}
+                    disabled
+                    className="bg-muted text-muted-foreground"
                   />
+                  <p className="text-xs text-muted-foreground">Email is your login ID and cannot be changed here</p>
                 </div>
                 <div className="flex justify-end pt-1">
                   <Button type="submit" disabled={updateProfileMutation.isPending} data-testid="button-save-profile">
