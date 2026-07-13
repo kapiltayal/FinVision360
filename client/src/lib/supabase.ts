@@ -88,3 +88,8 @@ export async function getAccessToken(): Promise<string | null> {
 export function getCachedToken(): string | null {
   return cachedToken;
 }
+
+export function clearCachedToken(): void {
+  cachedToken = null;
+  tokenReady = true;
+}

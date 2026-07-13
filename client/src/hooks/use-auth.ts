@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest, getQueryFn } from "@/lib/queryClient";
-import { getSupabase, getAccessToken } from "@/lib/supabase";
+import { getSupabase, getAccessToken, clearCachedToken } from "@/lib/supabase";
 import { useLocation } from "wouter";
 import type { SupabaseClient, Session } from "@supabase/supabase-js";
 
@@ -26,7 +26,7 @@ export function useSupabaseSession() {
       sb.auth.getSession().then(({ data }) => {
         setSession(data.session);
         setLoading(false);
-      });
+      }).catch(() => setLoading(false));
       const { data: { subscription } } = sb.auth.onAuthStateChange((_event, s) => {
         setSession(s);
         if (!s) {
@@ -37,7 +37,7 @@ export function useSupabaseSession() {
         }
       });
       sub = subscription;
-    });
+    }).catch(() => setLoading(false));
     return () => sub?.unsubscribe();
   }, []);
 
@@ -86,11 +86,14 @@ export function useLogout() {
   const [, setLocation] = useLocation();
   return useMutation({
     mutationFn: async () => {
+      // Clear the cached token FIRST so any re-fetch triggered by onSuccess
+      // goes out without a token and gets 401 → null (prevents race condition)
+      clearCachedToken();
       try {
         const sb = await getSupabase();
         await sb.auth.signOut();
       } catch {
-        // Remote signout failed — still clear local session
+        // Remote signout failed — local session already cleared above
       }
     },
     onSuccess: () => {
