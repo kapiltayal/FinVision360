@@ -1,1 +1,3 @@
 - [Supabase Auth Migration](supabase-auth.md) — Passport.js fully replaced; JWT middleware on backend, Supabase client on frontend.
+---
+- [Supabase client init](supabase-client-init.md) — use synchronous singleton with hardcoded anon keys; never fetch /api/config (causes HMR race conditions)
