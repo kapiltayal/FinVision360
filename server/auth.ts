@@ -75,13 +75,11 @@ export function setupAuth(app: Express) {
     const { fullName, email } = req.body;
     const updated = await storage.updateUser(userId, { fullName, email } as any);
     if (!updated) return res.status(404).json({ message: "User not found" });
-    const { password: _, ...safeUser } = updated;
-    res.json(safeUser);
+    res.json(updated);
   });
 
   app.get("/api/auth/user", requireAuth, (req: any, res) => {
-    const { password: _, ...safeUser } = req.user;
-    res.json(safeUser);
+    res.json(req.user);
   });
 }
 

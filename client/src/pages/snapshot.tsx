@@ -112,7 +112,7 @@ function StatRow({ label, value, className = "" }: { label: string; value: strin
 
 export default function SnapshotPage() {
   const { user } = useAuth();
-  const firstName = (user as any)?.fullName?.split(" ")[0] || (user as any)?.username || "Your";
+  const firstName = (user as any)?.fullName?.split(" ")[0] || (user as any)?.email?.split("@")[0] || "Your";
   const today = new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
 
   const { data: assets = [], isLoading: aL } = useQuery<Asset[]>({ queryKey: ["/api/assets"] });

@@ -83,14 +83,14 @@ function numericToStr(v: string | null | undefined, fallback = ""): string {
   return v != null && v !== "" ? String(v) : fallback;
 }
 
-function getInitials(name: string | undefined | null, username: string | undefined | null): string {
+function getInitials(name: string | undefined | null, email: string | undefined | null): string {
   if (name && name.trim()) {
     const parts = name.trim().split(" ");
     return parts.length >= 2
       ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
       : parts[0].slice(0, 2).toUpperCase();
   }
-  return (username || "U").slice(0, 2).toUpperCase();
+  return (email || "U").slice(0, 2).toUpperCase();
 }
 
 export default function SettingsPage() {

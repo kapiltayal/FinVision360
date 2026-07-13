@@ -419,14 +419,14 @@ export default function LandingPage() {
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="sm" className="gap-2" data-testid="button-user-menu">
                     <span className="hidden sm:inline text-sm truncate max-w-[100px]">
-                      {user.fullName || user.username}
+                      {user.fullName || user.email}
                     </span>
                     <ChevronDown className="h-4 w-4 opacity-50" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-48">
                   <div className="px-2 py-1.5">
-                    <p className="text-sm font-semibold">{user.fullName || user.username}</p>
+                    <p className="text-sm font-semibold">{user.fullName || user.email}</p>
                     <p className="text-xs text-muted-foreground truncate">{user.email}</p>
                   </div>
                   <div className="h-px bg-border my-1" />

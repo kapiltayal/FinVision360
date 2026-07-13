@@ -1,27 +1,13 @@
 import { storage } from "./storage";
-import { db } from "./db";
-import { users } from "@shared/schema";
-import { scrypt, randomBytes } from "crypto";
-import { promisify } from "util";
-
-const scryptAsync = promisify(scrypt);
-
-async function hashPassword(password: string): Promise<string> {
-  const salt = randomBytes(16).toString("hex");
-  const buf = (await scryptAsync(password, salt, 64)) as Buffer;
-  return `${buf.toString("hex")}.${salt}`;
-}
 
 export async function seedDatabase() {
-  const existing = await storage.getUserByUsername("demo");
+  const existing = await storage.getUserBySupabaseId("demo-seed-user");
   if (existing) return;
 
-  const hashedPassword = await hashPassword("demo123");
   const user = await storage.createUser({
-    username: "demo",
-    password: hashedPassword,
-    fullName: "Alex Morgan",
-    email: "alex@example.com",
+    fullName: "Demo Account",
+    email: "demo@finvision360.app",
+    supabaseId: "demo-seed-user",
   });
 
   await Promise.all([
@@ -69,5 +55,5 @@ export async function seedDatabase() {
     otherInsuranceThreshold: "100",
   });
 
-  console.log("Seed data created: demo/demo123");
+  console.log("Seed data created for demo user");
 }

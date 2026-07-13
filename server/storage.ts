@@ -26,7 +26,6 @@ import {
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
-  getUserByUsername(username: string): Promise<User | undefined>;
   getUserBySupabaseId(supabaseId: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   createUserFromSupabase(supabaseId: string, email: string, fullName?: string): Promise<User>;
@@ -103,7 +102,7 @@ export interface IStorage {
   updateEstateContact(id: number, userId: string, data: Partial<InsertEstateContact>): Promise<EstateContact | undefined>;
   deleteEstateContact(id: number, userId: string): Promise<void>;
 
-  getFeedback(): Promise<(Feedback & { username: string })[]>;
+  getFeedback(): Promise<(Feedback & { email: string })[]>;
   createFeedback(data: InsertFeedback): Promise<Feedback>;
   createContactSubmission(data: InsertContactus): Promise<Contactus>;
   getContactSubmissions(): Promise<Contactus[]>;
@@ -112,11 +111,6 @@ export interface IStorage {
 export class DatabaseStorage implements IStorage {
   async getUser(id: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.id, id));
-    return user;
-  }
-
-  async getUserByUsername(username: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.username, username));
     return user;
   }
 
@@ -131,11 +125,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createUserFromSupabase(supabaseId: string, email: string, fullName?: string): Promise<User> {
-    const emailPrefix = email.split("@")[0].replace(/[^a-zA-Z0-9_]/g, "_");
-    const suffix = Math.random().toString(36).slice(2, 7);
-    const username = `${emailPrefix}_${suffix}`;
     const [user] = await db.insert(users).values({
-      username,
       supabaseId,
       email,
       fullName: fullName || null,
@@ -476,9 +466,9 @@ export class DatabaseStorage implements IStorage {
     await pool.query(`DELETE FROM estate_contacts WHERE id = $1 AND user_id = $2`, [id, userId]);
   }
 
-  async getFeedback(): Promise<(Feedback & { username: string })[]> {
+  async getFeedback(): Promise<(Feedback & { email: string })[]> {
     const res = await pool.query(
-      `SELECT f.id, f.user_id AS "userId", f.message, f.created_at AS "createdAt", u.username
+      `SELECT f.id, f.user_id AS "userId", f.message, f.created_at AS "createdAt", u.email
        FROM feedback f JOIN users u ON u.id = f.user_id
        ORDER BY f.created_at DESC`
     );
