@@ -47,8 +47,7 @@ export default function ResetPasswordPage() {
       const { error } = await supabaseClient.auth.updateUser({ password });
       if (error) throw error;
       setDone(true);
-      await supabaseClient.auth.signOut();
-      setTimeout(() => setLocation("/home"), 3000);
+      setTimeout(() => setLocation("/"), 1500);
     } catch (err: any) {
       toast({ title: "Reset failed", description: err.message, variant: "destructive" });
     } finally {
