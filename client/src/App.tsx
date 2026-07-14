@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Switch, Route, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -69,7 +70,17 @@ function AuthenticatedApp() {
 
 function AppRouter() {
   const { user, isLoading } = useAuth();
+  const [, setLocation] = useLocation();
   useSupabaseSession(); // global auth state listener — clears cache on signout/token expiry
+
+  // Supabase password-reset emails redirect to {SITE_URL}/#access_token=...&type=recovery
+  // Intercept that hash here and forward to the dedicated reset-password page.
+  useEffect(() => {
+    const hash = window.location.hash;
+    if (hash.includes("type=recovery") || hash.includes("type=email_change")) {
+      setLocation("/reset-password");
+    }
+  }, []);
 
   if (isLoading) {
     return (

@@ -3,9 +3,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Eye, EyeOff, Lock, CheckCircle } from "lucide-react";
+import { Eye, EyeOff, Lock, CheckCircle, Loader2, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { getSupabase } from "@/lib/supabase";
+import { supabaseClient } from "@/lib/supabase";
 import { useLocation } from "wouter";
 import logoPath from "@assets/FinVision360_Logo_H_(transparent)_1776714495394.png";
 
@@ -15,22 +15,27 @@ export default function ResetPasswordPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
+  const [sessionReady, setSessionReady] = useState(false);
+  const [sessionError, setSessionError] = useState("");
   const { toast } = useToast();
   const [, setLocation] = useLocation();
 
   useEffect(() => {
-    getSupabase().then((sb) => {
-      sb.auth.onAuthStateChange((event) => {
-        if (event === "PASSWORD_RECOVERY") {
-        }
-      });
+    // Supabase automatically exchanges the hash tokens when getSession() is called.
+    // This works whether the hash is on /reset-password or was on / (root).
+    supabaseClient.auth.getSession().then(({ data, error }) => {
+      if (error || !data.session) {
+        setSessionError("This reset link is invalid or has expired. Please request a new one.");
+      } else {
+        setSessionReady(true);
+      }
     });
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (password.length < 6) {
-      toast({ title: "Password too short", description: "Minimum 6 characters.", variant: "destructive" });
+    if (password.length < 8) {
+      toast({ title: "Password too short", description: "Minimum 8 characters.", variant: "destructive" });
       return;
     }
     if (password !== confirm) {
@@ -39,10 +44,11 @@ export default function ResetPasswordPage() {
     }
     setLoading(true);
     try {
-      const sb = await getSupabase();
-      const { error } = await sb.auth.updateUser({ password });
+      const { error } = await supabaseClient.auth.updateUser({ password });
       if (error) throw error;
       setDone(true);
+      await supabaseClient.auth.signOut();
+      setTimeout(() => setLocation("/home"), 3000);
     } catch (err: any) {
       toast({ title: "Reset failed", description: err.message, variant: "destructive" });
     } finally {
@@ -67,11 +73,26 @@ export default function ResetPasswordPage() {
                 </div>
                 <div>
                   <h2 className="text-lg font-semibold">Password updated!</h2>
-                  <p className="text-sm text-muted-foreground mt-1">Your password has been changed successfully.</p>
+                  <p className="text-sm text-muted-foreground mt-1">You'll be redirected to sign in shortly.</p>
                 </div>
-                <Button className="w-full" onClick={() => setLocation("/")}>
-                  Go to Dashboard
+              </div>
+            ) : sessionError ? (
+              <div className="text-center space-y-4 py-4">
+                <div className="w-12 h-12 rounded-full bg-destructive/10 flex items-center justify-center mx-auto">
+                  <AlertCircle className="h-6 w-6 text-destructive" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-semibold">Link expired</h2>
+                  <p className="text-sm text-muted-foreground mt-1">{sessionError}</p>
+                </div>
+                <Button className="w-full" variant="outline" onClick={() => setLocation("/home")}>
+                  Back to sign in
                 </Button>
+              </div>
+            ) : !sessionReady ? (
+              <div className="flex items-center justify-center gap-2 py-10 text-muted-foreground text-sm">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Verifying reset link…
               </div>
             ) : (
               <div className="space-y-4">
@@ -91,8 +112,9 @@ export default function ResetPasswordPage() {
                         className="pl-9 pr-10"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
-                        placeholder="Min 6 characters"
+                        placeholder="Min 8 characters"
                         required
+                        autoFocus
                       />
                       <Button
                         type="button"
@@ -122,7 +144,19 @@ export default function ResetPasswordPage() {
                     </div>
                   </div>
                   <Button type="submit" className="w-full" disabled={loading} data-testid="button-set-password">
-                    {loading ? "Updating..." : "Set New Password"}
+                    {loading ? (
+                      <><Loader2 className="h-4 w-4 animate-spin mr-2" />Updating…</>
+                    ) : (
+                      "Set New Password"
+                    )}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="w-full text-xs text-muted-foreground"
+                    onClick={() => setLocation("/home")}
+                  >
+                    Cancel — back to sign in
                   </Button>
                 </form>
               </div>
