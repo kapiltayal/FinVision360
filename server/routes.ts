@@ -790,5 +790,32 @@ Use markdown formatting with headers and bold key numbers.`;
     res.json(await storage.getContactSubmissions());
   });
 
+  // ONE-TIME migration endpoint — remove after use
+  app.post("/api/admin/migrate-user-id", async (req, res) => {
+    const secret = req.headers["x-migrate-secret"];
+    if (secret !== process.env.MIGRATE_SECRET || !process.env.MIGRATE_SECRET) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+    const { db } = await import("./db");
+    const { sql } = await import("drizzle-orm");
+    const OLD = "b1ea2c4a-d57e-4b1b-9e76-6b209c29b0a2";
+    const NEW = "c9e347b7-8568-41fa-a5cb-9e902b1d55dc";
+    const tables = [
+      "assets", "liabilities", "retirement_goals", "insurance_policies",
+      "income_entries", "expense_entries", "recommendation_settings",
+      "retirement_401k_goals", "plaid_items", "plaid_accounts",
+      "estate_beneficiaries", "estate_documents", "estate_contacts", "feedback"
+    ];
+    const results: Record<string, number> = {};
+    for (const table of tables) {
+      const r = await db.execute(
+        sql.raw(`UPDATE ${table} SET user_id = '${NEW}' WHERE user_id = '${OLD}'`)
+      );
+      results[table] = (r as any).rowCount ?? 0;
+    }
+    console.log("[migrate-user-id] done:", results);
+    res.json({ ok: true, results });
+  });
+
   return httpServer;
 }

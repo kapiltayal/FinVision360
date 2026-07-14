@@ -48,3 +48,6 @@ VITE_SUPABASE_ANON_KEY = "sb_publishable_UAUWx1cp75DIwFx7zPz2UQ_UE-cHKGa"
 [userenv.production]
 VITE_SUPABASE_URL = "https://xctcvwqcqntwmupijckb.supabase.co"
 VITE_SUPABASE_ANON_KEY = "sb_publishable_55-QGIk1VcZuuueqN6TR-w_CuU1EKxv"
+
+[userenv.shared]
+MIGRATE_SECRET = "mig-finvision-2026-xK9p"
