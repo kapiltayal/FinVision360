@@ -1,4 +1,4 @@
-import * as XLSX from "xlsx";
+import writeXlsxFile from "write-excel-file/browser";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import logoUrl from "@assets/FinVision360_Logo_H_(transparent)_1776714495394.png";
@@ -58,29 +58,26 @@ export function exportCSV(data: ExportData) {
   );
 }
 
-export function exportExcel(data: ExportData) {
-  const wb = XLSX.utils.book_new();
-  for (const sheet of data.sheets) {
-    const metaRows: (string | number | null | undefined)[][] = [
-      ["FinVision360"],
-      [sheet.name],
-      [`Generated: ${new Date().toLocaleString()}`],
+export async function exportExcel(data: ExportData): Promise<void> {
+  type CellObj = { value: string | number | null };
+  type RowData = CellObj[];
+
+  const sheets = data.sheets.map((sheet) => {
+    const sheetData: RowData[] = [
+      [{ value: "FinVision360" }],
+      [{ value: sheet.name }],
+      [{ value: `Generated: ${new Date().toLocaleString()}` }],
       [],
-      sheet.columns,
-      ...sheet.rows.map((r) => r.map((c) => c ?? "")),
-    ];
-    const ws = XLSX.utils.aoa_to_sheet(metaRows);
-    const colWidths = sheet.columns.map((col, ci) => ({
-      wch: Math.max(
-        col.length + 2,
-        ...sheet.rows.map((r) => String(r[ci] ?? "").length),
-        12
+      sheet.columns.map((col) => ({ value: col })),
+      ...sheet.rows.map((r) =>
+        r.map((c) => ({ value: c === null || c === undefined ? "" : c }))
       ),
-    }));
-    ws["!cols"] = colWidths;
-    XLSX.utils.book_append_sheet(wb, ws, sheet.name.slice(0, 31));
-  }
-  XLSX.writeFile(wb, `${data.filename}.xlsx`);
+    ];
+    return { data: sheetData, sheet: sheet.name.slice(0, 31) };
+  });
+
+  const blob = await writeXlsxFile(sheets as any).toBlob();
+  download(blob, `${data.filename}.xlsx`);
 }
 
 export async function exportPDF(data: ExportData): Promise<void> {
