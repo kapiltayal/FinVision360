@@ -405,12 +405,14 @@ export default function SnapshotPage() {
               const tileColor =
                 tileState === "ok" ? "#22c55e"
                 : tileState === "warn" ? "#f59e0b"
-                : "#ef4444";
+                : tileState === "expired" ? "#ef4444"
+                : "#9ca3af";
 
               const shadowRgb =
                 tileState === "ok" ? "34,197,94"
                 : tileState === "warn" ? "245,158,11"
-                : "239,68,68";
+                : tileState === "expired" ? "239,68,68"
+                : "156,163,175";
 
               const tileShadowBase = `0 1px 0 rgba(255,255,255,0.5) inset, 0 1px 3px rgba(${shadowRgb},0.1), 0 3px 0 rgba(${shadowRgb},0.12), 0 4px 1px rgba(0,0,0,0.05)`;
               const tileShadowHover = `0 1px 0 rgba(255,255,255,0.5) inset, 0 2px 6px rgba(${shadowRgb},0.15), 0 5px 0 rgba(${shadowRgb},0.16), 0 6px 2px rgba(0,0,0,0.07)`;
@@ -418,12 +420,14 @@ export default function SnapshotPage() {
               const tileBg =
                 tileState === "ok" ? "linear-gradient(160deg, rgba(240,255,244,1) 0%, rgba(220,252,231,0.8) 100%)"
                 : tileState === "warn" ? "linear-gradient(160deg, rgba(255,251,235,1) 0%, rgba(254,243,199,0.8) 100%)"
-                : "linear-gradient(160deg, rgba(255,241,241,1) 0%, rgba(254,226,226,0.8) 100%)";
+                : tileState === "expired" ? "linear-gradient(160deg, rgba(255,241,241,1) 0%, rgba(254,226,226,0.8) 100%)"
+                : "linear-gradient(160deg, rgba(249,250,251,1) 0%, rgba(243,244,246,0.8) 100%)";
 
               const tileBorder =
                 tileState === "ok" ? "rgba(34,197,94,0.35)"
                 : tileState === "warn" ? "rgba(245,158,11,0.35)"
-                : "rgba(239,68,68,0.3)";
+                : tileState === "expired" ? "rgba(239,68,68,0.3)"
+                : "rgba(156,163,175,0.35)";
 
               const tooltipLines: string[] = [];
               if (typePolicies.length === 0) {
