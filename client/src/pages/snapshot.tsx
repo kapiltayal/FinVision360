@@ -30,6 +30,7 @@ import {
   ScrollText,
   UserCheck,
   Users,
+  Info,
 } from "lucide-react";
 import { type Asset, type Liability, type IncomeEntry, type ExpenseEntry, type InsurancePolicy, type RetirementGoal, type Retirement401kGoal, type EstateBeneficiary, type EstateDocument, type EstateContact, ESTATE_DOCUMENT_TYPES } from "@shared/schema";
 
@@ -67,6 +68,7 @@ function SnapshotCard({
   href,
   children,
   className = "",
+  tooltip,
 }: {
   title: string;
   accent: string;
@@ -74,6 +76,7 @@ function SnapshotCard({
   href?: string;
   children: React.ReactNode;
   className?: string;
+  tooltip?: string;
 }) {
   const [, nav] = useLocation();
   return (
@@ -93,6 +96,22 @@ function SnapshotCard({
             <Icon className="h-4 w-4" style={{ color: accent }} />
           </div>
           <span className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">{title}</span>
+          {tooltip && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span
+                  onClick={(e) => e.stopPropagation()}
+                  className="cursor-default"
+                  data-testid={`icon-info-${title.toLowerCase().replace(/\s+/g, "-")}`}
+                >
+                  <Info className="h-3.5 w-3.5 text-muted-foreground/50 hover:text-muted-foreground transition-colors" />
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="max-w-xs text-xs leading-relaxed">
+                {tooltip}
+              </TooltipContent>
+            </Tooltip>
+          )}
         </div>
         {href && <ArrowRight className="h-4 w-4 text-muted-foreground/40 group-hover:text-primary transition-colors" />}
       </div>
@@ -476,7 +495,7 @@ export default function SnapshotPage() {
         </SnapshotCard>
 
         {/* ── Emergency Funds ── */}
-        <SnapshotCard title="Emergency Funds" accent="#0d9488" icon={Banknote} href="/assets">
+        <SnapshotCard title="Emergency Funds" accent="#0d9488" icon={Banknote} href="/assets" tooltip="Calculated as the total of your savings and cash assets. Months of coverage = savings & cash ÷ your total monthly expenses. A healthy fund covers 3–6 months of expenses.">
           <div className="mb-4">
             <p
               className="text-3xl font-bold tabular-nums leading-none mb-1"
