@@ -427,7 +427,7 @@ export default function SnapshotPage() {
                         transition: "transform 0.18s ease, box-shadow 0.18s ease",
                       }}
                       data-testid={`indicator-insurance-${key}`}
-                      onClick={() => nav(`/insurance?tab=${key}`)}
+                      onClick={(e) => { e.stopPropagation(); nav(`/insurance?tab=${key}`); }}
                       onMouseEnter={e => {
                         const el = e.currentTarget as HTMLElement;
                         el.style.transform = "translateY(-4px)";
