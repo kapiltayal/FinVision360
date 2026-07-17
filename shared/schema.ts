@@ -9,6 +9,7 @@ export const users = pgTable("users", {
   email: text("email"),
   isAdmin: boolean("is_admin").default(false).notNull(),
   supabaseId: text("supabase_id").unique(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
 export const insertUserSchema = createInsertSchema(users).pick({
