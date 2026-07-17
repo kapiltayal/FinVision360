@@ -11,7 +11,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useSEO } from "@/hooks/use-seo";
 import {
   Building2, RefreshCw, Trash2, Plus, ShieldCheck, Link2,
-  CreditCard, Landmark, TrendingUp, Wallet, AlertCircle, Loader2
+  CreditCard, Landmark, TrendingUp, Wallet, AlertCircle, Loader2,
+  ChevronDown, ChevronRight,
 } from "lucide-react";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel,
@@ -127,6 +128,15 @@ export default function ConnectedAccountsPage() {
 
   const { toast } = useToast();
   const [syncingId, setSyncingId] = useState<number | null>(null);
+  const [expandedItems, setExpandedItems] = useState<Set<number>>(new Set());
+
+  const toggleExpanded = (itemId: number) => {
+    setExpandedItems(prev => {
+      const next = new Set(prev);
+      next.has(itemId) ? next.delete(itemId) : next.add(itemId);
+      return next;
+    });
+  };
 
   const { data, isLoading } = useQuery<{ accounts: PlaidAccount[]; items: PlaidItem[] }>({
     queryKey: ["/api/plaid/accounts"],
@@ -287,51 +297,69 @@ export default function ConnectedAccountsPage() {
               </div>
             </CardHeader>
             <Separator />
-            <CardContent className="pt-4">
-              {itemAccounts.length === 0 ? (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
-                  <AlertCircle className="h-4 w-4" />
-                  No accounts found — try syncing.
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {itemAccounts.map((acct) => (
-                    <div
-                      key={acct.id}
-                      className="flex items-center justify-between rounded-lg border px-4 py-3 hover:bg-accent/40 transition-colors"
-                      data-testid={`row-account-${acct.id}`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="text-muted-foreground">
-                          {accountTypeIcon(acct.type, acct.subtype)}
-                        </div>
-                        <div>
-                          <p className="font-medium text-sm">{acct.name}</p>
-                          {acct.officialName && acct.officialName !== acct.name && (
-                            <p className="text-xs text-muted-foreground">{acct.officialName}</p>
-                          )}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-4">
-                        <Badge variant="secondary" className="text-xs capitalize hidden sm:flex">
-                          {accountTypeLabel(acct.type, acct.subtype)}
-                        </Badge>
-                        <div className="text-right">
-                          <p className="font-semibold text-sm" data-testid={`text-balance-${acct.id}`}>
-                            {formatBalance(acct.currentBalance)}
-                          </p>
-                          {acct.availableBalance && acct.availableBalance !== acct.currentBalance && (
-                            <p className="text-xs text-muted-foreground">
-                              {formatBalance(acct.availableBalance)} available
-                            </p>
-                          )}
-                        </div>
-                      </div>
+            <button
+              className="w-full flex items-center justify-between px-6 py-3 text-sm text-muted-foreground hover:bg-accent/40 transition-colors"
+              onClick={() => toggleExpanded(item.id)}
+              data-testid={`button-toggle-accounts-${item.id}`}
+            >
+              <span className="flex items-center gap-2">
+                {expandedItems.has(item.id)
+                  ? <ChevronDown className="h-4 w-4" />
+                  : <ChevronRight className="h-4 w-4" />}
+                <span>{itemAccounts.length} account{itemAccounts.length !== 1 ? "s" : ""}</span>
+              </span>
+              <span className="text-xs">{expandedItems.has(item.id) ? "Hide" : "Show accounts"}</span>
+            </button>
+            {expandedItems.has(item.id) && (
+              <>
+                <Separator />
+                <CardContent className="pt-4">
+                  {itemAccounts.length === 0 ? (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
+                      <AlertCircle className="h-4 w-4" />
+                      No accounts found — try syncing.
                     </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
+                  ) : (
+                    <div className="space-y-2">
+                      {itemAccounts.map((acct) => (
+                        <div
+                          key={acct.id}
+                          className="flex items-center justify-between rounded-lg border px-4 py-3 hover:bg-accent/40 transition-colors"
+                          data-testid={`row-account-${acct.id}`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="text-muted-foreground">
+                              {accountTypeIcon(acct.type, acct.subtype)}
+                            </div>
+                            <div>
+                              <p className="font-medium text-sm">{acct.name}</p>
+                              {acct.officialName && acct.officialName !== acct.name && (
+                                <p className="text-xs text-muted-foreground">{acct.officialName}</p>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-4">
+                            <Badge variant="secondary" className="text-xs capitalize hidden sm:flex">
+                              {accountTypeLabel(acct.type, acct.subtype)}
+                            </Badge>
+                            <div className="text-right">
+                              <p className="font-semibold text-sm" data-testid={`text-balance-${acct.id}`}>
+                                {formatBalance(acct.currentBalance)}
+                              </p>
+                              {acct.availableBalance && acct.availableBalance !== acct.currentBalance && (
+                                <p className="text-xs text-muted-foreground">
+                                  {formatBalance(acct.availableBalance)} available
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </>
+            )}
           </Card>
         );
       })}
