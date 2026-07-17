@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -815,7 +815,11 @@ function PolicyCard({
 
 export default function InsurancePage() {
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState<TabType>("auto");
+  const [activeTab, setActiveTab] = useState<TabType>(() => {
+    const param = new URLSearchParams(window.location.search).get("tab");
+    const valid: TabType[] = ["auto", "home", "life", "health", "other", "annuity"];
+    return valid.includes(param as TabType) ? (param as TabType) : "auto";
+  });
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingPolicy, setEditingPolicy] = useState<InsurancePolicy | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<InsurancePolicy | null>(null);

@@ -418,7 +418,7 @@ export default function SnapshotPage() {
                 <Tooltip key={key}>
                   <TooltipTrigger asChild>
                     <div
-                      className="flex flex-col items-center gap-1.5 p-3 rounded-xl border cursor-default select-none"
+                      className="flex flex-col items-center gap-1.5 p-3 rounded-xl border cursor-pointer select-none"
                       style={{
                         borderColor: tileBorder,
                         background: tileBg,
@@ -426,6 +426,7 @@ export default function SnapshotPage() {
                         transition: "transform 0.18s ease, box-shadow 0.18s ease",
                       }}
                       data-testid={`indicator-insurance-${key}`}
+                      onClick={() => nav(`/insurance?tab=${key}`)}
                       onMouseEnter={e => {
                         const el = e.currentTarget as HTMLElement;
                         el.style.transform = "translateY(-4px)";
