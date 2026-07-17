@@ -334,7 +334,7 @@ export default function SettingsPage() {
                   </div>
                 </div>
                 <div className="flex justify-end pt-1">
-                  <Button type="submit" variant="outline" disabled={changePasswordMutation.isPending} data-testid="button-change-password">
+                  <Button type="submit" disabled={changePasswordMutation.isPending} data-testid="button-change-password">
                     <Lock className="h-4 w-4 mr-2" />
                     {changePasswordMutation.isPending ? "Changing..." : "Change Password"}
                   </Button>
