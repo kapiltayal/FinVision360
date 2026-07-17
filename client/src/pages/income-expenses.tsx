@@ -503,8 +503,12 @@ export default function IncomeExpensesPage() {
                   </div>
                 ) : (
                   <>
-                  <Tabs defaultValue="needs">
+                  <Tabs defaultValue="all">
                     <TabsList className="mb-3 w-full">
+                      <TabsTrigger value="all" className="flex-1 gap-1.5" data-testid="tab-all-expenses">
+                        All
+                        <Badge variant="secondary" className="ml-1 text-xs">{expenseList.length}</Badge>
+                      </TabsTrigger>
                       <TabsTrigger value="needs" className="flex-1 gap-1.5" data-testid="tab-needs">
                         <Home className="h-3.5 w-3.5" />
                         Needs
@@ -516,6 +520,12 @@ export default function IncomeExpensesPage() {
                         <Badge variant="secondary" className="ml-1 text-xs">{wants.length}</Badge>
                       </TabsTrigger>
                     </TabsList>
+
+                    <TabsContent value="all" className="mt-0 space-y-2">
+                      {expenseList.map((entry) => (
+                        <ExpenseRow key={entry.id} entry={entry} onEdit={openEditExpense} onDelete={(id) => deleteExpense.mutate(id)} />
+                      ))}
+                    </TabsContent>
 
                     <TabsContent value="needs" className="mt-0 space-y-2">
                       {needs.length === 0 ? (
