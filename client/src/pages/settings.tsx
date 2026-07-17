@@ -197,7 +197,7 @@ export default function SettingsPage() {
   const initials = getInitials(user?.fullName, user?.username);
 
   return (
-    <div className="p-6 space-y-8 max-w-3xl">
+    <div className="p-6 space-y-8 max-w-3xl mx-auto">
       {/* Page Header */}
       <div className="page-header-gradient">
         <h1 className="text-2xl font-bold" data-testid="text-settings-title">Settings</h1>
