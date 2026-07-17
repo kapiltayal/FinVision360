@@ -112,6 +112,9 @@ export function AppHeader() {
           </DropdownMenuContent>
         </DropdownMenu>
 
+        {/* Divider */}
+        <div className="h-7 w-px bg-gradient-to-b from-transparent via-blue-400 dark:via-blue-500 to-transparent mx-2" aria-hidden="true" />
+
         {/* Admin Dropdown — only for admins */}
         {isAdmin && (
           <DropdownMenu open={adminOpen} onOpenChange={setAdminOpen}>
@@ -158,9 +161,6 @@ export function AppHeader() {
             </DropdownMenuContent>
           </DropdownMenu>
         )}
-
-        {/* Divider */}
-        <div className="h-7 w-px bg-gradient-to-b from-transparent via-blue-400 dark:via-blue-500 to-transparent mx-2" aria-hidden="true" />
 
         {/* User Menu */}
         <DropdownMenu open={userOpen} onOpenChange={setUserOpen}>
