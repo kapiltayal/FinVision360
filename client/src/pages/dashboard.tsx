@@ -557,14 +557,14 @@ export default function DashboardPage() {
         <StatCard
           title="Net Return on Assets"
           value={`${netAnnualReturn >= 0 ? "+" : ""}${formatCurrency(netAnnualReturn)}/yr`}
+          color={netAnnualReturn >= 0 ? "green" : "red"}
           extraLine={
-            <div className="flex items-center gap-1.5 mt-0.5">
-              <span className={`text-sm font-semibold ${spreadPct >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
-                {spreadPct >= 0 ? "+" : ""}{spreadPct.toFixed(2)}% spread
-              </span>
+            <div className="mt-1 space-y-0.5 text-xs text-muted-foreground">
+              <p>Earning {formatCurrency(earnedAnnual)} ({weightedAssetRate.toFixed(2)}%)</p>
+              <p>Paying {formatCurrency(paidAnnual)} ({weightedLiabilityRate.toFixed(2)}%)</p>
             </div>
           }
-          subtitle={`Earning ${formatCurrency(earnedAnnual)} (${weightedAssetRate.toFixed(2)}%) · Paying ${formatCurrency(paidAnnual)} (${weightedLiabilityRate.toFixed(2)}%) · click to expand`}
+          subtitle="click to expand"
           icon={Percent}
           trend={netAnnualReturn >= 0 ? "up" : "down"}
           testId="card-interest-spread"
