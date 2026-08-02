@@ -565,7 +565,7 @@ export default function DashboardPage() {
             </div>
           }
           subtitle="click to expand"
-          icon={Percent}
+          icon={TrendingUp}
           trend={netAnnualReturn >= 0 ? "up" : "down"}
           testId="card-interest-spread"
           onClick={() => toggleSection("interest")}
