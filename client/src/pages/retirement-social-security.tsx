@@ -281,7 +281,7 @@ export default function SocialSecurityPage() {
               </div>
               <div className="space-y-2">
                 <Label>Estimated Benefit at FRA ($/month)</Label>
-                <Input
+                <CurrencyInput
                   data-testid="input-ss-fra-benefit"
                   value={fraMonthlyBenefit}
                   onChange={(v) => setFraMonthlyBenefit(v)}
