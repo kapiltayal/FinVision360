@@ -336,7 +336,7 @@ export default function SocialSecurityPage() {
               <CardTitle className="text-base">Cumulative Benefits by Start Age</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="h-72">
+              <div className="h-[420px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={cumulativeData} margin={{ top: 5, right: 10, left: 10, bottom: 48 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
