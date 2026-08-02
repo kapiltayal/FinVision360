@@ -335,9 +335,9 @@ export default function Retirement401kPage() {
                   <CardTitle className="text-base">Balance Projection</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="h-72">
+                  <div className="h-[420px]">
                     <ResponsiveContainer width="100%" height="100%">
-                      <AreaChart data={projectionData} margin={{ top: 5, right: 10, left: 10, bottom: 48 }}>
+                      <AreaChart data={projectionData} margin={{ top: 5, right: 10, left: 10, bottom: 56 }}>
                         <defs>
                           <linearGradient id="tradGradient" x1="0" y1="0" x2="0" y2="1">
                             <stop offset="5%" stopColor="hsl(var(--chart-1))" stopOpacity={0.3} />
@@ -366,7 +366,7 @@ export default function Retirement401kPage() {
                             return null;
                           }}
                         />
-                        <Legend wrapperStyle={{ fontSize: 12 }} />
+                        <Legend wrapperStyle={{ fontSize: 12, paddingTop: 24 }} />
                         <Area type="monotone" dataKey="contributions" name="Total Contributions" stroke="hsl(var(--chart-3))" fill="url(#contribGradient)" strokeWidth={1.5} />
                         <Area type="monotone" dataKey="traditional" name="Balance (w/ growth)" stroke="hsl(var(--chart-1))" fill="url(#tradGradient)" strokeWidth={2} />
                       </AreaChart>
