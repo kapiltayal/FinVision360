@@ -256,7 +256,7 @@ export default function AssetsPage() {
             </div>
           </CardContent>
         </Card>
-        <Card className="stat-card-3d stat-card-3d-green border">
+        <Card className="stat-card-3d">
           <CardContent className="p-5">
             <div className="flex items-center gap-3">
               <div className="h-10 w-10 rounded-md bg-emerald-500/10 flex items-center justify-center">

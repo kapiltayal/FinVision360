@@ -257,11 +257,11 @@ export default function LiabilitiesPage() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card className="stat-card-3d stat-card-3d-red border">
+        <Card className="stat-card-3d">
           <CardContent className="p-5">
             <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-md bg-destructive/10 flex items-center justify-center">
-                <CreditCard className="h-5 w-5 text-destructive" />
+              <div className="h-10 w-10 rounded-md bg-primary/10 flex items-center justify-center">
+                <CreditCard className="h-5 w-5 text-primary" />
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Total Owed</p>
@@ -270,11 +270,11 @@ export default function LiabilitiesPage() {
             </div>
           </CardContent>
         </Card>
-        <Card className="stat-card-3d stat-card-3d-red border">
+        <Card className="stat-card-3d">
           <CardContent className="p-5">
             <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-md bg-destructive/10 flex items-center justify-center">
-                <TrendingDown className="h-5 w-5 text-destructive" />
+              <div className="h-10 w-10 rounded-md bg-red-500/10 flex items-center justify-center">
+                <TrendingDown className="h-5 w-5 text-red-600 dark:text-red-400" />
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Avg Interest Rate</p>
@@ -283,11 +283,11 @@ export default function LiabilitiesPage() {
             </div>
           </CardContent>
         </Card>
-        <Card className="stat-card-3d stat-card-3d-red border">
+        <Card className="stat-card-3d">
           <CardContent className="p-5">
             <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-md bg-destructive/10 flex items-center justify-center">
-                <CreditCard className="h-5 w-5 text-destructive" />
+              <div className="h-10 w-10 rounded-md bg-primary/10 flex items-center justify-center">
+                <CreditCard className="h-5 w-5 text-primary" />
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Total Min Payments</p>
