@@ -3,6 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { CurrencyInput } from "@/components/ui/currency-input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -211,11 +212,11 @@ export default function RetirementPlannerPage() {
               </div>
               <div className="space-y-2">
                 <Label>Current Savings ($)</Label>
-                <Input data-testid="input-current-savings" type="number" value={form.currentSavings} onChange={(e) => setForm({ ...form, currentSavings: e.target.value })} />
+                <CurrencyInput data-testid="input-current-savings" value={form.currentSavings} onChange={(v) => setForm({ ...form, currentSavings: v })} />
               </div>
               <div className="space-y-2">
                 <Label>Monthly Contribution ($)</Label>
-                <Input data-testid="input-monthly-contribution" type="number" value={form.monthlyContribution} onChange={(e) => setForm({ ...form, monthlyContribution: e.target.value })} />
+                <CurrencyInput data-testid="input-monthly-contribution" value={form.monthlyContribution} onChange={(v) => setForm({ ...form, monthlyContribution: v })} />
               </div>
             </CardContent>
           </Card>
@@ -248,7 +249,7 @@ export default function RetirementPlannerPage() {
               </div>
               <div className="space-y-2">
                 <Label>Target Amount ($)</Label>
-                <Input data-testid="input-target-amount" type="number" value={form.targetAmount} onChange={(e) => setForm({ ...form, targetAmount: e.target.value })} />
+                <CurrencyInput data-testid="input-target-amount" value={form.targetAmount} onChange={(v) => setForm({ ...form, targetAmount: v })} />
               </div>
             </CardContent>
           </Card>

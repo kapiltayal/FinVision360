@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { CurrencyInput } from "@/components/ui/currency-input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
@@ -266,11 +267,11 @@ export default function Retirement401kPage() {
             </div>
             <div className="space-y-2">
               <Label>Current 401k Balance ($)</Label>
-              <Input data-testid="input-401k-balance" type="number" value={form.currentBalance} onChange={(e) => set("currentBalance", e.target.value)} />
+              <CurrencyInput data-testid="input-401k-balance" value={form.currentBalance} onChange={(v) => set("currentBalance", v)} />
             </div>
             <div className="space-y-2">
               <Label>Annual Salary ($)</Label>
-              <Input data-testid="input-401k-salary" type="number" value={form.annualSalary} onChange={(e) => set("annualSalary", e.target.value)} />
+              <CurrencyInput data-testid="input-401k-salary" value={form.annualSalary} onChange={(v) => set("annualSalary", v)} />
             </div>
 
             <div className="space-y-2">

@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { CurrencyInput } from "@/components/ui/currency-input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -282,9 +283,8 @@ export default function SocialSecurityPage() {
                 <Label>Estimated Benefit at FRA ($/month)</Label>
                 <Input
                   data-testid="input-ss-fra-benefit"
-                  type="number"
                   value={fraMonthlyBenefit}
-                  onChange={(e) => setFraMonthlyBenefit(e.target.value)}
+                  onChange={(v) => setFraMonthlyBenefit(v)}
                   placeholder="2000"
                 />
                 <p className="text-xs text-muted-foreground">Find this at ssa.gov/myaccount</p>
