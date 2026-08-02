@@ -338,7 +338,7 @@ export default function SocialSecurityPage() {
             <CardContent>
               <div className="h-72">
                 <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={cumulativeData} margin={{ top: 5, right: 10, left: 10, bottom: 22 }}>
+                  <LineChart data={cumulativeData} margin={{ top: 5, right: 10, left: 10, bottom: 48 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                     <XAxis dataKey="age" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" label={{ value: "Age", position: "insideBottom", offset: -10, fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
                     <YAxis tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} width={68} label={{ value: "Cumulative Benefits", angle: -90, position: "insideLeft", offset: 0, fontSize: 11, fill: "hsl(var(--muted-foreground))", dy: 62 }} />
@@ -357,7 +357,7 @@ export default function SocialSecurityPage() {
                         return null;
                       }}
                     />
-                    <Legend wrapperStyle={{ fontSize: 12 }} />
+                    <Legend wrapperStyle={{ fontSize: 12, paddingTop: 24 }} />
                     <Line type="monotone" dataKey="at62" name="Start at 62" stroke="hsl(var(--chart-4))" strokeWidth={2} dot={false} />
                     <Line type="monotone" dataKey="atFRA" name={`Start at FRA (${fraLabel})`} stroke="hsl(var(--chart-1))" strokeWidth={2} dot={false} />
                     <Line type="monotone" dataKey="at70" name="Start at 70" stroke="hsl(var(--chart-2))" strokeWidth={2} dot={false} />
