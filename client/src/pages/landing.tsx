@@ -481,8 +481,8 @@ export default function LandingPage() {
           AI-Powered Personal Finance
         </div>
         <h1 className="text-4xl md:text-6xl font-bold tracking-tight mb-5 leading-tight">
-          Your Personal<br />
-          <span className="text-primary">Finance Intelligence</span>
+          Your CFO for<br />
+          <span className="text-primary">Personal Finance</span>
         </h1>
         <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto mb-8 leading-relaxed">
           Track your day-to-day finances, grow your savings, plan for retirement, and get
