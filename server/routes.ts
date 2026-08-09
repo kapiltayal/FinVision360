@@ -827,6 +827,19 @@ Use markdown formatting with headers and bold key numbers.`;
         .sort(([a], [b]) => a.localeCompare(b))
         .map(([, v]) => ({ ...v, netWorth: v.assets - v.liabilities }));
 
+      // Append live "Current" snapshot from the assets/liabilities tables
+      const { rows: [currentAssets] } = await pool.query<{ total: string }>(
+        `SELECT COALESCE(SUM(value::numeric), 0) AS total FROM assets WHERE user_id = $1`,
+        [userId],
+      );
+      const { rows: [currentLiabilities] } = await pool.query<{ total: string }>(
+        `SELECT COALESCE(SUM(balance::numeric), 0) AS total FROM liabilities WHERE user_id = $1`,
+        [userId],
+      );
+      const curAssets = parseFloat(currentAssets.total);
+      const curLiabilities = parseFloat(currentLiabilities.total);
+      data.push({ month: "Current", assets: curAssets, liabilities: curLiabilities, netWorth: curAssets - curLiabilities });
+
       res.json(data);
     } catch (err) {
       console.error("[history/net-worth]", err);
