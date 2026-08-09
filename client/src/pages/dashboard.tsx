@@ -34,6 +34,8 @@ import {
 import { type Asset, type Liability, ASSET_CATEGORIES, LIABILITY_CATEGORIES } from "@shared/schema";
 import { formatCurrency, formatPercent, getCategoryLabel } from "@/lib/format";
 import { ExportMenu } from "@/components/export-menu";
+import { useAuth } from "@/hooks/use-auth";
+import { getQueryFn } from "@/lib/queryClient";
 
 type OpenSection = "netWorth" | "assets" | "liabilities" | "interest" | null;
 type HistoryChartType = "line" | "bar";
@@ -462,6 +464,7 @@ function NetWorthHistoryChart({ data }: { data: NetWorthHistoryPoint[] }) {
 }
 
 export default function DashboardPage() {
+  const { user } = useAuth();
   const [openSection, setOpenSection] = useState<OpenSection>(null);
   const [excludedAssetIds, setExcludedAssetIds] = useState<Set<number>>(new Set());
   const [excludedLiabilityIds, setExcludedLiabilityIds] = useState<Set<number>>(new Set());
@@ -474,6 +477,8 @@ export default function DashboardPage() {
   });
   const { data: netWorthHistory = [] } = useQuery<NetWorthHistoryPoint[]>({
     queryKey: ["/api/history/net-worth"],
+    queryFn: getQueryFn({ on401: "returnNull" }),
+    enabled: !!user,
   });
 
   const isLoading = assetsLoading || liabilitiesLoading;
