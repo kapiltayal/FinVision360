@@ -409,6 +409,41 @@ export const insertContactusSchema = createInsertSchema(contactus).omit({
 export type InsertContactus = z.infer<typeof insertContactusSchema>;
 export type Contactus = typeof contactus.$inferSelect;
 
+// ── Net Worth History ────────────────────────────────────────────────────────
+
+export const assetHistory = pgTable("asset_history", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  assetId: integer("asset_id").notNull(),
+  name: text("name").notNull(),
+  category: text("category").notNull(),
+  value: numeric("value", { precision: 15, scale: 2 }).notNull(),
+  interestRate: numeric("interest_rate", { precision: 5, scale: 2 }).default("0"),
+  institution: text("institution"),
+  notes: text("notes"),
+  snapshotAt: timestamp("snapshot_at").defaultNow().notNull(),
+});
+
+export type AssetHistory = typeof assetHistory.$inferSelect;
+
+export const liabilityHistory = pgTable("liability_history", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  liabilityId: integer("liability_id").notNull(),
+  name: text("name").notNull(),
+  category: text("category").notNull(),
+  balance: numeric("balance", { precision: 15, scale: 2 }).notNull(),
+  interestRate: numeric("interest_rate", { precision: 5, scale: 2 }).default("0"),
+  minimumPayment: numeric("minimum_payment", { precision: 10, scale: 2 }).default("0"),
+  institution: text("institution"),
+  notes: text("notes"),
+  snapshotAt: timestamp("snapshot_at").defaultNow().notNull(),
+});
+
+export type LiabilityHistory = typeof liabilityHistory.$inferSelect;
+
+// ── Estate Contact Roles ─────────────────────────────────────────────────────
+
 export const ESTATE_CONTACT_ROLES = [
   { value: "attorney", label: "Estate Attorney" },
   { value: "executor", label: "Executor / Personal Representative" },

@@ -2,6 +2,8 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth, requireAuth, requireAdmin, authenticateSupabase } from "./auth";
+import { db, pool } from "./db";
+import { assets, liabilities, assetHistory, liabilityHistory } from "@shared/schema";
 import OpenAI from "openai";
 import { scrapeBank, DEFAULT_BANK_CONFIGS, type BankSelectorConfig } from "./scraper";
 import { PlaidApi, PlaidEnvironments, Configuration, Products, CountryCode } from "plaid";
@@ -788,6 +790,81 @@ Use markdown formatting with headers and bold key numbers.`;
 
   app.get("/api/contact", requireAdmin, async (_req, res) => {
     res.json(await storage.getContactSubmissions());
+  });
+
+  // ── Monthly Net Worth Backup (cron-triggered) ───────────────────────────
+  app.post("/api/tasks/monthly-backup", async (req, res) => {
+    const token = req.headers["x-cron-token"];
+    if (!token || token !== process.env.CRON_TOKEN) {
+      return res.status(401).json({ message: "Unauthorized: invalid or missing X-Cron-Token" });
+    }
+
+    try {
+      console.log("[monthly-backup] starting snapshot...");
+
+      // Snapshot assets
+      const assetRows = await db.select().from(assets);
+      if (assetRows.length > 0) {
+        await db.insert(assetHistory).values(
+          assetRows.map((a) => ({
+            userId: a.userId,
+            assetId: a.id,
+            name: a.name,
+            category: a.category,
+            value: a.value,
+            interestRate: a.interestRate ?? "0",
+            institution: a.institution,
+            notes: a.notes,
+          }))
+        );
+        console.log(`[monthly-backup] inserted ${assetRows.length} asset snapshot(s)`);
+      }
+
+      // Snapshot liabilities
+      const liabilityRows = await db.select().from(liabilities);
+      if (liabilityRows.length > 0) {
+        await db.insert(liabilityHistory).values(
+          liabilityRows.map((l) => ({
+            userId: l.userId,
+            liabilityId: l.id,
+            name: l.name,
+            category: l.category,
+            balance: l.balance,
+            interestRate: l.interestRate ?? "0",
+            minimumPayment: l.minimumPayment ?? "0",
+            institution: l.institution,
+            notes: l.notes,
+          }))
+        );
+        console.log(`[monthly-backup] inserted ${liabilityRows.length} liability snapshot(s)`);
+      }
+
+      // Cleanup: delete records older than 24 months
+      const cutoff = new Date();
+      cutoff.setMonth(cutoff.getMonth() - 24);
+
+      const { rowCount: deletedAssets } = await pool.query(
+        "DELETE FROM asset_history WHERE snapshot_at < $1",
+        [cutoff]
+      );
+      const { rowCount: deletedLiabilities } = await pool.query(
+        "DELETE FROM liability_history WHERE snapshot_at < $1",
+        [cutoff]
+      );
+      console.log(`[monthly-backup] pruned ${deletedAssets ?? 0} old asset record(s) and ${deletedLiabilities ?? 0} old liability record(s)`);
+
+      console.log("[monthly-backup] completed successfully");
+      return res.json({
+        message: "Monthly backup completed",
+        assetsSnapshotted: assetRows.length,
+        liabilitiesSnapshotted: liabilityRows.length,
+        assetsDeleted: deletedAssets ?? 0,
+        liabilitiesDeleted: deletedLiabilities ?? 0,
+      });
+    } catch (err) {
+      console.error("[monthly-backup] database error:", err);
+      return res.status(500).json({ message: "Database error during monthly backup" });
+    }
   });
 
   return httpServer;
