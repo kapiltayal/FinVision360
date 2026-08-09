@@ -792,6 +792,48 @@ Use markdown formatting with headers and bold key numbers.`;
     res.json(await storage.getContactSubmissions());
   });
 
+  // ── Net Worth History (per-user monthly aggregates) ──────────────────────
+  app.get("/api/history/net-worth", requireAuth, async (req: any, res) => {
+    try {
+      const userId = req.user?.id;
+      const { rows: assetRows } = await pool.query<{ month: Date; total: string }>(
+        `SELECT DATE_TRUNC('month', snapshot_at) AS month, SUM(value::numeric) AS total
+         FROM asset_history WHERE user_id = $1
+         GROUP BY 1 ORDER BY 1`,
+        [userId],
+      );
+      const { rows: liabilityRows } = await pool.query<{ month: Date; total: string }>(
+        `SELECT DATE_TRUNC('month', snapshot_at) AS month, SUM(balance::numeric) AS total
+         FROM liability_history WHERE user_id = $1
+         GROUP BY 1 ORDER BY 1`,
+        [userId],
+      );
+
+      // Merge by month label
+      const byMonth: Record<string, { month: string; assets: number; liabilities: number }> = {};
+      for (const r of assetRows) {
+        const key = r.month.toISOString().slice(0, 7);
+        const label = new Date(r.month).toLocaleDateString("en-US", { month: "short", year: "numeric" });
+        byMonth[key] = { month: label, assets: parseFloat(r.total), liabilities: 0 };
+      }
+      for (const r of liabilityRows) {
+        const key = r.month.toISOString().slice(0, 7);
+        const label = new Date(r.month).toLocaleDateString("en-US", { month: "short", year: "numeric" });
+        if (byMonth[key]) byMonth[key].liabilities = parseFloat(r.total);
+        else byMonth[key] = { month: label, assets: 0, liabilities: parseFloat(r.total) };
+      }
+
+      const data = Object.entries(byMonth)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([, v]) => ({ ...v, netWorth: v.assets - v.liabilities }));
+
+      res.json(data);
+    } catch (err) {
+      console.error("[history/net-worth]", err);
+      res.status(500).json({ message: "Failed to load history" });
+    }
+  });
+
   // ── Monthly Net Worth Backup (cron-triggered) ───────────────────────────
   app.post("/api/tasks/monthly-backup", async (req, res) => {
     const token = req.headers["x-cron-token"];

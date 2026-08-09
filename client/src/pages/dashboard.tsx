@@ -24,15 +24,27 @@ import {
   RotateCcw,
   AlertCircle,
   Info,
+  BarChart2,
+  LineChart as LineChartIcon,
 } from "lucide-react";
 import {
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend,
+  LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid,
 } from "recharts";
 import { type Asset, type Liability, ASSET_CATEGORIES, LIABILITY_CATEGORIES } from "@shared/schema";
 import { formatCurrency, formatPercent, getCategoryLabel } from "@/lib/format";
 import { ExportMenu } from "@/components/export-menu";
 
-type OpenSection = "assets" | "liabilities" | "interest" | null;
+type OpenSection = "netWorth" | "assets" | "liabilities" | "interest" | null;
+type HistoryChartType = "line" | "bar";
+type HistorySeries = "assets" | "liabilities" | "netWorth";
+
+interface NetWorthHistoryPoint {
+  month: string;
+  assets: number;
+  liabilities: number;
+  netWorth: number;
+}
 
 function StatCard({
   title, value, extraLine, subtitle, icon: Icon, trend, testId, color, onClick, isExpanded, infoText, expandedAccent,
@@ -299,6 +311,156 @@ function StackedRateBar({
   );
 }
 
+// ── Net Worth History Chart ───────────────────────────────────────────────────
+const NW_ASSET_COLOR = "hsl(220, 85%, 52%)";
+const NW_LIABILITY_COLOR = "hsl(0, 72%, 52%)";
+const NW_NET_COLOR = "hsl(150, 65%, 42%)";
+
+function NetWorthHistoryChart({ data }: { data: NetWorthHistoryPoint[] }) {
+  const [chartType, setChartType] = useState<HistoryChartType>("line");
+  const [activeSeries, setActiveSeries] = useState<Set<HistorySeries>>(
+    new Set<HistorySeries>(["assets", "liabilities", "netWorth"]),
+  );
+
+  const toggleSeries = (s: HistorySeries) =>
+    setActiveSeries((prev) => {
+      const next = new Set(prev);
+      if (next.has(s)) { if (next.size > 1) next.delete(s); }
+      else next.add(s);
+      return next;
+    });
+
+  const seriesConfig: { key: HistorySeries; label: string; color: string }[] = [
+    { key: "assets", label: "Assets", color: NW_ASSET_COLOR },
+    { key: "liabilities", label: "Liabilities", color: NW_LIABILITY_COLOR },
+    { key: "netWorth", label: "Net Worth", color: NW_NET_COLOR },
+  ];
+
+  const HistoryTooltip = ({ active, payload, label }: any) => {
+    if (!active || !payload?.length) return null;
+    return (
+      <div className="bg-popover border border-border rounded-md px-3 py-2 shadow-md space-y-1 min-w-[160px]">
+        <p className="text-xs font-semibold text-muted-foreground">{label}</p>
+        {payload.map((p: any) => (
+          <div key={p.dataKey} className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-1.5">
+              <div className="h-2 w-2 rounded-sm" style={{ backgroundColor: p.color }} />
+              <span className="text-xs">{p.name}</span>
+            </div>
+            <span className="text-xs font-medium">{formatCurrency(p.value)}</span>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  const commonProps = {
+    data,
+    margin: { top: 4, right: 8, left: 8, bottom: 0 },
+  };
+
+  const xAxis = <XAxis dataKey="month" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />;
+  const yAxis = (
+    <YAxis
+      tick={{ fontSize: 11 }}
+      tickLine={false}
+      axisLine={false}
+      tickFormatter={(v: number) =>
+        v >= 1_000_000 ? `$${(v / 1_000_000).toFixed(1)}M` : v >= 1_000 ? `$${(v / 1_000).toFixed(0)}k` : `$${v}`
+      }
+      width={56}
+    />
+  );
+  const grid = <CartesianGrid strokeDasharray="3 3" className="stroke-border/50" />;
+  const tooltip = <Tooltip content={<HistoryTooltip />} />;
+
+  return (
+    <div className="space-y-4">
+      {/* Controls */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        {/* Series toggles */}
+        <div className="flex items-center gap-2 flex-wrap">
+          {seriesConfig.map(({ key, label, color }) => {
+            const active = activeSeries.has(key);
+            return (
+              <button
+                key={key}
+                onClick={() => toggleSeries(key)}
+                className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium border transition-all ${
+                  active
+                    ? "text-white border-transparent shadow-sm"
+                    : "bg-transparent text-muted-foreground border-border hover:border-muted-foreground"
+                }`}
+                style={active ? { backgroundColor: color, borderColor: color } : {}}
+              >
+                <div
+                  className="h-2 w-2 rounded-sm shrink-0"
+                  style={{ backgroundColor: active ? "rgba(255,255,255,0.8)" : color }}
+                />
+                {label}
+              </button>
+            );
+          })}
+        </div>
+        {/* Chart type toggle */}
+        <div className="flex items-center gap-1 rounded-md border border-border p-0.5 bg-muted/40">
+          <button
+            onClick={() => setChartType("line")}
+            className={`flex items-center gap-1.5 rounded px-2.5 py-1 text-xs font-medium transition-all ${
+              chartType === "line" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <LineChartIcon className="h-3.5 w-3.5" />
+            Line
+          </button>
+          <button
+            onClick={() => setChartType("bar")}
+            className={`flex items-center gap-1.5 rounded px-2.5 py-1 text-xs font-medium transition-all ${
+              chartType === "bar" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <BarChart2 className="h-3.5 w-3.5" />
+            Bar
+          </button>
+        </div>
+      </div>
+
+      {/* Chart */}
+      <div className="h-[320px]">
+        <ResponsiveContainer width="100%" height="100%">
+          {chartType === "line" ? (
+            <LineChart {...commonProps}>
+              {grid}{xAxis}{yAxis}{tooltip}
+              {activeSeries.has("assets") && (
+                <Line type="monotone" dataKey="assets" name="Assets" stroke={NW_ASSET_COLOR} strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
+              )}
+              {activeSeries.has("liabilities") && (
+                <Line type="monotone" dataKey="liabilities" name="Liabilities" stroke={NW_LIABILITY_COLOR} strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
+              )}
+              {activeSeries.has("netWorth") && (
+                <Line type="monotone" dataKey="netWorth" name="Net Worth" stroke={NW_NET_COLOR} strokeWidth={2.5} dot={false} activeDot={{ r: 4 }} strokeDasharray="0" />
+              )}
+            </LineChart>
+          ) : (
+            <BarChart {...commonProps} barGap={2}>
+              {grid}{xAxis}{yAxis}{tooltip}
+              {activeSeries.has("assets") && (
+                <Bar dataKey="assets" name="Assets" fill={NW_ASSET_COLOR} radius={[3, 3, 0, 0]} maxBarSize={32} />
+              )}
+              {activeSeries.has("liabilities") && (
+                <Bar dataKey="liabilities" name="Liabilities" fill={NW_LIABILITY_COLOR} radius={[3, 3, 0, 0]} maxBarSize={32} />
+              )}
+              {activeSeries.has("netWorth") && (
+                <Bar dataKey="netWorth" name="Net Worth" fill={NW_NET_COLOR} radius={[3, 3, 0, 0]} maxBarSize={32} />
+              )}
+            </BarChart>
+          )}
+        </ResponsiveContainer>
+      </div>
+    </div>
+  );
+}
+
 export default function DashboardPage() {
   const [openSection, setOpenSection] = useState<OpenSection>(null);
   const [excludedAssetIds, setExcludedAssetIds] = useState<Set<number>>(new Set());
@@ -309,6 +471,9 @@ export default function DashboardPage() {
   });
   const { data: liabilities = [], isLoading: liabilitiesLoading } = useQuery<Liability[]>({
     queryKey: ["/api/liabilities"],
+  });
+  const { data: netWorthHistory = [] } = useQuery<NetWorthHistoryPoint[]>({
+    queryKey: ["/api/history/net-worth"],
   });
 
   const isLoading = assetsLoading || liabilitiesLoading;
@@ -505,11 +670,14 @@ export default function DashboardPage() {
         <StatCard
           title="Net Worth"
           value={formatCurrency(netWorth)}
-          subtitle={netWorth >= 0 ? "Positive net worth" : "Negative net worth"}
+          subtitle={`${netWorth >= 0 ? "Positive net worth" : "Negative net worth"} · click to expand`}
           icon={netWorth >= 0 ? TrendingUp : TrendingDown}
           trend={netWorth >= 0 ? "up" : "down"}
           color={netWorth >= 0 ? "green" : "red"}
           testId="card-net-worth"
+          onClick={() => toggleSection("netWorth")}
+          isExpanded={openSection === "netWorth"}
+          expandedAccent="ring-2 ring-emerald-400/50 stat-card-accent-green"
           infoText={
             <div className="space-y-1.5">
               <p className="font-semibold">How Net Worth is calculated</p>
@@ -581,6 +749,30 @@ export default function DashboardPage() {
           }
         />
       </div>
+
+      {/* Collapsible: Net Worth History */}
+      <CollapsibleSection open={openSection === "netWorth"}>
+        <Card data-testid="card-net-worth-history" className="mt-1 border-t-[3px] border-t-emerald-500 overflow-hidden">
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <CardTitle className="text-base">Net Worth History</CardTitle>
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 px-3 py-0.5 text-xs font-medium text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
+                <TrendingUp className="h-3 w-3" />
+                18-Month Trend
+              </span>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {netWorthHistory.length === 0 ? (
+              <div className="h-52 flex items-center justify-center text-muted-foreground text-sm">
+                No history data yet — snapshots are taken monthly.
+              </div>
+            ) : (
+              <NetWorthHistoryChart data={netWorthHistory} />
+            )}
+          </CardContent>
+        </Card>
+      </CollapsibleSection>
 
       {/* Collapsible: Asset Allocation */}
       <CollapsibleSection open={openSection === "assets"}>
