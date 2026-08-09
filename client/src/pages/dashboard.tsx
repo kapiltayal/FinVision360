@@ -477,8 +477,11 @@ export default function DashboardPage() {
   });
   const { data: netWorthHistory = [] } = useQuery<NetWorthHistoryPoint[]>({
     queryKey: ["/api/history/net-worth"],
-    queryFn: getQueryFn({ on401: "returnNull" }),
+    queryFn: getQueryFn({ on401: "throw" }),
     enabled: !!user,
+    staleTime: 0,   // always re-fetch fresh on mount; overrides global Infinity
+    gcTime: 0,      // never serve a stale [] from a previous unauthenticated fetch
+    select: (d: any) => (Array.isArray(d) ? d : []),
   });
 
   const isLoading = assetsLoading || liabilitiesLoading;
@@ -755,9 +758,9 @@ export default function DashboardPage() {
         />
       </div>
 
-      {/* Collapsible: Net Worth History */}
-      <CollapsibleSection open={openSection === "netWorth"}>
-        <Card data-testid="card-net-worth-history" className="mt-1 border-t-[3px] border-t-emerald-500 overflow-hidden">
+      {/* Net Worth History — conditional mount so Recharts measures real dimensions */}
+      {openSection === "netWorth" && (
+        <Card data-testid="card-net-worth-history" className="mt-1 border-t-[3px] border-t-emerald-500">
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between flex-wrap gap-2">
               <CardTitle className="text-base">Net Worth History</CardTitle>
@@ -777,7 +780,7 @@ export default function DashboardPage() {
             )}
           </CardContent>
         </Card>
-      </CollapsibleSection>
+      )}
 
       {/* Collapsible: Asset Allocation */}
       <CollapsibleSection open={openSection === "assets"}>
