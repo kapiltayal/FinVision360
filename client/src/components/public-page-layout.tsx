@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import logoPath from "@assets/FinVision360_Logo_H_(transparent)_1776714495394.png";
 import { useTheme } from "@/components/theme-provider";
 import { Sun, Moon } from "lucide-react";
+import { AppFooter } from "@/components/app-footer";
 
 export function PublicPageLayout({ children }: { children: React.ReactNode }) {
   const { theme, toggleTheme } = useTheme();
@@ -40,21 +41,7 @@ export function PublicPageLayout({ children }: { children: React.ReactNode }) {
         </div>
       </main>
 
-      <footer className="border-t py-8 mt-12">
-        <div className="max-w-6xl mx-auto px-4">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-            <img src={logoPath} alt="FinVision360" className="h-7 w-auto" />
-            <div className="flex flex-wrap justify-center gap-x-6 gap-y-1 text-xs text-muted-foreground">
-              <Link href="/about" className="hover:text-foreground transition-colors">About Us</Link>
-              <Link href="/privacy" className="hover:text-foreground transition-colors">Privacy Policy</Link>
-              <Link href="/terms" className="hover:text-foreground transition-colors">Terms & Conditions</Link>
-              <Link href="/faq" className="hover:text-foreground transition-colors">FAQ</Link>
-              <Link href="/contact" className="hover:text-foreground transition-colors">Contact Us</Link>
-            </div>
-            <p className="text-xs text-muted-foreground">© {new Date().getFullYear()} Tooothy LLC</p>
-          </div>
-        </div>
-      </footer>
+      <AppFooter />
     </div>
   );
 }
