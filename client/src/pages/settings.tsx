@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -7,14 +7,21 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useLastUpdated } from "@/hooks/use-last-updated";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useAuth, useChangePassword } from "@/hooks/use-auth";
 import {
   User, Lock, Save, PiggyBank, CreditCard, Shield,
-  KeyRound, BadgeCheck, SlidersHorizontal, Clock,
+  KeyRound, BadgeCheck, SlidersHorizontal, Clock, Camera, Upload, X,
 } from "lucide-react";
+
+// All preset avatars served from /public/Images/Avatars/
+const AVATAR_PRESETS = [
+  "avatar-default",
+  ...Array.from({ length: 50 }, (_, i) => `avatar-${String(i + 1).padStart(2, "0")}`),
+];
 
 function DollarInput({
   id,
@@ -97,6 +104,49 @@ export default function SettingsPage() {
   const { user } = useAuth();
   const { toast } = useToast();
 
+  // ── Avatar state ────────────────────────────────────────────────────────────
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Load persisted avatar from localStorage on mount / user change
+  useEffect(() => {
+    if (user?.id) {
+      const saved = localStorage.getItem(`avatar-${user.id}`);
+      setAvatarUrl(saved || null);
+    }
+  }, [user?.id]);
+
+  const saveAvatar = (url: string) => {
+    if (user?.id) localStorage.setItem(`avatar-${user.id}`, url);
+    setAvatarUrl(url);
+    setPickerOpen(false);
+    toast({ title: "Avatar updated" });
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      toast({ title: "Please select an image file", variant: "destructive" });
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast({ title: "Image must be under 5 MB", variant: "destructive" });
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (ev) => saveAvatar(ev.target?.result as string);
+    reader.readAsDataURL(file);
+  };
+
+  const removeAvatar = () => {
+    if (user?.id) localStorage.removeItem(`avatar-${user.id}`);
+    setAvatarUrl(null);
+    toast({ title: "Avatar removed" });
+  };
+
+  // ── Profile state ───────────────────────────────────────────────────────────
   const [profile, setProfile] = useState({ fullName: "" });
   useEffect(() => {
     if (user) setProfile({ fullName: user.fullName || "" });
@@ -211,9 +261,24 @@ export default function SettingsPage() {
       <Card className="border-primary/20 bg-gradient-to-r from-primary/5 via-primary/3 to-transparent">
         <CardContent className="p-5">
           <div className="flex items-center gap-4">
-            <div className="h-14 w-14 rounded-full bg-primary flex items-center justify-center shrink-0 text-primary-foreground font-bold text-lg shadow-md">
-              {initials}
-            </div>
+            {/* Clickable avatar */}
+            <button
+              type="button"
+              onClick={() => setPickerOpen(true)}
+              className="relative h-14 w-14 rounded-full shrink-0 group focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              title="Change avatar"
+            >
+              {avatarUrl ? (
+                <img src={avatarUrl} alt="Avatar" className="h-14 w-14 rounded-full object-cover shadow-md" />
+              ) : (
+                <div className="h-14 w-14 rounded-full bg-primary flex items-center justify-center text-primary-foreground font-bold text-lg shadow-md">
+                  {initials}
+                </div>
+              )}
+              <span className="absolute inset-0 rounded-full flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity">
+                <Camera className="h-5 w-5 text-white" />
+              </span>
+            </button>
             <div className="min-w-0">
               <p className="font-semibold text-base truncate">{user?.fullName || user?.username}</p>
               <p className="text-sm text-muted-foreground truncate">{user?.email || "No email set"}</p>
@@ -234,6 +299,84 @@ export default function SettingsPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Avatar Picker Dialog */}
+      <Dialog open={pickerOpen} onOpenChange={setPickerOpen}>
+        <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col overflow-hidden">
+          <DialogHeader className="shrink-0">
+            <DialogTitle>Choose Your Avatar</DialogTitle>
+          </DialogHeader>
+
+          {/* Upload section */}
+          <div className="shrink-0 border rounded-lg p-4 bg-muted/30 space-y-3">
+            <p className="text-sm font-medium flex items-center gap-2"><Upload className="h-4 w-4" /> Upload your own photo</p>
+            <div className="flex items-center gap-3 flex-wrap">
+              <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} className="gap-2">
+                <Camera className="h-4 w-4" /> Choose file
+              </Button>
+              {avatarUrl?.startsWith("data:") && (
+                <Button type="button" variant="ghost" size="sm" onClick={removeAvatar} className="gap-1 text-destructive hover:text-destructive">
+                  <X className="h-3.5 w-3.5" /> Remove photo
+                </Button>
+              )}
+              <span className="text-xs text-muted-foreground">PNG, JPG, GIF · max 5 MB</span>
+            </div>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              className="sr-only"
+              onChange={handleFileUpload}
+            />
+          </div>
+
+          {/* Preset avatar grid */}
+          <div className="flex-1 overflow-y-auto min-h-0">
+            <p className="text-sm font-medium mb-3 sticky top-0 bg-background pt-1 pb-2 z-10">Or pick a preset avatar</p>
+            <div className="grid grid-cols-6 sm:grid-cols-8 gap-2 pb-2">
+              {AVATAR_PRESETS.map((name) => {
+                const url = `/Images/Avatars/${name}.png`;
+                const isSelected = avatarUrl === url;
+                return (
+                  <button
+                    key={name}
+                    type="button"
+                    onClick={() => saveAvatar(url)}
+                    className={`relative rounded-full overflow-hidden aspect-square focus:outline-none transition-transform hover:scale-105 ${
+                      isSelected ? "ring-2 ring-primary ring-offset-2" : "ring-1 ring-border hover:ring-primary/50"
+                    }`}
+                    title={name}
+                  >
+                    <img
+                      src={url}
+                      alt={name}
+                      className="w-full h-full object-cover"
+                      loading="lazy"
+                    />
+                    {isSelected && (
+                      <span className="absolute inset-0 flex items-center justify-center bg-primary/20">
+                        <BadgeCheck className="h-5 w-5 text-primary drop-shadow" />
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Freepik credit */}
+          <p className="shrink-0 text-center border-t pt-3 mt-1">
+            <a
+              href="http://www.freepik.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Designed by Kubanek / Freepik
+            </a>
+          </p>
+        </DialogContent>
+      </Dialog>
 
       <Tabs defaultValue="profile" className="space-y-6">
         <TabsList className="grid w-full grid-cols-2 h-11">
