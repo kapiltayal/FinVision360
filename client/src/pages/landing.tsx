@@ -709,9 +709,7 @@ export default function LandingPage() {
             </div>
           </div>
           <div className="border-t pt-4 flex flex-col sm:flex-row items-center justify-between gap-3">
-            <p className="text-xs text-muted-foreground">© {new Date().getFullYear()} Tooothy LLC. All rights reserved.</p>
-
-            {/* Social media icons */}
+            {/* Social media icons — left */}
             <div className="flex flex-col items-center gap-1">
               <div className="flex items-center gap-3">
                 {[
@@ -732,7 +730,7 @@ export default function LandingPage() {
               </a>
             </div>
 
-            <p className="text-xs text-muted-foreground">FinVision360 is for informational purposes only — not financial advice.</p>
+            <p className="text-xs text-muted-foreground">© {new Date().getFullYear()} Tooothy LLC. All rights reserved.</p>
           </div>
         </div>
       </footer>
