@@ -45,7 +45,7 @@ export function AppFooter() {
                 aria-label={name}
                 className="opacity-70 hover:opacity-100 transition-opacity"
               >
-                <img src={icon} alt={name} className="h-6 w-6 object-contain" />
+                <img src={icon} alt={name} className="h-9 w-9 object-contain" />
               </a>
             ))}
           </div>
