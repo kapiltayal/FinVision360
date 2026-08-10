@@ -224,6 +224,12 @@ export default function SettingsPage() {
                 </Badge>
                 <span className="text-xs text-muted-foreground">@{user?.username}</span>
               </div>
+              {user?.createdAt && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Member since{" "}
+                  {new Date(user.createdAt).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
+                </p>
+              )}
             </div>
           </div>
         </CardContent>
