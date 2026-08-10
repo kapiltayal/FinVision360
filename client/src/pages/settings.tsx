@@ -265,13 +265,13 @@ export default function SettingsPage() {
             <button
               type="button"
               onClick={() => setPickerOpen(true)}
-              className="relative h-14 w-14 rounded-full shrink-0 group focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              className="relative h-[70px] w-[70px] rounded-full shrink-0 group focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
               title="Change avatar"
             >
               <img
                 src={avatarUrl ?? "/Images/Avatars/avatar-default.png"}
                 alt="Avatar"
-                className="h-14 w-14 rounded-full object-cover shadow-md"
+                className="h-[70px] w-[70px] rounded-full object-cover shadow-md"
               />
               <span className="absolute inset-0 rounded-full flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity">
                 <Camera className="h-5 w-5 text-white" />
