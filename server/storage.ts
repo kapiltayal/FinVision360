@@ -538,25 +538,64 @@ export class DatabaseStorage implements IStorage {
   // ── User Goals ──────────────────────────────────────────────────────────────
 
   async getUserGoals(userId: string): Promise<UserGoal[]> {
-    return db.select().from(userGoals).where(eq(userGoals.userId, userId)).orderBy(desc(userGoals.createdAt));
+    const result = await pool.query(
+      `SELECT * FROM user_goals WHERE user_id = $1 ORDER BY created_at DESC`,
+      [userId]
+    );
+    return result.rows.map((r: any) => ({
+      id: r.id, userId: r.user_id, title: r.title, category: r.category,
+      targetAmount: r.target_amount, currentAmount: r.current_amount,
+      targetDate: r.target_date, notes: r.notes,
+      createdAt: r.created_at, updatedAt: r.updated_at,
+    })) as UserGoal[];
   }
 
   async createUserGoal(data: InsertUserGoal): Promise<UserGoal> {
-    const [goal] = await db.insert(userGoals).values(data).returning();
-    return goal;
+    const result = await pool.query(
+      `INSERT INTO user_goals (user_id, title, category, target_amount, current_amount, target_date, notes)
+       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+      [data.userId, data.title, data.category ?? 'custom',
+       data.targetAmount, data.currentAmount ?? '0',
+       data.targetDate ?? null, data.notes ?? null]
+    );
+    const r = result.rows[0];
+    return {
+      id: r.id, userId: r.user_id, title: r.title, category: r.category,
+      targetAmount: r.target_amount, currentAmount: r.current_amount,
+      targetDate: r.target_date, notes: r.notes,
+      createdAt: r.created_at, updatedAt: r.updated_at,
+    } as UserGoal;
   }
 
   async updateUserGoal(id: number, userId: string, data: Partial<InsertUserGoal>): Promise<UserGoal | undefined> {
-    const [goal] = await db
-      .update(userGoals)
-      .set({ ...data, updatedAt: new Date() })
-      .where(and(eq(userGoals.id, id), eq(userGoals.userId, userId)))
-      .returning();
-    return goal;
+    const fields: string[] = [];
+    const values: any[] = [];
+    let idx = 1;
+    if (data.title !== undefined)         { fields.push(`title = $${idx++}`);          values.push(data.title); }
+    if (data.category !== undefined)      { fields.push(`category = $${idx++}`);       values.push(data.category); }
+    if (data.targetAmount !== undefined)  { fields.push(`target_amount = $${idx++}`);  values.push(data.targetAmount); }
+    if (data.currentAmount !== undefined) { fields.push(`current_amount = $${idx++}`); values.push(data.currentAmount); }
+    if (data.targetDate !== undefined)    { fields.push(`target_date = $${idx++}`);    values.push(data.targetDate ?? null); }
+    if (data.notes !== undefined)         { fields.push(`notes = $${idx++}`);          values.push(data.notes ?? null); }
+    if (fields.length === 0) return undefined;
+    fields.push(`updated_at = NOW()`);
+    values.push(id, userId);
+    const result = await pool.query(
+      `UPDATE user_goals SET ${fields.join(', ')} WHERE id = $${idx++} AND user_id = $${idx++} RETURNING *`,
+      values
+    );
+    if (!result.rows[0]) return undefined;
+    const r = result.rows[0];
+    return {
+      id: r.id, userId: r.user_id, title: r.title, category: r.category,
+      targetAmount: r.target_amount, currentAmount: r.current_amount,
+      targetDate: r.target_date, notes: r.notes,
+      createdAt: r.created_at, updatedAt: r.updated_at,
+    } as UserGoal;
   }
 
   async deleteUserGoal(id: number, userId: string): Promise<void> {
-    await db.delete(userGoals).where(and(eq(userGoals.id, id), eq(userGoals.userId, userId)));
+    await pool.query(`DELETE FROM user_goals WHERE id = $1 AND user_id = $2`, [id, userId]);
   }
 }
 
