@@ -5,6 +5,9 @@ import { CurrencyInput } from "@/components/ui/currency-input";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Save } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
 import {
   ShieldCheck, Heart, DollarSign, Briefcase, Users, Clock, ChevronDown,
@@ -122,6 +125,7 @@ const SS_FACTORS = [
 export default function SocialSecurityPage() {
   const currentYear = new Date().getFullYear();
   const { user } = useAuth();
+  const { toast } = useToast();
 
   // Derive birth year from profile DOB (read-only)
   const dobStr: string | undefined = (user as any)?.dateOfBirth;
@@ -136,41 +140,34 @@ export default function SocialSecurityPage() {
   // Load saved settings
   const { data: savedSettings } = useQuery<any>({
     queryKey: ["/api/social-security"],
+    staleTime: 0,
   });
 
-  // Populate form once settings load — only when we receive real saved data, not the empty {} fallback
+  // Populate form when settings load — skip empty {} fallback, wait for real data
   const initialised = useRef(false);
   useEffect(() => {
     if (initialised.current || !savedSettings) return;
     const hasSavedData = savedSettings.fraMonthlyBenefit != null || savedSettings.expectedLifeAge != null;
-    if (!hasSavedData) return;          // stale empty {} — wait for real data
+    if (!hasSavedData) return;
     initialised.current = true;
     if (savedSettings.fraMonthlyBenefit) setFraMonthlyBenefit(String(savedSettings.fraMonthlyBenefit));
     if (savedSettings.expectedLifeAge)  setExpectedLifeAge(String(savedSettings.expectedLifeAge));
   }, [savedSettings]);
 
-  // Auto-save with debounce
-  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const saveMutation = useMutation({
     mutationFn: (data: any) => apiRequest("PUT", "/api/social-security", data),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/social-security"] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/social-security"] });
+      toast({ title: "Settings saved" });
+    },
+    onError: (e: any) => toast({ title: "Failed to save", description: e.message, variant: "destructive" }),
   });
 
-  const scheduleSave = (benefit: string, lifeAge: string) => {
-    if (saveTimer.current) clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(() => {
-      saveMutation.mutate({ fraMonthlyBenefit: benefit, expectedLifeAge: parseInt(lifeAge) || 85 });
-    }, 800);
-  };
-
-  const handleBenefitChange = (v: string) => {
-    setFraMonthlyBenefit(v);
-    scheduleSave(v, expectedLifeAge);
-  };
-
-  const handleLifeAgeChange = (v: string) => {
-    setExpectedLifeAge(v);
-    scheduleSave(fraMonthlyBenefit, v);
+  const handleSave = () => {
+    saveMutation.mutate({
+      fraMonthlyBenefit: fraMonthlyBenefit,
+      expectedLifeAge: parseInt(expectedLifeAge) || 85,
+    });
   };
 
   const toggleFactor = (title: string) =>
@@ -402,9 +399,17 @@ export default function SocialSecurityPage() {
                     {formatCurrency(monthlyAt70)}/mo
                   </span>
                 </div>
-                {saveMutation.isPending && (
-                  <p className="text-xs text-muted-foreground text-right">Saving…</p>
-                )}
+                <div className="pt-1">
+                  <Button
+                    onClick={handleSave}
+                    disabled={saveMutation.isPending}
+                    className="w-full"
+                    data-testid="button-ss-save"
+                  >
+                    <Save className="h-4 w-4 mr-2" />
+                    {saveMutation.isPending ? "Saving…" : "Save"}
+                  </Button>
+                </div>
               </div>
             </CardContent>
           </Card>
