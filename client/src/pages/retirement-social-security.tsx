@@ -355,7 +355,7 @@ export default function SocialSecurityPage() {
                 <CurrencyInput
                   data-testid="input-ss-fra-benefit"
                   value={fraMonthlyBenefit}
-                  onChange={handleBenefitChange}
+                  onChange={(v) => setFraMonthlyBenefit(v)}
                   placeholder="2000"
                 />
                 <p className="text-xs text-muted-foreground">Find this at ssa.gov/myaccount</p>
@@ -370,7 +370,7 @@ export default function SocialSecurityPage() {
                   value={expectedLifeAge}
                   min={63}
                   max={110}
-                  onChange={(e) => handleLifeAgeChange(e.target.value)}
+                  onChange={(e) => setExpectedLifeAge(e.target.value)}
                   placeholder="85"
                 />
                 <p className="text-xs text-muted-foreground">Used to personalize the recommendation below</p>
