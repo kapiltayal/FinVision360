@@ -138,14 +138,15 @@ export default function SocialSecurityPage() {
     queryKey: ["/api/social-security"],
   });
 
-  // Populate form once settings load
+  // Populate form once settings load — only when we receive real saved data, not the empty {} fallback
   const initialised = useRef(false);
   useEffect(() => {
-    if (savedSettings && !initialised.current) {
-      initialised.current = true;
-      if (savedSettings.fraMonthlyBenefit) setFraMonthlyBenefit(savedSettings.fraMonthlyBenefit);
-      if (savedSettings.expectedLifeAge) setExpectedLifeAge(String(savedSettings.expectedLifeAge));
-    }
+    if (initialised.current || !savedSettings) return;
+    const hasSavedData = savedSettings.fraMonthlyBenefit != null || savedSettings.expectedLifeAge != null;
+    if (!hasSavedData) return;          // stale empty {} — wait for real data
+    initialised.current = true;
+    if (savedSettings.fraMonthlyBenefit) setFraMonthlyBenefit(String(savedSettings.fraMonthlyBenefit));
+    if (savedSettings.expectedLifeAge)  setExpectedLifeAge(String(savedSettings.expectedLifeAge));
   }, [savedSettings]);
 
   // Auto-save with debounce
