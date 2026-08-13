@@ -20,8 +20,9 @@ import {
   type Feedback, type InsertFeedback,
   users, assets, liabilities, retirementGoals, retirement401kGoals, insurancePolicies, incomeEntries, expenseEntries, recommendationSettings,
   bankConfigs, bankRates, plaidItems, plaidAccounts,
-  estateBeneficiaries, estateDocuments, estateContacts, feedback, contactus,
+  estateBeneficiaries, estateDocuments, estateContacts, feedback, contactus, socialSecuritySettings,
   type InsertContactus, type Contactus,
+  type SocialSecuritySettings, type InsertSocialSecuritySettings,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -106,6 +107,9 @@ export interface IStorage {
   createFeedback(data: InsertFeedback): Promise<Feedback>;
   createContactSubmission(data: InsertContactus): Promise<Contactus>;
   getContactSubmissions(): Promise<Contactus[]>;
+
+  getSocialSecuritySettings(userId: string): Promise<SocialSecuritySettings | undefined>;
+  upsertSocialSecuritySettings(data: InsertSocialSecuritySettings): Promise<SocialSecuritySettings>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -487,6 +491,24 @@ export class DatabaseStorage implements IStorage {
 
   async getContactSubmissions(): Promise<Contactus[]> {
     return db.select().from(contactus).orderBy(contactus.createdAt);
+  }
+
+  async getSocialSecuritySettings(userId: string): Promise<SocialSecuritySettings | undefined> {
+    const [row] = await db.select().from(socialSecuritySettings).where(eq(socialSecuritySettings.userId, userId));
+    return row;
+  }
+
+  async upsertSocialSecuritySettings(data: InsertSocialSecuritySettings): Promise<SocialSecuritySettings> {
+    const existing = await this.getSocialSecuritySettings(data.userId);
+    if (existing) {
+      const [updated] = await db.update(socialSecuritySettings)
+        .set({ ...data, updatedAt: new Date() })
+        .where(eq(socialSecuritySettings.userId, data.userId))
+        .returning();
+      return updated;
+    }
+    const [created] = await db.insert(socialSecuritySettings).values(data).returning();
+    return created;
   }
 }
 

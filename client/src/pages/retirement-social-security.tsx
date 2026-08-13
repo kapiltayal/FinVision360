@@ -1,14 +1,18 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { CurrencyInput } from "@/components/ui/currency-input";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Link } from "wouter";
 import {
   ShieldCheck, Heart, DollarSign, Briefcase, Users, Clock, ChevronDown,
-  TrendingUp, AlertTriangle, CheckCircle2,
+  TrendingUp, AlertTriangle, CheckCircle2, Info,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/format";
+import { useAuth } from "@/hooks/use-auth";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, ReferenceLine, Legend,
@@ -117,17 +121,64 @@ const SS_FACTORS = [
 
 export default function SocialSecurityPage() {
   const currentYear = new Date().getFullYear();
-  const [birthYear, setBirthYear] = useState(1965);
+  const { user } = useAuth();
+
+  // Derive birth year from profile DOB (read-only)
+  const dobStr: string | undefined = (user as any)?.dateOfBirth;
+  const birthYearFromProfile = dobStr ? new Date(dobStr).getUTCFullYear() : null;
+  const currentAge = birthYearFromProfile ? currentYear - birthYearFromProfile : null;
+
+  // Editable calculator values (loaded from DB)
   const [fraMonthlyBenefit, setFraMonthlyBenefit] = useState("2000");
   const [expectedLifeAge, setExpectedLifeAge] = useState("85");
   const [openFactor, setOpenFactor] = useState<string | null>(null);
 
+  // Load saved settings
+  const { data: savedSettings } = useQuery<any>({
+    queryKey: ["/api/social-security"],
+  });
+
+  // Populate form once settings load
+  const initialised = useRef(false);
+  useEffect(() => {
+    if (savedSettings && !initialised.current) {
+      initialised.current = true;
+      if (savedSettings.fraMonthlyBenefit) setFraMonthlyBenefit(savedSettings.fraMonthlyBenefit);
+      if (savedSettings.expectedLifeAge) setExpectedLifeAge(String(savedSettings.expectedLifeAge));
+    }
+  }, [savedSettings]);
+
+  // Auto-save with debounce
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const saveMutation = useMutation({
+    mutationFn: (data: any) => apiRequest("PUT", "/api/social-security", data),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/social-security"] }),
+  });
+
+  const scheduleSave = (benefit: string, lifeAge: string) => {
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => {
+      saveMutation.mutate({ fraMonthlyBenefit: benefit, expectedLifeAge: parseInt(lifeAge) || 85 });
+    }, 800);
+  };
+
+  const handleBenefitChange = (v: string) => {
+    setFraMonthlyBenefit(v);
+    scheduleSave(v, expectedLifeAge);
+  };
+
+  const handleLifeAgeChange = (v: string) => {
+    setExpectedLifeAge(v);
+    scheduleSave(fraMonthlyBenefit, v);
+  };
+
   const toggleFactor = (title: string) =>
     setOpenFactor((prev) => (prev === title ? null : title));
 
+  // Use profile birth year if available, else fall back to 1965
+  const birthYear = birthYearFromProfile ?? 1965;
   const fra = getFRA(birthYear);
   const fraLabel = getFRALabel(birthYear);
-  const currentAge = currentYear - birthYear;
   const benefit = parseFloat(fraMonthlyBenefit) || 0;
   const lifeAge = parseFloat(expectedLifeAge) || 85;
 
@@ -267,28 +318,52 @@ export default function SocialSecurityPage() {
               <CardTitle className="text-base">Your Information</CardTitle>
             </CardHeader>
             <CardContent className="space-y-5">
+
+              {/* Birth Year — read-only from profile */}
               <div className="space-y-2">
                 <Label>Birth Year</Label>
-                <Input
-                  data-testid="input-ss-birth-year"
-                  type="number"
-                  value={birthYear}
-                  min={1943}
-                  max={currentYear - 18}
-                  onChange={(e) => setBirthYear(parseInt(e.target.value) || 1965)}
-                />
-                <p className="text-xs text-muted-foreground">Current age: {currentAge}</p>
+                {birthYearFromProfile ? (
+                  <>
+                    <div
+                      data-testid="text-ss-birth-year"
+                      className="flex h-9 w-full rounded-md border border-input bg-muted px-3 py-1 text-sm text-muted-foreground items-center select-none"
+                    >
+                      {birthYearFromProfile}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Current age: {currentAge} ·{" "}
+                      <Link href="/settings" className="text-[#1475A8] dark:text-[#49AEE3] underline underline-offset-2">
+                        Update in Settings
+                      </Link>
+                    </p>
+                  </>
+                ) : (
+                  <div className="flex items-start gap-2 rounded-md border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/30 p-3">
+                    <Info className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
+                    <p className="text-xs text-amber-700 dark:text-amber-400 leading-relaxed">
+                      Add your date of birth in{" "}
+                      <Link href="/settings" className="font-semibold underline underline-offset-2">
+                        Settings → Profile
+                      </Link>{" "}
+                      to auto-populate your birth year. Using 1965 as a placeholder.
+                    </p>
+                  </div>
+                )}
               </div>
+
+              {/* FRA Monthly Benefit */}
               <div className="space-y-2">
                 <Label>Estimated Benefit at FRA ($/month)</Label>
                 <CurrencyInput
                   data-testid="input-ss-fra-benefit"
                   value={fraMonthlyBenefit}
-                  onChange={(v) => setFraMonthlyBenefit(v)}
+                  onChange={handleBenefitChange}
                   placeholder="2000"
                 />
                 <p className="text-xs text-muted-foreground">Find this at ssa.gov/myaccount</p>
               </div>
+
+              {/* Expected Life Age */}
               <div className="space-y-2">
                 <Label>Expected Life Age</Label>
                 <Input
@@ -297,7 +372,7 @@ export default function SocialSecurityPage() {
                   value={expectedLifeAge}
                   min={63}
                   max={110}
-                  onChange={(e) => setExpectedLifeAge(e.target.value)}
+                  onChange={(e) => handleLifeAgeChange(e.target.value)}
                   placeholder="85"
                 />
                 <p className="text-xs text-muted-foreground">Used to personalize the recommendation below</p>
@@ -326,6 +401,9 @@ export default function SocialSecurityPage() {
                     {formatCurrency(monthlyAt70)}/mo
                   </span>
                 </div>
+                {saveMutation.isPending && (
+                  <p className="text-xs text-muted-foreground text-right">Saving…</p>
+                )}
               </div>
             </CardContent>
           </Card>

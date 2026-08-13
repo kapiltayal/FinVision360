@@ -443,6 +443,19 @@ export const liabilityHistory = pgTable("liability_history", {
 
 export type LiabilityHistory = typeof liabilityHistory.$inferSelect;
 
+// ── Social Security Settings ──────────────────────────────────────────────────
+
+export const socialSecuritySettings = pgTable("social_security_settings", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().unique().references(() => users.id, { onDelete: "cascade" }),
+  fraMonthlyBenefit: numeric("fra_monthly_benefit", { precision: 10, scale: 2 }).default("2000"),
+  expectedLifeAge: integer("expected_life_age").default(85),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export type SocialSecuritySettings = typeof socialSecuritySettings.$inferSelect;
+export type InsertSocialSecuritySettings = typeof socialSecuritySettings.$inferInsert;
+
 // ── Estate Contact Roles ─────────────────────────────────────────────────────
 
 export const ESTATE_CONTACT_ROLES = [

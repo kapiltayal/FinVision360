@@ -567,6 +567,21 @@ Use markdown formatting with headers and bold key numbers.`;
     res.json(settings);
   });
 
+  // ── Social Security Settings ─────────────────────────────────────────────────
+
+  app.get("/api/social-security", requireAuth, async (req, res) => {
+    const userId = (req.user as any).id;
+    const settings = await storage.getSocialSecuritySettings(userId);
+    res.json(settings || {});
+  });
+
+  app.put("/api/social-security", requireAuth, async (req, res) => {
+    const userId = (req.user as any).id;
+    const { fraMonthlyBenefit, expectedLifeAge } = req.body;
+    const settings = await storage.upsertSocialSecuritySettings({ userId, fraMonthlyBenefit, expectedLifeAge });
+    res.json(settings);
+  });
+
   // ── Plaid routes ────────────────────────────────────────────────────────────
 
   type PlaidBookMapping =
