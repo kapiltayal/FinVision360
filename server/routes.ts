@@ -937,5 +937,68 @@ Use markdown formatting with headers and bold key numbers.`;
     }
   });
 
+  // ── User Goals ──────────────────────────────────────────────────────────────
+
+  app.get("/api/goals", requireAuth, async (req, res) => {
+    try {
+      const goals = await storage.getUserGoals(req.user!.id);
+      return res.json(goals);
+    } catch (err) {
+      return res.status(500).json({ message: "Failed to fetch goals" });
+    }
+  });
+
+  app.post("/api/goals", requireAuth, async (req, res) => {
+    const { title, category, targetAmount, currentAmount, targetDate, notes } = req.body;
+    if (!title || !targetAmount) {
+      return res.status(400).json({ message: "title and targetAmount are required" });
+    }
+    try {
+      const goal = await storage.createUserGoal({
+        userId: req.user!.id,
+        title,
+        category: category || "custom",
+        targetAmount: String(targetAmount),
+        currentAmount: String(currentAmount ?? 0),
+        targetDate: targetDate || null,
+        notes: notes || null,
+      });
+      return res.status(201).json(goal);
+    } catch (err) {
+      return res.status(500).json({ message: "Failed to create goal" });
+    }
+  });
+
+  app.patch("/api/goals/:id", requireAuth, async (req, res) => {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ message: "Invalid id" });
+    try {
+      const { title, category, targetAmount, currentAmount, targetDate, notes } = req.body;
+      const updated = await storage.updateUserGoal(id, req.user!.id, {
+        ...(title !== undefined && { title }),
+        ...(category !== undefined && { category }),
+        ...(targetAmount !== undefined && { targetAmount: String(targetAmount) }),
+        ...(currentAmount !== undefined && { currentAmount: String(currentAmount) }),
+        ...(targetDate !== undefined && { targetDate }),
+        ...(notes !== undefined && { notes }),
+      });
+      if (!updated) return res.status(404).json({ message: "Goal not found" });
+      return res.json(updated);
+    } catch (err) {
+      return res.status(500).json({ message: "Failed to update goal" });
+    }
+  });
+
+  app.delete("/api/goals/:id", requireAuth, async (req, res) => {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ message: "Invalid id" });
+    try {
+      await storage.deleteUserGoal(id, req.user!.id);
+      return res.status(204).send();
+    } catch (err) {
+      return res.status(500).json({ message: "Failed to delete goal" });
+    }
+  });
+
   return httpServer;
 }

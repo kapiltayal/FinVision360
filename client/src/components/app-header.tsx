@@ -38,6 +38,7 @@ const baseNavItems = [
   { title: "Retirement", url: "/retirement", icon: Target },
   { title: "Insurance", url: "/insurance", icon: ShieldCheck },
   { title: "Estate & Legacy", url: "/estate-planning", icon: ScrollText },
+  { title: "Goals & Tracking", url: "/goals", icon: Target },
   { title: "AI Advisor", url: "/ai-advisor", icon: Brain },
 ];
 

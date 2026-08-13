@@ -21,8 +21,10 @@ import {
   users, assets, liabilities, retirementGoals, retirement401kGoals, insurancePolicies, incomeEntries, expenseEntries, recommendationSettings,
   bankConfigs, bankRates, plaidItems, plaidAccounts,
   estateBeneficiaries, estateDocuments, estateContacts, feedback, contactus, socialSecuritySettings,
+  userGoals,
   type InsertContactus, type Contactus,
   type SocialSecuritySettings, type InsertSocialSecuritySettings,
+  type UserGoal, type InsertUserGoal,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -110,6 +112,11 @@ export interface IStorage {
 
   getSocialSecuritySettings(userId: string): Promise<SocialSecuritySettings | undefined>;
   upsertSocialSecuritySettings(data: InsertSocialSecuritySettings): Promise<SocialSecuritySettings>;
+
+  getUserGoals(userId: string): Promise<UserGoal[]>;
+  createUserGoal(data: InsertUserGoal): Promise<UserGoal>;
+  updateUserGoal(id: number, userId: string, data: Partial<InsertUserGoal>): Promise<UserGoal | undefined>;
+  deleteUserGoal(id: number, userId: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -526,6 +533,30 @@ export class DatabaseStorage implements IStorage {
       expectedLifeAge: r.expected_life_age,
       updatedAt: r.updated_at,
     } as SocialSecuritySettings;
+  }
+
+  // ── User Goals ──────────────────────────────────────────────────────────────
+
+  async getUserGoals(userId: string): Promise<UserGoal[]> {
+    return db.select().from(userGoals).where(eq(userGoals.userId, userId)).orderBy(desc(userGoals.createdAt));
+  }
+
+  async createUserGoal(data: InsertUserGoal): Promise<UserGoal> {
+    const [goal] = await db.insert(userGoals).values(data).returning();
+    return goal;
+  }
+
+  async updateUserGoal(id: number, userId: string, data: Partial<InsertUserGoal>): Promise<UserGoal | undefined> {
+    const [goal] = await db
+      .update(userGoals)
+      .set({ ...data, updatedAt: new Date() })
+      .where(and(eq(userGoals.id, id), eq(userGoals.userId, userId)))
+      .returning();
+    return goal;
+  }
+
+  async deleteUserGoal(id: number, userId: string): Promise<void> {
+    await db.delete(userGoals).where(and(eq(userGoals.id, id), eq(userGoals.userId, userId)));
   }
 }
 

@@ -29,6 +29,7 @@ import PrivacyPage from "@/pages/privacy";
 import TermsPage from "@/pages/terms";
 import FAQPage from "@/pages/faq";
 import ContactPage from "@/pages/contact";
+import GoalsPage from "@/pages/goals";
 import ResetPasswordPage from "@/pages/reset-password";
 
 function AuthenticatedApp() {
@@ -53,6 +54,7 @@ function AuthenticatedApp() {
               <Route path="/income-expenses" component={IncomeExpensesPage} />
               <Route path="/insurance" component={InsurancePage} />
               <Route path="/estate-planning" component={EstatePlanningPage} />
+              <Route path="/goals" component={GoalsPage} />
               <Route path="/ai-advisor" component={AIAdvisorPage} />
               <Route path="/settings" component={SettingsPage} />
               <Route path="/bank-rates" component={BankRatesPage} />

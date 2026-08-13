@@ -456,6 +456,24 @@ export const socialSecuritySettings = pgTable("social_security_settings", {
 export type SocialSecuritySettings = typeof socialSecuritySettings.$inferSelect;
 export type InsertSocialSecuritySettings = typeof socialSecuritySettings.$inferInsert;
 
+// ── User Goals ────────────────────────────────────────────────────────────────
+
+export const userGoals = pgTable("user_goals", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  title: varchar("title", { length: 200 }).notNull(),
+  category: varchar("category", { length: 50 }).notNull().default("custom"),
+  targetAmount: numeric("target_amount", { precision: 12, scale: 2 }).notNull(),
+  currentAmount: numeric("current_amount", { precision: 12, scale: 2 }).notNull().default("0"),
+  targetDate: date("target_date"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export type UserGoal = typeof userGoals.$inferSelect;
+export type InsertUserGoal = typeof userGoals.$inferInsert;
+
 // ── Estate Contact Roles ─────────────────────────────────────────────────────
 
 export const ESTATE_CONTACT_ROLES = [
