@@ -31,6 +31,7 @@ import {
   UserCheck,
   Users,
   Info,
+  Landmark,
 } from "lucide-react";
 import { type Asset, type Liability, type IncomeEntry, type ExpenseEntry, type InsurancePolicy, type RetirementGoal, type Retirement401kGoal, type EstateBeneficiary, type EstateDocument, type EstateContact, ESTATE_DOCUMENT_TYPES } from "@shared/schema";
 
@@ -364,7 +365,7 @@ export default function SnapshotPage() {
         </SnapshotCard>
 
         {/* ── Retirement ── */}
-        <SnapshotCard title="Retirement" accent="#8b5cf6" icon={Target} href="/retirement">
+        <SnapshotCard title="Retirement" accent="#8b5cf6" icon={Landmark} href="/retirement">
           <div className="mb-4">
             <p className="text-3xl font-bold tabular-nums leading-none mb-1 text-violet-500"
               data-testid="text-snapshot-retirement">
