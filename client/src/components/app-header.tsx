@@ -35,7 +35,7 @@ const baseNavItems = [
   { title: "Assets", url: "/assets", icon: Wallet },
   { title: "Liabilities", url: "/liabilities", icon: CreditCard },
   { title: "Income & Expenses", url: "/income-expenses", icon: ArrowLeftRight },
-  { title: "Retirement", url: "/retirement", icon: Target },
+  { title: "Retirement", url: "/retirement", icon: Landmark },
   { title: "Insurance", url: "/insurance", icon: ShieldCheck },
   { title: "Estate & Legacy", url: "/estate-planning", icon: ScrollText },
   { title: "Goals & Tracking", url: "/goals", icon: Target },
