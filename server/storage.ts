@@ -494,21 +494,38 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getSocialSecuritySettings(userId: string): Promise<SocialSecuritySettings | undefined> {
-    const [row] = await db.select().from(socialSecuritySettings).where(eq(socialSecuritySettings.userId, userId));
-    return row;
+    const result = await pool.query(
+      `SELECT * FROM social_security_settings WHERE user_id = $1 LIMIT 1`,
+      [userId]
+    );
+    return result.rows[0] ? {
+      id: result.rows[0].id,
+      userId: result.rows[0].user_id,
+      fraMonthlyBenefit: result.rows[0].fra_monthly_benefit,
+      expectedLifeAge: result.rows[0].expected_life_age,
+      updatedAt: result.rows[0].updated_at,
+    } as SocialSecuritySettings : undefined;
   }
 
   async upsertSocialSecuritySettings(data: InsertSocialSecuritySettings): Promise<SocialSecuritySettings> {
-    const existing = await this.getSocialSecuritySettings(data.userId);
-    if (existing) {
-      const [updated] = await db.update(socialSecuritySettings)
-        .set({ ...data, updatedAt: new Date() })
-        .where(eq(socialSecuritySettings.userId, data.userId))
-        .returning();
-      return updated;
-    }
-    const [created] = await db.insert(socialSecuritySettings).values(data).returning();
-    return created;
+    const result = await pool.query(
+      `INSERT INTO social_security_settings (user_id, fra_monthly_benefit, expected_life_age)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (user_id) DO UPDATE
+         SET fra_monthly_benefit = EXCLUDED.fra_monthly_benefit,
+             expected_life_age   = EXCLUDED.expected_life_age,
+             updated_at          = NOW()
+       RETURNING *`,
+      [data.userId, data.fraMonthlyBenefit ?? null, data.expectedLifeAge ?? null]
+    );
+    const r = result.rows[0];
+    return {
+      id: r.id,
+      userId: r.user_id,
+      fraMonthlyBenefit: r.fra_monthly_benefit,
+      expectedLifeAge: r.expected_life_age,
+      updatedAt: r.updated_at,
+    } as SocialSecuritySettings;
   }
 }
 
