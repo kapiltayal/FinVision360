@@ -37,7 +37,7 @@ import {
 import {
   Plus, Target, Pencil, Trash2, TrendingUp, CheckCircle2,
   PiggyBank, Home, GraduationCap, Car, Plane, Briefcase,
-  ShieldCheck, BarChart3, Wallet, Calendar, Clock,
+  ShieldCheck, BarChart3, Wallet, Calendar, Clock, Trophy,
 } from "lucide-react";
 import { CurrencyInput } from "@/components/ui/currency-input";
 
@@ -335,97 +335,172 @@ export default function GoalsPage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-          {goals.map((goal) => {
-            const cat = getCat(goal.category);
-            const Icon = cat.icon;
-            const target = parseFloat(goal.targetAmount);
-            const current = parseFloat(goal.currentAmount);
-            const pct = target > 0 ? Math.min(100, (current / target) * 100) : 0;
-            const done = current >= target;
-            const days = daysRemaining(goal.targetDate);
-            const overdue = days !== null && days < 0;
+        <>
+          {/* ── Active goals ─────────────────────────────────────────────── */}
+          {goals.filter((g) => parseFloat(g.currentAmount) < parseFloat(g.targetAmount)).length > 0 && (
+            <div className="space-y-4">
+              <h2 className="text-base font-semibold text-muted-foreground uppercase tracking-wide">
+                Active Goals
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+                {goals
+                  .filter((g) => parseFloat(g.currentAmount) < parseFloat(g.targetAmount))
+                  .map((goal) => {
+                    const cat = getCat(goal.category);
+                    const Icon = cat.icon;
+                    const target = parseFloat(goal.targetAmount);
+                    const current = parseFloat(goal.currentAmount);
+                    const pct = target > 0 ? Math.min(100, (current / target) * 100) : 0;
+                    const days = daysRemaining(goal.targetDate);
+                    const overdue = days !== null && days < 0;
 
-            return (
-              <Card key={goal.id} className={`stat-card-3d border flex flex-col ${done ? "border-emerald-300 dark:border-emerald-700" : ""}`}>
-                <CardContent className="p-5 flex flex-col gap-4 flex-1">
-                  {/* Title row */}
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <div className={`h-9 w-9 rounded-md ${cat.bg} flex items-center justify-center shrink-0`}>
-                        <Icon className={`h-5 w-5 ${cat.color}`} />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="font-semibold truncate">{goal.title}</p>
-                        <Badge variant="outline" className={`text-xs mt-0.5 ${cat.border}`}>
-                          {cat.label}
-                        </Badge>
-                      </div>
-                    </div>
-                    {done && (
-                      <CheckCircle2 className="h-5 w-5 text-emerald-500 shrink-0 mt-0.5" />
-                    )}
-                  </div>
+                    return (
+                      <Card key={goal.id} className="stat-card-3d border flex flex-col">
+                        <CardContent className="p-5 flex flex-col gap-4 flex-1">
+                          {/* Title row */}
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <div className={`h-9 w-9 rounded-md ${cat.bg} flex items-center justify-center shrink-0`}>
+                                <Icon className={`h-5 w-5 ${cat.color}`} />
+                              </div>
+                              <div className="min-w-0">
+                                <p className="font-semibold truncate">{goal.title}</p>
+                                <Badge variant="outline" className={`text-xs mt-0.5 ${cat.border}`}>
+                                  {cat.label}
+                                </Badge>
+                              </div>
+                            </div>
+                          </div>
 
-                  {/* Progress */}
-                  <div className="space-y-1.5">
-                    <div className="flex justify-between text-xs text-muted-foreground">
-                      <span>{formatCurrency(current)} saved</span>
-                      <span className="font-medium text-foreground">{pct.toFixed(0)}%</span>
-                    </div>
-                    <Progress value={pct} className="h-2.5" />
-                    <div className="flex justify-between text-xs text-muted-foreground">
-                      <span>{done ? "🎉 Goal reached!" : `${formatCurrency(target - current)} to go`}</span>
-                      <span>of {formatCurrency(target)}</span>
-                    </div>
-                  </div>
+                          {/* Progress */}
+                          <div className="space-y-1.5">
+                            <div className="flex justify-between text-xs text-muted-foreground">
+                              <span>{formatCurrency(current)} saved</span>
+                              <span className="font-medium text-foreground">{pct.toFixed(0)}%</span>
+                            </div>
+                            <Progress value={pct} className="h-2.5" />
+                            <div className="flex justify-between text-xs text-muted-foreground">
+                              <span>{formatCurrency(target - current)} to go</span>
+                              <span>of {formatCurrency(target)}</span>
+                            </div>
+                          </div>
 
-                  {/* Deadline */}
-                  <div className="flex items-center gap-1.5 text-xs">
-                    {goal.targetDate ? (
-                      <>
-                        <Calendar className={`h-3.5 w-3.5 ${overdue ? "text-rose-500" : "text-muted-foreground"}`} />
-                        <span className={overdue ? "text-rose-500 font-medium" : "text-muted-foreground"}>
-                          {new Date(goal.targetDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
-                          {" · "}
-                          {formatDaysRemaining(days)}
-                        </span>
-                      </>
-                    ) : (
-                      <>
-                        <Clock className="h-3.5 w-3.5 text-muted-foreground" />
-                        <span className="text-muted-foreground">No deadline set</span>
-                      </>
-                    )}
-                  </div>
+                          {/* Deadline */}
+                          <div className="flex items-center gap-1.5 text-xs">
+                            {goal.targetDate ? (
+                              <>
+                                <Calendar className={`h-3.5 w-3.5 ${overdue ? "text-rose-500" : "text-muted-foreground"}`} />
+                                <span className={overdue ? "text-rose-500 font-medium" : "text-muted-foreground"}>
+                                  {new Date(goal.targetDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                                  {" · "}
+                                  {formatDaysRemaining(days)}
+                                </span>
+                              </>
+                            ) : (
+                              <>
+                                <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+                                <span className="text-muted-foreground">No deadline set</span>
+                              </>
+                            )}
+                          </div>
 
-                  {/* Notes */}
-                  {goal.notes && (
-                    <p className="text-xs text-muted-foreground line-clamp-2 border-t pt-2">{goal.notes}</p>
-                  )}
+                          {/* Notes */}
+                          {goal.notes && (
+                            <p className="text-xs text-muted-foreground line-clamp-2 border-t pt-2">{goal.notes}</p>
+                          )}
 
-                  {/* Actions */}
-                  <div className="flex gap-2 pt-1 mt-auto">
-                    <Button
-                      size="sm"
-                      className="flex-1"
-                      onClick={() => openProgress(goal)}
-                      data-testid={`button-update-progress-${goal.id}`}
-                    >
-                      <TrendingUp className="h-3.5 w-3.5 mr-1.5" /> Update Progress
-                    </Button>
-                    <Button size="sm" variant="outline" onClick={() => openEdit(goal)}>
-                      <Pencil className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button size="sm" variant="outline" className="text-rose-500 hover:text-rose-600" onClick={() => setDeleteId(goal.id)}>
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
+                          {/* Actions */}
+                          <div className="flex gap-2 pt-1 mt-auto">
+                            <Button
+                              size="sm"
+                              className="flex-1"
+                              onClick={() => openProgress(goal)}
+                              data-testid={`button-update-progress-${goal.id}`}
+                            >
+                              <TrendingUp className="h-3.5 w-3.5 mr-1.5" /> Update Progress
+                            </Button>
+                            <Button size="sm" variant="outline" onClick={() => openEdit(goal)}>
+                              <Pencil className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button size="sm" variant="outline" className="text-rose-500 hover:text-rose-600" onClick={() => setDeleteId(goal.id)}>
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+              </div>
+            </div>
+          )}
+
+          {/* ── Achieved goals ────────────────────────────────────────────── */}
+          {goals.filter((g) => parseFloat(g.currentAmount) >= parseFloat(g.targetAmount)).length > 0 && (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <Trophy className="h-4 w-4 text-amber-500" />
+                <h2 className="text-base font-semibold text-muted-foreground uppercase tracking-wide">
+                  Achieved Goals
+                </h2>
+                <Badge className="bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-0 text-xs">
+                  {goals.filter((g) => parseFloat(g.currentAmount) >= parseFloat(g.targetAmount)).length} completed
+                </Badge>
+              </div>
+
+              <div className="space-y-2">
+                {goals
+                  .filter((g) => parseFloat(g.currentAmount) >= parseFloat(g.targetAmount))
+                  .map((goal) => {
+                    const cat = getCat(goal.category);
+                    const Icon = cat.icon;
+                    const target = parseFloat(goal.targetAmount);
+
+                    return (
+                      <Card key={goal.id} className="border-emerald-200 dark:border-emerald-800 bg-emerald-50/40 dark:bg-emerald-950/20">
+                        <CardContent className="px-4 py-3">
+                          <div className="flex items-center gap-3">
+                            {/* Icon */}
+                            <div className={`h-8 w-8 rounded-md ${cat.bg} flex items-center justify-center shrink-0`}>
+                              <Icon className={`h-4 w-4 ${cat.color}`} />
+                            </div>
+
+                            {/* Title + category */}
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <p className="font-medium text-sm truncate">{goal.title}</p>
+                                <Badge variant="outline" className={`text-xs ${cat.border} hidden sm:inline-flex`}>
+                                  {cat.label}
+                                </Badge>
+                              </div>
+                              <p className="text-xs text-muted-foreground mt-0.5">
+                                {formatCurrency(target)} achieved
+                                {goal.targetDate && (
+                                  <span className="ml-2">
+                                    · target was {new Date(goal.targetDate).toLocaleDateString("en-US", { month: "short", year: "numeric" })}
+                                  </span>
+                                )}
+                              </p>
+                            </div>
+
+                            {/* Done badge + actions */}
+                            <div className="flex items-center gap-2 shrink-0">
+                              <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                              <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEdit(goal)}>
+                                <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
+                              </Button>
+                              <Button size="icon" variant="ghost" className="h-7 w-7 text-rose-400 hover:text-rose-600" onClick={() => setDeleteId(goal.id)}>
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+              </div>
+            </div>
+          )}
+        </>
       )}
 
       {/* Add / Edit dialog */}
