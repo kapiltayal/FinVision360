@@ -133,6 +133,16 @@ export default function SnapshotPage() {
   const [, nav] = useLocation();
   const { user } = useAuth();
   const firstName = (user as any)?.fullName?.split(" ")[0] || (user as any)?.email?.split("@")[0] || "Your";
+  const age = useMemo(() => {
+    const dob = (user as any)?.dateOfBirth;
+    if (!dob) return null;
+    const birth = new Date(dob);
+    const today = new Date();
+    let a = today.getFullYear() - birth.getFullYear();
+    const m = today.getMonth() - birth.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) a--;
+    return a;
+  }, [(user as any)?.dateOfBirth]);
   const today = new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
 
   const { data: assets = [], isLoading: aL } = useQuery<Asset[]>({ queryKey: ["/api/assets"] });
@@ -295,7 +305,7 @@ export default function SnapshotPage() {
         <div className="relative px-6 py-10 md:py-12">
           <p className="text-blue-400 text-xs font-bold tracking-[0.2em] uppercase mb-2">Financial Snapshot</p>
           <h1 className="text-3xl md:text-4xl font-bold text-white mb-2 leading-tight">
-            {firstName}&apos;s Financial Snapshot
+            {firstName}&apos;s Financial Snapshot{age !== null ? <span className="text-2xl md:text-3xl font-normal text-blue-300 ml-3">({age})</span> : null}
           </h1>
           <p className="text-slate-400 text-sm">Your complete financial picture &nbsp;·&nbsp; as of {today}</p>
         </div>

@@ -147,9 +147,9 @@ export default function SettingsPage() {
   };
 
   // ── Profile state ───────────────────────────────────────────────────────────
-  const [profile, setProfile] = useState({ fullName: "" });
+  const [profile, setProfile] = useState({ fullName: "", dateOfBirth: "" });
   useEffect(() => {
-    if (user) setProfile({ fullName: user.fullName || "" });
+    if (user) setProfile({ fullName: user.fullName || "", dateOfBirth: (user as any).dateOfBirth || "" });
   }, [user]);
 
   const [passwords, setPasswords] = useState({
@@ -400,7 +400,7 @@ export default function SettingsPage() {
                 </div>
                 <div>
                   <CardTitle className="text-base">Profile Information</CardTitle>
-                  <CardDescription>Update your display name</CardDescription>
+                  <CardDescription>Update your display name and personal details</CardDescription>
                 </div>
               </div>
             </CardHeader>
@@ -427,6 +427,17 @@ export default function SettingsPage() {
                     className="bg-muted text-muted-foreground"
                   />
                   <p className="text-xs text-muted-foreground">Email is your login ID and cannot be changed here</p>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="dateOfBirth" className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Date of Birth</Label>
+                  <Input
+                    id="dateOfBirth"
+                    data-testid="input-settings-dob"
+                    type="date"
+                    value={profile.dateOfBirth}
+                    onChange={(e) => setProfile({ ...profile, dateOfBirth: e.target.value })}
+                    max={new Date().toISOString().split("T")[0]}
+                  />
                 </div>
                 <div className="flex justify-end pt-1">
                   <Button type="submit" disabled={updateProfileMutation.isPending} data-testid="button-save-profile">

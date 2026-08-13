@@ -72,8 +72,8 @@ export function setupAuth(app: Express) {
 
   app.patch("/api/auth/user", requireAuth, async (req: any, res) => {
     const userId = req.user.id;
-    const { fullName, email } = req.body;
-    const updated = await storage.updateUser(userId, { fullName, email } as any);
+    const { fullName, email, dateOfBirth } = req.body;
+    const updated = await storage.updateUser(userId, { fullName, email, dateOfBirth } as any);
     if (!updated) return res.status(404).json({ message: "User not found" });
     res.json(updated);
   });

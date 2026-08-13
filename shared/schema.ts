@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, serial, integer, numeric, timestamp, boolean } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, serial, integer, numeric, timestamp, boolean, date } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -10,6 +10,7 @@ export const users = pgTable("users", {
   isAdmin: boolean("is_admin").default(false).notNull(),
   supabaseId: text("supabase_id").unique(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
+  dateOfBirth: date("date_of_birth"),
 });
 
 export const insertUserSchema = createInsertSchema(users).pick({
