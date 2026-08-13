@@ -950,21 +950,22 @@ Use markdown formatting with headers and bold key numbers.`;
 
   app.post("/api/goals", requireAuth, async (req, res) => {
     const { title, category, targetAmount, currentAmount, targetDate, notes } = req.body;
-    if (!title || !targetAmount) {
-      return res.status(400).json({ message: "title and targetAmount are required" });
+    if (!title) {
+      return res.status(400).json({ message: "title is required" });
     }
     try {
       const goal = await storage.createUserGoal({
         userId: req.user!.id,
         title,
         category: category || "custom",
-        targetAmount: String(targetAmount),
+        targetAmount: String(targetAmount ?? 0),
         currentAmount: String(currentAmount ?? 0),
         targetDate: targetDate || null,
         notes: notes || null,
       });
       return res.status(201).json(goal);
-    } catch (err) {
+    } catch (err: any) {
+      console.error("[POST /api/goals] error:", err.message);
       return res.status(500).json({ message: "Failed to create goal" });
     }
   });

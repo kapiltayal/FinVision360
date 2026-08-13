@@ -188,12 +188,20 @@ export default function GoalsPage() {
     setProgressGoal(goal);
   }
 
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  function handleSaveGoal() {
+    if (!form.title.trim()) {
+      toast({ title: "Title is required", variant: "destructive" });
+      return;
+    }
+    const targetAmt = parseFloat(form.targetAmount);
+    if (!form.targetAmount || isNaN(targetAmt) || targetAmt <= 0) {
+      toast({ title: "Enter a valid target amount", variant: "destructive" });
+      return;
+    }
     const payload = {
-      title: form.title,
+      title: form.title.trim(),
       category: form.category,
-      targetAmount: parseFloat(form.targetAmount) || 0,
+      targetAmount: targetAmt,
       currentAmount: parseFloat(form.currentAmount) || 0,
       targetDate: form.targetDate || null,
       notes: form.notes || null,
@@ -426,7 +434,7 @@ export default function GoalsPage() {
           <DialogHeader>
             <DialogTitle>{editGoal ? "Edit Goal" : "Add New Goal"}</DialogTitle>
           </DialogHeader>
-          <form onSubmit={handleSubmit} className="space-y-4 py-2">
+          <div className="space-y-4 py-2">
             <div className="space-y-1.5">
               <Label>Goal Title</Label>
               <Input
@@ -496,12 +504,15 @@ export default function GoalsPage() {
             </div>
 
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
-              <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending}>
-                {editGoal ? "Save Changes" : "Create Goal"}
+              <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
+              <Button
+                onClick={handleSaveGoal}
+                disabled={createMutation.isPending || updateMutation.isPending}
+              >
+                {createMutation.isPending || updateMutation.isPending ? "Saving…" : editGoal ? "Save Changes" : "Create Goal"}
               </Button>
             </DialogFooter>
-          </form>
+          </div>
         </DialogContent>
       </Dialog>
 
