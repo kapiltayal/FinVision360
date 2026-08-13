@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { Link } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { CurrencyInput } from "@/components/ui/currency-input";
@@ -15,6 +16,7 @@ import { useLastUpdated } from "@/hooks/use-last-updated";
 import { ExportMenu } from "@/components/export-menu";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { type Retirement401kGoal } from "@shared/schema";
+import { useAuth } from "@/hooks/use-auth";
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, Legend,
@@ -25,7 +27,22 @@ const CATCHUP_LIMIT_2024 = 30500;
 
 export default function Retirement401kPage() {
   const { toast } = useToast();
+  const { user } = useAuth();
   const { data: goal } = useQuery<Retirement401kGoal | null>({ queryKey: ["/api/retirement/401k"] });
+
+  // Derive current age from profile DOB (birthday-aware), same pattern as snapshot page
+  const dobStr: string | undefined = (user as any)?.dateOfBirth;
+  const ageFromProfile = (() => {
+    if (!dobStr) return null;
+    const dob = new Date(dobStr);
+    const today = new Date();
+    let age = today.getUTCFullYear() - dob.getUTCFullYear();
+    const hadBirthday =
+      today.getUTCMonth() > dob.getUTCMonth() ||
+      (today.getUTCMonth() === dob.getUTCMonth() && today.getUTCDate() >= dob.getUTCDate());
+    if (!hadBirthday) age -= 1;
+    return age;
+  })();
 
   const [form, setForm] = useState({
     currentAge: 35,
@@ -43,7 +60,7 @@ export default function Retirement401kPage() {
   useEffect(() => {
     if (goal) {
       setForm({
-        currentAge: goal.currentAge ?? 35,
+        currentAge: ageFromProfile ?? goal.currentAge ?? 35,
         retirementAge: goal.retirementAge ?? 65,
         currentBalance: goal.currentBalance ?? "25000",
         annualSalary: goal.annualSalary ?? "80000",
@@ -55,7 +72,14 @@ export default function Retirement401kPage() {
         rothTaxRate: parseFloat(goal.rothTaxRate ?? "20"),
       });
     }
-  }, [goal]);
+  }, [goal]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Keep currentAge in sync whenever the profile DOB resolves
+  useEffect(() => {
+    if (ageFromProfile !== null) {
+      setForm((f) => ({ ...f, currentAge: ageFromProfile }));
+    }
+  }, [ageFromProfile]);
 
   const { formattedDate, markUpdated } = useLastUpdated("retirement-401k");
 
@@ -251,13 +275,31 @@ export default function Retirement401kPage() {
             <CardTitle className="text-base">Your 401k Details</CardTitle>
           </CardHeader>
           <CardContent className="space-y-5">
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label>Current Age</Label>
-                <span className="text-sm font-medium">{form.currentAge}</span>
+            {ageFromProfile !== null ? (
+              <div className="space-y-1">
+                <div className="flex items-center justify-between">
+                  <Label>Current Age</Label>
+                  <span className="text-sm font-bold">{ageFromProfile}</span>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  From your{" "}
+                  <Link href="/settings" className="underline underline-offset-2 text-primary">
+                    profile
+                  </Link>
+                </p>
               </div>
-              <Slider value={[form.currentAge]} onValueChange={([v]) => set("currentAge", v)} min={18} max={69} step={1} data-testid="slider-401k-current-age" />
-            </div>
+            ) : (
+              <div className="rounded-md border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/20 p-3 space-y-1">
+                <p className="text-xs font-semibold text-amber-700 dark:text-amber-400">Current age not set</p>
+                <p className="text-xs text-muted-foreground">
+                  Add your date of birth in{" "}
+                  <Link href="/settings" className="underline underline-offset-2 text-primary">
+                    Settings
+                  </Link>{" "}
+                  to auto-fill your age.
+                </p>
+              </div>
+            )}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label>Retirement Age</Label>
