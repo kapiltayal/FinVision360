@@ -305,7 +305,7 @@ export default function SnapshotPage() {
         <div className="relative px-6 py-10 md:py-12">
           <p className="text-blue-400 text-xs font-bold tracking-[0.2em] uppercase mb-2">Financial Snapshot</p>
           <h1 className="text-3xl md:text-4xl font-bold text-white mb-2 leading-tight">
-            {firstName}&apos;s Financial Snapshot{age !== null ? <span className="text-2xl md:text-3xl font-normal text-blue-300 ml-3">({age})</span> : null}
+            {firstName}&apos;s Financial Snapshot{age !== null ? <span className="text-2xl md:text-3xl font-normal text-blue-300 ml-3">(Age: {age})</span> : null}
           </h1>
           <p className="text-slate-400 text-sm">Your complete financial picture &nbsp;·&nbsp; as of {today}</p>
         </div>
