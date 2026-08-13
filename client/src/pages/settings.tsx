@@ -438,6 +438,20 @@ export default function SettingsPage() {
                     onChange={(e) => setProfile({ ...profile, dateOfBirth: e.target.value })}
                     max={new Date().toISOString().split("T")[0]}
                   />
+                  {(() => {
+                    if (!profile.dateOfBirth) return null;
+                    const dob = new Date(profile.dateOfBirth);
+                    const today = new Date();
+                    let age = today.getUTCFullYear() - dob.getUTCFullYear();
+                    const hadBirthday =
+                      today.getUTCMonth() > dob.getUTCMonth() ||
+                      (today.getUTCMonth() === dob.getUTCMonth() && today.getUTCDate() >= dob.getUTCDate());
+                    if (!hadBirthday) age -= 1;
+                    if (age < 0 || age > 130) return null;
+                    return (
+                      <p className="text-xs text-muted-foreground">Age: <span className="font-medium text-foreground">{age}</span></p>
+                    );
+                  })()}
                 </div>
                 <div className="flex justify-end pt-1">
                   <Button type="submit" disabled={updateProfileMutation.isPending} data-testid="button-save-profile">
