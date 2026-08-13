@@ -37,7 +37,7 @@ import {
 import {
   Plus, Target, Pencil, Trash2, TrendingUp, CheckCircle2,
   PiggyBank, Home, GraduationCap, Car, Plane, Briefcase,
-  ShieldCheck, BarChart3, Wallet, Calendar, Clock, Trophy,
+  ShieldCheck, BarChart3, Wallet, Calendar, Clock, Trophy, Landmark,
 } from "lucide-react";
 import { CurrencyInput } from "@/components/ui/currency-input";
 
@@ -49,7 +49,7 @@ const CATEGORIES = [
   { value: "emergency_fund", label: "Emergency Fund",  icon: ShieldCheck, color: "text-amber-500",   bg: "bg-amber-500/10",   border: "border-amber-200 dark:border-amber-800" },
   { value: "home",           label: "Home Purchase",   icon: Home,        color: "text-[#1C91D4]",   bg: "bg-[#1C91D4]/10",   border: "border-blue-200 dark:border-blue-800" },
   { value: "investment",     label: "Investment",      icon: BarChart3,   color: "text-violet-500",  bg: "bg-violet-500/10",  border: "border-violet-200 dark:border-violet-800" },
-  { value: "retirement",     label: "Retirement",      icon: TrendingUp,  color: "text-[#1475A8]",   bg: "bg-[#1475A8]/10",   border: "border-blue-200 dark:border-blue-800" },
+  { value: "retirement",     label: "Retirement",      icon: Landmark,    color: "text-[#1475A8]",   bg: "bg-[#1475A8]/10",   border: "border-blue-200 dark:border-blue-800" },
   { value: "education",      label: "Education",       icon: GraduationCap, color: "text-cyan-500", bg: "bg-cyan-500/10",     border: "border-cyan-200 dark:border-cyan-800" },
   { value: "travel",         label: "Travel",          icon: Plane,       color: "text-pink-500",    bg: "bg-pink-500/10",    border: "border-pink-200 dark:border-pink-800" },
   { value: "vehicle",        label: "Vehicle",         icon: Car,         color: "text-orange-500",  bg: "bg-orange-500/10",  border: "border-orange-200 dark:border-orange-800" },
