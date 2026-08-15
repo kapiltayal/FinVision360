@@ -63,27 +63,6 @@ export const insertLiabilitySchema = createInsertSchema(liabilities).omit({
 export type InsertLiability = z.infer<typeof insertLiabilitySchema>;
 export type Liability = typeof liabilities.$inferSelect;
 
-export const retirementGoals = pgTable("retirement_goals", {
-  id: serial("id").primaryKey(),
-  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  currentAge: integer("current_age").notNull(),
-  retirementAge: integer("retirement_age").notNull(),
-  monthlyContribution: numeric("monthly_contribution", { precision: 10, scale: 2 }).notNull(),
-  expectedReturn: numeric("expected_return", { precision: 5, scale: 2 }).default("7"),
-  inflationRate: numeric("inflation_rate", { precision: 5, scale: 2 }).default("3"),
-  targetAmount: numeric("target_amount", { precision: 15, scale: 2 }),
-  currentSavings: numeric("current_savings", { precision: 15, scale: 2 }).default("0"),
-  createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
-});
-
-export const insertRetirementGoalSchema = createInsertSchema(retirementGoals).omit({
-  id: true,
-  createdAt: true,
-});
-
-export type InsertRetirementGoal = z.infer<typeof insertRetirementGoalSchema>;
-export type RetirementGoal = typeof retirementGoals.$inferSelect;
-
 export const insurancePolicies = pgTable("insurance_policies", {
   id: serial("id").primaryKey(),
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),

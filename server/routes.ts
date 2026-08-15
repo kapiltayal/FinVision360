@@ -102,24 +102,6 @@ export async function registerRoutes(
     res.status(204).send();
   });
 
-  app.get("/api/retirement", requireAuth, async (req, res) => {
-    const userId = (req.user as any).id;
-    const goal = await storage.getRetirementGoal(userId);
-    res.json(goal || null);
-  });
-
-  app.post("/api/retirement", requireAuth, async (req, res) => {
-    const userId = (req.user as any).id;
-    const { currentAge, retirementAge, monthlyContribution, expectedReturn, inflationRate, currentSavings, targetAmount } = req.body;
-    if (!currentAge || !retirementAge || !monthlyContribution) {
-      return res.status(400).json({ message: "Required fields missing" });
-    }
-    const goal = await storage.upsertRetirementGoal({
-      userId, currentAge, retirementAge, monthlyContribution, expectedReturn, inflationRate, currentSavings, targetAmount,
-    });
-    res.json(goal);
-  });
-
   app.get("/api/retirement/401k", requireAuth, async (req, res) => {
     const userId = (req.user as any).id;
     const goal = await storage.getRetirement401kGoal(userId);

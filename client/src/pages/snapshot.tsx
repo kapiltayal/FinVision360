@@ -33,7 +33,7 @@ import {
   Info,
   Landmark,
 } from "lucide-react";
-import { type Asset, type Liability, type IncomeEntry, type ExpenseEntry, type InsurancePolicy, type RetirementGoal, type Retirement401kGoal, type EstateBeneficiary, type EstateDocument, type EstateContact, ESTATE_DOCUMENT_TYPES } from "@shared/schema";
+import { type Asset, type Liability, type IncomeEntry, type ExpenseEntry, type InsurancePolicy, type Retirement401kGoal, type EstateBeneficiary, type EstateDocument, type EstateContact, ESTATE_DOCUMENT_TYPES } from "@shared/schema";
 
 const FREQ: Record<string, number> = {
   weekly: 52 / 12, biweekly: 26 / 12, monthly: 1, quarterly: 1 / 3, annual: 1 / 12,
@@ -151,7 +151,6 @@ export default function SnapshotPage() {
   const { data: incomeList = [], isLoading: iL } = useQuery<IncomeEntry[]>({ queryKey: ["/api/income"] });
   const { data: expenseList = [], isLoading: eL } = useQuery<ExpenseEntry[]>({ queryKey: ["/api/expenses"] });
   const { data: policies = [], isLoading: pL } = useQuery<InsurancePolicy[]>({ queryKey: ["/api/insurance"] });
-  const { data: retGoal } = useQuery<RetirementGoal | null>({ queryKey: ["/api/retirement"] });
   const { data: goal401k } = useQuery<Retirement401kGoal | null>({ queryKey: ["/api/retirement/401k"] });
   const { data: estateBeneficiaries = [] } = useQuery<EstateBeneficiary[]>({ queryKey: ["/api/estate/beneficiaries"] });
   const { data: estateDocuments = [] } = useQuery<EstateDocument[]>({ queryKey: ["/api/estate/documents"] });
@@ -173,16 +172,6 @@ export default function SnapshotPage() {
   const k401Balance = goal401k ? parseFloat((goal401k as any).currentBalance || "0") : retirementAssets;
   const ssnMonthlyEst = Math.min(totalMonthlyIncome * 0.42, 3822);
 
-  const projectedRetirement = useMemo(() => {
-    if (!retGoal) return 0;
-    const years = (retGoal as any).retirementAge - (retGoal as any).currentAge;
-    if (years <= 0) return 0;
-    const monthlyRate = parseFloat((retGoal as any).expectedReturn || "7") / 100 / 12;
-    const monthly = parseFloat((retGoal as any).monthlyContribution || "0");
-    let balance = parseFloat((retGoal as any).currentSavings || "0");
-    for (let m = 0; m < years * 12; m++) balance = balance * (1 + monthlyRate) + monthly;
-    return Math.round(balance);
-  }, [retGoal]);
 
   const emergencyFunds = useMemo(() =>
     assets
@@ -369,21 +358,13 @@ export default function SnapshotPage() {
           <div className="mb-4">
             <p className="text-3xl font-bold tabular-nums leading-none mb-1 text-violet-500"
               data-testid="text-snapshot-retirement">
-              {projectedRetirement > 0 ? formatCurrency(projectedRetirement) : formatCurrency(retirementAssets)}
+              {formatCurrency(retirementAssets)}
             </p>
-            <p className="text-xs text-muted-foreground mt-1">
-              {projectedRetirement > 0 ? "Projected at retirement" : "Current retirement savings"}
-            </p>
+            <p className="text-xs text-muted-foreground mt-1">Current retirement savings</p>
           </div>
           <div className="space-y-2 pt-3 border-t border-slate-100 dark:border-slate-800">
             <StatRow label="401k / Retirement Funds" value={formatCurrency(k401Balance || retirementAssets)} />
             <StatRow label="SSN Est. (at retirement)" value={`~${formatCurrency(ssnMonthlyEst)}/mo`} />
-            {retGoal && (
-              <StatRow
-                label="Years to Retire"
-                value={`${Math.max(0, (retGoal as any).retirementAge - (retGoal as any).currentAge)} yrs`}
-              />
-            )}
           </div>
         </SnapshotCard>
 

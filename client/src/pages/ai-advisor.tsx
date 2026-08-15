@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Brain, Lightbulb, TrendingUp, CreditCard, Loader2, Sparkles, Send } from "lucide-react";
-import { type Asset, type Liability, type RetirementGoal } from "@shared/schema";
+import { type Asset, type Liability } from "@shared/schema";
 
 function escapeHtml(text: string): string {
   return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -154,8 +154,6 @@ function StreamingResponse({
 export default function AIAdvisorPage() {
   const { data: assets = [] } = useQuery<Asset[]>({ queryKey: ["/api/assets"] });
   const { data: liabilities = [] } = useQuery<Liability[]>({ queryKey: ["/api/liabilities"] });
-  const { data: retirementGoal } = useQuery<RetirementGoal | null>({ queryKey: ["/api/retirement"] });
-
   const [scenarioQuery, setScenarioQuery] = useState("");
   const [scenarioSubmitted, setScenarioSubmitted] = useState<any>(null);
 
@@ -188,7 +186,6 @@ export default function AIAdvisorPage() {
         weightedRate: weightedLiabilityRate.toFixed(2),
         items: liabilities.map((l) => ({ name: l.name, category: l.category, balance: l.balance, rate: l.interestRate })),
       },
-      retirementGoal: retirementGoal || undefined,
     });
   };
 
@@ -209,7 +206,6 @@ export default function AIAdvisorPage() {
     setForecastSubmitted({
       assets: assets.map((a) => ({ name: a.name, value: a.value, interestRate: a.interestRate, category: a.category })),
       liabilities: liabilities.map((l) => ({ name: l.name, balance: l.balance, interestRate: l.interestRate, category: l.category })),
-      retirementGoal: retirementGoal || undefined,
       yearsToForecast: parseInt(forecastYears) || 10,
     });
   };

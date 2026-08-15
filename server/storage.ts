@@ -4,7 +4,6 @@ import {
   type User, type InsertUser,
   type Asset, type InsertAsset,
   type Liability, type InsertLiability,
-  type RetirementGoal, type InsertRetirementGoal,
   type Retirement401kGoal, type InsertRetirement401kGoal,
   type InsurancePolicy, type InsertInsurancePolicy,
   type IncomeEntry, type InsertIncomeEntry,
@@ -18,7 +17,7 @@ import {
   type EstateDocument, type InsertEstateDocument,
   type EstateContact, type InsertEstateContact,
   type Feedback, type InsertFeedback,
-  users, assets, liabilities, retirementGoals, retirement401kGoals, insurancePolicies, incomeEntries, expenseEntries, recommendationSettings,
+  users, assets, liabilities, retirement401kGoals, insurancePolicies, incomeEntries, expenseEntries, recommendationSettings,
   bankConfigs, bankRates, plaidItems, plaidAccounts,
   estateBeneficiaries, estateDocuments, estateContacts, feedback, contactus, socialSecuritySettings,
   userGoals,
@@ -45,9 +44,6 @@ export interface IStorage {
   createLiability(liability: InsertLiability): Promise<Liability>;
   updateLiability(id: number, userId: string, data: Partial<InsertLiability>): Promise<Liability | undefined>;
   deleteLiability(id: number, userId: string): Promise<void>;
-
-  getRetirementGoal(userId: string): Promise<RetirementGoal | undefined>;
-  upsertRetirementGoal(goal: InsertRetirementGoal): Promise<RetirementGoal>;
 
   getRetirement401kGoal(userId: string): Promise<Retirement401kGoal | undefined>;
   upsertRetirement401kGoal(goal: InsertRetirement401kGoal): Promise<Retirement401kGoal>;
@@ -193,21 +189,6 @@ export class DatabaseStorage implements IStorage {
 
   async deleteLiability(id: number, userId: string): Promise<void> {
     await db.delete(liabilities).where(and(eq(liabilities.id, id), eq(liabilities.userId, userId)));
-  }
-
-  async getRetirementGoal(userId: string): Promise<RetirementGoal | undefined> {
-    const [goal] = await db.select().from(retirementGoals).where(eq(retirementGoals.userId, userId));
-    return goal;
-  }
-
-  async upsertRetirementGoal(goal: InsertRetirementGoal): Promise<RetirementGoal> {
-    const existing = await this.getRetirementGoal(goal.userId);
-    if (existing) {
-      const [updated] = await db.update(retirementGoals).set(goal).where(eq(retirementGoals.id, existing.id)).returning();
-      return updated;
-    }
-    const [created] = await db.insert(retirementGoals).values(goal).returning();
-    return created;
   }
 
   async getRetirement401kGoal(userId: string): Promise<Retirement401kGoal | undefined> {
