@@ -171,6 +171,8 @@ export default function SnapshotPage() {
     assets.filter(a => a.category === "retirement_fund").reduce((s, a) => s + parseFloat(a.value || "0"), 0), [assets]);
   const k401Balance = goal401k ? parseFloat((goal401k as any).currentBalance || "0") : retirementAssets;
   const ssnMonthlyEst = Math.min(totalMonthlyIncome * 0.42, 3822);
+  const retirementAge = (goal401k as any)?.retirementAge ?? 65;
+  const yearsToRetire = age != null ? Math.max(retirementAge - age, 0) : null;
 
 
   const emergencyFunds = useMemo(() =>
@@ -365,6 +367,17 @@ export default function SnapshotPage() {
           <div className="space-y-2 pt-3 border-t border-slate-100 dark:border-slate-800">
             <StatRow label="401k / Retirement Funds" value={formatCurrency(k401Balance || retirementAssets)} />
             <StatRow label="SSN Est. (at retirement)" value={`~${formatCurrency(ssnMonthlyEst)}/mo`} />
+            <div className="flex items-center justify-between pt-0.5">
+              <span className="text-xs text-muted-foreground">Years to retire:</span>
+              <div className="text-right">
+                <span className="text-xs font-medium tabular-nums">
+                  {yearsToRetire != null ? yearsToRetire : "—"}
+                </span>
+                <p className="text-[10px] text-muted-foreground/70 leading-tight">
+                  when Retirement age {retirementAge}
+                </p>
+              </div>
+            </div>
           </div>
         </SnapshotCard>
 
