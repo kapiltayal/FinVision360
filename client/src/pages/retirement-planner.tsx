@@ -10,7 +10,7 @@ export default function RetirementPlannerPage() {
           </div>
           <div>
             <h1 className="text-2xl font-bold">Retirement Planner</h1>
-            <p className="text-muted-foreground">Plan your path to financial freedom</p>
+            <p className="text-muted-foreground">Project your savings, wealth and income. Plan your path to financial freedom</p>
           </div>
         </div>
       </div>
