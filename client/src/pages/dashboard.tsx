@@ -516,13 +516,19 @@ export default function DashboardPage() {
   const totalLiabilities = includedLiabilities.reduce((sum, l) => sum + parseFloat(l.balance || "0"), 0);
   const netWorth = totalAssets - totalLiabilities;
 
+  // Weighted avg rate — only over items that actually carry a rate (matching the donut chart)
+  const ratedAssets = includedAssets.filter((a) => parseFloat(a.interestRate || "0") > 0);
+  const ratedAssetTotal = ratedAssets.reduce((sum, a) => sum + parseFloat(a.value || "0"), 0);
   const weightedAssetRate =
-    totalAssets > 0
-      ? includedAssets.reduce((sum, a) => sum + parseFloat(a.value || "0") * parseFloat(a.interestRate || "0"), 0) / totalAssets
+    ratedAssetTotal > 0
+      ? ratedAssets.reduce((sum, a) => sum + parseFloat(a.value || "0") * parseFloat(a.interestRate || "0"), 0) / ratedAssetTotal
       : 0;
+
+  const ratedLiabilities = includedLiabilities.filter((l) => parseFloat(l.interestRate || "0") > 0);
+  const ratedLiabilityTotal = ratedLiabilities.reduce((sum, l) => sum + parseFloat(l.balance || "0"), 0);
   const weightedLiabilityRate =
-    totalLiabilities > 0
-      ? includedLiabilities.reduce((sum, l) => sum + parseFloat(l.balance || "0") * parseFloat(l.interestRate || "0"), 0) / totalLiabilities
+    ratedLiabilityTotal > 0
+      ? ratedLiabilities.reduce((sum, l) => sum + parseFloat(l.balance || "0") * parseFloat(l.interestRate || "0"), 0) / ratedLiabilityTotal
       : 0;
 
   const earnedAnnual = includedAssets.reduce(
