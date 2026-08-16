@@ -355,6 +355,64 @@ export default function SnapshotPage() {
           </div>
         </SnapshotCard>
 
+        {/* ── Emergency Funds ── */}
+        <SnapshotCard title="Emergency Funds" accent="#0d9488" icon={Banknote} href="/assets" tooltip="Calculated as the total of your savings and cash assets. Months of coverage = savings & cash ÷ your total monthly expenses. A healthy fund covers 3–6 months of expenses.">
+          <div className="mb-4">
+            <p
+              className="text-3xl font-bold tabular-nums leading-none mb-1"
+              style={{ color: "#0d9488" }}
+              data-testid="text-snapshot-emergency-funds"
+            >
+              {formatCurrency(emergencyFunds)}
+            </p>
+            <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
+              {emergencyFunds === 0
+                ? <span className="text-red-500 font-medium">No emergency savings found</span>
+                : monthsOfCoverage !== null
+                  ? <>
+                      <span
+                        className="font-semibold"
+                        style={{ color: monthsOfCoverage >= 6 ? "#22c55e" : monthsOfCoverage >= 3 ? "#eab308" : "#ef4444" }}
+                      >
+                        {monthsOfCoverage.toFixed(1)} months
+                      </span>
+                      <span>&nbsp;of coverage</span>
+                    </>
+                  : <span>No expense data to calculate coverage</span>
+              }
+            </div>
+          </div>
+
+          {/* Progress bar — 0 to 6 months target */}
+          {monthsOfCoverage !== null && totalMonthlyExpenses > 0 && (
+            <div className="mb-3">
+              <div className="h-2 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
+                <div
+                  className="h-full rounded-full transition-all duration-500"
+                  style={{
+                    width: `${Math.min(100, (monthsOfCoverage / 6) * 100)}%`,
+                    background: monthsOfCoverage >= 6 ? "#22c55e" : monthsOfCoverage >= 3 ? "#eab308" : "#ef4444",
+                  }}
+                />
+              </div>
+              <div className="flex justify-between text-[10px] text-muted-foreground mt-1">
+                <span>0 mo</span>
+                <span className="font-medium" style={{ color: "#0d9488" }}>Target: 3–6 mo</span>
+                <span>6 mo</span>
+              </div>
+            </div>
+          )}
+
+          <div className="space-y-2 pt-3 border-t border-slate-100 dark:border-slate-800">
+            <StatRow label="Savings & Cash Assets" value={formatCurrency(emergencyFunds)} />
+            {totalMonthlyExpenses > 0 && (
+              <p className="text-[11px] text-muted-foreground leading-relaxed">
+                Based on your <span className="font-semibold tabular-nums">{formatCurrency(totalMonthlyExpenses)}</span>/mo in expenses
+              </p>
+            )}
+          </div>
+        </SnapshotCard>
+
         {/* ── Retirement ── */}
         <SnapshotCard title="Retirement" accent="#8b5cf6" icon={Landmark} href="/retirement">
           <div className="mb-4">
@@ -499,64 +557,6 @@ export default function SnapshotPage() {
               </span>
             )}
           </p>
-        </SnapshotCard>
-
-        {/* ── Emergency Funds ── */}
-        <SnapshotCard title="Emergency Funds" accent="#0d9488" icon={Banknote} href="/assets" tooltip="Calculated as the total of your savings and cash assets. Months of coverage = savings & cash ÷ your total monthly expenses. A healthy fund covers 3–6 months of expenses.">
-          <div className="mb-4">
-            <p
-              className="text-3xl font-bold tabular-nums leading-none mb-1"
-              style={{ color: "#0d9488" }}
-              data-testid="text-snapshot-emergency-funds"
-            >
-              {formatCurrency(emergencyFunds)}
-            </p>
-            <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
-              {emergencyFunds === 0
-                ? <span className="text-red-500 font-medium">No emergency savings found</span>
-                : monthsOfCoverage !== null
-                  ? <>
-                      <span
-                        className="font-semibold"
-                        style={{ color: monthsOfCoverage >= 6 ? "#22c55e" : monthsOfCoverage >= 3 ? "#eab308" : "#ef4444" }}
-                      >
-                        {monthsOfCoverage.toFixed(1)} months
-                      </span>
-                      <span>&nbsp;of coverage</span>
-                    </>
-                  : <span>No expense data to calculate coverage</span>
-              }
-            </div>
-          </div>
-
-          {/* Progress bar — 0 to 6 months target */}
-          {monthsOfCoverage !== null && totalMonthlyExpenses > 0 && (
-            <div className="mb-3">
-              <div className="h-2 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
-                <div
-                  className="h-full rounded-full transition-all duration-500"
-                  style={{
-                    width: `${Math.min(100, (monthsOfCoverage / 6) * 100)}%`,
-                    background: monthsOfCoverage >= 6 ? "#22c55e" : monthsOfCoverage >= 3 ? "#eab308" : "#ef4444",
-                  }}
-                />
-              </div>
-              <div className="flex justify-between text-[10px] text-muted-foreground mt-1">
-                <span>0 mo</span>
-                <span className="font-medium" style={{ color: "#0d9488" }}>Target: 3–6 mo</span>
-                <span>6 mo</span>
-              </div>
-            </div>
-          )}
-
-          <div className="space-y-2 pt-3 border-t border-slate-100 dark:border-slate-800">
-            <StatRow label="Savings & Cash Assets" value={formatCurrency(emergencyFunds)} />
-            {totalMonthlyExpenses > 0 && (
-              <p className="text-[11px] text-muted-foreground leading-relaxed">
-                Based on your <span className="font-semibold tabular-nums">{formatCurrency(totalMonthlyExpenses)}</span>/mo in expenses
-              </p>
-            )}
-          </div>
         </SnapshotCard>
 
         {/* ── Estate & Legacy ── */}
