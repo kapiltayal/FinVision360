@@ -516,19 +516,14 @@ export default function DashboardPage() {
   const totalLiabilities = includedLiabilities.reduce((sum, l) => sum + parseFloat(l.balance || "0"), 0);
   const netWorth = totalAssets - totalLiabilities;
 
-  // Weighted avg rate — only over items that actually carry a rate (matching the donut chart)
-  const ratedAssets = includedAssets.filter((a) => parseFloat(a.interestRate || "0") > 0);
-  const ratedAssetTotal = ratedAssets.reduce((sum, a) => sum + parseFloat(a.value || "0"), 0);
+  // Dollar-weighted avg rate over ALL included items (0%-rate items count toward denominator)
   const weightedAssetRate =
-    ratedAssetTotal > 0
-      ? ratedAssets.reduce((sum, a) => sum + parseFloat(a.value || "0") * parseFloat(a.interestRate || "0"), 0) / ratedAssetTotal
+    totalAssets > 0
+      ? includedAssets.reduce((sum, a) => sum + parseFloat(a.value || "0") * parseFloat(a.interestRate || "0"), 0) / totalAssets
       : 0;
-
-  const ratedLiabilities = includedLiabilities.filter((l) => parseFloat(l.interestRate || "0") > 0);
-  const ratedLiabilityTotal = ratedLiabilities.reduce((sum, l) => sum + parseFloat(l.balance || "0"), 0);
   const weightedLiabilityRate =
-    ratedLiabilityTotal > 0
-      ? ratedLiabilities.reduce((sum, l) => sum + parseFloat(l.balance || "0") * parseFloat(l.interestRate || "0"), 0) / ratedLiabilityTotal
+    totalLiabilities > 0
+      ? includedLiabilities.reduce((sum, l) => sum + parseFloat(l.balance || "0") * parseFloat(l.interestRate || "0"), 0) / totalLiabilities
       : 0;
 
   const earnedAnnual = includedAssets.reduce(
@@ -562,7 +557,6 @@ export default function DashboardPage() {
     .filter((l) => l.value > 0);
 
   const interestEarnedBySource = includedAssets
-    .filter((a) => parseFloat(a.interestRate || "0") > 0)
     .map((a) => ({
       name: a.name,
       value: Math.round(parseFloat(a.value || "0") * parseFloat(a.interestRate || "0") / 100),
@@ -571,7 +565,6 @@ export default function DashboardPage() {
     .filter((a) => a.value > 0);
 
   const interestPaidBySource = includedLiabilities
-    .filter((l) => parseFloat(l.interestRate || "0") > 0)
     .map((l) => ({
       name: l.name,
       value: Math.round(parseFloat(l.balance || "0") * parseFloat(l.interestRate || "0") / 100),
