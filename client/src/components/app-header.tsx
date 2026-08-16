@@ -49,7 +49,6 @@ const adminNavItems = [
 export function AppHeader() {
   const [location] = useLocation();
   const [navOpen, setNavOpen] = useState(false);
-  const [adminOpen, setAdminOpen] = useState(false);
   const [userOpen, setUserOpen] = useState(false);
   const { user } = useAuth();
   const logout = useLogout();
@@ -116,53 +115,6 @@ export function AppHeader() {
         {/* Divider */}
         <div className="h-7 w-px bg-gradient-to-b from-transparent via-blue-400 dark:via-blue-500 to-transparent mx-2" aria-hidden="true" />
 
-        {/* Admin Dropdown — only for admins */}
-        {isAdmin && (
-          <DropdownMenu open={adminOpen} onOpenChange={setAdminOpen}>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-2 text-white border-0 hover:text-white hover:opacity-90 transition-opacity"
-                style={{ background: "linear-gradient(135deg, #1565a8 0%, #1c91d4 55%, #42b8ed 100%)" }}
-                data-testid="button-admin-menu"
-              >
-                {currentAdminPage ? (
-                  <>
-                    <currentAdminPage.icon className="h-4 w-4" />
-                    <span className="hidden sm:inline">{currentAdminPage.title}</span>
-                  </>
-                ) : (
-                  <>
-                    <ShieldAlert className="h-4 w-4" />
-                    <span className="hidden sm:inline">Admin</span>
-                  </>
-                )}
-                <ChevronDown className="h-4 w-4 opacity-70" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48">
-              <div className="px-2 py-1.5 text-sm font-semibold">Admin</div>
-              <div className="h-px bg-border my-1" />
-              {adminNavItems.map((item) => (
-                <Link
-                  key={item.title}
-                  href={item.url}
-                  onClick={() => setAdminOpen(false)}
-                  className="flex items-center gap-2 px-2 py-2 text-sm hover:bg-accent rounded cursor-pointer"
-                  data-testid={`nav-admin-${item.title.toLowerCase().replace(/\s/g, "-")}`}
-                >
-                  <item.icon className="h-4 w-4 shrink-0" />
-                  <span className="flex-1">{item.title}</span>
-                  {(location === item.url || (item.url !== "/" && location.startsWith(item.url))) && (
-                    <span className="text-primary">✓</span>
-                  )}
-                </Link>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        )}
-
         {/* User Menu */}
         <DropdownMenu open={userOpen} onOpenChange={setUserOpen}>
           <DropdownMenuTrigger asChild>
@@ -204,6 +156,30 @@ export function AppHeader() {
               <Settings className="h-4 w-4" />
               <span>Settings</span>
             </Link>
+            {isAdmin && (
+              <>
+                <div className="h-px bg-border my-1" />
+                <div className="px-2 py-1 flex items-center gap-1.5">
+                  <ShieldAlert className="h-3.5 w-3.5 text-muted-foreground" />
+                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Admin</span>
+                </div>
+                {adminNavItems.map((item) => (
+                  <Link
+                    key={item.title}
+                    href={item.url}
+                    onClick={() => setUserOpen(false)}
+                    className="flex items-center gap-2 px-2 py-2 text-sm hover:bg-accent rounded cursor-pointer"
+                    data-testid={`nav-admin-${item.title.toLowerCase().replace(/\s/g, "-")}`}
+                  >
+                    <item.icon className="h-4 w-4 shrink-0" />
+                    <span className="flex-1">{item.title}</span>
+                    {(location === item.url || (item.url !== "/" && location.startsWith(item.url))) && (
+                      <span className="text-primary">✓</span>
+                    )}
+                  </Link>
+                ))}
+              </>
+            )}
             <div className="h-px bg-border my-1" />
             <button
               onClick={() => logout.mutate()}
