@@ -421,22 +421,22 @@ export default function FinanceTrackerPage() {
 
   const { data: stats, isLoading: statsL } = useQuery<Stats>({
     queryKey: statsQK,
-    queryFn: () => fetch(`/api/transactions/stats${buildQS()}`).then(r => r.json()),
+    queryFn: () => apiRequest("GET", `/api/transactions/stats${buildQS()}`).then(r => r.json()).catch(() => null),
   });
   const { data: transactionsRaw, isLoading: txnL } = useQuery<Transaction[]>({
     queryKey: txnQK,
-    queryFn: () => fetch(`/api/transactions${buildQS()}`).then(r => r.ok ? r.json() : []),
+    queryFn: () => apiRequest("GET", `/api/transactions${buildQS()}`).then(r => r.json()).catch(() => []),
   });
   const transactions: Transaction[] = Array.isArray(transactionsRaw) ? transactionsRaw : [];
   const { data: trendRaw } = useQuery<TrendRow[]>({
     queryKey: trendQK,
-    queryFn: () => fetch(`/api/transactions/trend${buildQS({ groupBy })}`).then(r => r.ok ? r.json() : []),
+    queryFn: () => apiRequest("GET", `/api/transactions/trend${buildQS({ groupBy })}`).then(r => r.json()).catch(() => []),
   });
   const trendData: TrendRow[] = Array.isArray(trendRaw) ? trendRaw : [];
 
   const { data: catRaw } = useQuery<CatRow[]>({
     queryKey: catQK,
-    queryFn: () => fetch(`/api/transactions/categories${buildQS({ type: catChartType })}`).then(r => r.ok ? r.json() : []),
+    queryFn: () => apiRequest("GET", `/api/transactions/categories${buildQS({ type: catChartType })}`).then(r => r.json()).catch(() => []),
   });
   const catData: CatRow[] = Array.isArray(catRaw) ? catRaw : [];
 
@@ -816,8 +816,9 @@ export default function FinanceTrackerPage() {
         </CardContent>
       </Card>
 
-      {/* ── Dialogs ── */}
+      {/* ── Dialogs ── key forces full remount so state always resets to defaults/initial */}
       <TransactionDialog
+        key={addOpen ? "add-open" : "add-closed"}
         open={addOpen}
         onOpenChange={setAddOpen}
         onSave={data => createMut.mutate(data)}
@@ -825,6 +826,7 @@ export default function FinanceTrackerPage() {
       />
       {editTxn && (
         <TransactionDialog
+          key={`edit-${editTxn.id}`}
           open={!!editTxn}
           onOpenChange={v => { if (!v) setEditTxn(null); }}
           initial={editTxn}

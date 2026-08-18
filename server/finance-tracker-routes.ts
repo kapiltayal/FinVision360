@@ -224,7 +224,7 @@ export function registerFinanceTrackerRoutes(app: Express) {
   app.post("/api/transactions", requireAuth, async (req, res) => {
     try {
       const userId = (req.user as any).id;
-      const { date, description, amount, type, subcategory, needsWant, notes, source = "manual" } = req.body;
+      const { date, description, amount, type, subcategory, needsWant, isRecurring, recurringType, notes, source = "manual" } = req.body;
 
       if (!date || !description || amount === undefined || !type)
         return res.status(400).json({ message: "date, description, amount, type are required" });
@@ -234,9 +234,10 @@ export function registerFinanceTrackerRoutes(app: Express) {
       const finalNW = needsWant || cat.needsWant;
 
       const { rows } = await pool.query(
-        `INSERT INTO transactions (user_id, date, description, merchant, amount, type, subcategory, needs_want, source, notes)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
-        [userId, date, description, description, Math.abs(parseFloat(amount)), type, finalSubcat, finalNW, source, notes || null]
+        `INSERT INTO transactions (user_id, date, description, merchant, amount, type, subcategory, needs_want, is_recurring, recurring_type, source, notes)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
+        [userId, date, description, description, Math.abs(parseFloat(amount)), type, finalSubcat, finalNW,
+         isRecurring ?? false, isRecurring && recurringType ? recurringType : null, source, notes || null]
       );
 
       res.status(201).json(rows[0]);
