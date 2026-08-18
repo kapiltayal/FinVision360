@@ -475,7 +475,11 @@ export default function FinanceTrackerPage() {
     mutationFn: () => apiRequest("POST", "/api/transactions/import-from-entries"),
     onSuccess: (res: any) => res.json().then((d: any) => {
       invalidateAll();
-      toast({ title: `Imported ${d.inserted} from existing entries` });
+      const summary = [
+        d.inserted ? `${d.inserted} imported` : "",
+        d.updated ? `${d.updated} updated` : "",
+      ].filter(Boolean).join(" · ");
+      toast({ title: summary ? `Existing entries synced: ${summary}` : "Existing entries are already up to date" });
     }),
     onError: () => toast({ title: "Import failed", variant: "destructive" }),
   });

@@ -3,6 +3,38 @@ import { requireAuth } from "./auth";
 import type { Express } from "express";
 
 // ─── AUTO-CATEGORIZATION ENGINE ──────────────────────────────────────────────
+// The Income & Expenses page predates Finance Tracker and uses a few different
+// category keys. These maps preserve the original entry choice whenever there is
+// an equivalent Finance Tracker category; "other" deliberately falls back to
+// keyword categorization.
+const importedIncomeCategoryMap: Record<string, string> = {
+  salary: "salary",
+  freelance: "freelance",
+  business: "business",
+  investment: "other_income",
+  rental: "rental",
+  pension: "other_income",
+  social_security: "other_income",
+};
+
+const importedExpenseCategoryMap: Record<string, string> = {
+  housing: "housing",
+  utilities: "utilities",
+  groceries: "groceries",
+  transport: "transportation",
+  healthcare: "healthcare",
+  insurance: "insurance",
+  education: "education",
+  childcare: "other_expense",
+  dining: "dining_out",
+  entertainment: "entertainment",
+  subscriptions: "subscriptions",
+  shopping: "shopping",
+  travel: "travel",
+  personal_care: "personal_care",
+  hobbies: "other_expense",
+};
+
 function autoCategorizeFn(
   description: string,
   type: "income" | "expense"
@@ -10,7 +42,7 @@ function autoCategorizeFn(
   const d = description.toLowerCase();
 
   if (type === "income") {
-    if (/salary|payroll|direct dep|wages|pay stub/.test(d)) return { subcategory: "salary", needsWant: "na" };
+    if (/salary|payroll|direct dep|wage(s)?|pay stub/.test(d)) return { subcategory: "salary", needsWant: "na" };
     if (/bonus/.test(d)) return { subcategory: "bonus", needsWant: "na" };
     if (/freelance|consulting|contract work|upwork|fiverr/.test(d)) return { subcategory: "freelance", needsWant: "na" };
     if (/dividend|distribution/.test(d)) return { subcategory: "dividend", needsWant: "na" };
@@ -24,12 +56,12 @@ function autoCategorizeFn(
   }
 
   // expense rules (ordered by specificity)
-  if (/mortgage|rent(?! received)|hoa fee|property tax|homeowners/.test(d)) return { subcategory: "housing", needsWant: "need" };
+  if (/mortgage|rent(?! received)|hoa fee|property tax|homeowners|\bhouse\b/.test(d)) return { subcategory: "housing", needsWant: "need" };
   if (/electric|gas bill|water bill|internet|broadband|at&t|verizon|t-mobile|comcast|xfinity|spectrum|pge|con ?ed|energy/.test(d)) return { subcategory: "utilities", needsWant: "need" };
   if (/grocery|groceries|whole foods|trader joe|costco|kroger|safeway|aldi|publix|wegmans|food lion|sprouts|supermarket/.test(d)) return { subcategory: "groceries", needsWant: "need" };
   if (/^uber$|lyft|gas station|shell |chevron|bp |exxon|mobil |sunoco|marathon gas|parking|transit|metro |mta |bart|caltrain|auto loan|car payment/.test(d)) return { subcategory: "transportation", needsWant: "need" };
   if (/restaurant|doordash|grubhub|uber eats|ubereats|mcdonald|starbucks|chipotle|pizza|taco |burger|diner|cafe |bistro|sushi|thai food|chinese food/.test(d)) return { subcategory: "dining_out", needsWant: "want" };
-  if (/netflix|hulu|disney[\+ ]|hbo |max\b|peacock|paramount\+|showtime|amc\+|movie theater|cinema|concert|ticketmaster|live nation|apple music|tidal|pandora/.test(d)) return { subcategory: "entertainment", needsWant: "want" };
+  if (/netflix|hulu|disney[\+ ]|hbo |max\b|peacock|paramount\+|showtime|amc\+|movie theater|cinema|concert|ticketmaster|live nation|apple music|tidal|pandora|\bfun\b/.test(d)) return { subcategory: "entertainment", needsWant: "want" };
   if (/pharmacy|cvs |walgreens|rite aid|hospital|clinic |doctor|dental|vision care|healthcare|medical |urgent care|labcorp|quest diag/.test(d)) return { subcategory: "healthcare", needsWant: "need" };
   if (/insurance|geico|progressive|allstate|state farm|nationwide|aaa |usaa/.test(d)) return { subcategory: "insurance", needsWant: "need" };
   if (/tuition|university|college|udemy|coursera|skillshare|student loan|khan academy/.test(d)) return { subcategory: "education", needsWant: "need" };
@@ -290,35 +322,62 @@ export function registerFinanceTrackerRoutes(app: Express) {
         `SELECT name, amount, frequency, category, created_at FROM income_entries WHERE user_id=$1`, [userId]
       );
       const { rows: expenses } = await pool.query(
-        `SELECT name, amount, frequency, category, created_at FROM expense_entries WHERE user_id=$1`, [userId]
+        `SELECT name, amount, frequency, category, type, created_at FROM expense_entries WHERE user_id=$1`, [userId]
       );
 
       let inserted = 0;
+      let updated = 0;
       const today = new Date().toISOString().split("T")[0];
 
       for (const e of income) {
-        const cat = autoCategorizeFn(e.name, "income");
+        const detected = autoCategorizeFn(e.name, "income");
+        const subcategory = importedIncomeCategoryMap[e.category] ?? detected.subcategory;
+        const needsWant = "na";
+        const amount = Math.abs(parseFloat(e.amount));
+        const existing = await pool.query(
+          `UPDATE transactions
+           SET subcategory=$1, needs_want=$2, merchant=$3, updated_at=NOW()
+           WHERE user_id=$4 AND source='import' AND type='income' AND description=$5 AND amount=$6`,
+          [subcategory, needsWant, e.name, userId, e.name, amount]
+        );
+        if (existing.rowCount) {
+          updated += existing.rowCount;
+          continue;
+        }
         await pool.query(
           `INSERT INTO transactions (user_id, date, description, merchant, amount, type, subcategory, needs_want, source)
            VALUES ($1,$2,$3,$4,$5,'income',$6,$7,'import')
-           ON CONFLICT DO NOTHING`,
-          [userId, today, e.name, e.name, Math.abs(parseFloat(e.amount)), cat.subcategory, cat.needsWant]
+          `,
+          [userId, today, e.name, e.name, amount, subcategory, needsWant]
         );
         inserted++;
       }
       for (const e of expenses) {
-        const cat = autoCategorizeFn(e.name, "expense");
+        const detected = autoCategorizeFn(e.name, "expense");
+        const subcategory = importedExpenseCategoryMap[e.category] ?? detected.subcategory;
+        const needsWant = e.type === "need" || e.type === "want" ? e.type : detected.needsWant;
+        const amount = Math.abs(parseFloat(e.amount));
+        const existing = await pool.query(
+          `UPDATE transactions
+           SET subcategory=$1, needs_want=$2, merchant=$3, updated_at=NOW()
+           WHERE user_id=$4 AND source='import' AND type='expense' AND description=$5 AND amount=$6`,
+          [subcategory, needsWant, e.name, userId, e.name, amount]
+        );
+        if (existing.rowCount) {
+          updated += existing.rowCount;
+          continue;
+        }
         await pool.query(
           `INSERT INTO transactions (user_id, date, description, merchant, amount, type, subcategory, needs_want, source)
            VALUES ($1,$2,$3,$4,$5,'expense',$6,$7,'import')
-           ON CONFLICT DO NOTHING`,
-          [userId, today, e.name, e.name, Math.abs(parseFloat(e.amount)), cat.subcategory, cat.needsWant]
+          `,
+          [userId, today, e.name, e.name, amount, subcategory, needsWant]
         );
         inserted++;
       }
 
       const recurringMarked = await detectAndMarkRecurring(userId);
-      res.json({ inserted, recurringMarked });
+      res.json({ inserted, updated, recurringMarked });
     } catch (e) {
       console.error(e);
       res.status(500).json({ message: "Failed to import from entries" });
