@@ -31,6 +31,7 @@ import FAQPage from "@/pages/faq";
 import ContactPage from "@/pages/contact";
 import GoalsPage from "@/pages/goals";
 import ResetPasswordPage from "@/pages/reset-password";
+import FinanceTrackerPage from "@/pages/finance-tracker";
 
 function AuthenticatedApp() {
   const [location] = useLocation();
@@ -55,6 +56,7 @@ function AuthenticatedApp() {
               <Route path="/insurance" component={InsurancePage} />
               <Route path="/estate-planning" component={EstatePlanningPage} />
               <Route path="/goals" component={GoalsPage} />
+              <Route path="/finance-tracker" component={FinanceTrackerPage} />
               <Route path="/ai-advisor" component={AIAdvisorPage} />
               <Route path="/settings" component={SettingsPage} />
               <Route path="/bank-rates" component={BankRatesPage} />

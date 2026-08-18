@@ -17,6 +17,7 @@ import {
   Link2,
   UserCircle,
   ScrollText,
+  Receipt,
 } from "lucide-react";
 import logoPath from "@assets/FinVision360_Logo_H_(transparent)_1776714495394.png";
 import { Button } from "@/components/ui/button";
@@ -35,6 +36,7 @@ const baseNavItems = [
   { title: "Assets", url: "/assets", icon: Wallet },
   { title: "Liabilities", url: "/liabilities", icon: CreditCard },
   { title: "Income & Expenses", url: "/income-expenses", icon: ArrowLeftRight },
+  { title: "Finance Tracker", url: "/finance-tracker", icon: Receipt },
   { title: "Retirement", url: "/retirement", icon: Landmark },
   { title: "Insurance", url: "/insurance", icon: ShieldCheck },
   { title: "Estate & Legacy", url: "/estate-planning", icon: ScrollText },

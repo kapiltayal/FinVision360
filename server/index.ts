@@ -63,6 +63,31 @@ app.use((req, res, next) => {
 (async () => {
   // Ensure estate planning tables exist on every startup (safe on existing DBs).
   // No FK constraints here so this works on a fresh DB before db:push has run.
+  // Finance Tracker tables
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS transactions (
+      id              SERIAL PRIMARY KEY,
+      user_id         VARCHAR NOT NULL,
+      date            DATE NOT NULL,
+      description     TEXT NOT NULL,
+      merchant        TEXT,
+      amount          NUMERIC(12,2) NOT NULL,
+      type            TEXT NOT NULL CHECK(type IN ('income','expense')),
+      subcategory     TEXT NOT NULL DEFAULT 'unassigned',
+      needs_want      TEXT CHECK(needs_want IN ('need','want','na')),
+      is_recurring    BOOLEAN DEFAULT FALSE,
+      recurring_type  TEXT CHECK(recurring_type IN ('subscription','recurring_bill')),
+      source          TEXT NOT NULL DEFAULT 'manual' CHECK(source IN ('manual','plaid','upload','import')),
+      plaid_transaction_id TEXT,
+      notes           TEXT,
+      created_at      TIMESTAMPTZ DEFAULT NOW(),
+      updated_at      TIMESTAMPTZ DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS idx_transactions_user_id ON transactions(user_id);
+    CREATE INDEX IF NOT EXISTS idx_transactions_date    ON transactions(date);
+    CREATE INDEX IF NOT EXISTS idx_transactions_type    ON transactions(type);
+  `).catch((e) => console.error("Transactions table init error:", e));
+
   await pool.query(`
     CREATE TABLE IF NOT EXISTS estate_beneficiaries (
       id SERIAL PRIMARY KEY,

@@ -1,0 +1,833 @@
+import { useState, useRef, useMemo } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useToast } from "@/hooks/use-toast";
+import {
+  TrendingUp, TrendingDown, Wallet, Plus, Upload, RefreshCw, Pencil, Trash2,
+  AlertCircle, ArrowDownCircle, ArrowUpCircle, Repeat2, Tag, Search, X,
+  ChevronLeft, ChevronRight, BarChart3, PieChart as PieChartIcon, Zap, Database,
+} from "lucide-react";
+import {
+  ComposedChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
+  ResponsiveContainer, PieChart, Pie, Cell,
+} from "recharts";
+
+// ── Types ─────────────────────────────────────────────────────────────────────
+type Transaction = {
+  id: number; user_id: string; date: string; description: string; merchant: string | null;
+  amount: string; type: "income" | "expense"; subcategory: string;
+  needs_want: "need" | "want" | "na" | null; is_recurring: boolean;
+  recurring_type: "subscription" | "recurring_bill" | null;
+  source: "manual" | "plaid" | "upload" | "import"; notes: string | null;
+  created_at: string; updated_at: string;
+};
+type Stats = { total_income: string; total_expenses: string; unassigned_count: string; total_count: string };
+type TrendRow = { period: string; income: string; expenses: string };
+type CatRow = { subcategory: string; total: string; count: string };
+
+// ── Constants ─────────────────────────────────────────────────────────────────
+const INCOME_SUBCATS = [
+  { value: "salary", label: "Salary / Wages" }, { value: "bonus", label: "Bonus" },
+  { value: "freelance", label: "Freelance / Contract" }, { value: "dividend", label: "Dividend" },
+  { value: "interest", label: "Interest" }, { value: "rental", label: "Rental Income" },
+  { value: "capital_gains", label: "Capital Gains" }, { value: "business", label: "Business Income" },
+  { value: "gift", label: "Gift / Transfer" }, { value: "refund", label: "Refund / Cashback" },
+  { value: "other_income", label: "Other Income" }, { value: "unassigned", label: "Unassigned" },
+];
+const EXPENSE_SUBCATS = [
+  { value: "housing", label: "Housing / Rent" }, { value: "utilities", label: "Utilities" },
+  { value: "groceries", label: "Groceries" }, { value: "transportation", label: "Transportation" },
+  { value: "dining_out", label: "Dining Out" }, { value: "entertainment", label: "Entertainment" },
+  { value: "healthcare", label: "Healthcare" }, { value: "insurance", label: "Insurance" },
+  { value: "education", label: "Education" }, { value: "shopping", label: "Shopping" },
+  { value: "subscriptions", label: "Subscriptions" }, { value: "personal_care", label: "Personal Care" },
+  { value: "travel", label: "Travel" }, { value: "debt_payment", label: "Debt Payment" },
+  { value: "investment", label: "Investment" }, { value: "taxes", label: "Taxes" },
+  { value: "savings_transfer", label: "Savings Transfer" }, { value: "other_expense", label: "Other Expense" },
+  { value: "unassigned", label: "Unassigned" },
+];
+const ALL_SUBCATS = [...INCOME_SUBCATS, ...EXPENSE_SUBCATS];
+
+const CAT_COLORS: Record<string, string> = {
+  housing: "#3b82f6", utilities: "#8b5cf6", groceries: "#22c55e", transportation: "#f97316",
+  dining_out: "#ef4444", entertainment: "#ec4899", healthcare: "#06b6d4", insurance: "#6366f1",
+  education: "#84cc16", shopping: "#f59e0b", subscriptions: "#a855f7", personal_care: "#fb923c",
+  travel: "#14b8a6", debt_payment: "#dc2626", investment: "#059669", taxes: "#9333ea",
+  savings_transfer: "#0ea5e9", other_expense: "#94a3b8", salary: "#16a34a", bonus: "#15803d",
+  freelance: "#4ade80", dividend: "#86efac", interest: "#166534", rental: "#6ee7b7",
+  capital_gains: "#052e16", business: "#22c55e", gift: "#a7f3d0", refund: "#d1fae5",
+  other_income: "#bbf7d0", unassigned: "#cbd5e1",
+};
+
+const PERIOD_OPTIONS = [
+  { value: "today", label: "Today" }, { value: "week", label: "This Week" },
+  { value: "month", label: "This Month" }, { value: "year", label: "This Year" },
+  { value: "all", label: "All Time" }, { value: "custom", label: "Custom" },
+];
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function fmt(n: number) {
+  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(n);
+}
+function fmtFull(n: number) {
+  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(n);
+}
+function fmtDate(s: string) {
+  return new Date(s + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+function fmtPeriod(s: string, groupBy: string) {
+  const d = new Date(s + "T12:00:00");
+  if (groupBy === "day") return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  if (groupBy === "week") return `Wk ${d.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`;
+  if (groupBy === "year") return String(d.getFullYear());
+  return d.toLocaleDateString("en-US", { month: "short", year: "2-digit" });
+}
+function catLabel(v: string) {
+  return ALL_SUBCATS.find(s => s.value === v)?.label ?? v;
+}
+
+function getDateRange(period: string, customStart?: string, customEnd?: string) {
+  const now = new Date();
+  const today = now.toISOString().split("T")[0];
+  if (period === "today") return { start: today, end: today };
+  if (period === "week") {
+    const d = new Date(now); d.setDate(d.getDate() - 6);
+    return { start: d.toISOString().split("T")[0], end: today };
+  }
+  if (period === "month") {
+    return { start: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`, end: today };
+  }
+  if (period === "year") return { start: `${now.getFullYear()}-01-01`, end: today };
+  if (period === "custom") return { start: customStart, end: customEnd };
+  return { start: undefined, end: undefined };
+}
+
+// ── CSV Parsing ───────────────────────────────────────────────────────────────
+function detectDelimiter(line: string) {
+  const counts = { "\t": 0, ",": 0, ";": 0, "|": 0 };
+  for (const ch of line) if (ch in counts) (counts as any)[ch]++;
+  return Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0];
+}
+function parseCSVText(text: string): string[][] {
+  const lines = text.trim().split(/\r?\n/);
+  if (!lines.length) return [];
+  const delim = detectDelimiter(lines[0]);
+  return lines.map(line => {
+    const cells: string[] = []; let inQ = false; let cur = "";
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (ch === '"') { inQ = !inQ; continue; }
+      if (ch === delim && !inQ) { cells.push(cur.trim()); cur = ""; continue; }
+      cur += ch;
+    }
+    cells.push(cur.trim());
+    return cells;
+  });
+}
+function parseDate(s: string): string | null {
+  if (!s) return null;
+  const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
+  const us = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
+  if (us) {
+    const yr = us[3].length === 2 ? `20${us[3]}` : us[3];
+    return `${yr}-${us[1].padStart(2, "0")}-${us[2].padStart(2, "0")}`;
+  }
+  const d = new Date(s);
+  if (!isNaN(d.getTime())) return d.toISOString().split("T")[0];
+  return null;
+}
+function guessCol(headers: string[], keywords: string[]) {
+  const h = headers.map(x => x.toLowerCase().trim());
+  for (const kw of keywords) {
+    const i = h.findIndex(x => x.includes(kw));
+    if (i !== -1) return String(i);
+  }
+  return "";
+}
+
+// ── TransactionDialog ─────────────────────────────────────────────────────────
+function TransactionDialog({
+  open, onOpenChange, initial, onSave, saving,
+}: {
+  open: boolean; onOpenChange: (v: boolean) => void;
+  initial?: Partial<Transaction>; onSave: (data: any) => void; saving: boolean;
+}) {
+  const today = new Date().toISOString().split("T")[0];
+  const [date, setDate] = useState(initial?.date ?? today);
+  const [desc, setDesc] = useState(initial?.description ?? "");
+  const [amount, setAmount] = useState(initial?.amount ? String(parseFloat(initial.amount)) : "");
+  const [type, setType] = useState<"income" | "expense">(initial?.type ?? "expense");
+  const [subcat, setSubcat] = useState(initial?.subcategory ?? "unassigned");
+  const [nw, setNw] = useState(initial?.needs_want ?? "");
+  const [recurring, setRecurring] = useState(initial?.is_recurring ?? false);
+  const [recurringType, setRecurringType] = useState(initial?.recurring_type ?? "");
+  const [notes, setNotes] = useState(initial?.notes ?? "");
+
+  const subcats = type === "income" ? INCOME_SUBCATS : EXPENSE_SUBCATS;
+  const isEdit = !!initial?.id;
+
+  const canSave = date && desc && amount && parseFloat(amount) > 0;
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>{isEdit ? "Edit Transaction" : "Add Transaction"}</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3 py-1">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label className="text-xs">Date *</Label>
+              <Input type="date" value={date} onChange={e => setDate(e.target.value)} className="mt-1" />
+            </div>
+            <div>
+              <Label className="text-xs">Type *</Label>
+              <Select value={type} onValueChange={v => { setType(v as any); setSubcat("unassigned"); }}>
+                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="income">Income</SelectItem>
+                  <SelectItem value="expense">Expense</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div>
+            <Label className="text-xs">Description *</Label>
+            <Input value={desc} onChange={e => setDesc(e.target.value)} placeholder="e.g. Spotify, Payroll…" className="mt-1" />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label className="text-xs">Amount *</Label>
+              <Input type="number" min="0.01" step="0.01" value={amount} onChange={e => setAmount(e.target.value)} placeholder="0.00" className="mt-1" />
+            </div>
+            <div>
+              <Label className="text-xs">Category</Label>
+              <Select value={subcat} onValueChange={setSubcat}>
+                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {subcats.map(s => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label className="text-xs">Needs / Want</Label>
+              <Select value={nw || "na"} onValueChange={setNw}>
+                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="na">N/A</SelectItem>
+                  <SelectItem value="need">Need</SelectItem>
+                  <SelectItem value="want">Want</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex flex-col justify-end">
+              <label className="flex items-center gap-2 cursor-pointer mt-4">
+                <input type="checkbox" checked={recurring} onChange={e => setRecurring(e.target.checked)} className="rounded" />
+                <span className="text-sm">Recurring</span>
+              </label>
+            </div>
+          </div>
+          {recurring && (
+            <div>
+              <Label className="text-xs">Recurring Type</Label>
+              <Select value={recurringType || "subscription"} onValueChange={setRecurringType}>
+                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="subscription">Subscription (fixed amount)</SelectItem>
+                  <SelectItem value="recurring_bill">Recurring Bill (variable)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+          <div>
+            <Label className="text-xs">Notes</Label>
+            <Input value={notes} onChange={e => setNotes(e.target.value)} placeholder="Optional note" className="mt-1" />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button
+            disabled={!canSave || saving}
+            onClick={() => onSave({ date, description: desc, amount, type, subcategory: subcat, needsWant: nw || null, isRecurring: recurring, recurringType: recurring ? (recurringType || "subscription") : null, notes })}
+          >
+            {saving ? "Saving…" : isEdit ? "Save Changes" : "Add Transaction"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ── CSV Upload Panel ──────────────────────────────────────────────────────────
+function CsvUploadPanel({ onImport, importing }: { onImport: (rows: any[]) => void; importing: boolean }) {
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [rows, setRows] = useState<string[][]>([]);
+  const [headers, setHeaders] = useState<string[]>([]);
+  const [colDate, setColDate] = useState("");
+  const [colDesc, setColDesc] = useState("");
+  const [colAmt, setColAmt] = useState("");
+  const [colType, setColType] = useState("");
+  const [negIsExpense, setNegIsExpense] = useState(true);
+
+  function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const text = ev.target?.result as string;
+      const parsed = parseCSVText(text);
+      if (parsed.length < 2) return;
+      const hdrs = parsed[0];
+      const data = parsed.slice(1).filter(r => r.some(c => c));
+      setHeaders(hdrs);
+      setRows(data);
+      setColDate(guessCol(hdrs, ["date", "posted", "trans date", "transaction date"]));
+      setColDesc(guessCol(hdrs, ["description", "memo", "name", "payee", "merchant", "details", "narrative"]));
+      setColAmt(guessCol(hdrs, ["amount", "debit", "credit", "value", "sum"]));
+      setColType(guessCol(hdrs, ["type", "category", "transaction type"]));
+    };
+    reader.readAsText(file);
+  }
+
+  function buildTransactions() {
+    const dIdx = parseInt(colDate); const descIdx = parseInt(colDesc); const aIdx = parseInt(colAmt);
+    const tIdx = colType !== "" ? parseInt(colType) : -1;
+    return rows
+      .map(r => {
+        const dateStr = parseDate(r[dIdx] ?? "");
+        const desc = r[descIdx]?.trim() ?? "";
+        const rawAmt = parseFloat((r[aIdx] ?? "").replace(/[$,\s]/g, ""));
+        if (!dateStr || !desc || isNaN(rawAmt)) return null;
+        let type: "income" | "expense";
+        if (tIdx !== -1) {
+          const tv = (r[tIdx] ?? "").toLowerCase();
+          type = tv.includes("income") || tv.includes("credit") || tv.includes("deposit") ? "income" : "expense";
+        } else {
+          type = negIsExpense ? (rawAmt < 0 ? "expense" : "income") : (rawAmt > 0 ? "expense" : "income");
+        }
+        return { date: dateStr, description: desc, amount: Math.abs(rawAmt), type };
+      })
+      .filter(Boolean);
+  }
+
+  const preview = rows.slice(0, 5);
+  const ready = colDate !== "" && colDesc !== "" && colAmt !== "" && rows.length > 0;
+
+  return (
+    <div className="space-y-4">
+      <div
+        className="border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl p-8 text-center cursor-pointer hover:border-blue-400 transition-colors"
+        onClick={() => fileRef.current?.click()}
+      >
+        <Upload className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
+        <p className="text-sm font-medium">Click to upload CSV / TSV / TXT</p>
+        <p className="text-xs text-muted-foreground mt-1">Most bank export formats are supported. PDF not yet supported — download as CSV from your bank first.</p>
+        <input ref={fileRef} type="file" accept=".csv,.tsv,.txt" className="hidden" onChange={handleFile} />
+      </div>
+
+      {rows.length > 0 && (
+        <div className="space-y-3">
+          <p className="text-sm font-medium text-emerald-600">{rows.length} rows detected — map columns below</p>
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+            {[
+              { label: "Date column", val: colDate, set: setColDate },
+              { label: "Description column", val: colDesc, set: setColDesc },
+              { label: "Amount column", val: colAmt, set: setColAmt },
+              { label: "Type column (optional)", val: colType, set: setColType },
+            ].map(({ label, val, set }) => (
+              <div key={label}>
+                <Label className="text-xs">{label}</Label>
+                <Select value={val} onValueChange={set}>
+                  <SelectTrigger className="mt-1 text-xs"><SelectValue placeholder="Select…" /></SelectTrigger>
+                  <SelectContent>
+                    {colType === "" || label !== "Type column (optional)" ? null : null}
+                    {label === "Type column (optional)" && <SelectItem value="">— none —</SelectItem>}
+                    {headers.map((h, i) => <SelectItem key={i} value={String(i)}>{h || `Col ${i + 1}`}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            ))}
+          </div>
+          {colType === "" && (
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <input type="checkbox" checked={negIsExpense} onChange={e => setNegIsExpense(e.target.checked)} className="rounded" />
+              Negative amounts = expenses (standard bank format)
+            </label>
+          )}
+          {preview.length > 0 && (
+            <div className="overflow-x-auto rounded-lg border text-xs">
+              <table className="w-full">
+                <thead className="bg-muted/50">
+                  <tr>{headers.map((h, i) => <th key={i} className="px-3 py-2 text-left font-medium text-muted-foreground">{h || `Col ${i+1}`}</th>)}</tr>
+                </thead>
+                <tbody>
+                  {preview.map((row, ri) => <tr key={ri} className="border-t">{row.map((c, ci) => <td key={ci} className="px-3 py-1.5 truncate max-w-[120px]">{c}</td>)}</tr>)}
+                </tbody>
+              </table>
+            </div>
+          )}
+          <Button disabled={!ready || importing} onClick={() => onImport(buildTransactions())} className="w-full">
+            {importing ? "Importing…" : `Import ${rows.length} transactions`}
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Main Page ─────────────────────────────────────────────────────────────────
+export default function FinanceTrackerPage() {
+  const { toast } = useToast();
+  const [period, setPeriod] = useState("month");
+  const [customStart, setCustomStart] = useState("");
+  const [customEnd, setCustomEnd] = useState("");
+  const [typeFilter, setTypeFilter] = useState("all");
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 25;
+  const [addOpen, setAddOpen] = useState(false);
+  const [editTxn, setEditTxn] = useState<Transaction | null>(null);
+  const [groupBy, setGroupBy] = useState("month");
+  const [catChartType, setCatChartType] = useState<"income" | "expense">("expense");
+
+  const { start, end } = getDateRange(period, customStart, customEnd);
+
+  function buildQS(extra: Record<string, string> = {}) {
+    const p: Record<string, string> = {};
+    if (start) p.startDate = start;
+    if (end) p.endDate = end;
+    if (typeFilter !== "all") p.type = typeFilter;
+    if (search) p.search = search;
+    Object.assign(p, extra);
+    return "?" + new URLSearchParams(p).toString();
+  }
+
+  const statsQK = ["/api/transactions/stats", start, end];
+  const trendQK = ["/api/transactions/trend", start, end, groupBy];
+  const catQK = ["/api/transactions/categories", start, end, catChartType];
+  const txnQK = ["/api/transactions", start, end, typeFilter, search];
+
+  const { data: stats, isLoading: statsL } = useQuery<Stats>({
+    queryKey: statsQK,
+    queryFn: () => fetch(`/api/transactions/stats${buildQS()}`).then(r => r.json()),
+  });
+  const { data: transactions = [], isLoading: txnL } = useQuery<Transaction[]>({
+    queryKey: txnQK,
+    queryFn: () => fetch(`/api/transactions${buildQS()}`).then(r => r.json()),
+  });
+  const { data: trendData = [] } = useQuery<TrendRow[]>({
+    queryKey: trendQK,
+    queryFn: () => fetch(`/api/transactions/trend${buildQS({ groupBy })}`).then(r => r.json()),
+  });
+  const { data: catData = [] } = useQuery<CatRow[]>({
+    queryKey: catQK,
+    queryFn: () => fetch(`/api/transactions/categories${buildQS({ type: catChartType })}`).then(r => r.json()),
+  });
+
+  function invalidateAll() {
+    queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/transactions/stats"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/transactions/trend"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/transactions/categories"] });
+  }
+
+  const createMut = useMutation({
+    mutationFn: (data: any) => apiRequest("POST", "/api/transactions", data),
+    onSuccess: () => { invalidateAll(); setAddOpen(false); toast({ title: "Transaction added" }); },
+    onError: () => toast({ title: "Failed to add", variant: "destructive" }),
+  });
+  const updateMut = useMutation({
+    mutationFn: ({ id, ...data }: any) => apiRequest("PATCH", `/api/transactions/${id}`, data),
+    onSuccess: () => { invalidateAll(); setEditTxn(null); toast({ title: "Transaction updated" }); },
+    onError: () => toast({ title: "Failed to update", variant: "destructive" }),
+  });
+  const deleteMut = useMutation({
+    mutationFn: (id: number) => apiRequest("DELETE", `/api/transactions/${id}`),
+    onSuccess: () => { invalidateAll(); toast({ title: "Deleted" }); },
+    onError: () => toast({ title: "Failed to delete", variant: "destructive" }),
+  });
+  const bulkMut = useMutation({
+    mutationFn: (rows: any[]) => apiRequest("POST", "/api/transactions/bulk", { transactions: rows }),
+    onSuccess: (res: any) => res.json().then((d: any) => {
+      invalidateAll();
+      toast({ title: `Imported ${d.inserted} transactions`, description: d.recurringMarked ? `${d.recurringMarked} marked as recurring` : undefined });
+    }),
+    onError: () => toast({ title: "Import failed", variant: "destructive" }),
+  });
+  const importEntMut = useMutation({
+    mutationFn: () => apiRequest("POST", "/api/transactions/import-from-entries"),
+    onSuccess: (res: any) => res.json().then((d: any) => {
+      invalidateAll();
+      toast({ title: `Imported ${d.inserted} from existing entries` });
+    }),
+    onError: () => toast({ title: "Import failed", variant: "destructive" }),
+  });
+  const recurringMut = useMutation({
+    mutationFn: () => apiRequest("POST", "/api/transactions/detect-recurring"),
+    onSuccess: (res: any) => res.json().then((d: any) => {
+      invalidateAll();
+      toast({ title: `Recurring detection complete`, description: `${d.updated} transactions flagged` });
+    }),
+  });
+
+  const income = parseFloat(stats?.total_income ?? "0");
+  const expenses = parseFloat(stats?.total_expenses ?? "0");
+  const netFlow = income - expenses;
+  const unassigned = parseInt(stats?.unassigned_count ?? "0");
+
+  const trendChart = trendData.map(r => ({
+    period: fmtPeriod(r.period, groupBy),
+    Income: parseFloat(r.income),
+    Expenses: parseFloat(r.expenses),
+  }));
+
+  const donutData = catData
+    .filter(r => parseFloat(r.total) > 0 && r.subcategory !== "unassigned")
+    .slice(0, 8)
+    .map(r => ({ name: catLabel(r.subcategory), value: parseFloat(r.total), key: r.subcategory }));
+
+  const totalPages = Math.max(1, Math.ceil(transactions.length / PAGE_SIZE));
+  const pageTxns = transactions.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  return (
+    <div className="p-4 md:p-6 space-y-5 max-w-7xl mx-auto">
+      {/* ── Header ── */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 page-header-gradient">
+        <div>
+          <h1 className="text-2xl font-bold">Finance Tracker</h1>
+          <p className="text-muted-foreground text-sm">Track, categorize and analyze your income &amp; expenses</p>
+        </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          <Button size="sm" variant="outline" onClick={() => recurringMut.mutate()} disabled={recurringMut.isPending}>
+            <RefreshCw className="h-3.5 w-3.5 mr-1.5" />Detect Recurring
+          </Button>
+          <Button size="sm" onClick={() => setAddOpen(true)}>
+            <Plus className="h-3.5 w-3.5 mr-1.5" />Add Transaction
+          </Button>
+        </div>
+      </div>
+
+      {/* ── Period Selector ── */}
+      <div className="flex flex-wrap gap-2 items-center">
+        {PERIOD_OPTIONS.map(o => (
+          <button
+            key={o.value}
+            onClick={() => { setPeriod(o.value); setPage(1); }}
+            className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-all ${period === o.value
+              ? "bg-blue-600 text-white border-blue-600"
+              : "border-slate-200 dark:border-slate-700 hover:border-blue-400 text-muted-foreground"}`}
+          >
+            {o.label}
+          </button>
+        ))}
+        {period === "custom" && (
+          <div className="flex items-center gap-1.5">
+            <Input type="date" value={customStart} onChange={e => setCustomStart(e.target.value)} className="h-8 w-36 text-xs" />
+            <span className="text-muted-foreground text-xs">→</span>
+            <Input type="date" value={customEnd} onChange={e => setCustomEnd(e.target.value)} className="h-8 w-36 text-xs" />
+          </div>
+        )}
+      </div>
+
+      {/* ── KPI Cards ── */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {[
+          { label: "Total Income", value: income, icon: ArrowUpCircle, color: "emerald", fmt: fmt },
+          { label: "Total Expenses", value: expenses, icon: ArrowDownCircle, color: "red", fmt: fmt },
+          { label: "Net Cash Flow", value: netFlow, icon: netFlow >= 0 ? TrendingUp : TrendingDown, color: netFlow >= 0 ? "emerald" : "red", fmt: fmt },
+        ].map(({ label, value, icon: Icon, color, fmt: f }) => (
+          <Card key={label} className={`border-t-4 ${color === "emerald" ? "border-t-emerald-500" : "border-t-red-500"}`}>
+            <CardContent className="pt-5 pb-4">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">{label}</p>
+                  {statsL
+                    ? <Skeleton className="h-9 w-32 mt-1" />
+                    : <p className={`text-3xl font-bold mt-1 ${color === "emerald" ? "text-emerald-600 dark:text-emerald-400" : "text-red-500 dark:text-red-400"}`}>
+                        {label === "Net Cash Flow" && value > 0 ? "+" : ""}{f(value)}
+                      </p>}
+                  <p className="text-xs text-muted-foreground mt-1">{stats?.total_count ?? "—"} transactions</p>
+                </div>
+                <div className={`p-2.5 rounded-xl ${color === "emerald" ? "bg-emerald-50 dark:bg-emerald-950/40" : "bg-red-50 dark:bg-red-950/40"}`}>
+                  <Icon className={`h-5 w-5 ${color === "emerald" ? "text-emerald-600 dark:text-emerald-400" : "text-red-500"}`} />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {/* ── Unassigned Alert ── */}
+      {unassigned > 0 && (
+        <div className="flex items-center gap-3 p-3 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-700">
+          <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
+          <p className="text-sm text-amber-800 dark:text-amber-300">
+            <strong>{unassigned} transaction{unassigned !== 1 ? "s" : ""}</strong> couldn't be auto-categorized.
+            Filter by "Unassigned" to review and categorize them.
+          </p>
+        </div>
+      )}
+
+      {/* ── Data Intake ── */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Database className="h-4 w-4 text-blue-500" />Add Transactions
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Tabs defaultValue="manual">
+            <TabsList className="grid grid-cols-3 w-full max-w-md">
+              <TabsTrigger value="manual"><Plus className="h-3.5 w-3.5 mr-1.5" />Manual</TabsTrigger>
+              <TabsTrigger value="upload"><Upload className="h-3.5 w-3.5 mr-1.5" />Upload CSV</TabsTrigger>
+              <TabsTrigger value="import"><Zap className="h-3.5 w-3.5 mr-1.5" />From Entries</TabsTrigger>
+            </TabsList>
+            <TabsContent value="manual" className="mt-4">
+              <p className="text-sm text-muted-foreground mb-3">Click the button above to add a transaction manually, or use the form below for quick entry.</p>
+              <Button onClick={() => setAddOpen(true)} className="w-full sm:w-auto">
+                <Plus className="h-4 w-4 mr-2" />Open Add Transaction Form
+              </Button>
+            </TabsContent>
+            <TabsContent value="upload" className="mt-4">
+              <CsvUploadPanel onImport={rows => bulkMut.mutate(rows)} importing={bulkMut.isPending} />
+            </TabsContent>
+            <TabsContent value="import" className="mt-4">
+              <div className="flex flex-col sm:flex-row items-start gap-4">
+                <div>
+                  <p className="text-sm font-medium">Import from existing entries</p>
+                  <p className="text-xs text-muted-foreground mt-1 max-w-sm">
+                    Pull your existing income and expense entries from other sections of FinVision360 into the tracker. Already-imported entries will be skipped.
+                  </p>
+                </div>
+                <Button onClick={() => importEntMut.mutate()} disabled={importEntMut.isPending} className="shrink-0">
+                  {importEntMut.isPending ? "Importing…" : "Import Now"}
+                </Button>
+              </div>
+            </TabsContent>
+          </Tabs>
+        </CardContent>
+      </Card>
+
+      {/* ── Charts ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* Trend Chart */}
+        <Card className="lg:col-span-2">
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <BarChart3 className="h-4 w-4 text-blue-500" />Income vs Expenses Trend
+              </CardTitle>
+              <div className="flex gap-1">
+                {["day","week","month","year"].map(g => (
+                  <button key={g} onClick={() => setGroupBy(g)}
+                    className={`px-2 py-0.5 text-xs rounded-full border transition-all ${groupBy===g?"bg-blue-600 text-white border-blue-600":"border-slate-200 dark:border-slate-700 text-muted-foreground"}`}>
+                    {g.charAt(0).toUpperCase()+g.slice(1)}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {trendChart.length === 0
+              ? <div className="h-44 flex items-center justify-center text-muted-foreground text-sm">No trend data for this period</div>
+              : (
+                <ResponsiveContainer width="100%" height={220}>
+                  <ComposedChart data={trendChart} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+                    <XAxis dataKey="period" tick={{ fontSize: 11 }} />
+                    <YAxis tick={{ fontSize: 11 }} tickFormatter={v => `$${(v/1000).toFixed(0)}k`} />
+                    <Tooltip formatter={(v: any) => fmtFull(v)} />
+                    <Legend />
+                    <Bar dataKey="Income" fill="#22c55e" radius={[3,3,0,0]} maxBarSize={40} />
+                    <Bar dataKey="Expenses" fill="#ef4444" radius={[3,3,0,0]} maxBarSize={40} />
+                  </ComposedChart>
+                </ResponsiveContainer>
+              )}
+          </CardContent>
+        </Card>
+
+        {/* Category Donut */}
+        <Card>
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <PieChartIcon className="h-4 w-4 text-violet-500" />By Category
+              </CardTitle>
+              <div className="flex gap-1">
+                {(["expense","income"] as const).map(t => (
+                  <button key={t} onClick={() => setCatChartType(t)}
+                    className={`px-2 py-0.5 text-xs rounded-full border transition-all ${catChartType===t?"bg-violet-600 text-white border-violet-600":"border-slate-200 dark:border-slate-700 text-muted-foreground"}`}>
+                    {t.charAt(0).toUpperCase()+t.slice(1)}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {donutData.length === 0
+              ? <div className="h-44 flex items-center justify-center text-muted-foreground text-sm">No data</div>
+              : (
+                <>
+                  <ResponsiveContainer width="100%" height={160}>
+                    <PieChart>
+                      <Pie data={donutData} dataKey="value" cx="50%" cy="50%" innerRadius={40} outerRadius={72} paddingAngle={2}>
+                        {donutData.map(d => <Cell key={d.key} fill={CAT_COLORS[d.key] ?? "#94a3b8"} />)}
+                      </Pie>
+                      <Tooltip formatter={(v: any) => fmtFull(v)} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div className="space-y-1 mt-2">
+                    {donutData.slice(0, 5).map(d => (
+                      <div key={d.key} className="flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-1.5">
+                          <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: CAT_COLORS[d.key] ?? "#94a3b8" }} />
+                          <span className="text-muted-foreground truncate max-w-[110px]">{d.name}</span>
+                        </div>
+                        <span className="font-medium tabular-nums">{fmt(d.value)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* ── Transaction Table ── */}
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Tag className="h-4 w-4 text-slate-500" />Transactions
+              <Badge variant="secondary">{transactions.length}</Badge>
+              {unassigned > 0 && <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 border-amber-200">{unassigned} unassigned</Badge>}
+            </CardTitle>
+            <div className="flex items-center gap-2 flex-wrap">
+              {/* Type filter */}
+              <div className="flex rounded-lg border overflow-hidden text-xs">
+                {[["all","All"],["income","Income"],["expense","Expense"]].map(([v,l]) => (
+                  <button key={v} onClick={() => { setTypeFilter(v); setPage(1); }}
+                    className={`px-3 py-1.5 transition-all ${typeFilter===v?"bg-slate-800 text-white dark:bg-slate-200 dark:text-slate-900":"hover:bg-muted"}`}>
+                    {l}
+                  </button>
+                ))}
+              </div>
+              {/* Search */}
+              <div className="relative">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                <Input value={search} onChange={e => { setSearch(e.target.value); setPage(1); }} placeholder="Search…" className="pl-8 h-8 w-44 text-xs" />
+                {search && <button onClick={() => setSearch("")} className="absolute right-2 top-1/2 -translate-y-1/2"><X className="h-3.5 w-3.5 text-muted-foreground" /></button>}
+              </div>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="p-0">
+          {txnL
+            ? <div className="p-4 space-y-2">{[...Array(5)].map((_, i) => <Skeleton key={i} className="h-12" />)}</div>
+            : pageTxns.length === 0
+              ? <div className="p-10 text-center text-muted-foreground text-sm">No transactions found. Add one above or upload a CSV file.</div>
+              : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="bg-muted/40 border-b">
+                      <tr>
+                        {["Date","Description","Type","Category","Need/Want","Amount","Recurring",""].map(h => (
+                          <th key={h} className="px-3 py-2.5 text-left text-xs font-semibold text-muted-foreground">{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {pageTxns.map(t => (
+                        <tr key={t.id} className={`hover:bg-muted/30 transition-colors ${t.subcategory === "unassigned" ? "bg-amber-50/40 dark:bg-amber-950/10" : ""}`}>
+                          <td className="px-3 py-2.5 text-xs text-muted-foreground whitespace-nowrap">{fmtDate(t.date)}</td>
+                          <td className="px-3 py-2.5 max-w-[180px]">
+                            <p className="truncate font-medium text-xs">{t.description}</p>
+                            {t.source !== "manual" && <span className="text-[10px] text-muted-foreground capitalize">{t.source}</span>}
+                          </td>
+                          <td className="px-3 py-2.5">
+                            <Badge className={`text-[10px] ${t.type === "income" ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"}`}>
+                              {t.type}
+                            </Badge>
+                          </td>
+                          <td className="px-3 py-2.5">
+                            <div className="flex items-center gap-1.5">
+                              <div className="w-2 h-2 rounded-full shrink-0" style={{ background: CAT_COLORS[t.subcategory] ?? "#94a3b8" }} />
+                              <span className={`text-xs ${t.subcategory === "unassigned" ? "text-amber-600 dark:text-amber-400 font-medium" : ""}`}>{catLabel(t.subcategory)}</span>
+                            </div>
+                          </td>
+                          <td className="px-3 py-2.5">
+                            {t.needs_want && t.needs_want !== "na"
+                              ? <Badge variant="outline" className={`text-[10px] ${t.needs_want === "need" ? "border-blue-300 text-blue-600" : "border-orange-300 text-orange-600"}`}>{t.needs_want}</Badge>
+                              : <span className="text-xs text-muted-foreground">—</span>}
+                          </td>
+                          <td className={`px-3 py-2.5 font-semibold tabular-nums text-xs whitespace-nowrap ${t.type === "income" ? "text-emerald-600 dark:text-emerald-400" : "text-red-500"}`}>
+                            {t.type === "income" ? "+" : "-"}{fmtFull(parseFloat(t.amount))}
+                          </td>
+                          <td className="px-3 py-2.5">
+                            {t.is_recurring
+                              ? <div className="flex items-center gap-1">
+                                  <Repeat2 className="h-3.5 w-3.5 text-violet-500" />
+                                  <span className="text-[10px] text-violet-600 dark:text-violet-400">{t.recurring_type === "subscription" ? "Sub" : "Bill"}</span>
+                                </div>
+                              : <span className="text-xs text-muted-foreground">—</span>}
+                          </td>
+                          <td className="px-3 py-2.5">
+                            <div className="flex items-center gap-1">
+                              <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setEditTxn(t)}>
+                                <Pencil className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button size="icon" variant="ghost" className="h-7 w-7 text-red-500 hover:text-red-600" onClick={() => deleteMut.mutate(t.id)}>
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between px-4 py-3 border-t">
+              <span className="text-xs text-muted-foreground">Page {page} of {totalPages} · {transactions.length} total</span>
+              <div className="flex gap-1">
+                <Button size="icon" variant="outline" className="h-7 w-7" disabled={page === 1} onClick={() => setPage(p => p - 1)}><ChevronLeft className="h-4 w-4" /></Button>
+                <Button size="icon" variant="outline" className="h-7 w-7" disabled={page === totalPages} onClick={() => setPage(p => p + 1)}><ChevronRight className="h-4 w-4" /></Button>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* ── Dialogs ── */}
+      <TransactionDialog
+        open={addOpen}
+        onOpenChange={setAddOpen}
+        onSave={data => createMut.mutate(data)}
+        saving={createMut.isPending}
+      />
+      {editTxn && (
+        <TransactionDialog
+          open={!!editTxn}
+          onOpenChange={v => { if (!v) setEditTxn(null); }}
+          initial={editTxn}
+          onSave={data => updateMut.mutate({ id: editTxn.id, ...data })}
+          saving={updateMut.isPending}
+        />
+      )}
+    </div>
+  );
+}

@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth, requireAuth, requireAdmin, authenticateSupabase } from "./auth";
 import { db, pool } from "./db";
+import { registerFinanceTrackerRoutes } from "./finance-tracker-routes";
 import { assets, liabilities, assetHistory, liabilityHistory } from "@shared/schema";
 import OpenAI from "openai";
 import { scrapeBank, DEFAULT_BANK_CONFIGS, type BankSelectorConfig } from "./scraper";
@@ -982,6 +983,8 @@ Use markdown formatting with headers and bold key numbers.`;
       return res.status(500).json({ message: "Failed to delete goal" });
     }
   });
+
+  registerFinanceTrackerRoutes(app);
 
   return httpServer;
 }
