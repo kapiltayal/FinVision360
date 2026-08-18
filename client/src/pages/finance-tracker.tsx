@@ -762,7 +762,13 @@ export default function FinanceTrackerPage() {
                           <td className="px-3 py-2.5 text-xs text-muted-foreground whitespace-nowrap">{fmtDate(t.date)}</td>
                           <td className="px-3 py-2.5 max-w-[180px]">
                             <p className="truncate font-medium text-xs">{t.description}</p>
-                            {t.source !== "manual" && <span className="text-[10px] text-muted-foreground capitalize">{t.source}</span>}
+                            {t.source !== "manual" && (
+                              <span className="text-[10px] text-muted-foreground">
+                                {t.source === "import"
+                                  ? `Import · ${t.type === "income" ? "Income entry" : "Expense entry"}`
+                                  : t.source}
+                              </span>
+                            )}
                           </td>
                           <td className="px-3 py-2.5">
                             <Badge className={`text-[10px] ${t.type === "income" ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"}`}>
