@@ -82,10 +82,10 @@ function fmtFull(n: number) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(n);
 }
 function fmtDate(s: string) {
-  return new Date(s + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  return new Date(s.slice(0, 10) + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 function fmtPeriod(s: string, groupBy: string) {
-  const d = new Date(s + "T12:00:00");
+  const d = new Date(s.slice(0, 10) + "T12:00:00");
   if (groupBy === "day") return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
   if (groupBy === "week") return `Wk ${d.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`;
   if (groupBy === "year") return String(d.getFullYear());
