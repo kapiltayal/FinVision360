@@ -423,10 +423,11 @@ export default function FinanceTrackerPage() {
     queryKey: statsQK,
     queryFn: () => fetch(`/api/transactions/stats${buildQS()}`).then(r => r.json()),
   });
-  const { data: transactions = [], isLoading: txnL } = useQuery<Transaction[]>({
+  const { data: transactionsRaw, isLoading: txnL } = useQuery<Transaction[]>({
     queryKey: txnQK,
-    queryFn: () => fetch(`/api/transactions${buildQS()}`).then(r => r.json()),
+    queryFn: () => fetch(`/api/transactions${buildQS()}`).then(r => r.ok ? r.json() : []),
   });
+  const transactions: Transaction[] = Array.isArray(transactionsRaw) ? transactionsRaw : [];
   const { data: trendData = [] } = useQuery<TrendRow[]>({
     queryKey: trendQK,
     queryFn: () => fetch(`/api/transactions/trend${buildQS({ groupBy })}`).then(r => r.json()),
