@@ -159,9 +159,8 @@ export function AppHeader() {
             {isAdmin && (
               <>
                 <div className="h-px bg-border my-1" />
-                <div className="mx-1 my-0.5 px-2 py-1 flex items-center gap-1.5 rounded bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800">
-                  <ShieldAlert className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
-                  <span className="text-xs font-semibold text-amber-700 dark:text-amber-400 uppercase tracking-wide">Admin</span>
+                <div className="mx-1 my-0.5 px-2 py-1 flex items-center rounded bg-slate-700 dark:bg-slate-600">
+                  <span className="text-xs font-semibold text-slate-100 uppercase tracking-wide">Admin</span>
                 </div>
                 {adminNavItems.map((item) => (
                   <Link
