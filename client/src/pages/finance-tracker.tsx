@@ -397,6 +397,7 @@ export default function FinanceTrackerPage() {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 25;
+  const [dataIntakeOpen, setDataIntakeOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [editTxn, setEditTxn] = useState<Transaction | null>(null);
   const [groupBy, setGroupBy] = useState("month");
@@ -449,7 +450,7 @@ export default function FinanceTrackerPage() {
 
   const createMut = useMutation({
     mutationFn: (data: any) => apiRequest("POST", "/api/transactions", data),
-    onSuccess: () => { invalidateAll(); setAddOpen(false); toast({ title: "Transaction added" }); },
+    onSuccess: () => { invalidateAll(); setAddOpen(false); setDataIntakeOpen(false); toast({ title: "Transaction added" }); },
     onError: () => toast({ title: "Failed to add", variant: "destructive" }),
   });
   const updateMut = useMutation({
@@ -517,11 +518,54 @@ export default function FinanceTrackerPage() {
           <Button size="sm" variant="outline" onClick={() => recurringMut.mutate()} disabled={recurringMut.isPending}>
             <RefreshCw className="h-3.5 w-3.5 mr-1.5" />Detect Recurring
           </Button>
-          <Button size="sm" onClick={() => setAddOpen(true)}>
-            <Plus className="h-3.5 w-3.5 mr-1.5" />Add Transaction
+          <Button size="sm" onClick={() => setDataIntakeOpen(value => !value)}>
+            {dataIntakeOpen ? <X className="h-3.5 w-3.5 mr-1.5" /> : <Plus className="h-3.5 w-3.5 mr-1.5" />}
+            {dataIntakeOpen ? "Close Add Transactions" : "Add Transaction"}
           </Button>
         </div>
       </div>
+
+      {/* ── Data Intake ── */}
+      {dataIntakeOpen && (
+        <Card className="border-blue-200 dark:border-blue-900/60 shadow-sm">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Database className="h-4 w-4 text-blue-500" />Add Transactions
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Tabs defaultValue="manual">
+              <TabsList className="grid grid-cols-3 w-full max-w-md">
+                <TabsTrigger value="manual"><Plus className="h-3.5 w-3.5 mr-1.5" />Manual</TabsTrigger>
+                <TabsTrigger value="upload"><Upload className="h-3.5 w-3.5 mr-1.5" />Upload CSV</TabsTrigger>
+                <TabsTrigger value="import"><Zap className="h-3.5 w-3.5 mr-1.5" />From Entries</TabsTrigger>
+              </TabsList>
+              <TabsContent value="manual" className="mt-4">
+                <p className="text-sm text-muted-foreground mb-3">Enter one transaction manually with the full transaction form.</p>
+                <Button onClick={() => setAddOpen(true)} className="w-full sm:w-auto">
+                  <Plus className="h-4 w-4 mr-2" />Open Manual Entry Form
+                </Button>
+              </TabsContent>
+              <TabsContent value="upload" className="mt-4">
+                <CsvUploadPanel onImport={rows => bulkMut.mutate(rows)} importing={bulkMut.isPending} />
+              </TabsContent>
+              <TabsContent value="import" className="mt-4">
+                <div className="flex flex-col sm:flex-row items-start gap-4">
+                  <div>
+                    <p className="text-sm font-medium">Import from existing entries</p>
+                    <p className="text-xs text-muted-foreground mt-1 max-w-sm">
+                      Pull your existing income and expense entries from other sections of FinVision360 into the tracker. Already-imported entries will be skipped.
+                    </p>
+                  </div>
+                  <Button onClick={() => importEntMut.mutate()} disabled={importEntMut.isPending} className="shrink-0">
+                    {importEntMut.isPending ? "Importing…" : "Import Now"}
+                  </Button>
+                </div>
+              </TabsContent>
+            </Tabs>
+          </CardContent>
+        </Card>
+      )}
 
       {/* ── Period Selector ── */}
       <div className="flex flex-wrap gap-2 items-center">
@@ -583,46 +627,6 @@ export default function FinanceTrackerPage() {
           </p>
         </div>
       )}
-
-      {/* ── Data Intake ── */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base flex items-center gap-2">
-            <Database className="h-4 w-4 text-blue-500" />Add Transactions
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Tabs defaultValue="manual">
-            <TabsList className="grid grid-cols-3 w-full max-w-md">
-              <TabsTrigger value="manual"><Plus className="h-3.5 w-3.5 mr-1.5" />Manual</TabsTrigger>
-              <TabsTrigger value="upload"><Upload className="h-3.5 w-3.5 mr-1.5" />Upload CSV</TabsTrigger>
-              <TabsTrigger value="import"><Zap className="h-3.5 w-3.5 mr-1.5" />From Entries</TabsTrigger>
-            </TabsList>
-            <TabsContent value="manual" className="mt-4">
-              <p className="text-sm text-muted-foreground mb-3">Click the button above to add a transaction manually, or use the form below for quick entry.</p>
-              <Button onClick={() => setAddOpen(true)} className="w-full sm:w-auto">
-                <Plus className="h-4 w-4 mr-2" />Open Add Transaction Form
-              </Button>
-            </TabsContent>
-            <TabsContent value="upload" className="mt-4">
-              <CsvUploadPanel onImport={rows => bulkMut.mutate(rows)} importing={bulkMut.isPending} />
-            </TabsContent>
-            <TabsContent value="import" className="mt-4">
-              <div className="flex flex-col sm:flex-row items-start gap-4">
-                <div>
-                  <p className="text-sm font-medium">Import from existing entries</p>
-                  <p className="text-xs text-muted-foreground mt-1 max-w-sm">
-                    Pull your existing income and expense entries from other sections of FinVision360 into the tracker. Already-imported entries will be skipped.
-                  </p>
-                </div>
-                <Button onClick={() => importEntMut.mutate()} disabled={importEntMut.isPending} className="shrink-0">
-                  {importEntMut.isPending ? "Importing…" : "Import Now"}
-                </Button>
-              </div>
-            </TabsContent>
-          </Tabs>
-        </CardContent>
-      </Card>
 
       {/* ── Charts ── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
