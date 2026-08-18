@@ -17,7 +17,7 @@ import {
   ChevronLeft, ChevronRight, BarChart3, PieChart as PieChartIcon, Zap, Database,
 } from "lucide-react";
 import {
-  ComposedChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
+  ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   ResponsiveContainer, PieChart, Pie, Cell,
 } from "recharts";
 
@@ -401,6 +401,7 @@ export default function FinanceTrackerPage() {
   const [addOpen, setAddOpen] = useState(false);
   const [editTxn, setEditTxn] = useState<Transaction | null>(null);
   const [groupBy, setGroupBy] = useState("month");
+  const [trendChartType, setTrendChartType] = useState<"bar" | "line">("bar");
   const [catChartType, setCatChartType] = useState<"income" | "expense">("expense");
 
   const { start, end } = getDateRange(period, customStart, customEnd);
@@ -641,13 +642,23 @@ export default function FinanceTrackerPage() {
               <CardTitle className="text-sm flex items-center gap-2">
                 <BarChart3 className="h-4 w-4 text-blue-500" />Income vs Expenses Trend
               </CardTitle>
-              <div className="flex gap-1">
-                {["day","week","month","year"].map(g => (
-                  <button key={g} onClick={() => setGroupBy(g)}
-                    className={`px-2 py-0.5 text-xs rounded-full border transition-all ${groupBy===g?"bg-blue-600 text-white border-blue-600":"border-slate-200 dark:border-slate-700 text-muted-foreground"}`}>
-                    {g.charAt(0).toUpperCase()+g.slice(1)}
-                  </button>
-                ))}
+              <div className="flex items-center gap-2 flex-wrap justify-end">
+                <div className="flex gap-1">
+                  {(["bar", "line"] as const).map(chartType => (
+                    <button key={chartType} onClick={() => setTrendChartType(chartType)}
+                      className={`px-2 py-0.5 text-xs rounded-full border transition-all ${trendChartType === chartType ? "bg-blue-600 text-white border-blue-600" : "border-slate-200 dark:border-slate-700 text-muted-foreground"}`}>
+                      {chartType === "bar" ? "Bars" : "Line"}
+                    </button>
+                  ))}
+                </div>
+                <div className="flex gap-1">
+                  {["day","week","month","year"].map(g => (
+                    <button key={g} onClick={() => setGroupBy(g)}
+                      className={`px-2 py-0.5 text-xs rounded-full border transition-all ${groupBy===g?"bg-blue-600 text-white border-blue-600":"border-slate-200 dark:border-slate-700 text-muted-foreground"}`}>
+                      {g.charAt(0).toUpperCase()+g.slice(1)}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
           </CardHeader>
@@ -662,8 +673,17 @@ export default function FinanceTrackerPage() {
                     <YAxis tick={{ fontSize: 11 }} tickFormatter={v => `$${(v/1000).toFixed(0)}k`} />
                     <Tooltip formatter={(v: any) => fmtFull(v)} />
                     <Legend />
-                    <Bar dataKey="Income" fill="#22c55e" radius={[3,3,0,0]} maxBarSize={40} />
-                    <Bar dataKey="Expenses" fill="#ef4444" radius={[3,3,0,0]} maxBarSize={40} />
+                    {trendChartType === "bar" ? (
+                      <>
+                        <Bar dataKey="Income" fill="#22c55e" radius={[3,3,0,0]} maxBarSize={40} />
+                        <Bar dataKey="Expenses" fill="#ef4444" radius={[3,3,0,0]} maxBarSize={40} />
+                      </>
+                    ) : (
+                      <>
+                        <Line type="monotone" dataKey="Income" stroke="#22c55e" strokeWidth={2.5} dot={{ r: 3 }} activeDot={{ r: 5 }} />
+                        <Line type="monotone" dataKey="Expenses" stroke="#ef4444" strokeWidth={2.5} dot={{ r: 3 }} activeDot={{ r: 5 }} />
+                      </>
+                    )}
                   </ComposedChart>
                 </ResponsiveContainer>
               )}
