@@ -428,14 +428,17 @@ export default function FinanceTrackerPage() {
     queryFn: () => fetch(`/api/transactions${buildQS()}`).then(r => r.ok ? r.json() : []),
   });
   const transactions: Transaction[] = Array.isArray(transactionsRaw) ? transactionsRaw : [];
-  const { data: trendData = [] } = useQuery<TrendRow[]>({
+  const { data: trendRaw } = useQuery<TrendRow[]>({
     queryKey: trendQK,
-    queryFn: () => fetch(`/api/transactions/trend${buildQS({ groupBy })}`).then(r => r.json()),
+    queryFn: () => fetch(`/api/transactions/trend${buildQS({ groupBy })}`).then(r => r.ok ? r.json() : []),
   });
-  const { data: catData = [] } = useQuery<CatRow[]>({
+  const trendData: TrendRow[] = Array.isArray(trendRaw) ? trendRaw : [];
+
+  const { data: catRaw } = useQuery<CatRow[]>({
     queryKey: catQK,
-    queryFn: () => fetch(`/api/transactions/categories${buildQS({ type: catChartType })}`).then(r => r.json()),
+    queryFn: () => fetch(`/api/transactions/categories${buildQS({ type: catChartType })}`).then(r => r.ok ? r.json() : []),
   });
+  const catData: CatRow[] = Array.isArray(catRaw) ? catRaw : [];
 
   function invalidateAll() {
     queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
