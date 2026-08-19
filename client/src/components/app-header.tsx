@@ -1,5 +1,5 @@
 import { useLocation, Link } from "wouter";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   LayoutDashboard,
   Wallet,
@@ -15,7 +15,6 @@ import {
   ShieldAlert,
   Sparkles,
   Link2,
-  UserCircle,
   ScrollText,
   Receipt,
 } from "lucide-react";
@@ -55,6 +54,21 @@ export function AppHeader() {
   const { user } = useAuth();
   const logout = useLogout();
   const isAdmin = (user as any)?.isAdmin;
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    const syncAvatar = () => {
+      setAvatarUrl(user?.id ? localStorage.getItem(`avatar-${user.id}`) : null);
+    };
+
+    syncAvatar();
+    window.addEventListener("avatar-updated", syncAvatar);
+    window.addEventListener("storage", syncAvatar);
+    return () => {
+      window.removeEventListener("avatar-updated", syncAvatar);
+      window.removeEventListener("storage", syncAvatar);
+    };
+  }, [user?.id]);
 
   const currentPage = baseNavItems.find(
     (item) => location === item.url || (item.url !== "/" && location.startsWith(item.url))
@@ -127,7 +141,11 @@ export function AppHeader() {
               style={{ background: "linear-gradient(135deg, #1565a8 0%, #1c91d4 55%, #42b8ed 100%)" }}
               data-testid="button-user-menu"
             >
-              <UserCircle className="h-4 w-4" />
+              <img
+                src={avatarUrl ?? "/Images/Avatars/avatar-default.png"}
+                alt=""
+                className="h-5 w-5 rounded-full object-cover ring-1 ring-white/60"
+              />
               <span className="hidden sm:inline truncate max-w-[100px]">
                 {user?.fullName || user?.username}
               </span>

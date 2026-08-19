@@ -120,6 +120,7 @@ export default function SettingsPage() {
   const saveAvatar = (url: string) => {
     if (user?.id) localStorage.setItem(`avatar-${user.id}`, url);
     setAvatarUrl(url);
+    window.dispatchEvent(new Event("avatar-updated"));
     setPickerOpen(false);
     toast({ title: "Avatar updated" });
   };
@@ -143,6 +144,7 @@ export default function SettingsPage() {
   const removeAvatar = () => {
     if (user?.id) localStorage.removeItem(`avatar-${user.id}`);
     setAvatarUrl(null);
+    window.dispatchEvent(new Event("avatar-updated"));
     toast({ title: "Avatar removed" });
   };
 
