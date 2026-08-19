@@ -779,7 +779,7 @@ export default function FinanceTrackerPage() {
                           </td>
                           <td className="px-3 py-2.5">
                             <Badge className={`text-[10px] ${t.type === "income" ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"}`}>
-                              {t.type}
+                              {t.type === "income" ? "Income" : "Expense"}
                             </Badge>
                           </td>
                           <td className="px-3 py-2.5">
@@ -790,7 +790,7 @@ export default function FinanceTrackerPage() {
                           </td>
                           <td className="px-3 py-2.5">
                             {t.needs_want && t.needs_want !== "na"
-                              ? <Badge variant="outline" className={`text-[10px] ${t.needs_want === "need" ? "border-blue-300 text-blue-600" : "border-orange-300 text-orange-600"}`}>{t.needs_want}</Badge>
+                              ? <Badge variant="outline" className={`text-[10px] ${t.needs_want === "need" ? "border-blue-300 text-blue-600" : "border-orange-300 text-orange-600"}`}>{t.needs_want === "need" ? "Need" : "Want"}</Badge>
                               : <span className="text-xs text-muted-foreground">—</span>}
                           </td>
                           <td className={`px-3 py-2.5 font-semibold tabular-nums text-xs whitespace-nowrap ${t.type === "income" ? "text-emerald-600 dark:text-emerald-400" : "text-red-500"}`}>
