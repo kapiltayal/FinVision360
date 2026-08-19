@@ -559,7 +559,7 @@ export default function FinanceTrackerPage() {
                   <div>
                     <p className="text-sm font-medium">Import from existing entries</p>
                     <p className="text-xs text-muted-foreground mt-1 max-w-sm">
-                      Pull your existing income and expense entries from other sections of FinVision360 into the tracker. Already-imported entries will be skipped.
+                      Pull your saved income and expense entries from the Income &amp; Expenses section into the tracker. Previously imported entries will be synced instead of duplicated.
                     </p>
                   </div>
                   <Button onClick={() => importEntMut.mutate()} disabled={importEntMut.isPending} className="shrink-0">
