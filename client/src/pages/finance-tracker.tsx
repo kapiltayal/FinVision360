@@ -15,7 +15,8 @@ import { ConnectedAccountsImportPanel } from "@/components/finance-tracker/conne
 import {
   TrendingUp, TrendingDown, Wallet, Plus, Upload, RefreshCw, Pencil, Trash2,
   AlertCircle, ArrowDownCircle, ArrowUpCircle, Repeat2, Tag, Search, X,
-  ChevronLeft, ChevronRight, BarChart3, PieChart as PieChartIcon, Landmark, Database, CalendarDays,
+  ChevronLeft, ChevronRight, ArrowUp, ArrowDown, ArrowUpDown, BarChart3,
+  PieChart as PieChartIcon, Landmark, Database, CalendarDays,
 } from "lucide-react";
 import {
   ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
@@ -33,6 +34,17 @@ type Transaction = {
   plaid_account_name: string | null; plaid_institution_name: string | null;
   created_at: string; updated_at: string;
 };
+type SortKey = "date" | "description" | "type" | "category" | "needsWant" | "amount" | "recurring";
+type SortDirection = "asc" | "desc";
+const TRANSACTION_COLUMNS: { key: SortKey; label: string }[] = [
+  { key: "date", label: "Date" },
+  { key: "description", label: "Description" },
+  { key: "type", label: "Type" },
+  { key: "category", label: "Category" },
+  { key: "needsWant", label: "Need/Want" },
+  { key: "amount", label: "Amount" },
+  { key: "recurring", label: "Recurring" },
+];
 type Stats = {
   total_income: string;
   total_expenses: string;
@@ -434,6 +446,8 @@ export default function FinanceTrackerPage() {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
+  const [sortKey, setSortKey] = useState<SortKey>("date");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   const [dataIntakeOpen, setDataIntakeOpen] = useState(false);
   const [lastImportResult, setLastImportResult] = useState<ImportResult | null>(null);
   const [addOpen, setAddOpen] = useState(false);
@@ -561,8 +575,56 @@ export default function FinanceTrackerPage() {
     .filter(r => parseFloat(r.total) > 0)
     .map(r => ({ name: catLabel(r.subcategory), value: parseFloat(r.total), key: r.subcategory }));
 
-  const totalPages = Math.max(1, Math.ceil(transactions.length / pageSize));
-  const pageTxns = transactions.slice((page - 1) * pageSize, page * pageSize);
+  const sortedTransactions = useMemo(() => {
+    const sortValue = (transaction: Transaction): string | number => {
+      switch (sortKey) {
+        case "amount":
+          return parseFloat(transaction.amount) || 0;
+        case "category":
+          return catLabel(transaction.subcategory).toLocaleLowerCase();
+        case "needsWant":
+          return transaction.needs_want && transaction.needs_want !== "na" ? transaction.needs_want : "";
+        case "recurring":
+          return transaction.is_recurring ? 1 : 0;
+        case "description":
+          return transaction.description.toLocaleLowerCase();
+        case "type":
+          return transaction.type;
+        case "date":
+        default:
+          return transaction.date.slice(0, 10);
+      }
+    };
+
+    return [...transactions].sort((a, b) => {
+      const aValue = sortValue(a);
+      const bValue = sortValue(b);
+      const aEmpty = aValue === "";
+      const bEmpty = bValue === "";
+      if (aEmpty || bEmpty) {
+        if (aEmpty && bEmpty) return 0;
+        return aEmpty ? 1 : -1;
+      }
+
+      const comparison = typeof aValue === "number" && typeof bValue === "number"
+        ? aValue - bValue
+        : String(aValue).localeCompare(String(bValue), undefined, { numeric: true, sensitivity: "base" });
+      return sortDirection === "asc" ? comparison : -comparison;
+    });
+  }, [transactions, sortKey, sortDirection]);
+
+  function handleSort(key: SortKey) {
+    setPage(1);
+    if (key === sortKey) {
+      setSortDirection(direction => direction === "asc" ? "desc" : "asc");
+      return;
+    }
+    setSortKey(key);
+    setSortDirection("asc");
+  }
+
+  const totalPages = Math.max(1, Math.ceil(sortedTransactions.length / pageSize));
+  const pageTxns = sortedTransactions.slice((page - 1) * pageSize, page * pageSize);
 
   return (
     <div className="p-4 md:p-6 space-y-5 max-w-7xl mx-auto">
@@ -872,9 +934,28 @@ export default function FinanceTrackerPage() {
                   <table className="w-full text-sm">
                     <thead className="bg-muted/40 border-b">
                       <tr>
-                        {["Date","Description","Type","Category","Need/Want","Amount","Recurring",""].map(h => (
-                          <th key={h} className="px-3 py-2.5 text-left text-xs font-semibold text-muted-foreground">{h}</th>
+                        {TRANSACTION_COLUMNS.map(column => (
+                          <th
+                            key={column.key}
+                            aria-sort={sortKey === column.key ? (sortDirection === "asc" ? "ascending" : "descending") : "none"}
+                            className="px-3 py-2.5 text-left text-xs font-semibold text-muted-foreground"
+                          >
+                            <button
+                              type="button"
+                              onClick={() => handleSort(column.key)}
+                              className={`inline-flex items-center gap-1 rounded hover:text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500/40 ${sortKey === column.key ? "text-foreground" : ""}`}
+                              title={`Sort by ${column.label}`}
+                            >
+                              {column.label}
+                              {sortKey === column.key
+                                ? sortDirection === "asc"
+                                  ? <ArrowUp className="h-3 w-3" aria-hidden="true" />
+                                  : <ArrowDown className="h-3 w-3" aria-hidden="true" />
+                                : <ArrowUpDown className="h-3 w-3 opacity-50" aria-hidden="true" />}
+                            </button>
+                          </th>
                         ))}
+                        <th className="px-3 py-2.5"><span className="sr-only">Actions</span></th>
                       </tr>
                     </thead>
                     <tbody className="divide-y">
