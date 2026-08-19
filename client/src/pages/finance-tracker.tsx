@@ -558,8 +558,7 @@ export default function FinanceTrackerPage() {
   }));
 
   const donutData = catData
-    .filter(r => parseFloat(r.total) > 0 && r.subcategory !== "unassigned")
-    .slice(0, 8)
+    .filter(r => parseFloat(r.total) > 0)
     .map(r => ({ name: catLabel(r.subcategory), value: parseFloat(r.total), key: r.subcategory }));
 
   const totalPages = Math.max(1, Math.ceil(transactions.length / pageSize));
@@ -801,8 +800,8 @@ export default function FinanceTrackerPage() {
                       <Tooltip formatter={(v: any) => fmtFull(v)} />
                     </PieChart>
                   </ResponsiveContainer>
-                  <div className="space-y-1 mt-2">
-                    {donutData.slice(0, 5).map(d => (
+                  <div className="space-y-1 mt-2 max-h-36 overflow-y-auto pr-1">
+                    {donutData.map(d => (
                       <div key={d.key} className="flex items-center justify-between text-xs">
                         <div className="flex items-center gap-1.5">
                           <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: CAT_COLORS[d.key] ?? "#94a3b8" }} />
