@@ -656,22 +656,28 @@ export default function FinanceTrackerPage() {
               <CardTitle className="text-sm flex items-center gap-2">
                 <BarChart3 className="h-4 w-4 text-blue-500" />Income vs Expenses Trend
               </CardTitle>
-              <div className="flex items-center gap-2 flex-wrap justify-end">
-                <div className="flex gap-1">
-                  {(["bar", "line"] as const).map(chartType => (
-                    <button key={chartType} onClick={() => setTrendChartType(chartType)}
-                      className={`px-2 py-0.5 text-xs rounded-full border transition-all ${trendChartType === chartType ? "bg-blue-600 text-white border-blue-600" : "border-slate-200 dark:border-slate-700 text-muted-foreground"}`}>
-                      {chartType === "bar" ? "Bars" : "Line"}
-                    </button>
-                  ))}
+              <div className="flex items-center gap-2.5 flex-wrap justify-end">
+                <div className="flex items-center gap-1.5 rounded-lg bg-muted/40 p-1">
+                  <span className="px-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Chart type</span>
+                  <div className="flex gap-1" aria-label="Chart type">
+                    {(["bar", "line"] as const).map(chartType => (
+                      <button key={chartType} onClick={() => setTrendChartType(chartType)}
+                        className={`px-2 py-0.5 text-xs rounded-full border transition-all ${trendChartType === chartType ? "bg-blue-600 text-white border-blue-600" : "border-slate-200 dark:border-slate-700 text-muted-foreground"}`}>
+                        {chartType === "bar" ? "Bars" : "Line"}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-                <div className="flex gap-1">
-                  {["day","week","month","year"].map(g => (
-                    <button key={g} onClick={() => setGroupBy(g)}
-                      className={`px-2 py-0.5 text-xs rounded-full border transition-all ${groupBy===g?"bg-blue-600 text-white border-blue-600":"border-slate-200 dark:border-slate-700 text-muted-foreground"}`}>
-                      {g.charAt(0).toUpperCase()+g.slice(1)}
-                    </button>
-                  ))}
+                <div className="flex items-center gap-1.5 rounded-lg bg-muted/40 p-1">
+                  <span className="px-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Time granularity</span>
+                  <div className="flex gap-1" aria-label="Time granularity">
+                    {["day","week","month","year"].map(g => (
+                      <button key={g} onClick={() => setGroupBy(g)}
+                        className={`px-2 py-0.5 text-xs rounded-full border transition-all ${groupBy===g?"bg-blue-600 text-white border-blue-600":"border-slate-200 dark:border-slate-700 text-muted-foreground"}`}>
+                        {g.charAt(0).toUpperCase()+g.slice(1)}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>
