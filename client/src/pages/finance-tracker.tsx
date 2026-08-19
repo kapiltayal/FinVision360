@@ -492,6 +492,7 @@ export default function FinanceTrackerPage() {
       setCustomStart("");
       setCustomEnd("");
       setPage(1);
+      setDataIntakeOpen(false);
       toast({
         title: `Imported ${d.inserted} transactions`,
         description: [
