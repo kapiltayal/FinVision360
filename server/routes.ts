@@ -7,20 +7,8 @@ import { registerFinanceTrackerRoutes } from "./finance-tracker-routes";
 import { assets, liabilities, assetHistory, liabilityHistory } from "@shared/schema";
 import OpenAI from "openai";
 import { scrapeBank, DEFAULT_BANK_CONFIGS, type BankSelectorConfig } from "./scraper";
-import { PlaidApi, PlaidEnvironments, Configuration, Products, CountryCode } from "plaid";
-
-function getPlaidClient(): PlaidApi {
-  const configuration = new Configuration({
-    basePath: PlaidEnvironments.sandbox,
-    baseOptions: {
-      headers: {
-        "PLAID-CLIENT-ID": process.env.PLAID_CLIENT_ID,
-        "PLAID-SECRET": process.env.PLAID_SECRET,
-      },
-    },
-  });
-  return new PlaidApi(configuration);
-}
+import { Products, CountryCode } from "plaid";
+import { getPlaidClient } from "./plaid";
 
 function getOpenAIClient(): OpenAI {
   const apiKey = process.env.AI_INTEGRATIONS_OPENAI_API_KEY || process.env.OPENAI_API_KEY;
@@ -707,7 +695,14 @@ Use markdown formatting with headers and bold key numbers.`;
     const userId = (req.user as any).id;
     const accounts = await storage.getPlaidAccounts(userId);
     const items = await storage.getPlaidItems(userId);
-    res.json({ accounts, items });
+    const safeItems = items.map((item) => ({
+      id: item.id,
+      institutionId: item.institutionId,
+      institutionName: item.institutionName,
+      createdAt: item.createdAt,
+      lastSynced: item.lastSynced,
+    }));
+    res.json({ accounts, items: safeItems });
   });
 
   app.post("/api/plaid/sync/:itemId", requireAuth, async (req, res) => {

@@ -11,10 +11,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
+import { ConnectedAccountsImportPanel } from "@/components/finance-tracker/connected-accounts-import";
 import {
   TrendingUp, TrendingDown, Wallet, Plus, Upload, RefreshCw, Pencil, Trash2,
   AlertCircle, ArrowDownCircle, ArrowUpCircle, Repeat2, Tag, Search, X,
-  ChevronLeft, ChevronRight, BarChart3, PieChart as PieChartIcon, Zap, Database,
+  ChevronLeft, ChevronRight, BarChart3, PieChart as PieChartIcon, Landmark, Database,
 } from "lucide-react";
 import {
   ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
@@ -28,6 +29,8 @@ type Transaction = {
   needs_want: "need" | "want" | "na" | null; is_recurring: boolean;
   recurring_type: "subscription" | "recurring_bill" | null;
   source: "manual" | "plaid" | "upload" | "import"; notes: string | null;
+  plaid_transaction_id: string | null; plaid_account_id: string | null;
+  plaid_account_name: string | null; plaid_institution_name: string | null;
   created_at: string; updated_at: string;
 };
 type Stats = { total_income: string; total_expenses: string; unassigned_count: string; total_count: string };
@@ -472,18 +475,6 @@ export default function FinanceTrackerPage() {
     }),
     onError: () => toast({ title: "Import failed", variant: "destructive" }),
   });
-  const importEntMut = useMutation({
-    mutationFn: () => apiRequest("POST", "/api/transactions/import-from-entries"),
-    onSuccess: (res: any) => res.json().then((d: any) => {
-      invalidateAll();
-      const summary = [
-        d.inserted ? `${d.inserted} imported` : "",
-        d.updated ? `${d.updated} updated` : "",
-      ].filter(Boolean).join(" · ");
-      toast({ title: summary ? `Existing entries synced: ${summary}` : "Existing entries are already up to date" });
-    }),
-    onError: () => toast({ title: "Import failed", variant: "destructive" }),
-  });
   const recurringMut = useMutation({
     mutationFn: () => apiRequest("POST", "/api/transactions/detect-recurring"),
     onSuccess: (res: any) => res.json().then((d: any) => {
@@ -540,10 +531,10 @@ export default function FinanceTrackerPage() {
           </CardHeader>
           <CardContent>
             <Tabs defaultValue="manual">
-              <TabsList className="grid grid-cols-3 w-full max-w-md">
+              <TabsList className="grid grid-cols-3 w-full max-w-xl">
                 <TabsTrigger value="manual"><Plus className="h-3.5 w-3.5 mr-1.5" />Manual</TabsTrigger>
                 <TabsTrigger value="upload"><Upload className="h-3.5 w-3.5 mr-1.5" />Upload CSV</TabsTrigger>
-                <TabsTrigger value="import"><Zap className="h-3.5 w-3.5 mr-1.5" />From Entries</TabsTrigger>
+                <TabsTrigger value="import"><Landmark className="h-3.5 w-3.5 mr-1.5" />Connected</TabsTrigger>
               </TabsList>
               <TabsContent value="manual" className="mt-4">
                 <p className="text-sm text-muted-foreground mb-3">Enter one transaction manually with the full transaction form.</p>
@@ -555,17 +546,7 @@ export default function FinanceTrackerPage() {
                 <CsvUploadPanel onImport={rows => bulkMut.mutate(rows)} importing={bulkMut.isPending} />
               </TabsContent>
               <TabsContent value="import" className="mt-4">
-                <div className="flex flex-col sm:flex-row items-start gap-4">
-                  <div>
-                    <p className="text-sm font-medium">Import from existing entries</p>
-                    <p className="text-xs text-muted-foreground mt-1 max-w-sm">
-                      Pull your saved income and expense entries from the Income &amp; Expenses section into the tracker. Previously imported entries will be synced instead of duplicated.
-                    </p>
-                  </div>
-                  <Button onClick={() => importEntMut.mutate()} disabled={importEntMut.isPending} className="shrink-0">
-                    {importEntMut.isPending ? "Importing…" : "Import Now"}
-                  </Button>
-                </div>
+                <ConnectedAccountsImportPanel onImported={invalidateAll} />
               </TabsContent>
             </Tabs>
           </CardContent>
@@ -790,7 +771,9 @@ export default function FinanceTrackerPage() {
                               <span className="text-[10px] text-muted-foreground">
                                 {t.source === "import"
                                   ? `Import · ${t.type === "income" ? "Income entry" : "Expense entry"}`
-                                  : t.source}
+                                  : t.source === "plaid"
+                                    ? ["Plaid", t.plaid_institution_name, t.plaid_account_name].filter(Boolean).join(" · ")
+                                    : t.source}
                               </span>
                             )}
                           </td>

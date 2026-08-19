@@ -79,14 +79,23 @@ app.use((req, res, next) => {
       recurring_type  TEXT CHECK(recurring_type IN ('subscription','recurring_bill')),
       source          TEXT NOT NULL DEFAULT 'manual' CHECK(source IN ('manual','plaid','upload','import')),
       plaid_transaction_id TEXT,
+      plaid_account_id TEXT,
+      plaid_account_name TEXT,
+      plaid_institution_name TEXT,
       notes           TEXT,
       created_at      TIMESTAMPTZ DEFAULT NOW(),
       updated_at      TIMESTAMPTZ DEFAULT NOW()
     );
+    ALTER TABLE transactions ADD COLUMN IF NOT EXISTS plaid_account_id TEXT;
+    ALTER TABLE transactions ADD COLUMN IF NOT EXISTS plaid_account_name TEXT;
+    ALTER TABLE transactions ADD COLUMN IF NOT EXISTS plaid_institution_name TEXT;
     CREATE INDEX IF NOT EXISTS idx_transactions_user_id ON transactions(user_id);
     CREATE INDEX IF NOT EXISTS idx_transactions_date    ON transactions(date);
     CREATE INDEX IF NOT EXISTS idx_transactions_type    ON transactions(type);
-  `).catch((e) => console.error("Transactions table init error:", e));
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_transactions_plaid_unique
+      ON transactions(user_id, plaid_transaction_id)
+      WHERE plaid_transaction_id IS NOT NULL;
+  `);
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS estate_beneficiaries (

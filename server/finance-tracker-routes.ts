@@ -1,40 +1,11 @@
 import { pool } from "./db";
 import { requireAuth } from "./auth";
 import type { Express } from "express";
+import type { Transaction as PlaidTransaction } from "plaid";
+import { getPlaidClient } from "./plaid";
+import { storage } from "./storage";
 
 // ─── AUTO-CATEGORIZATION ENGINE ──────────────────────────────────────────────
-// The Income & Expenses page predates Finance Tracker and uses a few different
-// category keys. These maps preserve the original entry choice whenever there is
-// an equivalent Finance Tracker category; "other" deliberately falls back to
-// keyword categorization.
-const importedIncomeCategoryMap: Record<string, string> = {
-  salary: "salary",
-  freelance: "freelance",
-  business: "business",
-  investment: "other_income",
-  rental: "rental",
-  pension: "other_income",
-  social_security: "other_income",
-};
-
-const importedExpenseCategoryMap: Record<string, string> = {
-  housing: "housing",
-  utilities: "utilities",
-  groceries: "groceries",
-  transport: "transportation",
-  healthcare: "healthcare",
-  insurance: "insurance",
-  education: "education",
-  childcare: "other_expense",
-  dining: "dining_out",
-  entertainment: "entertainment",
-  subscriptions: "subscriptions",
-  shopping: "shopping",
-  travel: "travel",
-  personal_care: "personal_care",
-  hobbies: "other_expense",
-};
-
 function autoCategorizeFn(
   description: string,
   type: "income" | "expense"
@@ -75,6 +46,73 @@ function autoCategorizeFn(
   if (/transfer to savings|savings deposit|savings transfer|high yield savings/.test(d)) return { subcategory: "savings_transfer", needsWant: "need" };
 
   return { subcategory: "unassigned", needsWant: null };
+}
+
+function categorizePlaidTransaction(
+  transaction: PlaidTransaction,
+  description: string,
+  type: "income" | "expense"
+): { subcategory: string; needsWant: "need" | "want" | "na" | null } {
+  const fallback = autoCategorizeFn(description, type);
+  const primary = transaction.personal_finance_category?.primary?.toUpperCase() ?? "";
+  const detailed = transaction.personal_finance_category?.detailed?.toUpperCase() ?? "";
+
+  if (type === "income") {
+    if (detailed.includes("WAGES")) return { subcategory: "salary", needsWant: "na" };
+    if (detailed.includes("DIVIDEND")) return { subcategory: "dividend", needsWant: "na" };
+    if (detailed.includes("INTEREST_EARNED")) return { subcategory: "interest", needsWant: "na" };
+    if (detailed.includes("TAX_REFUND") || detailed.includes("REFUND")) return { subcategory: "refund", needsWant: "na" };
+    if (primary === "INCOME") {
+      return fallback.subcategory !== "unassigned"
+        ? fallback
+        : { subcategory: "other_income", needsWant: "na" };
+    }
+    return fallback;
+  }
+
+  if (primary === "RENT_AND_UTILITIES") {
+    return detailed.includes("RENT") || detailed.includes("MORTGAGE")
+      ? { subcategory: "housing", needsWant: "need" }
+      : { subcategory: "utilities", needsWant: "need" };
+  }
+  if (primary === "FOOD_AND_DRINK") {
+    return detailed.includes("GROCER")
+      ? { subcategory: "groceries", needsWant: "need" }
+      : { subcategory: "dining_out", needsWant: "want" };
+  }
+
+  const primaryMap: Record<string, { subcategory: string; needsWant: "need" | "want" | "na" | null }> = {
+    ENTERTAINMENT: { subcategory: "entertainment", needsWant: "want" },
+    TRANSPORTATION: { subcategory: "transportation", needsWant: "need" },
+    MEDICAL: { subcategory: "healthcare", needsWant: "need" },
+    PERSONAL_CARE: { subcategory: "personal_care", needsWant: "want" },
+    TRAVEL: { subcategory: "travel", needsWant: "want" },
+    GENERAL_MERCHANDISE: { subcategory: "shopping", needsWant: "want" },
+    HOME_IMPROVEMENT: { subcategory: "housing", needsWant: "need" },
+    LOAN_PAYMENTS: { subcategory: "debt_payment", needsWant: "need" },
+    BANK_FEES: { subcategory: "other_expense", needsWant: "need" },
+  };
+
+  if (primaryMap[primary]) return primaryMap[primary];
+  if (primary === "GOVERNMENT_AND_NON_PROFIT" && detailed.includes("TAX")) {
+    return { subcategory: "taxes", needsWant: "need" };
+  }
+
+  return fallback;
+}
+
+function isValidIsoDate(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const date = new Date(`${value}T00:00:00Z`);
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+}
+
+function isPlaidTransfer(transaction: PlaidTransaction): boolean {
+  const primary = transaction.personal_finance_category?.primary?.toUpperCase() ?? "";
+  const detailed = transaction.personal_finance_category?.detailed?.toUpperCase() ?? "";
+  return primary === "TRANSFER_IN"
+    || primary === "TRANSFER_OUT"
+    || detailed === "LOAN_PAYMENTS_CREDIT_CARD_PAYMENT";
 }
 
 // ─── RECURRING DETECTION ENGINE ──────────────────────────────────────────────
@@ -313,74 +351,197 @@ export function registerFinanceTrackerRoutes(app: Express) {
     }
   });
 
-  // POST /api/transactions/import-from-entries — import from existing income/expense entries
-  app.post("/api/transactions/import-from-entries", requireAuth, async (req, res) => {
+  // POST /api/transactions/import-from-plaid — import a date range from connected accounts
+  app.post("/api/transactions/import-from-plaid", requireAuth, async (req, res) => {
     try {
       const userId = (req.user as any).id;
+      const { itemId, accountId, startDate, endDate } = req.body as {
+        itemId?: number;
+        accountId?: string;
+        startDate?: string;
+        endDate?: string;
+      };
 
-      const { rows: income } = await pool.query(
-        `SELECT name, amount, frequency, category, created_at FROM income_entries WHERE user_id=$1`, [userId]
-      );
-      const { rows: expenses } = await pool.query(
-        `SELECT name, amount, frequency, category, type, created_at FROM expense_entries WHERE user_id=$1`, [userId]
-      );
+      if (!startDate || !endDate || !isValidIsoDate(startDate) || !isValidIsoDate(endDate)) {
+        return res.status(400).json({ message: "A valid start and end date are required" });
+      }
+
+      const start = new Date(`${startDate}T12:00:00Z`);
+      const end = new Date(`${endDate}T12:00:00Z`);
+      const today = new Date().toISOString().slice(0, 10);
+      if (endDate > today) {
+        return res.status(400).json({ message: "End date cannot be in the future" });
+      }
+      const days = Math.ceil((end.getTime() - start.getTime()) / 86_400_000);
+      if (Number.isNaN(days) || days < 0) {
+        return res.status(400).json({ message: "Start date must be before end date" });
+      }
+      if (days > 730) {
+        return res.status(400).json({ message: "Choose a date range of two years or less" });
+      }
+
+      const allItems = await storage.getPlaidItems(userId);
+      const allAccounts = await storage.getPlaidAccounts(userId);
+      if (allItems.length === 0) {
+        return res.status(400).json({ message: "Connect a financial account before importing transactions" });
+      }
+
+      const numericItemId = itemId === undefined ? undefined : Number(itemId);
+      let selectedItems = allItems;
+      if (numericItemId !== undefined) {
+        const selectedItem = allItems.find((item) => item.id === numericItemId);
+        if (!selectedItem) return res.status(404).json({ message: "Connected institution not found" });
+        selectedItems = [selectedItem];
+      }
+
+      if (accountId) {
+        const selectedAccount = allAccounts.find((account) => account.plaidAccountId === accountId);
+        if (!selectedAccount) return res.status(404).json({ message: "Connected account not found" });
+        if (numericItemId !== undefined && selectedAccount.plaidItemId !== numericItemId) {
+          return res.status(400).json({ message: "Account does not belong to the selected institution" });
+        }
+        const owningItem = allItems.find((item) => item.id === selectedAccount.plaidItemId);
+        if (!owningItem) return res.status(404).json({ message: "Connected institution not found" });
+        selectedItems = [owningItem];
+      }
+
+      const plaid = getPlaidClient();
+      const accountByPlaidId = new Map(allAccounts.map((account) => [account.plaidAccountId, account]));
 
       let inserted = 0;
       let updated = 0;
-      const today = new Date().toISOString().split("T")[0];
+      let skipped = 0;
+      let skippedPending = 0;
+      let skippedTransfers = 0;
+      let skippedUnsupportedCurrency = 0;
+      let skippedInvalid = 0;
+      const unavailableInstitutions: string[] = [];
 
-      for (const e of income) {
-        const detected = autoCategorizeFn(e.name, "income");
-        const subcategory = importedIncomeCategoryMap[e.category] ?? detected.subcategory;
-        const needsWant = "na";
-        const amount = Math.abs(parseFloat(e.amount));
-        const existing = await pool.query(
-          `UPDATE transactions
-           SET subcategory=$1, needs_want=$2, merchant=$3, updated_at=NOW()
-           WHERE user_id=$4 AND source='import' AND type='income' AND description=$5 AND amount=$6`,
-          [subcategory, needsWant, e.name, userId, e.name, amount]
-        );
-        if (existing.rowCount) {
-          updated += existing.rowCount;
-          continue;
-        }
-        await pool.query(
-          `INSERT INTO transactions (user_id, date, description, merchant, amount, type, subcategory, needs_want, source)
-           VALUES ($1,$2,$3,$4,$5,'income',$6,$7,'import')
-          `,
-          [userId, today, e.name, e.name, amount, subcategory, needsWant]
-        );
-        inserted++;
-      }
-      for (const e of expenses) {
-        const detected = autoCategorizeFn(e.name, "expense");
-        const subcategory = importedExpenseCategoryMap[e.category] ?? detected.subcategory;
-        const needsWant = e.type === "need" || e.type === "want" ? e.type : detected.needsWant;
-        const amount = Math.abs(parseFloat(e.amount));
-        const existing = await pool.query(
-          `UPDATE transactions
-           SET subcategory=$1, needs_want=$2, merchant=$3, updated_at=NOW()
-           WHERE user_id=$4 AND source='import' AND type='expense' AND description=$5 AND amount=$6`,
-          [subcategory, needsWant, e.name, userId, e.name, amount]
-        );
-        if (existing.rowCount) {
-          updated += existing.rowCount;
-          continue;
-        }
-        await pool.query(
-          `INSERT INTO transactions (user_id, date, description, merchant, amount, type, subcategory, needs_want, source)
-           VALUES ($1,$2,$3,$4,$5,'expense',$6,$7,'import')
-          `,
-          [userId, today, e.name, e.name, amount, subcategory, needsWant]
-        );
-        inserted++;
+      for (const item of selectedItems) {
+        let offset = 0;
+        let totalTransactions = 0;
+
+        do {
+          let response;
+          try {
+            response = await plaid.transactionsGet({
+              access_token: item.accessToken,
+              start_date: startDate,
+              end_date: endDate,
+              options: {
+                count: 500,
+                offset,
+                include_original_description: true,
+                ...(accountId ? { account_ids: [accountId] } : {}),
+              },
+            });
+          } catch (error: any) {
+            console.error(
+              `[plaid] transaction import failed for item ${item.id}:`,
+              error?.response?.data || error?.message
+            );
+            unavailableInstitutions.push(item.institutionName || "Connected Institution");
+            break;
+          }
+
+          const plaidTransactions = response.data.transactions;
+          totalTransactions = response.data.total_transactions;
+
+          for (const transaction of plaidTransactions) {
+            const amount = Number(transaction.amount);
+            const account = accountByPlaidId.get(transaction.account_id);
+            const currency = transaction.iso_currency_code;
+
+            if (transaction.pending) {
+              skipped++;
+              skippedPending++;
+              continue;
+            }
+            if (isPlaidTransfer(transaction)) {
+              skipped++;
+              skippedTransfers++;
+              continue;
+            }
+            if (currency !== "USD") {
+              skipped++;
+              skippedUnsupportedCurrency++;
+              continue;
+            }
+            if (!account || !Number.isFinite(amount) || amount === 0) {
+              skipped++;
+              skippedInvalid++;
+              continue;
+            }
+
+            const description = (transaction.merchant_name || transaction.name || "Bank transaction").trim();
+            const merchant = (transaction.merchant_name || transaction.name || description).trim();
+            const type: "income" | "expense" = amount < 0 ? "income" : "expense";
+            const category = categorizePlaidTransaction(transaction, description, type);
+            const institutionName = item.institutionName || "Connected Institution";
+            const { rows } = await pool.query(
+              `INSERT INTO transactions (
+                 user_id, date, description, merchant, amount, type, subcategory, needs_want,
+                 source, plaid_transaction_id, plaid_account_id, plaid_account_name, plaid_institution_name
+               ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'plaid',$9,$10,$11,$12)
+               ON CONFLICT (user_id, plaid_transaction_id)
+                 WHERE plaid_transaction_id IS NOT NULL
+               DO UPDATE SET
+                 date=EXCLUDED.date,
+                 description=EXCLUDED.description,
+                 merchant=EXCLUDED.merchant,
+                 amount=EXCLUDED.amount,
+                 type=EXCLUDED.type,
+                 subcategory=EXCLUDED.subcategory,
+                 needs_want=EXCLUDED.needs_want,
+                 source='plaid',
+                 plaid_account_id=EXCLUDED.plaid_account_id,
+                 plaid_account_name=EXCLUDED.plaid_account_name,
+                 plaid_institution_name=EXCLUDED.plaid_institution_name,
+                 updated_at=NOW()
+               RETURNING (xmax = 0) AS was_inserted`,
+              [
+                userId,
+                transaction.date,
+                description,
+                merchant,
+                Math.abs(amount),
+                type,
+                category.subcategory,
+                category.needsWant,
+                transaction.transaction_id,
+                transaction.account_id,
+                account.name,
+                institutionName,
+              ]
+            );
+
+            if (rows[0]?.was_inserted) inserted++;
+            else updated++;
+          }
+
+          offset += plaidTransactions.length;
+          if (plaidTransactions.length === 0) break;
+        } while (offset < totalTransactions);
       }
 
-      const recurringMarked = await detectAndMarkRecurring(userId);
-      res.json({ inserted, updated, recurringMarked });
+      const recurringMarked = inserted || updated ? await detectAndMarkRecurring(userId) : 0;
+      res.json({
+        inserted,
+        updated,
+        skipped,
+        skippedReasons: {
+          pending: skippedPending,
+          transfers: skippedTransfers,
+          unsupportedCurrency: skippedUnsupportedCurrency,
+          invalid: skippedInvalid,
+        },
+        unavailable: unavailableInstitutions.length,
+        unavailableInstitutions,
+        recurringMarked,
+      });
     } catch (e) {
       console.error(e);
-      res.status(500).json({ message: "Failed to import from entries" });
+      res.status(500).json({ message: "Failed to import connected account transactions" });
     }
   });
 
