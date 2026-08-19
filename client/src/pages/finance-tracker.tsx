@@ -15,7 +15,7 @@ import { ConnectedAccountsImportPanel } from "@/components/finance-tracker/conne
 import {
   TrendingUp, TrendingDown, Wallet, Plus, Upload, RefreshCw, Pencil, Trash2,
   AlertCircle, ArrowDownCircle, ArrowUpCircle, Repeat2, Tag, Search, X,
-  ChevronLeft, ChevronRight, BarChart3, PieChart as PieChartIcon, Landmark, Database,
+  ChevronLeft, ChevronRight, BarChart3, PieChart as PieChartIcon, Landmark, Database, CalendarDays,
 } from "lucide-react";
 import {
   ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
@@ -33,7 +33,14 @@ type Transaction = {
   plaid_account_name: string | null; plaid_institution_name: string | null;
   created_at: string; updated_at: string;
 };
-type Stats = { total_income: string; total_expenses: string; unassigned_count: string; total_count: string };
+type Stats = {
+  total_income: string;
+  total_expenses: string;
+  unassigned_count: string;
+  total_count: string;
+  min_date: string | null;
+  max_date: string | null;
+};
 type TrendRow = { period: string; income: string; expenses: string };
 type CatRow = { subcategory: string; total: string; count: string };
 
@@ -433,6 +440,15 @@ export default function FinanceTrackerPage() {
     queryFn: () => apiRequest("GET", `/api/transactions${buildQS()}`).then(r => r.json()).catch(() => []),
   });
   const transactions: Transaction[] = Array.isArray(transactionsRaw) ? transactionsRaw : [];
+  const dateRangeLabel = period === "all"
+    ? statsL
+      ? "Loading…"
+      : stats?.min_date && stats?.max_date
+        ? `${fmtDate(stats.min_date)} – ${fmtDate(stats.max_date)}`
+        : "No transactions yet"
+    : start && end
+      ? `${fmtDate(start)} – ${fmtDate(end)}`
+      : "Select a start and end date";
   const { data: trendRaw } = useQuery<TrendRow[]>({
     queryKey: trendQK,
     queryFn: () => apiRequest("GET", `/api/transactions/trend${buildQS({ groupBy })}`).then(r => r.json()).catch(() => []),
@@ -583,6 +599,12 @@ export default function FinanceTrackerPage() {
             <Input type="date" value={customEnd} onChange={e => setCustomEnd(e.target.value)} className="h-8 w-36 text-xs" />
           </div>
         )}
+      </div>
+      <div className="flex items-center gap-1.5 text-xs text-muted-foreground" aria-live="polite">
+        <CalendarDays className="h-3.5 w-3.5 text-blue-500" />
+        <span>
+          Showing transactions from <span className="font-medium text-foreground">{dateRangeLabel}</span>
+        </span>
       </div>
 
       {/* ── KPI Cards ── */}

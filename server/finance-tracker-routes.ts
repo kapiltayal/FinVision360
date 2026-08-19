@@ -223,7 +223,9 @@ export function registerFinanceTrackerRoutes(app: Express) {
            COALESCE(SUM(CASE WHEN type='income' THEN amount ELSE 0 END),0)  AS total_income,
            COALESCE(SUM(CASE WHEN type='expense' THEN amount ELSE 0 END),0) AS total_expenses,
            COUNT(CASE WHEN subcategory='unassigned' THEN 1 END)             AS unassigned_count,
-           COUNT(*)                                                          AS total_count
+           COUNT(*)                                                          AS total_count,
+           MIN(date)::DATE                                                   AS min_date,
+           MAX(date)::DATE                                                   AS max_date
          FROM transactions ${where}`,
         params
       );
