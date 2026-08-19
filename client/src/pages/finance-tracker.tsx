@@ -41,6 +41,11 @@ type Stats = {
   min_date: string | null;
   max_date: string | null;
 };
+type ImportResult = {
+  inserted: number;
+  skipped: number;
+  skippedReasons: Record<string, number>;
+};
 type TrendRow = { period: string; income: string; expenses: string };
 type CatRow = { subcategory: string; total: string; count: string };
 
@@ -282,7 +287,13 @@ function TransactionDialog({
 }
 
 // ── CSV Upload Panel ──────────────────────────────────────────────────────────
-function CsvUploadPanel({ onImport, importing }: { onImport: (rows: any[]) => void; importing: boolean }) {
+function CsvUploadPanel({
+  onImport,
+  importing,
+}: {
+  onImport: (payload: { transactions: any[]; rejected: Record<string, number> }) => void;
+  importing: boolean;
+}) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [rows, setRows] = useState<string[][]>([]);
   const [headers, setHeaders] = useState<string[]>([]);
@@ -312,25 +323,40 @@ function CsvUploadPanel({ onImport, importing }: { onImport: (rows: any[]) => vo
     reader.readAsText(file);
   }
 
-  function buildTransactions() {
+  function buildImportPayload() {
     const dIdx = parseInt(colDate); const descIdx = parseInt(colDesc); const aIdx = parseInt(colAmt);
     const tIdx = colType !== "" ? parseInt(colType) : -1;
-    return rows
-      .map(r => {
-        const dateStr = parseDate(r[dIdx] ?? "");
-        const desc = r[descIdx]?.trim() ?? "";
-        const rawAmt = parseFloat((r[aIdx] ?? "").replace(/[$,\s]/g, ""));
-        if (!dateStr || !desc || isNaN(rawAmt)) return null;
-        let type: "income" | "expense";
-        if (tIdx !== -1) {
-          const tv = (r[tIdx] ?? "").toLowerCase();
-          type = tv.includes("income") || tv.includes("credit") || tv.includes("deposit") ? "income" : "expense";
-        } else {
-          type = negIsExpense ? (rawAmt < 0 ? "expense" : "income") : (rawAmt > 0 ? "expense" : "income");
-        }
-        return { date: dateStr, description: desc, amount: Math.abs(rawAmt), type };
-      })
-      .filter(Boolean);
+    const transactions: any[] = [];
+    const rejected: Record<string, number> = {};
+    const addRejected = (reason: string) => {
+      rejected[reason] = (rejected[reason] ?? 0) + 1;
+    };
+
+    rows.forEach(r => {
+      const dateStr = parseDate(r[dIdx] ?? "");
+      const desc = r[descIdx]?.trim() ?? "";
+      const rawAmt = parseFloat((r[aIdx] ?? "").replace(/[$,\s]/g, ""));
+      const reasons: string[] = [];
+      if (!dateStr) reasons.push("Missing or invalid date");
+      if (!desc) reasons.push("Missing description");
+      if (isNaN(rawAmt)) reasons.push("Missing or invalid amount");
+
+      if (reasons.length > 0) {
+        addRejected(reasons.join("; "));
+        return;
+      }
+
+      let type: "income" | "expense";
+      if (tIdx !== -1) {
+        const tv = (r[tIdx] ?? "").toLowerCase();
+        type = tv.includes("income") || tv.includes("credit") || tv.includes("deposit") ? "income" : "expense";
+      } else {
+        type = negIsExpense ? (rawAmt < 0 ? "expense" : "income") : (rawAmt > 0 ? "expense" : "income");
+      }
+      transactions.push({ date: dateStr, description: desc, amount: Math.abs(rawAmt), type });
+    });
+
+    return { transactions, rejected };
   }
 
   const preview = rows.slice(0, 5);
@@ -389,7 +415,7 @@ function CsvUploadPanel({ onImport, importing }: { onImport: (rows: any[]) => vo
               </table>
             </div>
           )}
-          <Button disabled={!ready || importing} onClick={() => onImport(buildTransactions())} className="w-full">
+          <Button disabled={!ready || importing} onClick={() => onImport(buildImportPayload())} className="w-full">
             {importing ? "Importing…" : `Import ${rows.length} transactions`}
           </Button>
         </div>
@@ -409,6 +435,7 @@ export default function FinanceTrackerPage() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
   const [dataIntakeOpen, setDataIntakeOpen] = useState(false);
+  const [lastImportResult, setLastImportResult] = useState<ImportResult | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [editTxn, setEditTxn] = useState<Transaction | null>(null);
   const [groupBy, setGroupBy] = useState("month");
@@ -485,18 +512,26 @@ export default function FinanceTrackerPage() {
     onError: () => toast({ title: "Failed to delete", variant: "destructive" }),
   });
   const bulkMut = useMutation({
-    mutationFn: (rows: any[]) => apiRequest("POST", "/api/transactions/bulk", { transactions: rows }),
+    mutationFn: (payload: { transactions: any[]; rejected: Record<string, number> }) =>
+      apiRequest("POST", "/api/transactions/bulk", payload),
     onSuccess: (res: any) => res.json().then((d: any) => {
+      const importResult: ImportResult = {
+        inserted: Number(d.inserted ?? 0),
+        skipped: Number(d.skipped ?? 0),
+        skippedReasons: d.skippedReasons ?? {},
+      };
       invalidateAll();
       setPeriod("all");
       setCustomStart("");
       setCustomEnd("");
       setPage(1);
       setDataIntakeOpen(false);
+      setLastImportResult(importResult);
       toast({
-        title: `Imported ${d.inserted} transactions`,
+        title: "CSV upload complete",
         description: [
-          "Showing All Time so imported dates are visible.",
+          `${importResult.inserted} uploaded · ${importResult.skipped} not uploaded.`,
+          "Showing All Time so uploaded dates are visible.",
           d.recurringMarked ? `${d.recurringMarked} marked as recurring` : "",
         ].filter(Boolean).join(" "),
       });
@@ -571,7 +606,7 @@ export default function FinanceTrackerPage() {
                 </Button>
               </TabsContent>
               <TabsContent value="upload" className="mt-4">
-                <CsvUploadPanel onImport={rows => bulkMut.mutate(rows)} importing={bulkMut.isPending} />
+                <CsvUploadPanel onImport={payload => bulkMut.mutate(payload)} importing={bulkMut.isPending} />
               </TabsContent>
               <TabsContent value="import" className="mt-4">
                 <ConnectedAccountsImportPanel onImported={invalidateAll} />
@@ -579,6 +614,31 @@ export default function FinanceTrackerPage() {
             </Tabs>
           </CardContent>
         </Card>
+      )}
+      {lastImportResult && (
+        <div className="flex items-start justify-between gap-3 rounded-lg border border-emerald-200 bg-emerald-50/70 p-3 dark:border-emerald-900/60 dark:bg-emerald-950/20" role="status">
+          <div className="flex items-start gap-2.5">
+            <Upload className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+            <div className="text-sm">
+              <p className="font-medium text-emerald-800 dark:text-emerald-300">CSV upload complete</p>
+              <p className="mt-0.5 text-emerald-700 dark:text-emerald-400">
+                <strong>{lastImportResult.inserted}</strong> uploaded · <strong>{lastImportResult.skipped}</strong> not uploaded
+              </p>
+              {lastImportResult.skipped > 0 && (
+                <p className="mt-1 text-xs text-emerald-700 dark:text-emerald-400">
+                  Not uploaded: {Object.entries(lastImportResult.skippedReasons)
+                    .filter(([, count]) => count > 0)
+                    .map(([reason, count]) => `${count} ${reason.toLowerCase()}`)
+                    .join(" · ")}
+                </p>
+              )}
+            </div>
+          </div>
+          <Button size="icon" variant="ghost" className="h-7 w-7 text-emerald-700 hover:text-emerald-900 dark:text-emerald-400" onClick={() => setLastImportResult(null)}>
+            <X className="h-4 w-4" />
+            <span className="sr-only">Dismiss upload summary</span>
+          </Button>
+        </div>
       )}
 
       {/* ── Period Selector ── */}

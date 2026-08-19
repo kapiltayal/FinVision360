@@ -394,30 +394,55 @@ export function registerFinanceTrackerRoutes(app: Express) {
   app.post("/api/transactions/bulk", requireAuth, async (req, res) => {
     try {
       const userId = (req.user as any).id;
-      const { transactions } = req.body;
+      const { transactions, rejected: clientRejected = {} } = req.body;
 
-      if (!Array.isArray(transactions) || transactions.length === 0)
+      if (!Array.isArray(transactions))
         return res.status(400).json({ message: "transactions array required" });
 
       let inserted = 0;
-      let skipped = 0;
+      const skippedReasons: Record<string, number> = {};
+      const addSkipped = (reason: string) => {
+        skippedReasons[reason] = (skippedReasons[reason] ?? 0) + 1;
+      };
 
-      for (const t of transactions) {
-        if (!t.date || !t.description || t.amount === undefined || !t.type) { skipped++; continue; }
-        const cat = autoCategorizeFn(t.description, t.type);
-        const finalSubcat = t.subcategory && t.subcategory !== "unassigned" ? t.subcategory : cat.subcategory;
-        const finalNW = t.needsWant || cat.needsWant;
-
-        await pool.query(
-          `INSERT INTO transactions (user_id, date, description, merchant, amount, type, subcategory, needs_want, source, notes)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'upload',$9)`,
-          [userId, t.date, t.description, t.merchant || t.description, Math.abs(parseFloat(t.amount)), t.type, finalSubcat, finalNW, t.notes || null]
-        );
-        inserted++;
+      if (clientRejected && typeof clientRejected === "object") {
+        for (const [reason, count] of Object.entries(clientRejected)) {
+          const numericCount = Number(count);
+          if (numericCount > 0) skippedReasons[reason] = numericCount;
+        }
       }
 
-      const recurringMarked = await detectAndMarkRecurring(userId);
-      res.json({ inserted, skipped, recurringMarked });
+      for (const t of transactions) {
+        if (!t.date) { addSkipped("Missing or invalid date"); continue; }
+        if (!t.description) { addSkipped("Missing description"); continue; }
+        if (t.amount === undefined || t.amount === null || !Number.isFinite(Number(t.amount))) {
+          addSkipped("Missing or invalid amount");
+          continue;
+        }
+        if (t.type !== "income" && t.type !== "expense") {
+          addSkipped("Invalid transaction type");
+          continue;
+        }
+
+        try {
+          const cat = autoCategorizeFn(t.description, t.type);
+          const finalSubcat = t.subcategory && t.subcategory !== "unassigned" ? t.subcategory : cat.subcategory;
+          const finalNW = t.needsWant || cat.needsWant;
+
+          await pool.query(
+            `INSERT INTO transactions (user_id, date, description, merchant, amount, type, subcategory, needs_want, source, notes)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'upload',$9)`,
+            [userId, t.date, t.description, t.merchant || t.description, Math.abs(parseFloat(t.amount)), t.type, finalSubcat, finalNW, t.notes || null]
+          );
+          inserted++;
+        } catch {
+          addSkipped("Could not save record");
+        }
+      }
+
+      const recurringMarked = inserted ? await detectAndMarkRecurring(userId) : 0;
+      const skipped = Object.values(skippedReasons).reduce((total, count) => total + count, 0);
+      res.json({ inserted, skipped, skippedReasons, recurringMarked });
     } catch (e) {
       console.error(e);
       res.status(500).json({ message: "Failed to import transactions" });
