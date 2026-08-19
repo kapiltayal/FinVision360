@@ -471,7 +471,17 @@ export default function FinanceTrackerPage() {
     mutationFn: (rows: any[]) => apiRequest("POST", "/api/transactions/bulk", { transactions: rows }),
     onSuccess: (res: any) => res.json().then((d: any) => {
       invalidateAll();
-      toast({ title: `Imported ${d.inserted} transactions`, description: d.recurringMarked ? `${d.recurringMarked} marked as recurring` : undefined });
+      setPeriod("all");
+      setCustomStart("");
+      setCustomEnd("");
+      setPage(1);
+      toast({
+        title: `Imported ${d.inserted} transactions`,
+        description: [
+          "Showing All Time so imported dates are visible.",
+          d.recurringMarked ? `${d.recurringMarked} marked as recurring` : "",
+        ].filter(Boolean).join(" "),
+      });
     }),
     onError: () => toast({ title: "Import failed", variant: "destructive" }),
   });
