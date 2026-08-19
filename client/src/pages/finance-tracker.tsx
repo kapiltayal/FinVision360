@@ -53,6 +53,7 @@ const INCOME_SUBCATS = [
   { value: "gift", label: "Gift / Transfer" }, { value: "refund", label: "Refund / Cashback" },
   { value: "other_income", label: "Other Income" }, { value: "unassigned", label: "Unassigned" },
 ];
+const PAGE_SIZE_OPTIONS = [25, 50, 100, 250, 500];
 const EXPENSE_SUBCATS = [
   { value: "housing", label: "Housing / Rent" }, { value: "utilities", label: "Utilities" },
   { value: "groceries", label: "Groceries" }, { value: "transportation", label: "Transportation" },
@@ -406,7 +407,7 @@ export default function FinanceTrackerPage() {
   const [typeFilter, setTypeFilter] = useState("all");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
-  const PAGE_SIZE = 25;
+  const [pageSize, setPageSize] = useState(50);
   const [dataIntakeOpen, setDataIntakeOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [editTxn, setEditTxn] = useState<Transaction | null>(null);
@@ -525,8 +526,8 @@ export default function FinanceTrackerPage() {
     .slice(0, 8)
     .map(r => ({ name: catLabel(r.subcategory), value: parseFloat(r.total), key: r.subcategory }));
 
-  const totalPages = Math.max(1, Math.ceil(transactions.length / PAGE_SIZE));
-  const pageTxns = transactions.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const totalPages = Math.max(1, Math.ceil(transactions.length / pageSize));
+  const pageTxns = transactions.slice((page - 1) * pageSize, page * pageSize);
 
   return (
     <div className="p-4 md:p-6 space-y-5 max-w-7xl mx-auto">
@@ -760,6 +761,23 @@ export default function FinanceTrackerPage() {
               {unassigned > 0 && <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 border-amber-200">{unassigned} unassigned</Badge>}
             </CardTitle>
             <div className="flex items-center gap-2 flex-wrap">
+              {/* Page size */}
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs text-muted-foreground whitespace-nowrap">Per page</span>
+                <Select
+                  value={String(pageSize)}
+                  onValueChange={value => { setPageSize(Number(value)); setPage(1); }}
+                >
+                  <SelectTrigger className="h-8 w-[76px] text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PAGE_SIZE_OPTIONS.map(size => (
+                      <SelectItem key={size} value={String(size)}>{size}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
               {/* Type filter */}
               <div className="flex rounded-lg border overflow-hidden text-xs">
                 {[["all","All"],["income","Income"],["expense","Expense"]].map(([v,l]) => (
@@ -855,7 +873,7 @@ export default function FinanceTrackerPage() {
           {/* Pagination */}
           {totalPages > 1 && (
             <div className="flex items-center justify-between px-4 py-3 border-t">
-              <span className="text-xs text-muted-foreground">Page {page} of {totalPages} · {transactions.length} total</span>
+              <span className="text-xs text-muted-foreground">Page {page} of {totalPages} · {transactions.length} total · {pageSize} per page</span>
               <div className="flex gap-1">
                 <Button size="icon" variant="outline" className="h-7 w-7" disabled={page === 1} onClick={() => setPage(p => p - 1)}><ChevronLeft className="h-4 w-4" /></Button>
                 <Button size="icon" variant="outline" className="h-7 w-7" disabled={page === totalPages} onClick={() => setPage(p => p + 1)}><ChevronRight className="h-4 w-4" /></Button>
