@@ -5,6 +5,41 @@ import type { Transaction as PlaidTransaction } from "plaid";
 import { getPlaidClient } from "./plaid";
 import { storage } from "./storage";
 
+function normalizeDateValue(value: unknown): string | null {
+  if (value instanceof Date) return value.toISOString().slice(0, 10);
+  if (typeof value === "string") return value.slice(0, 10);
+  return null;
+}
+
+function startOfPeriod(dateValue: string, groupBy: string): Date {
+  const [year, month, day] = dateValue.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+
+  if (groupBy === "day") return date;
+  if (groupBy === "week") {
+    const daysSinceMonday = (date.getUTCDay() + 6) % 7;
+    date.setUTCDate(date.getUTCDate() - daysSinceMonday);
+    return date;
+  }
+  if (groupBy === "year") {
+    return new Date(Date.UTC(year, 0, 1));
+  }
+  return new Date(Date.UTC(year, month - 1, 1));
+}
+
+function advancePeriod(date: Date, groupBy: string): Date {
+  const next = new Date(date);
+  if (groupBy === "day") next.setUTCDate(next.getUTCDate() + 1);
+  else if (groupBy === "week") next.setUTCDate(next.getUTCDate() + 7);
+  else if (groupBy === "year") next.setUTCFullYear(next.getUTCFullYear() + 1);
+  else next.setUTCMonth(next.getUTCMonth() + 1);
+  return next;
+}
+
+function isoDate(date: Date): string {
+  return date.toISOString().slice(0, 10);
+}
+
 // ─── AUTO-CATEGORIZATION ENGINE ──────────────────────────────────────────────
 function autoCategorizeFn(
   description: string,
@@ -251,15 +286,51 @@ export function registerFinanceTrackerRoutes(app: Express) {
       if (startDate) { where += ` AND date >= $${idx++}`; params.push(startDate); }
       if (endDate) { where += ` AND date <= $${idx++}`; params.push(endDate); }
 
-      const { rows } = await pool.query(
+      const [{ rows }, { rows: boundaryRows }] = await Promise.all([
+        pool.query(
         `SELECT DATE_TRUNC('${trunc}', date)::DATE AS period,
                 COALESCE(SUM(CASE WHEN type='income'  THEN amount ELSE 0 END),0) AS income,
                 COALESCE(SUM(CASE WHEN type='expense' THEN amount ELSE 0 END),0) AS expenses
          FROM transactions ${where}
          GROUP BY period ORDER BY period ASC`,
-        params
+          params
+        ),
+        pool.query(
+          `SELECT MIN(date)::DATE AS min_date, MAX(date)::DATE AS max_date
+           FROM transactions ${where}`,
+          params
+        ),
+      ]);
+
+      const minDate = startDate || normalizeDateValue(boundaryRows[0]?.min_date);
+      const maxDate = endDate || normalizeDateValue(boundaryRows[0]?.max_date);
+      if (!minDate || !maxDate || minDate > maxDate) {
+        res.json([]);
+        return;
+      }
+
+      const firstPeriod = startOfPeriod(minDate, trunc);
+      const lastPeriod = startOfPeriod(maxDate, trunc);
+      const rowsByPeriod = new Map(
+        rows.map(row => [normalizeDateValue(row.period), row])
       );
-      res.json(rows);
+      const completeSeries = [];
+
+      for (
+        let cursor = firstPeriod;
+        cursor <= lastPeriod;
+        cursor = advancePeriod(cursor, trunc)
+      ) {
+        const period = isoDate(cursor);
+        const row = rowsByPeriod.get(period);
+        completeSeries.push({
+          period,
+          income: row?.income ?? "0",
+          expenses: row?.expenses ?? "0",
+        });
+      }
+
+      res.json(completeSeries);
     } catch (e) {
       console.error(e);
       res.status(500).json({ message: "Failed to fetch trend" });
