@@ -352,11 +352,11 @@ function CsvUploadPanel({ onImport, importing }: { onImport: (rows: any[]) => vo
             ].map(({ label, val, set }) => (
               <div key={label}>
                 <Label className="text-xs">{label}</Label>
-                <Select value={val} onValueChange={set}>
+                <Select value={val} onValueChange={value => set(value === "none" ? "" : value)}>
                   <SelectTrigger className="mt-1 text-xs"><SelectValue placeholder="Select…" /></SelectTrigger>
                   <SelectContent>
                     {colType === "" || label !== "Type column (optional)" ? null : null}
-                    {label === "Type column (optional)" && <SelectItem value="">— none —</SelectItem>}
+                    {label === "Type column (optional)" && <SelectItem value="none">— none —</SelectItem>}
                     {headers.map((h, i) => <SelectItem key={i} value={String(i)}>{h || `Col ${i + 1}`}</SelectItem>)}
                   </SelectContent>
                 </Select>
