@@ -98,7 +98,8 @@ const CAT_COLORS: Record<string, string> = {
 
 const PERIOD_OPTIONS = [
   { value: "today", label: "Today" }, { value: "week", label: "This Week" },
-  { value: "month", label: "This Month" }, { value: "year", label: "This Year" },
+  { value: "month", label: "This Month" }, { value: "lastMonth", label: "Last Month" },
+  { value: "last90", label: "Last 90 Days" }, { value: "year", label: "This Year" },
   { value: "all", label: "All Time" }, { value: "custom", label: "Custom" },
 ];
 
@@ -126,6 +127,12 @@ function catLabel(v: string) {
 function getDateRange(period: string, customStart?: string, customEnd?: string) {
   const now = new Date();
   const today = now.toISOString().split("T")[0];
+  const formatDate = (date: Date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  };
   if (period === "today") return { start: today, end: today };
   if (period === "week") {
     const d = new Date(now); d.setDate(d.getDate() - 6);
@@ -133,6 +140,16 @@ function getDateRange(period: string, customStart?: string, customEnd?: string) 
   }
   if (period === "month") {
     return { start: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`, end: today };
+  }
+  if (period === "lastMonth") {
+    const start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const end = new Date(now.getFullYear(), now.getMonth(), 0);
+    return { start: formatDate(start), end: formatDate(end) };
+  }
+  if (period === "last90") {
+    const start = new Date(now);
+    start.setDate(start.getDate() - 89);
+    return { start: formatDate(start), end: today };
   }
   if (period === "year") return { start: `${now.getFullYear()}-01-01`, end: today };
   if (period === "custom") return { start: customStart, end: customEnd };
