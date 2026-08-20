@@ -16,7 +16,8 @@ import {
   TrendingUp, TrendingDown, Wallet, Plus, Upload, RefreshCw, Pencil, Trash2,
   AlertCircle, ArrowDownCircle, ArrowUpCircle, Repeat2, Tag, Search, X,
   ChevronLeft, ChevronRight, ArrowUp, ArrowDown, ArrowUpDown, BarChart3,
-  PieChart as PieChartIcon, Landmark, Database, CalendarDays,
+  PieChart as PieChartIcon, Landmark, Database, CalendarDays, CreditCard,
+  HeartHandshake,
 } from "lucide-react";
 import {
   ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
@@ -60,6 +61,25 @@ type ImportResult = {
 };
 type TrendRow = { period: string; income: string; expenses: string };
 type CatRow = { subcategory: string; total: string; count: string };
+type SubscriptionInsight = {
+  name: string;
+  charge_count: string;
+  total_paid: string;
+  latest_amount: string;
+  latest_charge_date: string;
+};
+type SpendingInsights = {
+  subscriptions: {
+    count: string;
+    total: string;
+    items: SubscriptionInsight[];
+  };
+  needsWant: {
+    needs: string;
+    wants: string;
+    unclassified: string;
+  };
+};
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const INCOME_SUBCATS = [
@@ -453,6 +473,224 @@ function CsvUploadPanel({
   );
 }
 
+// ── Spending Insight Carousel ────────────────────────────────────────────────
+function SpendingInsightCarousel({
+  categoryData,
+  categoryType,
+  onCategoryTypeChange,
+  insights,
+  insightsLoading,
+}: {
+  categoryData: { name: string; value: number; key: string }[];
+  categoryType: "income" | "expense";
+  onCategoryTypeChange: (type: "income" | "expense") => void;
+  insights: SpendingInsights | undefined;
+  insightsLoading: boolean;
+}) {
+  const [activeSlide, setActiveSlide] = useState(0);
+  const touchStartX = useRef<number | null>(null);
+  const slides = [
+    { title: "By Category", icon: PieChartIcon },
+    { title: "Subscriptions", icon: CreditCard },
+    { title: "Need vs Want", icon: HeartHandshake },
+  ];
+  const subscriptionCount = Number(insights?.subscriptions.count ?? 0);
+  const subscriptionTotal = Number(insights?.subscriptions.total ?? 0);
+  const needsTotal = Number(insights?.needsWant.needs ?? 0);
+  const wantsTotal = Number(insights?.needsWant.wants ?? 0);
+  const unclassifiedTotal = Number(insights?.needsWant.unclassified ?? 0);
+  const classifiedTotal = needsTotal + wantsTotal;
+  const needsPercent = classifiedTotal ? (needsTotal / classifiedTotal) * 100 : 0;
+
+  const goToSlide = (slide: number) => {
+    setActiveSlide((slide + slides.length) % slides.length);
+  };
+  const goNext = () => goToSlide(activeSlide + 1);
+  const goPrevious = () => goToSlide(activeSlide - 1);
+  const handleTouchEnd = (x: number) => {
+    if (touchStartX.current === null) return;
+    const swipeDistance = x - touchStartX.current;
+    touchStartX.current = null;
+    if (Math.abs(swipeDistance) < 48) return;
+    if (swipeDistance < 0) goNext();
+    else goPrevious();
+  };
+
+  const ActiveIcon = slides[activeSlide].icon;
+
+  return (
+    <Card className="overflow-hidden">
+      <CardHeader className="pb-2">
+        <div className="flex items-center justify-between gap-2">
+          <CardTitle className="text-sm flex items-center gap-2">
+            <ActiveIcon className="h-4 w-4 text-violet-500" />
+            {slides[activeSlide].title}
+          </CardTitle>
+          {activeSlide === 0 && (
+            <div className="flex gap-1" aria-label="Category transaction type">
+              {(["expense", "income"] as const).map(type => (
+                <button
+                  key={type}
+                  onClick={() => onCategoryTypeChange(type)}
+                  aria-pressed={categoryType === type}
+                  className={`px-2 py-0.5 text-xs rounded-full border transition-all ${categoryType === type ? "bg-violet-600 text-white border-violet-600" : "border-slate-200 dark:border-slate-700 text-muted-foreground"}`}
+                >
+                  {type.charAt(0).toUpperCase() + type.slice(1)}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </CardHeader>
+      <CardContent className="pb-4">
+        <div
+          className="touch-pan-y outline-none"
+          role="group"
+          aria-roledescription="carousel"
+          aria-label="Spending insights"
+          aria-live="polite"
+          tabIndex={0}
+          onTouchStart={event => { touchStartX.current = event.touches[0]?.clientX ?? null; }}
+          onTouchEnd={event => handleTouchEnd(event.changedTouches[0]?.clientX ?? 0)}
+          onTouchCancel={() => { touchStartX.current = null; }}
+          onKeyDown={event => {
+            if (event.key === "ArrowRight") { event.preventDefault(); goNext(); }
+            if (event.key === "ArrowLeft") { event.preventDefault(); goPrevious(); }
+          }}
+        >
+          {activeSlide === 0 && (
+            categoryData.length === 0
+              ? <div className="h-[244px] flex items-center justify-center text-muted-foreground text-sm">No {categoryType} data</div>
+              : (
+                <>
+                  <ResponsiveContainer width="100%" height={160}>
+                    <PieChart>
+                      <Pie data={categoryData} dataKey="value" cx="50%" cy="50%" innerRadius={40} outerRadius={72} paddingAngle={2}>
+                        {categoryData.map(d => <Cell key={d.key} fill={CAT_COLORS[d.key] ?? "#94a3b8"} />)}
+                      </Pie>
+                      <Tooltip formatter={(value: any) => fmtFull(Number(value))} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div className="space-y-1 mt-2 max-h-36 overflow-y-auto pr-1">
+                    {categoryData.map(d => (
+                      <div key={d.key} className="flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: CAT_COLORS[d.key] ?? "#94a3b8" }} />
+                          <span className="text-muted-foreground truncate">{d.name}</span>
+                        </div>
+                        <span className="font-medium tabular-nums ml-3">{fmt(d.value)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )
+          )}
+
+          {activeSlide === 1 && (
+            insightsLoading
+              ? <div className="space-y-3 pt-1"><Skeleton className="h-16 w-full" /><Skeleton className="h-28 w-full" /></div>
+              : subscriptionCount === 0
+                ? <div className="h-[244px] flex flex-col items-center justify-center text-center px-5">
+                    <CreditCard className="h-8 w-8 text-muted-foreground/60 mb-2" />
+                    <p className="text-sm font-medium">No subscriptions identified</p>
+                    <p className="text-xs text-muted-foreground mt-1">Mark a recurring transaction as a subscription to see it here.</p>
+                  </div>
+                : (
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="rounded-lg bg-violet-50 dark:bg-violet-950/30 px-3 py-2.5">
+                        <p className="text-[10px] uppercase tracking-wide font-semibold text-muted-foreground">Subscriptions</p>
+                        <p className="mt-0.5 text-xl font-bold text-violet-700 dark:text-violet-300">{subscriptionCount}</p>
+                      </div>
+                      <div className="rounded-lg bg-slate-50 dark:bg-slate-900/50 px-3 py-2.5">
+                        <p className="text-[10px] uppercase tracking-wide font-semibold text-muted-foreground">Paid this period</p>
+                        <p className="mt-0.5 text-xl font-bold tabular-nums">{fmt(subscriptionTotal)}</p>
+                      </div>
+                    </div>
+                    <div className="max-h-[153px] overflow-y-auto rounded-lg border divide-y">
+                      {insights?.subscriptions.items.map(item => (
+                        <div key={item.name} className="flex items-center justify-between gap-3 px-3 py-2">
+                          <div className="min-w-0">
+                            <p className="text-xs font-medium truncate">{item.name}</p>
+                            <p className="text-[11px] text-muted-foreground">
+                              {item.charge_count} charge{Number(item.charge_count) === 1 ? "" : "s"} · {fmt(Number(item.total_paid))} paid
+                            </p>
+                          </div>
+                          <div className="shrink-0 text-right">
+                            <p className="text-xs font-semibold tabular-nums">{fmtFull(Number(item.latest_amount))}</p>
+                            <p className="text-[10px] text-muted-foreground">latest charge</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )
+          )}
+
+          {activeSlide === 2 && (
+            insightsLoading
+              ? <div className="space-y-3 pt-1"><Skeleton className="h-20 w-full" /><Skeleton className="h-24 w-full" /></div>
+              : classifiedTotal === 0
+                ? <div className="h-[244px] flex flex-col items-center justify-center text-center px-5">
+                    <HeartHandshake className="h-8 w-8 text-muted-foreground/60 mb-2" />
+                    <p className="text-sm font-medium">No classified spending</p>
+                    <p className="text-xs text-muted-foreground mt-1">Tag expense transactions as Need or Want to see the breakdown.</p>
+                  </div>
+                : (
+                  <div className="space-y-4 pt-1">
+                    <p className="text-xs text-muted-foreground">Of your tagged expenses, here is where your spending went.</p>
+                    <div className="h-4 rounded-full overflow-hidden bg-rose-100 dark:bg-rose-950/40 flex" aria-label={`${needsPercent.toFixed(0)}% needs and ${(100 - needsPercent).toFixed(0)}% wants`}>
+                      <div className="bg-emerald-500 transition-all" style={{ width: `${needsPercent}%` }} />
+                      <div className="bg-rose-500 transition-all" style={{ width: `${100 - needsPercent}%` }} />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="rounded-lg border border-emerald-100 bg-emerald-50/60 dark:border-emerald-900/60 dark:bg-emerald-950/20 p-3">
+                        <div className="flex items-center gap-1.5 text-xs font-medium text-emerald-700 dark:text-emerald-300">
+                          <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />Needs
+                        </div>
+                        <p className="mt-1 text-xl font-bold tabular-nums">{fmt(needsTotal)}</p>
+                        <p className="text-[11px] text-muted-foreground">{needsPercent.toFixed(0)}% of tagged spending</p>
+                      </div>
+                      <div className="rounded-lg border border-rose-100 bg-rose-50/60 dark:border-rose-900/60 dark:bg-rose-950/20 p-3">
+                        <div className="flex items-center gap-1.5 text-xs font-medium text-rose-700 dark:text-rose-300">
+                          <span className="h-2.5 w-2.5 rounded-full bg-rose-500" />Wants
+                        </div>
+                        <p className="mt-1 text-xl font-bold tabular-nums">{fmt(wantsTotal)}</p>
+                        <p className="text-[11px] text-muted-foreground">{(100 - needsPercent).toFixed(0)}% of tagged spending</p>
+                      </div>
+                    </div>
+                    {unclassifiedTotal > 0 && (
+                      <p className="text-[11px] text-muted-foreground text-center">{fmt(unclassifiedTotal)} in expenses is not tagged as Need or Want.</p>
+                    )}
+                  </div>
+                )
+          )}
+        </div>
+
+        <div className="mt-3 pt-3 border-t flex items-center justify-between">
+          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={goPrevious} aria-label={`Show ${slides[(activeSlide + slides.length - 1) % slides.length].title}`}>
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <div className="flex items-center gap-1.5" aria-label={`Insight ${activeSlide + 1} of ${slides.length}`}>
+            {slides.map((slide, index) => (
+              <button
+                key={slide.title}
+                onClick={() => goToSlide(index)}
+                className={`h-2 rounded-full transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 ${index === activeSlide ? "w-5 bg-violet-600" : "w-2 bg-slate-300 dark:bg-slate-700"}`}
+                aria-label={`Show ${slide.title}`}
+                aria-current={index === activeSlide ? "true" : undefined}
+              />
+            ))}
+          </div>
+          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={goNext} aria-label={`Show ${slides[(activeSlide + 1) % slides.length].title}`}>
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function FinanceTrackerPage() {
   const { toast } = useToast();
@@ -488,7 +726,11 @@ export default function FinanceTrackerPage() {
   const statsQK = ["/api/transactions/stats", start, end];
   const trendQK = ["/api/transactions/trend", start, end, groupBy];
   const catQK = ["/api/transactions/categories", start, end, catChartType];
+  const insightsQK = ["/api/transactions/insights", start, end];
   const txnQK = ["/api/transactions", start, end, typeFilter, search];
+  const insightParams = new URLSearchParams();
+  if (start) insightParams.set("startDate", start);
+  if (end) insightParams.set("endDate", end);
 
   const { data: stats, isLoading: statsL } = useQuery<Stats>({
     queryKey: statsQK,
@@ -519,12 +761,17 @@ export default function FinanceTrackerPage() {
     queryFn: () => apiRequest("GET", `/api/transactions/categories${buildQS({ type: catChartType })}`).then(r => r.json()).catch(() => []),
   });
   const catData: CatRow[] = Array.isArray(catRaw) ? catRaw : [];
+  const { data: insights, isLoading: insightsLoading } = useQuery<SpendingInsights>({
+    queryKey: insightsQK,
+    queryFn: () => apiRequest("GET", `/api/transactions/insights?${insightParams.toString()}`).then(r => r.json()).catch(() => undefined),
+  });
 
   function invalidateAll() {
     queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
     queryClient.invalidateQueries({ queryKey: ["/api/transactions/stats"] });
     queryClient.invalidateQueries({ queryKey: ["/api/transactions/trend"] });
     queryClient.invalidateQueries({ queryKey: ["/api/transactions/categories"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/transactions/insights"] });
   }
 
   const createMut = useMutation({
@@ -849,51 +1096,13 @@ export default function FinanceTrackerPage() {
           </CardContent>
         </Card>
 
-        {/* Category Donut */}
-        <Card>
-          <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm flex items-center gap-2">
-                <PieChartIcon className="h-4 w-4 text-violet-500" />By Category
-              </CardTitle>
-              <div className="flex gap-1">
-                {(["expense","income"] as const).map(t => (
-                  <button key={t} onClick={() => setCatChartType(t)}
-                    className={`px-2 py-0.5 text-xs rounded-full border transition-all ${catChartType===t?"bg-violet-600 text-white border-violet-600":"border-slate-200 dark:border-slate-700 text-muted-foreground"}`}>
-                    {t.charAt(0).toUpperCase()+t.slice(1)}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {donutData.length === 0
-              ? <div className="h-44 flex items-center justify-center text-muted-foreground text-sm">No data</div>
-              : (
-                <>
-                  <ResponsiveContainer width="100%" height={160}>
-                    <PieChart>
-                      <Pie data={donutData} dataKey="value" cx="50%" cy="50%" innerRadius={40} outerRadius={72} paddingAngle={2}>
-                        {donutData.map(d => <Cell key={d.key} fill={CAT_COLORS[d.key] ?? "#94a3b8"} />)}
-                      </Pie>
-                      <Tooltip formatter={(v: any) => fmtFull(v)} />
-                    </PieChart>
-                  </ResponsiveContainer>
-                  <div className="space-y-1 mt-2 max-h-36 overflow-y-auto pr-1">
-                    {donutData.map(d => (
-                      <div key={d.key} className="flex items-center justify-between text-xs">
-                        <div className="flex items-center gap-1.5">
-                          <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: CAT_COLORS[d.key] ?? "#94a3b8" }} />
-                          <span className="text-muted-foreground truncate max-w-[110px]">{d.name}</span>
-                        </div>
-                        <span className="font-medium tabular-nums">{fmt(d.value)}</span>
-                      </div>
-                    ))}
-                  </div>
-                </>
-              )}
-          </CardContent>
-        </Card>
+        <SpendingInsightCarousel
+          categoryData={donutData}
+          categoryType={catChartType}
+          onCategoryTypeChange={setCatChartType}
+          insights={insights}
+          insightsLoading={insightsLoading}
+        />
       </div>
 
       {/* ── Transaction Table ── */}

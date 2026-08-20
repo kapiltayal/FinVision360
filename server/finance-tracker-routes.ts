@@ -363,6 +363,67 @@ export function registerFinanceTrackerRoutes(app: Express) {
     }
   });
 
+  // GET /api/transactions/insights — subscription and Need/Want spending summaries
+  app.get("/api/transactions/insights", requireAuth, async (req, res) => {
+    try {
+      const userId = (req.user as any).id;
+      const { startDate, endDate } = req.query as Record<string, string>;
+
+      let expenseWhere = `WHERE user_id = $1 AND type = 'expense'`;
+      const params: any[] = [userId];
+      let idx = 2;
+      if (startDate) { expenseWhere += ` AND date >= $${idx++}`; params.push(startDate); }
+      if (endDate) { expenseWhere += ` AND date <= $${idx++}`; params.push(endDate); }
+      const subscriptionWhere = `${expenseWhere} AND is_recurring = TRUE AND recurring_type = 'subscription'`;
+
+      const [
+        { rows: subscriptionSummaryRows },
+        { rows: subscriptionRows },
+        { rows: needsWantRows },
+      ] = await Promise.all([
+        pool.query(
+          `SELECT
+             COUNT(DISTINCT COALESCE(NULLIF(TRIM(merchant), ''), description)) AS count,
+             COALESCE(SUM(amount), 0) AS total
+           FROM transactions ${subscriptionWhere}`,
+          params,
+        ),
+        pool.query(
+          `SELECT
+             COALESCE(NULLIF(TRIM(merchant), ''), description) AS name,
+             COUNT(*) AS charge_count,
+             COALESCE(SUM(amount), 0) AS total_paid,
+             (ARRAY_AGG(amount ORDER BY date DESC, created_at DESC))[1] AS latest_amount,
+             MAX(date)::DATE AS latest_charge_date
+           FROM transactions ${subscriptionWhere}
+           GROUP BY COALESCE(NULLIF(TRIM(merchant), ''), description)
+           ORDER BY total_paid DESC, name ASC`,
+          params,
+        ),
+        pool.query(
+          `SELECT
+             COALESCE(SUM(CASE WHEN needs_want = 'need' THEN amount ELSE 0 END), 0) AS needs,
+             COALESCE(SUM(CASE WHEN needs_want = 'want' THEN amount ELSE 0 END), 0) AS wants,
+             COALESCE(SUM(CASE WHEN needs_want IS NULL OR needs_want = 'na' THEN amount ELSE 0 END), 0) AS unclassified
+           FROM transactions ${expenseWhere}`,
+          params,
+        ),
+      ]);
+
+      res.json({
+        subscriptions: {
+          count: subscriptionSummaryRows[0]?.count ?? "0",
+          total: subscriptionSummaryRows[0]?.total ?? "0",
+          items: subscriptionRows,
+        },
+        needsWant: needsWantRows[0] ?? { needs: "0", wants: "0", unclassified: "0" },
+      });
+    } catch (e) {
+      console.error(e);
+      res.status(500).json({ message: "Failed to fetch spending insights" });
+    }
+  });
+
   // POST /api/transactions — create single
   app.post("/api/transactions", requireAuth, async (req, res) => {
     try {
