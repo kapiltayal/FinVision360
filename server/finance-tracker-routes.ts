@@ -721,39 +721,114 @@ export function registerFinanceTrackerRoutes(app: Express) {
     try {
       const userId = (req.user as any).id;
       const id = parseInt(req.params.id);
-      const { date, description, amount, type, subcategory, needsWant, isRecurring, recurringType, notes } = req.body;
+      if (!Number.isInteger(id)) return res.status(400).json({ message: "Invalid transaction id" });
 
-      const { rows } = await pool.query(
-        `UPDATE transactions SET
-           date          = COALESCE($1, date),
-           description   = COALESCE($2, description),
-           merchant      = COALESCE($2, merchant),
-           amount        = COALESCE($3, amount),
-           type          = COALESCE($4, type),
-           subcategory   = COALESCE($5, subcategory),
-           needs_want    = COALESCE($6, needs_want),
-           is_recurring  = COALESCE($7, is_recurring),
-           recurring_type= COALESCE($8, recurring_type),
-           notes         = COALESCE($9, notes),
-           updated_at    = NOW()
-         WHERE id=$10 AND user_id=$11 RETURNING *`,
-        [
-          date || null,
-          description || null,
-          amount !== undefined ? Math.abs(parseFloat(amount)) : null,
-          type || null,
-          subcategory || null,
-          needsWant !== undefined ? needsWant : null,
-          isRecurring !== undefined ? isRecurring : null,
-          recurringType !== undefined ? recurringType : null,
-          notes !== undefined ? notes : null,
-          id,
-          userId,
-        ]
+      const {
+        date, description, amount, type, subcategory, needsWant, isRecurring, recurringType, notes,
+        applyToMerchant = false, merchantFields = [],
+      } = req.body;
+      const { rows: existingRows } = await pool.query(
+        `SELECT * FROM transactions WHERE id = $1 AND user_id = $2`,
+        [id, userId],
       );
+      const existing = existingRows[0];
+      if (!existing) return res.status(404).json({ message: "Not found" });
 
-      if (rows.length === 0) return res.status(404).json({ message: "Not found" });
-      res.json(rows[0]);
+      const updates: string[] = [];
+      const params: any[] = [];
+      const addUpdate = (column: string, value: unknown) => {
+        params.push(value);
+        updates.push(`${column} = $${params.length}`);
+      };
+
+      if (date !== undefined && date !== normalizeDateValue(existing.date)) addUpdate("date", date);
+      if (description !== undefined && description !== existing.description) {
+        addUpdate("description", description);
+        addUpdate("merchant", description);
+      }
+      if (amount !== undefined && Number.isFinite(Number(amount)) && Number(amount) !== Number(existing.amount)) {
+        addUpdate("amount", Math.abs(Number(amount)));
+      }
+      if (type !== undefined && type !== existing.type) addUpdate("type", type);
+      if (subcategory !== undefined && subcategory !== existing.subcategory) addUpdate("subcategory", subcategory);
+      if (needsWant !== undefined && needsWant !== existing.needs_want) addUpdate("needs_want", needsWant);
+      if (isRecurring !== undefined && Boolean(isRecurring) !== Boolean(existing.is_recurring)) {
+        addUpdate("is_recurring", Boolean(isRecurring));
+      }
+      if (isRecurring === false && existing.recurring_type !== null) {
+        addUpdate("recurring_type", null);
+      } else if (isRecurring !== false && recurringType !== undefined && recurringType !== existing.recurring_type) {
+        addUpdate("recurring_type", recurringType);
+      }
+      if (notes !== undefined && notes !== existing.notes) addUpdate("notes", notes || null);
+
+      let transaction = existing;
+      if (updates.length > 0) {
+        params.push(id, userId);
+        const { rows } = await pool.query(
+          `UPDATE transactions
+           SET ${updates.join(", ")}, updated_at = NOW()
+           WHERE id = $${params.length - 1} AND user_id = $${params.length}
+           RETURNING *`,
+          params,
+        );
+        transaction = rows[0];
+      }
+
+      const allowedMerchantFields = new Set(["subcategory", "needsWant", "recurring"]);
+      const scopedFields = Array.isArray(merchantFields)
+        ? merchantFields.filter((field): field is string => allowedMerchantFields.has(field))
+        : [];
+      let updatedCount = 1;
+
+      if (applyToMerchant === true && scopedFields.length > 0) {
+        if (scopedFields.includes("subcategory") && subcategory === undefined) {
+          return res.status(400).json({ message: "A category is required for a merchant-wide category update" });
+        }
+        if (scopedFields.includes("needsWant") && needsWant === undefined) {
+          return res.status(400).json({ message: "A Need / Want value is required for a merchant-wide update" });
+        }
+        if (scopedFields.includes("recurring") && typeof isRecurring !== "boolean") {
+          return res.status(400).json({ message: "A recurring value is required for a merchant-wide update" });
+        }
+
+        const merchantKey = normalizeMerchant(existing.merchant || existing.description);
+        const { rows: candidateRows } = await pool.query(
+          `SELECT id, merchant, description FROM transactions WHERE user_id = $1`,
+          [userId],
+        );
+        const matchingIds = candidateRows
+          .filter(row => normalizeMerchant(row.merchant || row.description) === merchantKey)
+          .map(row => row.id);
+
+        if (matchingIds.length > 0) {
+          const merchantUpdates: string[] = [];
+          const merchantParams: any[] = [];
+          const addMerchantUpdate = (column: string, value: unknown) => {
+            merchantParams.push(value);
+            merchantUpdates.push(`${column} = $${merchantParams.length}`);
+          };
+
+          if (scopedFields.includes("subcategory")) addMerchantUpdate("subcategory", subcategory);
+          if (scopedFields.includes("needsWant")) addMerchantUpdate("needs_want", needsWant);
+          if (scopedFields.includes("recurring")) {
+            addMerchantUpdate("is_recurring", Boolean(isRecurring));
+            addMerchantUpdate("recurring_type", isRecurring ? (recurringType || null) : null);
+          }
+
+          merchantParams.push(userId, matchingIds);
+          const { rowCount } = await pool.query(
+            `UPDATE transactions
+             SET ${merchantUpdates.join(", ")}, updated_at = NOW()
+             WHERE user_id = $${merchantParams.length - 1}
+               AND id = ANY($${merchantParams.length}::int[])`,
+            merchantParams,
+          );
+          updatedCount = rowCount ?? 0;
+        }
+      }
+
+      res.json({ transaction, updatedCount });
     } catch (e) {
       console.error(e);
       res.status(500).json({ message: "Failed to update transaction" });

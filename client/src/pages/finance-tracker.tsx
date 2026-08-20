@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
@@ -79,6 +79,13 @@ type SpendingInsights = {
     wants: string;
     unclassified: string;
   };
+};
+type MerchantUpdateField = "subcategory" | "needsWant" | "recurring";
+type PendingMerchantUpdate = {
+  id: number;
+  merchantName: string;
+  changedFields: MerchantUpdateField[];
+  data: Record<string, any>;
 };
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -707,6 +714,7 @@ export default function FinanceTrackerPage() {
   const [lastImportResult, setLastImportResult] = useState<ImportResult | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [editTxn, setEditTxn] = useState<Transaction | null>(null);
+  const [pendingMerchantUpdate, setPendingMerchantUpdate] = useState<PendingMerchantUpdate | null>(null);
   const [groupBy, setGroupBy] = useState("month");
   const [trendChartType, setTrendChartType] = useState<"bar" | "line">("bar");
   const [catChartType, setCatChartType] = useState<"income" | "expense">("expense");
@@ -780,8 +788,17 @@ export default function FinanceTrackerPage() {
     onError: () => toast({ title: "Failed to add", variant: "destructive" }),
   });
   const updateMut = useMutation({
-    mutationFn: ({ id, ...data }: any) => apiRequest("PATCH", `/api/transactions/${id}`, data),
-    onSuccess: () => { invalidateAll(); setEditTxn(null); toast({ title: "Transaction updated" }); },
+    mutationFn: ({ id, ...data }: any) => apiRequest("PATCH", `/api/transactions/${id}`, data).then(response => response.json()),
+    onSuccess: (result: { updatedCount?: number }) => {
+      invalidateAll();
+      setEditTxn(null);
+      setPendingMerchantUpdate(null);
+      const updatedCount = Number(result?.updatedCount ?? 1);
+      toast({
+        title: updatedCount > 1 ? `${updatedCount} transactions updated` : "Transaction updated",
+        description: updatedCount > 1 ? "Category and recurring settings were applied to this merchant." : undefined,
+      });
+    },
     onError: () => toast({ title: "Failed to update", variant: "destructive" }),
   });
   const deleteMut = useMutation({
@@ -885,6 +902,43 @@ export default function FinanceTrackerPage() {
     }
     setSortKey(key);
     setSortDirection("asc");
+  }
+
+  function handleEditSave(data: Record<string, any>) {
+    if (!editTxn) return;
+
+    const changedFields: MerchantUpdateField[] = [];
+    const typeOnlyCategoryReset = data.type !== editTxn.type && data.subcategory === "unassigned";
+    if (data.subcategory !== editTxn.subcategory && !typeOnlyCategoryReset) changedFields.push("subcategory");
+    if ((data.needsWant ?? null) !== (editTxn.needs_want ?? null)) changedFields.push("needsWant");
+
+    const recurringChanged = data.isRecurring !== editTxn.is_recurring
+      || (data.isRecurring && (data.recurringType ?? null) !== (editTxn.recurring_type ?? null));
+    if (recurringChanged) changedFields.push("recurring");
+
+    if (changedFields.length === 0) {
+      updateMut.mutate({ id: editTxn.id, ...data });
+      return;
+    }
+
+    setPendingMerchantUpdate({
+      id: editTxn.id,
+      merchantName: editTxn.merchant || editTxn.description,
+      changedFields,
+      data,
+    });
+    setEditTxn(null);
+  }
+
+  function submitMerchantUpdate(applyToMerchant: boolean) {
+    if (!pendingMerchantUpdate) return;
+    updateMut.mutate({
+      id: pendingMerchantUpdate.id,
+      ...pendingMerchantUpdate.data,
+      ...(applyToMerchant
+        ? { applyToMerchant: true, merchantFields: pendingMerchantUpdate.changedFields }
+        : {}),
+    });
   }
 
   const totalPages = Math.max(1, Math.ceil(sortedTransactions.length / pageSize));
@@ -1270,10 +1324,43 @@ export default function FinanceTrackerPage() {
           open={!!editTxn}
           onOpenChange={v => { if (!v) setEditTxn(null); }}
           initial={editTxn}
-          onSave={data => updateMut.mutate({ id: editTxn.id, ...data })}
+          onSave={handleEditSave}
           saving={updateMut.isPending}
         />
       )}
+      <Dialog
+        open={!!pendingMerchantUpdate}
+        onOpenChange={open => { if (!open && !updateMut.isPending) setPendingMerchantUpdate(null); }}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Apply this change to other transactions?</DialogTitle>
+            <DialogDescription>
+              You changed {pendingMerchantUpdate?.changedFields
+                .map(field => field === "subcategory" ? "Category" : field === "needsWant" ? "Need / Want" : "Recurring settings")
+                .join(", ")} for <span className="font-medium text-foreground">{pendingMerchantUpdate?.merchantName}</span>.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="rounded-lg border bg-muted/30 px-3 py-2.5 text-sm text-muted-foreground">
+            Choose whether to update only this transaction or every matching transaction for this merchant. Amounts, dates, notes, and account details will not be changed on the other transactions.
+          </div>
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button
+              variant="outline"
+              onClick={() => submitMerchantUpdate(false)}
+              disabled={updateMut.isPending}
+            >
+              Only this transaction
+            </Button>
+            <Button
+              onClick={() => submitMerchantUpdate(true)}
+              disabled={updateMut.isPending}
+            >
+              {updateMut.isPending ? "Updating…" : "All merchant transactions"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
