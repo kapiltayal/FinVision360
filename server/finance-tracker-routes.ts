@@ -271,6 +271,85 @@ export function registerFinanceTrackerRoutes(app: Express) {
     }
   });
 
+  // GET /api/transactions/monthly-averages — latest 12 complete calendar months
+  app.get("/api/transactions/monthly-averages", requireAuth, async (req, res) => {
+    try {
+      const userId = (req.user as any).id;
+      const { rows: boundaryRows } = await pool.query(
+        `SELECT
+           MIN(DATE_TRUNC('month', date)::DATE) AS first_month,
+           (DATE_TRUNC('month', CURRENT_DATE) - INTERVAL '1 month')::DATE AS end_month
+         FROM transactions
+         WHERE user_id = $1
+           AND date < DATE_TRUNC('month', CURRENT_DATE)::DATE`,
+        [userId],
+      );
+
+      const firstMonth = normalizeDateValue(boundaryRows[0]?.first_month);
+      const endMonth = normalizeDateValue(boundaryRows[0]?.end_month);
+      if (!firstMonth || !endMonth) {
+        res.json({
+          period: { startMonth: null, endMonth: null, months: 0 },
+          averages: { income: 0, expenses: 0, net: 0, savingsRate: 0 },
+          categories: [],
+        });
+        return;
+      }
+
+      const [endYear, endMonthNumber] = endMonth.split("-").map(Number);
+      const twelveMonthsAgo = new Date(Date.UTC(endYear, endMonthNumber - 12, 1));
+      const twelveMonthStart = isoDate(twelveMonthsAgo);
+      const startMonth = firstMonth > twelveMonthStart ? firstMonth : twelveMonthStart;
+      const [startYear, startMonthNumber] = startMonth.split("-").map(Number);
+      const monthCount = (endYear - startYear) * 12 + (endMonthNumber - startMonthNumber) + 1;
+      const endDate = isoDate(new Date(Date.UTC(endYear, endMonthNumber, 0)));
+
+      const { rows } = await pool.query(
+        `SELECT
+           type,
+           subcategory,
+           COALESCE(SUM(amount), 0) AS total,
+           COUNT(*) AS transaction_count
+         FROM transactions
+         WHERE user_id = $1
+           AND date >= $2
+           AND date <= $3
+         GROUP BY type, subcategory
+         ORDER BY type, total DESC, subcategory ASC`,
+        [userId, startMonth, endDate],
+      );
+
+      const categories = rows.map((row) => ({
+        type: row.type,
+        subcategory: row.subcategory || "unassigned",
+        total: Number(row.total),
+        average: Number(row.total) / monthCount,
+        transactionCount: Number(row.transaction_count),
+      }));
+      const income = categories
+        .filter((category) => category.type === "income")
+        .reduce((sum, category) => sum + category.average, 0);
+      const expenses = categories
+        .filter((category) => category.type === "expense")
+        .reduce((sum, category) => sum + category.average, 0);
+      const net = income - expenses;
+
+      res.json({
+        period: { startMonth, endMonth, months: monthCount },
+        averages: {
+          income,
+          expenses,
+          net,
+          savingsRate: income > 0 ? (net / income) * 100 : 0,
+        },
+        categories,
+      });
+    } catch (e) {
+      console.error(e);
+      res.status(500).json({ message: "Failed to calculate monthly transaction averages" });
+    }
+  });
+
   // GET /api/transactions/trend
   app.get("/api/transactions/trend", requireAuth, async (req, res) => {
     try {

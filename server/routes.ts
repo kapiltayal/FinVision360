@@ -274,52 +274,6 @@ Use markdown formatting with headers and bold key numbers.`;
     }
   });
 
-  // Income routes
-  app.get("/api/income", requireAuth, async (req, res) => {
-    const userId = (req.user as any).id;
-    res.json(await storage.getIncomeEntries(userId));
-  });
-  app.post("/api/income", requireAuth, async (req, res) => {
-    const userId = (req.user as any).id;
-    const { name, amount, ...rest } = req.body;
-    if (!name || !amount) return res.status(400).json({ message: "Name and amount are required" });
-    const entry = await storage.createIncomeEntry({ userId, name, amount, ...rest });
-    res.status(201).json(entry);
-  });
-  app.put("/api/income/:id", requireAuth, async (req, res) => {
-    const userId = (req.user as any).id;
-    const entry = await storage.updateIncomeEntry(parseInt(req.params.id), userId, req.body);
-    if (!entry) return res.status(404).json({ message: "Entry not found" });
-    res.json(entry);
-  });
-  app.delete("/api/income/:id", requireAuth, async (req, res) => {
-    await storage.deleteIncomeEntry(parseInt(req.params.id), (req.user as any).id);
-    res.status(204).send();
-  });
-
-  // Expense routes
-  app.get("/api/expenses", requireAuth, async (req, res) => {
-    const userId = (req.user as any).id;
-    res.json(await storage.getExpenseEntries(userId));
-  });
-  app.post("/api/expenses", requireAuth, async (req, res) => {
-    const userId = (req.user as any).id;
-    const { name, amount, ...rest } = req.body;
-    if (!name || !amount) return res.status(400).json({ message: "Name and amount are required" });
-    const entry = await storage.createExpenseEntry({ userId, name, amount, ...rest });
-    res.status(201).json(entry);
-  });
-  app.put("/api/expenses/:id", requireAuth, async (req, res) => {
-    const userId = (req.user as any).id;
-    const entry = await storage.updateExpenseEntry(parseInt(req.params.id), userId, req.body);
-    if (!entry) return res.status(404).json({ message: "Entry not found" });
-    res.json(entry);
-  });
-  app.delete("/api/expenses/:id", requireAuth, async (req, res) => {
-    await storage.deleteExpenseEntry(parseInt(req.params.id), (req.user as any).id);
-    res.status(204).send();
-  });
-
   app.get("/api/insurance", requireAuth, async (req, res) => {
     const userId = (req.user as any).id;
     const policies = await storage.getInsurancePolicies(userId);

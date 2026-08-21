@@ -104,37 +104,6 @@ export const insertInsurancePolicySchema = createInsertSchema(insurancePolicies)
 export type InsertInsurancePolicy = z.infer<typeof insertInsurancePolicySchema>;
 export type InsurancePolicy = typeof insurancePolicies.$inferSelect;
 
-export const incomeEntries = pgTable("income_entries", {
-  id: serial("id").primaryKey(),
-  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  name: text("name").notNull(),
-  category: text("category").notNull().default("other"),
-  amount: numeric("amount", { precision: 10, scale: 2 }).notNull(),
-  frequency: text("frequency").notNull().default("monthly"),
-  notes: text("notes"),
-  createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
-});
-
-export const insertIncomeEntrySchema = createInsertSchema(incomeEntries).omit({ id: true, createdAt: true });
-export type InsertIncomeEntry = z.infer<typeof insertIncomeEntrySchema>;
-export type IncomeEntry = typeof incomeEntries.$inferSelect;
-
-export const expenseEntries = pgTable("expense_entries", {
-  id: serial("id").primaryKey(),
-  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  name: text("name").notNull(),
-  category: text("category").notNull().default("other"),
-  type: text("type").notNull().default("need"), // 'need' | 'want'
-  amount: numeric("amount", { precision: 10, scale: 2 }).notNull(),
-  frequency: text("frequency").notNull().default("monthly"),
-  notes: text("notes"),
-  createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
-});
-
-export const insertExpenseEntrySchema = createInsertSchema(expenseEntries).omit({ id: true, createdAt: true });
-export type InsertExpenseEntry = z.infer<typeof insertExpenseEntrySchema>;
-export type ExpenseEntry = typeof expenseEntries.$inferSelect;
-
 export const recommendationSettings = pgTable("recommendation_settings", {
   id: serial("id").primaryKey(),
   userId: varchar("user_id").notNull().unique().references(() => users.id, { onDelete: "cascade" }),
@@ -159,44 +128,6 @@ export const recommendationSettings = pgTable("recommendation_settings", {
 export const insertRecommendationSettingsSchema = createInsertSchema(recommendationSettings).omit({ id: true, updatedAt: true });
 export type InsertRecommendationSettings = z.infer<typeof insertRecommendationSettingsSchema>;
 export type RecommendationSettings = typeof recommendationSettings.$inferSelect;
-
-export const INCOME_CATEGORIES = [
-  { value: "salary", label: "Salary / Wages" },
-  { value: "freelance", label: "Freelance / Contract" },
-  { value: "business", label: "Business Income" },
-  { value: "investment", label: "Investment Returns" },
-  { value: "rental", label: "Rental Income" },
-  { value: "pension", label: "Pension / Retirement" },
-  { value: "social_security", label: "Social Security" },
-  { value: "other", label: "Other" },
-] as const;
-
-export const EXPENSE_CATEGORIES = [
-  { value: "housing", label: "Housing / Rent" },
-  { value: "utilities", label: "Utilities" },
-  { value: "groceries", label: "Groceries" },
-  { value: "transport", label: "Transportation" },
-  { value: "healthcare", label: "Healthcare" },
-  { value: "insurance", label: "Insurance" },
-  { value: "education", label: "Education" },
-  { value: "childcare", label: "Childcare" },
-  { value: "dining", label: "Dining Out" },
-  { value: "entertainment", label: "Entertainment" },
-  { value: "subscriptions", label: "Subscriptions" },
-  { value: "shopping", label: "Shopping" },
-  { value: "travel", label: "Travel" },
-  { value: "personal_care", label: "Personal Care" },
-  { value: "hobbies", label: "Hobbies" },
-  { value: "other", label: "Other" },
-] as const;
-
-export const FREQUENCIES = [
-  { value: "weekly", label: "Weekly" },
-  { value: "biweekly", label: "Bi-Weekly" },
-  { value: "monthly", label: "Monthly" },
-  { value: "quarterly", label: "Quarterly" },
-  { value: "annual", label: "Annual" },
-] as const;
 
 export const ASSET_CATEGORIES = [
   { value: "bank_account", label: "Checking Account" },

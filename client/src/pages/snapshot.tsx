@@ -33,14 +33,7 @@ import {
   Info,
   Landmark,
 } from "lucide-react";
-import { type Asset, type Liability, type IncomeEntry, type ExpenseEntry, type InsurancePolicy, type Retirement401kGoal, type EstateBeneficiary, type EstateDocument, type EstateContact, ESTATE_DOCUMENT_TYPES } from "@shared/schema";
-
-const FREQ: Record<string, number> = {
-  weekly: 52 / 12, biweekly: 26 / 12, monthly: 1, quarterly: 1 / 3, annual: 1 / 12,
-};
-function toMonthly(amount: string, freq: string) {
-  return parseFloat(amount || "0") * (FREQ[freq] ?? 1);
-}
+import { type Asset, type Liability, type InsurancePolicy, type Retirement401kGoal, type EstateBeneficiary, type EstateDocument, type EstateContact, ESTATE_DOCUMENT_TYPES } from "@shared/schema";
 
 const INSURANCE_TYPES = [
   { key: "auto", label: "Auto", Icon: Car },
@@ -61,6 +54,11 @@ interface Rec {
   description: string;
   color: string;
 }
+
+type CashFlowSummary = {
+  period: { startMonth: string | null; endMonth: string | null; months: number };
+  averages: { income: number; expenses: number; net: number; savingsRate: number };
+};
 
 function SnapshotCard({
   title,
@@ -148,24 +146,26 @@ export default function SnapshotPage() {
 
   const { data: assets = [], isLoading: aL } = useQuery<Asset[]>({ queryKey: ["/api/assets"] });
   const { data: liabilities = [], isLoading: lL } = useQuery<Liability[]>({ queryKey: ["/api/liabilities"] });
-  const { data: incomeList = [], isLoading: iL } = useQuery<IncomeEntry[]>({ queryKey: ["/api/income"] });
-  const { data: expenseList = [], isLoading: eL } = useQuery<ExpenseEntry[]>({ queryKey: ["/api/expenses"] });
+  const { data: cashFlowSummary, isLoading: cashFlowLoading } = useQuery<CashFlowSummary>({
+    queryKey: ["/api/transactions/monthly-averages"],
+  });
   const { data: policies = [], isLoading: pL } = useQuery<InsurancePolicy[]>({ queryKey: ["/api/insurance"] });
   const { data: goal401k } = useQuery<Retirement401kGoal | null>({ queryKey: ["/api/retirement/401k"] });
   const { data: estateBeneficiaries = [] } = useQuery<EstateBeneficiary[]>({ queryKey: ["/api/estate/beneficiaries"] });
   const { data: estateDocuments = [] } = useQuery<EstateDocument[]>({ queryKey: ["/api/estate/documents"] });
   const { data: estateContacts = [] } = useQuery<EstateContact[]>({ queryKey: ["/api/estate/contacts"] });
 
-  const isLoading = aL || lL || iL || eL || pL;
+  const isLoading = aL || lL || cashFlowLoading || pL;
 
   const totalAssets = useMemo(() => assets.reduce((s, a) => s + parseFloat(a.value || "0"), 0), [assets]);
   const totalLiabilities = useMemo(() => liabilities.reduce((s, l) => s + parseFloat(l.balance || "0"), 0), [liabilities]);
   const netWorth = totalAssets - totalLiabilities;
 
-  const totalMonthlyIncome = useMemo(() => incomeList.reduce((s, e) => s + toMonthly(e.amount, e.frequency), 0), [incomeList]);
-  const totalMonthlyExpenses = useMemo(() => expenseList.reduce((s, e) => s + toMonthly(e.amount, e.frequency), 0), [expenseList]);
-  const netMonthly = totalMonthlyIncome - totalMonthlyExpenses;
-  const savingsRate = totalMonthlyIncome > 0 ? (netMonthly / totalMonthlyIncome) * 100 : 0;
+  const cashFlow = cashFlowSummary?.averages ?? { income: 0, expenses: 0, net: 0, savingsRate: 0 };
+  const totalMonthlyIncome = cashFlow.income;
+  const totalMonthlyExpenses = cashFlow.expenses;
+  const netMonthly = cashFlow.net;
+  const savingsRate = cashFlow.savingsRate;
 
   const retirementAssets = useMemo(() =>
     assets.filter(a => a.category === "retirement_fund").reduce((s, a) => s + parseFloat(a.value || "0"), 0), [assets]);

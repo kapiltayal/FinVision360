@@ -6,8 +6,6 @@ import {
   type Liability, type InsertLiability,
   type Retirement401kGoal, type InsertRetirement401kGoal,
   type InsurancePolicy, type InsertInsurancePolicy,
-  type IncomeEntry, type InsertIncomeEntry,
-  type ExpenseEntry, type InsertExpenseEntry,
   type RecommendationSettings, type InsertRecommendationSettings,
   type BankConfig, type InsertBankConfig,
   type BankRate, type InsertBankRate,
@@ -17,7 +15,7 @@ import {
   type EstateDocument, type InsertEstateDocument,
   type EstateContact, type InsertEstateContact,
   type Feedback, type InsertFeedback,
-  users, assets, liabilities, retirement401kGoals, insurancePolicies, incomeEntries, expenseEntries, recommendationSettings,
+  users, assets, liabilities, retirement401kGoals, insurancePolicies, recommendationSettings,
   bankConfigs, bankRates, plaidItems, plaidAccounts,
   estateBeneficiaries, estateDocuments, estateContacts, feedback, contactus, socialSecuritySettings,
   userGoals,
@@ -53,16 +51,6 @@ export interface IStorage {
   createInsurancePolicy(policy: InsertInsurancePolicy): Promise<InsurancePolicy>;
   updateInsurancePolicy(id: number, userId: string, data: Partial<InsertInsurancePolicy>): Promise<InsurancePolicy | undefined>;
   deleteInsurancePolicy(id: number, userId: string): Promise<void>;
-
-  getIncomeEntries(userId: string): Promise<IncomeEntry[]>;
-  createIncomeEntry(entry: InsertIncomeEntry): Promise<IncomeEntry>;
-  updateIncomeEntry(id: number, userId: string, data: Partial<InsertIncomeEntry>): Promise<IncomeEntry | undefined>;
-  deleteIncomeEntry(id: number, userId: string): Promise<void>;
-
-  getExpenseEntries(userId: string): Promise<ExpenseEntry[]>;
-  createExpenseEntry(entry: InsertExpenseEntry): Promise<ExpenseEntry>;
-  updateExpenseEntry(id: number, userId: string, data: Partial<InsertExpenseEntry>): Promise<ExpenseEntry | undefined>;
-  deleteExpenseEntry(id: number, userId: string): Promise<void>;
 
   getRecommendationSettings(userId: string): Promise<RecommendationSettings | undefined>;
   upsertRecommendationSettings(data: InsertRecommendationSettings): Promise<RecommendationSettings>;
@@ -227,36 +215,6 @@ export class DatabaseStorage implements IStorage {
 
   async deleteInsurancePolicy(id: number, userId: string): Promise<void> {
     await db.delete(insurancePolicies).where(and(eq(insurancePolicies.id, id), eq(insurancePolicies.userId, userId)));
-  }
-
-  async getIncomeEntries(userId: string): Promise<IncomeEntry[]> {
-    return db.select().from(incomeEntries).where(eq(incomeEntries.userId, userId));
-  }
-  async createIncomeEntry(entry: InsertIncomeEntry): Promise<IncomeEntry> {
-    const [created] = await db.insert(incomeEntries).values(entry).returning();
-    return created;
-  }
-  async updateIncomeEntry(id: number, userId: string, data: Partial<InsertIncomeEntry>): Promise<IncomeEntry | undefined> {
-    const [updated] = await db.update(incomeEntries).set(data).where(and(eq(incomeEntries.id, id), eq(incomeEntries.userId, userId))).returning();
-    return updated;
-  }
-  async deleteIncomeEntry(id: number, userId: string): Promise<void> {
-    await db.delete(incomeEntries).where(and(eq(incomeEntries.id, id), eq(incomeEntries.userId, userId)));
-  }
-
-  async getExpenseEntries(userId: string): Promise<ExpenseEntry[]> {
-    return db.select().from(expenseEntries).where(eq(expenseEntries.userId, userId));
-  }
-  async createExpenseEntry(entry: InsertExpenseEntry): Promise<ExpenseEntry> {
-    const [created] = await db.insert(expenseEntries).values(entry).returning();
-    return created;
-  }
-  async updateExpenseEntry(id: number, userId: string, data: Partial<InsertExpenseEntry>): Promise<ExpenseEntry | undefined> {
-    const [updated] = await db.update(expenseEntries).set(data).where(and(eq(expenseEntries.id, id), eq(expenseEntries.userId, userId))).returning();
-    return updated;
-  }
-  async deleteExpenseEntry(id: number, userId: string): Promise<void> {
-    await db.delete(expenseEntries).where(and(eq(expenseEntries.id, id), eq(expenseEntries.userId, userId)));
   }
 
   async getRecommendationSettings(userId: string): Promise<RecommendationSettings | undefined> {
