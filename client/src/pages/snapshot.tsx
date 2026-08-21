@@ -348,6 +348,9 @@ export default function SnapshotPage() {
                 {savingsRate.toFixed(1)}%
               </span>
             </div>
+            <p className="text-[10px] text-muted-foreground mt-1" data-testid="text-snapshot-cashflow-period">
+              Averages based on {cashFlowSummary?.period.months ?? 0} complete month{cashFlowSummary?.period.months === 1 ? "" : "s"}
+            </p>
           </div>
           <div className="space-y-2 pt-3 border-t border-slate-100 dark:border-slate-800">
             <StatRow label="Monthly Income" value={formatCurrency(totalMonthlyIncome)} />
