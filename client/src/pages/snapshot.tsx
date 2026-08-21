@@ -353,8 +353,10 @@ export default function SnapshotPage() {
             <StatRow label="Monthly Income" value={formatCurrency(totalMonthlyIncome)} />
             <StatRow label="Monthly Expenses" value={formatCurrency(totalMonthlyExpenses)} />
           </div>
-          <p className="mt-3 text-[10px] text-muted-foreground" data-testid="text-snapshot-cashflow-period">
-            Averages based on {cashFlowSummary?.period.months ?? 0} complete month{cashFlowSummary?.period.months === 1 ? "" : "s"}
+          <p className="mt-3 text-[11px] text-muted-foreground leading-relaxed" data-testid="text-snapshot-cashflow-period">
+            Averages based on{" "}
+            <span className="font-semibold tabular-nums">{cashFlowSummary?.period.months ?? 0}</span>{" "}
+            complete month{cashFlowSummary?.period.months === 1 ? "" : "s"}
           </p>
         </SnapshotCard>
 
