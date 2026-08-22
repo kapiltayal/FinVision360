@@ -52,6 +52,7 @@ function AuthenticatedApp() {
               <Route path="/retirement" component={RetirementPage} />
               <Route path="/retirement/social-security" component={RetirementPage} />
               <Route path="/retirement/401k" component={RetirementPage} />
+              <Route path="/retirement/pension" component={RetirementPage} />
               <Route path="/income-expenses" component={IncomeExpensesPage} />
               <Route path="/insurance" component={InsurancePage} />
               <Route path="/estate-planning" component={EstatePlanningPage} />

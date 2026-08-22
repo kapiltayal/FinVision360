@@ -10,6 +10,8 @@ import { scrapeBank, DEFAULT_BANK_CONFIGS, type BankSelectorConfig } from "./scr
 import { Products, CountryCode } from "plaid";
 import { getPlaidClient } from "./plaid";
 
+const MAX_PENSION_AMOUNT = 9_999_999_999_999.99;
+
 function getOpenAIClient(): OpenAI {
   const apiKey = process.env.AI_INTEGRATIONS_OPENAI_API_KEY || process.env.OPENAI_API_KEY;
   if (!apiKey) {
@@ -19,6 +21,32 @@ function getOpenAIClient(): OpenAI {
     apiKey,
     baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
   });
+}
+
+function parsePensionInput(body: any):
+  | { value: { name: string; amount: string; frequency: "monthly" | "annual"; startAge: number; notes: string | null } }
+  | { error: string } {
+  const name = typeof body?.name === "string" ? body.name.trim() : "";
+  const amount = Number(body?.amount);
+  const frequency = body?.frequency;
+  const startAge = Number(body?.startAge);
+  const notes = typeof body?.notes === "string" ? body.notes.trim() : "";
+
+  if (!name) return { error: "Pension name is required" };
+  if (!Number.isFinite(amount) || amount <= 0) return { error: "Benefit amount must be greater than zero" };
+  if (amount > MAX_PENSION_AMOUNT) return { error: "Benefit amount is too large" };
+  if (frequency !== "monthly" && frequency !== "annual") return { error: "Frequency must be monthly or annual" };
+  if (!Number.isInteger(startAge) || startAge < 0 || startAge > 120) return { error: "Start age must be a whole number from 0 to 120" };
+
+  return {
+    value: {
+      name,
+      amount: amount.toFixed(2),
+      frequency,
+      startAge,
+      notes: notes || null,
+    },
+  };
 }
 
 export async function registerRoutes(
@@ -107,6 +135,42 @@ export async function registerRoutes(
       userId, currentAge, retirementAge, currentBalance, annualSalary, contributionPct, employerMatchPct, employerMatchLimit, expectedReturn, taxBracket, rothTaxRate,
     });
     res.json(goal);
+  });
+
+  app.get("/api/retirement/pensions", requireAuth, async (req, res) => {
+    const userId = (req.user as any).id;
+    res.json(await storage.getRetirementPensions(userId));
+  });
+
+  app.post("/api/retirement/pensions", requireAuth, async (req, res) => {
+    const parsed = parsePensionInput(req.body);
+    if ("error" in parsed) return res.status(400).json({ message: parsed.error });
+
+    const pension = await storage.createRetirementPension({
+      userId: (req.user as any).id,
+      ...parsed.value,
+    });
+    res.status(201).json(pension);
+  });
+
+  app.patch("/api/retirement/pensions/:id", requireAuth, async (req, res) => {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id)) return res.status(400).json({ message: "Invalid pension id" });
+
+    const parsed = parsePensionInput(req.body);
+    if ("error" in parsed) return res.status(400).json({ message: parsed.error });
+
+    const pension = await storage.updateRetirementPension(id, (req.user as any).id, parsed.value);
+    if (!pension) return res.status(404).json({ message: "Pension not found" });
+    res.json(pension);
+  });
+
+  app.delete("/api/retirement/pensions/:id", requireAuth, async (req, res) => {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id)) return res.status(400).json({ message: "Invalid pension id" });
+
+    await storage.deleteRetirementPension(id, (req.user as any).id);
+    res.status(204).send();
   });
 
   app.post("/api/ai/scenario", requireAuth, async (req, res) => {

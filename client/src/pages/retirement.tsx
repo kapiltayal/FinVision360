@@ -1,13 +1,15 @@
 import { useLocation, Link, Switch, Route } from "wouter";
-import { Target, ShieldCheck, BarChart3 } from "lucide-react";
+import { Target, ShieldCheck, BarChart3, Landmark } from "lucide-react";
 import RetirementPlannerPage from "./retirement-planner";
 import SocialSecurityPage from "./retirement-social-security";
 import Retirement401kPage from "./retirement-401k";
+import RetirementPensionPage from "./retirement-pension";
 
 const tabs = [
   { title: "Retirement Planner", url: "/retirement", icon: Target },
   { title: "Social Security", url: "/retirement/social-security", icon: ShieldCheck },
   { title: "401k Calculator", url: "/retirement/401k", icon: BarChart3 },
+  { title: "Pension", url: "/retirement/pension", icon: Landmark },
 ];
 
 export default function RetirementPage() {
@@ -45,6 +47,7 @@ export default function RetirementPage() {
           <Route path="/retirement" component={RetirementPlannerPage} />
           <Route path="/retirement/social-security" component={SocialSecurityPage} />
           <Route path="/retirement/401k" component={Retirement401kPage} />
+          <Route path="/retirement/pension" component={RetirementPensionPage} />
         </Switch>
       </div>
     </div>

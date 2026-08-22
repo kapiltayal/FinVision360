@@ -5,6 +5,7 @@ import {
   type Asset, type InsertAsset,
   type Liability, type InsertLiability,
   type Retirement401kGoal, type InsertRetirement401kGoal,
+  type RetirementPension, type InsertRetirementPension,
   type InsurancePolicy, type InsertInsurancePolicy,
   type RecommendationSettings, type InsertRecommendationSettings,
   type BankConfig, type InsertBankConfig,
@@ -15,7 +16,7 @@ import {
   type EstateDocument, type InsertEstateDocument,
   type EstateContact, type InsertEstateContact,
   type Feedback, type InsertFeedback,
-  users, assets, liabilities, retirement401kGoals, insurancePolicies, recommendationSettings,
+  users, assets, liabilities, retirement401kGoals, retirementPensions, insurancePolicies, recommendationSettings,
   bankConfigs, bankRates, plaidItems, plaidAccounts,
   estateBeneficiaries, estateDocuments, estateContacts, feedback, contactus, socialSecuritySettings,
   userGoals,
@@ -45,6 +46,10 @@ export interface IStorage {
 
   getRetirement401kGoal(userId: string): Promise<Retirement401kGoal | undefined>;
   upsertRetirement401kGoal(goal: InsertRetirement401kGoal): Promise<Retirement401kGoal>;
+  getRetirementPensions(userId: string): Promise<RetirementPension[]>;
+  createRetirementPension(pension: InsertRetirementPension): Promise<RetirementPension>;
+  updateRetirementPension(id: number, userId: string, data: Partial<InsertRetirementPension>): Promise<RetirementPension | undefined>;
+  deleteRetirementPension(id: number, userId: string): Promise<void>;
 
   getInsurancePolicies(userId: string): Promise<InsurancePolicy[]>;
   getInsurancePolicy(id: number, userId: string): Promise<InsurancePolicy | undefined>;
@@ -192,6 +197,28 @@ export class DatabaseStorage implements IStorage {
     }
     const [created] = await db.insert(retirement401kGoals).values(goal).returning();
     return created;
+  }
+
+  async getRetirementPensions(userId: string): Promise<RetirementPension[]> {
+    return db.select().from(retirementPensions).where(eq(retirementPensions.userId, userId)).orderBy(desc(retirementPensions.id));
+  }
+
+  async createRetirementPension(pension: InsertRetirementPension): Promise<RetirementPension> {
+    const [created] = await db.insert(retirementPensions).values(pension).returning();
+    return created;
+  }
+
+  async updateRetirementPension(id: number, userId: string, data: Partial<InsertRetirementPension>): Promise<RetirementPension | undefined> {
+    const [updated] = await db
+      .update(retirementPensions)
+      .set(data)
+      .where(and(eq(retirementPensions.id, id), eq(retirementPensions.userId, userId)))
+      .returning();
+    return updated;
+  }
+
+  async deleteRetirementPension(id: number, userId: string): Promise<void> {
+    await db.delete(retirementPensions).where(and(eq(retirementPensions.id, id), eq(retirementPensions.userId, userId)));
   }
 
   async getInsurancePolicies(userId: string): Promise<InsurancePolicy[]> {
