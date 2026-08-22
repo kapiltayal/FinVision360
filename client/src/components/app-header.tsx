@@ -79,7 +79,7 @@ export function AppHeader() {
 
   return (
     <header className="border-b bg-background/95 backdrop-blur sticky top-0 z-50">
-      <div className="flex items-center justify-between h-14 px-4 gap-4">
+      <div className="flex items-center justify-between h-14 px-4 gap-2">
         {/* Logo */}
         <Link href="/home" className="flex items-center gap-2 shrink-0 hover-elevate rounded px-1">
           <img src={logoPath} alt="FinVision360" className="h-11 w-auto" />
