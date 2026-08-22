@@ -30,9 +30,13 @@ export default function RetirementPage() {
                 href={tab.url}
                 data-testid={`tab-${tab.title.toLowerCase().replace(/\s/g, "-")}`}
                 className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
-                  isActive
-                    ? "border-primary text-primary"
-                    : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
+                  tab.url === "/retirement"
+                    ? isActive
+                      ? "my-1 rounded-md border-transparent bg-gradient-to-r from-primary to-emerald-600 text-primary-foreground shadow-sm hover:from-primary/90 hover:to-emerald-600/90"
+                      : "my-1 rounded-md border-transparent bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/20 hover:text-emerald-800 dark:text-emerald-300 dark:hover:bg-emerald-500/20 dark:hover:text-emerald-200"
+                    : isActive
+                      ? "border-primary text-primary"
+                      : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
                 }`}
               >
                 <tab.icon className="h-4 w-4" />
