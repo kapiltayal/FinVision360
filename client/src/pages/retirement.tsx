@@ -33,8 +33,8 @@ export default function RetirementPage() {
                   tab.url === "/retirement"
                     ? `py-[7.5px] ${
                         isActive
-                          ? "my-1 rounded-md border-transparent bg-primary text-primary-foreground shadow-sm hover:bg-primary/90"
-                          : "my-1 rounded-md border-transparent bg-primary/10 text-primary hover:bg-primary/20 hover:text-primary dark:hover:bg-primary/20"
+                          ? "my-1 rounded-md border-transparent bg-gradient-to-r from-primary to-blue-600 text-primary-foreground shadow-sm hover:from-primary/90 hover:to-blue-600/90"
+                          : "my-1 rounded-md border-transparent bg-gradient-to-r from-primary/10 to-blue-600/10 text-primary hover:from-primary/20 hover:to-blue-600/20 hover:text-primary dark:hover:from-primary/20 dark:hover:to-blue-600/20"
                       }`
                     : `py-3 ${
                         isActive
