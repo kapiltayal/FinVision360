@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,9 +13,51 @@ import { useToast } from "@/hooks/use-toast";
 import { useLastUpdated } from "@/hooks/use-last-updated";
 import { ExportMenu } from "@/components/export-menu";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { Plus, Pencil, Trash2, CreditCard, TrendingDown, ChevronDown, Clock, Link2, LayoutGrid, Table2 } from "lucide-react";
+import { Plus, Pencil, Trash2, CreditCard, TrendingDown, ChevronDown, Clock, Link2, LayoutGrid, Table2, ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
 import { type Liability, type PlaidAccount, LIABILITY_CATEGORIES } from "@shared/schema";
 import { formatCurrency, formatPercent, getCategoryLabel } from "@/lib/format";
+
+type LiabilitySortKey = "category" | "name" | "institution" | "balance" | "rate" | "minimumPayment";
+type SortDirection = "asc" | "desc";
+
+function LiabilitySortHeader({
+  label,
+  column,
+  sortConfig,
+  onSort,
+  align = "left",
+}: {
+  label: string;
+  column: LiabilitySortKey;
+  sortConfig: { key: LiabilitySortKey; direction: SortDirection };
+  onSort: (column: LiabilitySortKey) => void;
+  align?: "left" | "right";
+}) {
+  const isActive = sortConfig.key === column;
+  return (
+    <th
+      scope="col"
+      aria-sort={isActive ? (sortConfig.direction === "asc" ? "ascending" : "descending") : "none"}
+      className={`px-5 py-3 font-medium ${align === "right" ? "text-right" : "text-left"}`}
+    >
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        onClick={() => onSort(column)}
+        className={`h-auto gap-1 px-0 py-1 font-medium hover:bg-transparent hover:text-foreground ${align === "right" ? "ml-auto justify-end" : ""}`}
+        data-testid={`button-sort-liabilities-${column}`}
+      >
+        {label}
+        {isActive ? (
+          sortConfig.direction === "asc" ? <ArrowUp className="h-3.5 w-3.5" /> : <ArrowDown className="h-3.5 w-3.5" />
+        ) : (
+          <ArrowUpDown className="h-3.5 w-3.5 text-muted-foreground" />
+        )}
+      </Button>
+    </th>
+  );
+}
 
 function LiabilityForm({
   liability,
@@ -169,6 +211,10 @@ export default function LiabilitiesPage() {
   const [editingLiability, setEditingLiability] = useState<Liability | undefined>();
   const [openCategory, setOpenCategory] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"cards" | "table">("cards");
+  const [sortConfig, setSortConfig] = useState<{ key: LiabilitySortKey; direction: SortDirection }>({
+    key: "category",
+    direction: "asc",
+  });
   const { toast } = useToast();
   const { formattedDate, markUpdated } = useLastUpdated("liabilities");
   const { data: liabilities = [], isLoading } = useQuery<Liability[]>({ queryKey: ["/api/liabilities"] });
@@ -189,6 +235,43 @@ export default function LiabilitiesPage() {
     ? liabilities.reduce((sum, l) => sum + parseFloat(l.balance || "0") * parseFloat(l.interestRate || "0"), 0) / totalBalance
     : 0;
   const totalMinPayment = liabilities.reduce((sum, l) => sum + parseFloat(l.minimumPayment || "0"), 0);
+  const sortedLiabilities = useMemo(() => {
+    const sorted = [...liabilities];
+    sorted.sort((a, b) => {
+      let comparison = 0;
+      if (sortConfig.key === "category") {
+        comparison = getCategoryLabel(LIABILITY_CATEGORIES, a.category).localeCompare(getCategoryLabel(LIABILITY_CATEGORIES, b.category));
+      } else if (sortConfig.key === "name") {
+        comparison = a.name.localeCompare(b.name);
+      } else if (sortConfig.key === "institution") {
+        comparison = (a.institution || "").localeCompare(b.institution || "");
+      } else if (sortConfig.key === "balance") {
+        comparison = parseFloat(a.balance || "0") - parseFloat(b.balance || "0");
+      } else if (sortConfig.key === "rate") {
+        comparison = parseFloat(a.interestRate || "0") - parseFloat(b.interestRate || "0");
+      } else {
+        comparison = parseFloat(a.minimumPayment || "0") - parseFloat(b.minimumPayment || "0");
+      }
+
+      if (comparison === 0 && sortConfig.key !== "category") {
+        comparison = getCategoryLabel(LIABILITY_CATEGORIES, a.category).localeCompare(getCategoryLabel(LIABILITY_CATEGORIES, b.category));
+      }
+      if (comparison === 0) {
+        comparison = parseFloat(a.balance || "0") - parseFloat(b.balance || "0");
+        return comparison === 0 ? a.name.localeCompare(b.name) : -comparison;
+      }
+      return sortConfig.direction === "asc" ? comparison : -comparison;
+    });
+    return sorted;
+  }, [liabilities, sortConfig]);
+
+  const handleSort = (key: LiabilitySortKey) => {
+    setSortConfig((current) => (
+      current.key === key
+        ? { key, direction: current.direction === "asc" ? "desc" : "asc" }
+        : { key, direction: key === "category" || key === "name" || key === "institution" ? "asc" : "desc" }
+    ));
+  };
 
   const openEdit = (liability: Liability) => {
     setEditingLiability(liability);
@@ -240,30 +323,6 @@ export default function LiabilitiesPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1 rounded-md border p-1" role="group" aria-label="Liability view options">
-            <Button
-              type="button"
-              size="sm"
-              variant={viewMode === "cards" ? "default" : "ghost"}
-              onClick={() => setViewMode("cards")}
-              aria-pressed={viewMode === "cards"}
-              data-testid="button-liabilities-card-view"
-            >
-              <LayoutGrid className="h-4 w-4 sm:mr-1.5" />
-              <span className="hidden sm:inline">Cards</span>
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant={viewMode === "table" ? "default" : "ghost"}
-              onClick={() => setViewMode("table")}
-              aria-pressed={viewMode === "table"}
-              data-testid="button-liabilities-table-view"
-            >
-              <Table2 className="h-4 w-4 sm:mr-1.5" />
-              <span className="hidden sm:inline">Table</span>
-            </Button>
-          </div>
           <ExportMenu data={exportData} />
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
@@ -323,6 +382,37 @@ export default function LiabilitiesPage() {
         </Card>
       </div>
 
+      {liabilities.length > 0 && (
+        <div className="flex justify-end">
+          <div className="flex items-center gap-1 rounded-lg border border-primary/10 bg-primary/[0.03] p-1" role="group" aria-label="Liability view options">
+            <Button
+              type="button"
+              size="sm"
+              variant={viewMode === "cards" ? "default" : "ghost"}
+              onClick={() => setViewMode("cards")}
+              aria-pressed={viewMode === "cards"}
+              data-testid="button-liabilities-card-view"
+              className="h-9 gap-2 px-4"
+            >
+              <LayoutGrid className="h-4 w-4" />
+              Cards
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant={viewMode === "table" ? "default" : "ghost"}
+              onClick={() => setViewMode("table")}
+              aria-pressed={viewMode === "table"}
+              data-testid="button-liabilities-table-view"
+              className="h-9 gap-2 px-4"
+            >
+              <Table2 className="h-4 w-4" />
+              Table
+            </Button>
+          </div>
+        </div>
+      )}
+
       {liabilities.length === 0 ? (
         <Card>
           <CardContent className="p-12 text-center">
@@ -340,27 +430,27 @@ export default function LiabilitiesPage() {
             <table className="w-full text-sm" data-testid="table-liabilities">
               <thead className="border-b bg-muted/50">
                 <tr className="text-left">
-                  <th scope="col" className="px-5 py-3 font-medium">Name</th>
-                  <th scope="col" className="px-5 py-3 font-medium">Category</th>
-                  <th scope="col" className="px-5 py-3 font-medium">Institution</th>
-                  <th scope="col" className="px-5 py-3 text-right font-medium">Balance</th>
-                  <th scope="col" className="px-5 py-3 text-right font-medium">Interest Rate</th>
-                  <th scope="col" className="px-5 py-3 text-right font-medium">Min Payment</th>
+                  <LiabilitySortHeader label="Category" column="category" sortConfig={sortConfig} onSort={handleSort} />
+                  <LiabilitySortHeader label="Name" column="name" sortConfig={sortConfig} onSort={handleSort} />
+                  <LiabilitySortHeader label="Institution" column="institution" sortConfig={sortConfig} onSort={handleSort} />
+                  <LiabilitySortHeader label="Balance" column="balance" sortConfig={sortConfig} onSort={handleSort} align="right" />
+                  <LiabilitySortHeader label="Interest Rate" column="rate" sortConfig={sortConfig} onSort={handleSort} align="right" />
+                  <LiabilitySortHeader label="Min Payment" column="minimumPayment" sortConfig={sortConfig} onSort={handleSort} align="right" />
                   <th scope="col" className="px-5 py-3 text-right font-medium">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y">
-                {liabilities.map((liability) => (
+                {sortedLiabilities.map((liability) => (
                   <tr key={liability.id} className="hover:bg-muted/30" data-testid={`table-row-liability-${liability.id}`}>
+                    <td className="px-5 py-3 text-muted-foreground">{getCategoryLabel(LIABILITY_CATEGORIES, liability.category)}</td>
                     <td className="px-5 py-3 font-medium">
                       <div className="flex items-center gap-1.5">
                         <span className="max-w-52 truncate">{liability.name}</span>
                         {plaidLinkedLiabilityIds.has(liability.id) && (
-                          <Link2 className="h-3.5 w-3.5 shrink-0 text-blue-500" title="Synced via Plaid" />
+                          <Link2 className="h-3.5 w-3.5 shrink-0 text-blue-500" aria-label="Synced via Plaid" />
                         )}
                       </div>
                     </td>
-                    <td className="px-5 py-3 text-muted-foreground">{getCategoryLabel(LIABILITY_CATEGORIES, liability.category)}</td>
                     <td className="px-5 py-3 text-muted-foreground">{liability.institution || "—"}</td>
                     <td className="px-5 py-3 text-right font-semibold whitespace-nowrap">{formatCurrency(liability.balance)}</td>
                     <td className="px-5 py-3 text-right whitespace-nowrap">
@@ -452,7 +542,7 @@ export default function LiabilitiesPage() {
                                   <div className="flex items-center gap-1.5">
                                     <h3 className="font-semibold truncate">{liability.name}</h3>
                                     {plaidLinkedLiabilityIds.has(liability.id) && (
-                                      <Link2 className="h-3.5 w-3.5 shrink-0 text-blue-500" title="Synced via Plaid" />
+                                      <Link2 className="h-3.5 w-3.5 shrink-0 text-blue-500" aria-label="Synced via Plaid" />
                                     )}
                                   </div>
                                   {liability.institution && (

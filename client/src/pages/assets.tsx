@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,9 +13,51 @@ import { useToast } from "@/hooks/use-toast";
 import { useLastUpdated } from "@/hooks/use-last-updated";
 import { ExportMenu } from "@/components/export-menu";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { Plus, Pencil, Trash2, Wallet, TrendingUp, ChevronDown, Clock, Link2, LayoutGrid, Table2 } from "lucide-react";
+import { Plus, Pencil, Trash2, Wallet, TrendingUp, ChevronDown, Clock, Link2, LayoutGrid, Table2, ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
 import { type Asset, type PlaidAccount, ASSET_CATEGORIES } from "@shared/schema";
 import { formatCurrency, formatPercent, getCategoryLabel } from "@/lib/format";
+
+type AssetSortKey = "category" | "name" | "institution" | "value" | "rate";
+type SortDirection = "asc" | "desc";
+
+function AssetSortHeader({
+  label,
+  column,
+  sortConfig,
+  onSort,
+  align = "left",
+}: {
+  label: string;
+  column: AssetSortKey;
+  sortConfig: { key: AssetSortKey; direction: SortDirection };
+  onSort: (column: AssetSortKey) => void;
+  align?: "left" | "right";
+}) {
+  const isActive = sortConfig.key === column;
+  return (
+    <th
+      scope="col"
+      aria-sort={isActive ? (sortConfig.direction === "asc" ? "ascending" : "descending") : "none"}
+      className={`px-5 py-3 font-medium ${align === "right" ? "text-right" : "text-left"}`}
+    >
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        onClick={() => onSort(column)}
+        className={`h-auto gap-1 px-0 py-1 font-medium hover:bg-transparent hover:text-foreground ${align === "right" ? "ml-auto justify-end" : ""}`}
+        data-testid={`button-sort-assets-${column}`}
+      >
+        {label}
+        {isActive ? (
+          sortConfig.direction === "asc" ? <ArrowUp className="h-3.5 w-3.5" /> : <ArrowDown className="h-3.5 w-3.5" />
+        ) : (
+          <ArrowUpDown className="h-3.5 w-3.5 text-muted-foreground" />
+        )}
+      </Button>
+    </th>
+  );
+}
 
 function AssetForm({
   asset,
@@ -157,6 +199,10 @@ export default function AssetsPage() {
   const [editingAsset, setEditingAsset] = useState<Asset | undefined>();
   const [openCategory, setOpenCategory] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"cards" | "table">("cards");
+  const [sortConfig, setSortConfig] = useState<{ key: AssetSortKey; direction: SortDirection }>({
+    key: "category",
+    direction: "asc",
+  });
   const { toast } = useToast();
   const { formattedDate, markUpdated } = useLastUpdated("assets");
   const { data: assets = [], isLoading } = useQuery<Asset[]>({ queryKey: ["/api/assets"] });
@@ -176,6 +222,41 @@ export default function AssetsPage() {
   const weightedRate = totalValue > 0
     ? assets.reduce((sum, a) => sum + parseFloat(a.value || "0") * parseFloat(a.interestRate || "0"), 0) / totalValue
     : 0;
+  const sortedAssets = useMemo(() => {
+    const sorted = [...assets];
+    sorted.sort((a, b) => {
+      let comparison = 0;
+      if (sortConfig.key === "category") {
+        comparison = getCategoryLabel(ASSET_CATEGORIES, a.category).localeCompare(getCategoryLabel(ASSET_CATEGORIES, b.category));
+      } else if (sortConfig.key === "name") {
+        comparison = a.name.localeCompare(b.name);
+      } else if (sortConfig.key === "institution") {
+        comparison = (a.institution || "").localeCompare(b.institution || "");
+      } else if (sortConfig.key === "value") {
+        comparison = parseFloat(a.value || "0") - parseFloat(b.value || "0");
+      } else {
+        comparison = parseFloat(a.interestRate || "0") - parseFloat(b.interestRate || "0");
+      }
+
+      if (comparison === 0 && sortConfig.key !== "category") {
+        comparison = getCategoryLabel(ASSET_CATEGORIES, a.category).localeCompare(getCategoryLabel(ASSET_CATEGORIES, b.category));
+      }
+      if (comparison === 0) {
+        comparison = parseFloat(a.value || "0") - parseFloat(b.value || "0");
+        return comparison === 0 ? a.name.localeCompare(b.name) : -comparison;
+      }
+      return sortConfig.direction === "asc" ? comparison : -comparison;
+    });
+    return sorted;
+  }, [assets, sortConfig]);
+
+  const handleSort = (key: AssetSortKey) => {
+    setSortConfig((current) => (
+      current.key === key
+        ? { key, direction: current.direction === "asc" ? "desc" : "asc" }
+        : { key, direction: key === "category" || key === "name" || key === "institution" ? "asc" : "desc" }
+    ));
+  };
 
   const openEdit = (asset: Asset) => {
     setEditingAsset(asset);
@@ -226,30 +307,6 @@ export default function AssetsPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1 rounded-md border p-1" role="group" aria-label="Asset view options">
-            <Button
-              type="button"
-              size="sm"
-              variant={viewMode === "cards" ? "default" : "ghost"}
-              onClick={() => setViewMode("cards")}
-              aria-pressed={viewMode === "cards"}
-              data-testid="button-assets-card-view"
-            >
-              <LayoutGrid className="h-4 w-4 sm:mr-1.5" />
-              <span className="hidden sm:inline">Cards</span>
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant={viewMode === "table" ? "default" : "ghost"}
-              onClick={() => setViewMode("table")}
-              aria-pressed={viewMode === "table"}
-              data-testid="button-assets-table-view"
-            >
-              <Table2 className="h-4 w-4 sm:mr-1.5" />
-              <span className="hidden sm:inline">Table</span>
-            </Button>
-          </div>
           <ExportMenu data={exportData} />
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
@@ -309,6 +366,37 @@ export default function AssetsPage() {
         </Card>
       </div>
 
+      {assets.length > 0 && (
+        <div className="flex justify-end">
+          <div className="flex items-center gap-1 rounded-lg border border-primary/10 bg-primary/[0.03] p-1" role="group" aria-label="Asset view options">
+            <Button
+              type="button"
+              size="sm"
+              variant={viewMode === "cards" ? "default" : "ghost"}
+              onClick={() => setViewMode("cards")}
+              aria-pressed={viewMode === "cards"}
+              data-testid="button-assets-card-view"
+              className="h-9 gap-2 px-4"
+            >
+              <LayoutGrid className="h-4 w-4" />
+              Cards
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant={viewMode === "table" ? "default" : "ghost"}
+              onClick={() => setViewMode("table")}
+              aria-pressed={viewMode === "table"}
+              data-testid="button-assets-table-view"
+              className="h-9 gap-2 px-4"
+            >
+              <Table2 className="h-4 w-4" />
+              Table
+            </Button>
+          </div>
+        </div>
+      )}
+
       {assets.length === 0 ? (
         <Card>
           <CardContent className="p-12 text-center">
@@ -326,26 +414,26 @@ export default function AssetsPage() {
             <table className="w-full text-sm" data-testid="table-assets">
               <thead className="border-b bg-muted/50">
                 <tr className="text-left">
-                  <th scope="col" className="px-5 py-3 font-medium">Name</th>
-                  <th scope="col" className="px-5 py-3 font-medium">Category</th>
-                  <th scope="col" className="px-5 py-3 font-medium">Institution</th>
-                  <th scope="col" className="px-5 py-3 text-right font-medium">Value</th>
-                  <th scope="col" className="px-5 py-3 text-right font-medium">Rate of Return</th>
+                  <AssetSortHeader label="Category" column="category" sortConfig={sortConfig} onSort={handleSort} />
+                  <AssetSortHeader label="Name" column="name" sortConfig={sortConfig} onSort={handleSort} />
+                  <AssetSortHeader label="Institution" column="institution" sortConfig={sortConfig} onSort={handleSort} />
+                  <AssetSortHeader label="Value" column="value" sortConfig={sortConfig} onSort={handleSort} align="right" />
+                  <AssetSortHeader label="Rate of Return" column="rate" sortConfig={sortConfig} onSort={handleSort} align="right" />
                   <th scope="col" className="px-5 py-3 text-right font-medium">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y">
-                {assets.map((asset) => (
+                {sortedAssets.map((asset) => (
                   <tr key={asset.id} className="hover:bg-muted/30" data-testid={`table-row-asset-${asset.id}`}>
+                    <td className="px-5 py-3 text-muted-foreground">{getCategoryLabel(ASSET_CATEGORIES, asset.category)}</td>
                     <td className="px-5 py-3 font-medium">
                       <div className="flex items-center gap-1.5">
                         <span className="max-w-52 truncate">{asset.name}</span>
                         {plaidLinkedAssetIds.has(asset.id) && (
-                          <Link2 className="h-3.5 w-3.5 shrink-0 text-blue-500" title="Synced via Plaid" />
+                          <Link2 className="h-3.5 w-3.5 shrink-0 text-blue-500" aria-label="Synced via Plaid" />
                         )}
                       </div>
                     </td>
-                    <td className="px-5 py-3 text-muted-foreground">{getCategoryLabel(ASSET_CATEGORIES, asset.category)}</td>
                     <td className="px-5 py-3 text-muted-foreground">{asset.institution || "—"}</td>
                     <td className="px-5 py-3 text-right font-semibold whitespace-nowrap">{formatCurrency(asset.value)}</td>
                     <td className="px-5 py-3 text-right whitespace-nowrap">
@@ -426,7 +514,7 @@ export default function AssetsPage() {
                                   <div className="flex items-center gap-1.5">
                                     <h3 className="font-semibold truncate">{asset.name}</h3>
                                     {plaidLinkedAssetIds.has(asset.id) && (
-                                      <Link2 className="h-3.5 w-3.5 shrink-0 text-blue-500" title="Synced via Plaid" />
+                                      <Link2 className="h-3.5 w-3.5 shrink-0 text-blue-500" aria-label="Synced via Plaid" />
                                     )}
                                   </div>
                                   {asset.institution && (
