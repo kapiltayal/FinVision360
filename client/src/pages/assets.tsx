@@ -314,7 +314,7 @@ export default function AssetsPage() {
         </div>
         <div className="flex items-center gap-2">
           <ExportMenu data={exportData} />
-          <Button onClick={openCreate} className="h-9" data-testid="button-add-asset">
+          <Button onClick={openCreate} size="sm" data-testid="button-add-asset">
               <Plus className="h-4 w-4 mr-2" /> Add Asset
           </Button>
           <BookEntryDialog
@@ -408,7 +408,7 @@ export default function AssetsPage() {
             <Wallet className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
             <h3 className="text-lg font-semibold mb-1">No assets yet</h3>
             <p className="text-sm text-muted-foreground mb-4">Start tracking your wealth by adding your first asset.</p>
-            <Button onClick={openCreate} className="h-9" data-testid="button-add-first-asset">
+            <Button onClick={openCreate} size="sm" data-testid="button-add-first-asset">
               <Plus className="h-4 w-4 mr-2" /> Add Your First Asset
             </Button>
           </CardContent>

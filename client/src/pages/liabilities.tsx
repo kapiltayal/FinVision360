@@ -330,7 +330,7 @@ export default function LiabilitiesPage() {
         </div>
         <div className="flex items-center gap-2">
           <ExportMenu data={exportData} />
-          <Button onClick={openCreate} className="h-9" data-testid="button-add-liability">
+          <Button onClick={openCreate} size="sm" data-testid="button-add-liability">
               <Plus className="h-4 w-4 mr-2" /> Add Liability
           </Button>
           <BookEntryDialog
@@ -424,7 +424,7 @@ export default function LiabilitiesPage() {
             <CreditCard className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
             <h3 className="text-lg font-semibold mb-1">No liabilities</h3>
             <p className="text-sm text-muted-foreground mb-4">Track your debts by adding your first liability.</p>
-            <Button onClick={openCreate} className="h-9" data-testid="button-add-first-liability">
+            <Button onClick={openCreate} size="sm" data-testid="button-add-first-liability">
               <Plus className="h-4 w-4 mr-2" /> Add Your First Liability
             </Button>
           </CardContent>
