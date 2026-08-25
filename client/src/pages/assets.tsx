@@ -13,7 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useLastUpdated } from "@/hooks/use-last-updated";
 import { ExportMenu } from "@/components/export-menu";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { Plus, Pencil, Trash2, Wallet, TrendingUp, ChevronDown, Clock, Link2 } from "lucide-react";
+import { Plus, Pencil, Trash2, Wallet, TrendingUp, ChevronDown, Clock, Link2, LayoutGrid, Table2 } from "lucide-react";
 import { type Asset, type PlaidAccount, ASSET_CATEGORIES } from "@shared/schema";
 import { formatCurrency, formatPercent, getCategoryLabel } from "@/lib/format";
 
@@ -156,6 +156,7 @@ export default function AssetsPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingAsset, setEditingAsset] = useState<Asset | undefined>();
   const [openCategory, setOpenCategory] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<"cards" | "table">("cards");
   const { toast } = useToast();
   const { formattedDate, markUpdated } = useLastUpdated("assets");
   const { data: assets = [], isLoading } = useQuery<Asset[]>({ queryKey: ["/api/assets"] });
@@ -225,6 +226,30 @@ export default function AssetsPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 rounded-md border p-1" role="group" aria-label="Asset view options">
+            <Button
+              type="button"
+              size="sm"
+              variant={viewMode === "cards" ? "default" : "ghost"}
+              onClick={() => setViewMode("cards")}
+              aria-pressed={viewMode === "cards"}
+              data-testid="button-assets-card-view"
+            >
+              <LayoutGrid className="h-4 w-4 sm:mr-1.5" />
+              <span className="hidden sm:inline">Cards</span>
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant={viewMode === "table" ? "default" : "ghost"}
+              onClick={() => setViewMode("table")}
+              aria-pressed={viewMode === "table"}
+              data-testid="button-assets-table-view"
+            >
+              <Table2 className="h-4 w-4 sm:mr-1.5" />
+              <span className="hidden sm:inline">Table</span>
+            </Button>
+          </div>
           <ExportMenu data={exportData} />
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
@@ -294,6 +319,57 @@ export default function AssetsPage() {
               <Plus className="h-4 w-4 mr-2" /> Add Your First Asset
             </Button>
           </CardContent>
+        </Card>
+      ) : viewMode === "table" ? (
+        <Card>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm" data-testid="table-assets">
+              <thead className="border-b bg-muted/50">
+                <tr className="text-left">
+                  <th scope="col" className="px-5 py-3 font-medium">Name</th>
+                  <th scope="col" className="px-5 py-3 font-medium">Category</th>
+                  <th scope="col" className="px-5 py-3 font-medium">Institution</th>
+                  <th scope="col" className="px-5 py-3 text-right font-medium">Value</th>
+                  <th scope="col" className="px-5 py-3 text-right font-medium">Rate of Return</th>
+                  <th scope="col" className="px-5 py-3 text-right font-medium">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {assets.map((asset) => (
+                  <tr key={asset.id} className="hover:bg-muted/30" data-testid={`table-row-asset-${asset.id}`}>
+                    <td className="px-5 py-3 font-medium">
+                      <div className="flex items-center gap-1.5">
+                        <span className="max-w-52 truncate">{asset.name}</span>
+                        {plaidLinkedAssetIds.has(asset.id) && (
+                          <Link2 className="h-3.5 w-3.5 shrink-0 text-blue-500" title="Synced via Plaid" />
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-5 py-3 text-muted-foreground">{getCategoryLabel(ASSET_CATEGORIES, asset.category)}</td>
+                    <td className="px-5 py-3 text-muted-foreground">{asset.institution || "—"}</td>
+                    <td className="px-5 py-3 text-right font-semibold whitespace-nowrap">{formatCurrency(asset.value)}</td>
+                    <td className="px-5 py-3 text-right whitespace-nowrap">
+                      {parseFloat(asset.interestRate || "0") > 0
+                        ? <span className="text-emerald-600 dark:text-emerald-400">{formatPercent(asset.interestRate || "0")}</span>
+                        : "—"}
+                    </td>
+                    <td className="px-5 py-3">
+                      <div className="flex justify-end gap-1">
+                        <Button size="icon" variant="ghost" onClick={() => openEdit(asset)} data-testid={`button-table-edit-asset-${asset.id}`}>
+                          <Pencil className="h-4 w-4" />
+                          <span className="sr-only">Edit {asset.name}</span>
+                        </Button>
+                        <Button size="icon" variant="ghost" onClick={() => deleteMutation.mutate(asset.id)} data-testid={`button-table-delete-asset-${asset.id}`}>
+                          <Trash2 className="h-4 w-4" />
+                          <span className="sr-only">Delete {asset.name}</span>
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </Card>
       ) : (
         <Card>
