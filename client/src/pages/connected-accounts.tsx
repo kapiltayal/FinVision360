@@ -73,7 +73,7 @@ function PlaidLinkButton({ onSuccess }: { onSuccess: () => void }) {
       queryClient.invalidateQueries({ queryKey: ["/api/plaid/create-link-token"] });
       queryClient.invalidateQueries({ queryKey: ["/api/assets"] });
       queryClient.invalidateQueries({ queryKey: ["/api/liabilities"] });
-      toast({ title: "Account connected!", description: "Your accounts now appear under Assets and Liabilities." });
+      toast({ title: "Account connected!", description: "Choose accounts to import from the Assets or Liabilities page." });
       onSuccess();
     },
     onError: () => {
@@ -220,7 +220,7 @@ export default function ConnectedAccountsPage() {
             <div>
               <p className="font-semibold text-lg">No accounts connected yet</p>
               <p className="text-muted-foreground text-sm mt-1 max-w-sm">
-                Connect your bank or investment accounts to automatically sync balances. Your manual entries are always preserved.
+                Connect your bank or investment accounts, then choose which ones to import from Assets or Liabilities. Your manual entries are always preserved.
               </p>
             </div>
             <PlaidLinkButton onSuccess={() => {}} />

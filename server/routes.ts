@@ -55,6 +55,92 @@ export async function registerRoutes(
 ): Promise<Server> {
   setupAuth(app);
 
+  async function importBookEntries(req: any, res: any, kind: "asset" | "liability") {
+    const entries = req.body?.entries;
+    if (!Array.isArray(entries) || entries.length === 0) {
+      return res.status(400).json({ message: "Provide at least one entry to import" });
+    }
+    if (entries.length > 500) {
+      return res.status(400).json({ message: "Imports are limited to 500 entries at a time" });
+    }
+
+    const userId = (req.user as any).id;
+    const skippedReasons: Record<string, number> = {};
+    const addSkipped = (reason: string) => {
+      skippedReasons[reason] = (skippedReasons[reason] ?? 0) + 1;
+    };
+    let inserted = 0;
+
+    for (const entry of entries) {
+      const name = typeof entry?.name === "string" ? entry.name.trim() : "";
+      const category = typeof entry?.category === "string" ? entry.category.trim() : "";
+      const rawAmount = kind === "asset" ? entry?.value : entry?.balance;
+      const hasSuppliedAmount =
+        (typeof rawAmount === "string" && rawAmount.trim().length > 0) ||
+        (typeof rawAmount === "number" && Number.isFinite(rawAmount));
+      const amount = hasSuppliedAmount ? Number(rawAmount) : Number.NaN;
+      const interestRate = entry?.interestRate === undefined || entry?.interestRate === "" ? 0 : Number(entry.interestRate);
+      const minimumPayment = entry?.minimumPayment === undefined || entry?.minimumPayment === "" ? 0 : Number(entry.minimumPayment);
+
+      if (!name || !category) {
+        addSkipped("missing name or category");
+        continue;
+      }
+      if (!Number.isFinite(amount) || (kind === "asset" && amount < 0)) {
+        addSkipped(kind === "asset" ? "invalid value" : "invalid balance");
+        continue;
+      }
+      if (!Number.isFinite(interestRate) || interestRate < 0) {
+        addSkipped("invalid interest rate");
+        continue;
+      }
+      if (kind === "liability" && (!Number.isFinite(minimumPayment) || minimumPayment < 0)) {
+        addSkipped("invalid minimum payment");
+        continue;
+      }
+
+      const institution = typeof entry?.institution === "string" && entry.institution.trim() ? entry.institution.trim() : null;
+      const notes = typeof entry?.notes === "string" && entry.notes.trim() ? entry.notes.trim() : null;
+      const normalizedAmount = kind === "liability" ? Math.abs(amount) : amount;
+
+      try {
+        if (kind === "asset") {
+          await storage.createAsset({
+            userId,
+            name,
+            category,
+            value: normalizedAmount.toFixed(2),
+            interestRate: interestRate.toFixed(2),
+            institution,
+            notes,
+          });
+        } else {
+          await storage.createLiability({
+            userId,
+            name,
+            category,
+            balance: normalizedAmount.toFixed(2),
+            interestRate: interestRate.toFixed(2),
+            minimumPayment: minimumPayment.toFixed(2),
+            institution,
+            notes,
+          });
+        }
+        inserted++;
+      } catch (error) {
+        console.error(`[${kind} import] entry failed`, error);
+        addSkipped("could not be saved");
+      }
+    }
+
+    res.status(201).json({
+      inserted,
+      updated: 0,
+      skipped: Object.values(skippedReasons).reduce((total, count) => total + count, 0),
+      skippedReasons,
+    });
+  }
+
   app.get("/api/assets", requireAuth, async (req, res) => {
     const userId = (req.user as any).id;
     const result = await storage.getAssets(userId);
@@ -69,6 +155,10 @@ export async function registerRoutes(
     }
     const asset = await storage.createAsset({ userId, name, category, value, interestRate, institution, notes });
     res.status(201).json(asset);
+  });
+
+  app.post("/api/assets/import", requireAuth, async (req, res) => {
+    await importBookEntries(req, res, "asset");
   });
 
   app.patch("/api/assets/:id", requireAuth, async (req, res) => {
@@ -101,6 +191,10 @@ export async function registerRoutes(
     }
     const liability = await storage.createLiability({ userId, name, category, balance, interestRate, minimumPayment, institution, notes });
     res.status(201).json(liability);
+  });
+
+  app.post("/api/liabilities/import", requireAuth, async (req, res) => {
+    await importBookEntries(req, res, "liability");
   });
 
   app.patch("/api/liabilities/:id", requireAuth, async (req, res) => {
@@ -613,36 +707,128 @@ Use markdown formatting with headers and bold key numbers.`;
     if (mapping.kind === "asset") {
       if (plaidAcct.linkedAssetId) {
         await storage.updateAsset(plaidAcct.linkedAssetId, userId, { value: absBalance, name: plaidAcct.name, institution: institutionName ?? undefined });
-      } else {
-        const created = await storage.createAsset({
-          userId,
-          name: plaidAcct.name,
-          category: mapping.category,
-          value: absBalance,
-          interestRate: "0",
-          institution: institutionName ?? null,
-          notes: "Synced from Plaid",
-        });
-        await storage.updatePlaidAccount(plaidAcct.id, { linkedAssetId: created.id });
       }
     } else {
       if (plaidAcct.linkedLiabilityId) {
         await storage.updateLiability(plaidAcct.linkedLiabilityId, userId, { balance: absBalance, name: plaidAcct.name, institution: institutionName ?? undefined });
-      } else {
-        const created = await storage.createLiability({
-          userId,
-          name: plaidAcct.name,
-          category: mapping.category,
-          balance: absBalance,
-          interestRate: "0",
-          minimumPayment: "0",
-          institution: institutionName ?? null,
-          notes: "Synced from Plaid",
-        });
-        await storage.updatePlaidAccount(plaidAcct.id, { linkedLiabilityId: created.id });
       }
     }
   }
+
+  async function importPlaidAccountToBook(userId: string, accountId: number, expectedKind: "asset" | "liability") {
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      const source = await client.query<{
+        id: number;
+        name: string;
+        type: string;
+        subtype: string | null;
+        currentBalance: string | null;
+        linkedAssetId: number | null;
+        linkedLiabilityId: number | null;
+        institutionName: string | null;
+      }>(
+        `SELECT
+           plaid_accounts.id,
+           plaid_accounts.name,
+           plaid_accounts.type,
+           plaid_accounts.subtype,
+           plaid_accounts.current_balance AS "currentBalance",
+           plaid_accounts.linked_asset_id AS "linkedAssetId",
+           plaid_accounts.linked_liability_id AS "linkedLiabilityId",
+           plaid_items.institution_name AS "institutionName"
+         FROM plaid_accounts
+         INNER JOIN plaid_items ON plaid_items.id = plaid_accounts.plaid_item_id
+         WHERE plaid_accounts.id = $1 AND plaid_accounts.user_id = $2
+         FOR UPDATE`,
+        [accountId, userId],
+      );
+      const account = source.rows[0];
+      if (!account) {
+        await client.query("COMMIT");
+        return { imported: false, reason: "account unavailable" };
+      }
+      const mapping = mapPlaidToBook(account.type, account.subtype);
+      if (mapping.kind !== expectedKind) {
+        await client.query("COMMIT");
+        return { imported: false, reason: "not eligible for this page" };
+      }
+      if (account.linkedAssetId || account.linkedLiabilityId) {
+        await client.query("COMMIT");
+        return { imported: false, reason: "already imported" };
+      }
+
+      const balance = Math.abs(parseFloat(account.currentBalance ?? "0") || 0).toFixed(2);
+      if (expectedKind === "asset") {
+        const created = await client.query<{ id: number }>(
+          `INSERT INTO assets (user_id, name, category, value, interest_rate, institution, notes)
+           VALUES ($1, $2, $3, $4, '0', $5, 'Synced from Plaid')
+           RETURNING id`,
+          [userId, account.name, mapping.category, balance, account.institutionName],
+        );
+        await client.query(
+          `UPDATE plaid_accounts SET linked_asset_id = $1, last_updated = CURRENT_TIMESTAMP WHERE id = $2`,
+          [created.rows[0].id, account.id],
+        );
+      } else {
+        const created = await client.query<{ id: number }>(
+          `INSERT INTO liabilities (user_id, name, category, balance, interest_rate, minimum_payment, institution, notes)
+           VALUES ($1, $2, $3, $4, '0', '0', $5, 'Synced from Plaid')
+           RETURNING id`,
+          [userId, account.name, mapping.category, balance, account.institutionName],
+        );
+        await client.query(
+          `UPDATE plaid_accounts SET linked_liability_id = $1, last_updated = CURRENT_TIMESTAMP WHERE id = $2`,
+          [created.rows[0].id, account.id],
+        );
+      }
+      await client.query("COMMIT");
+      return { imported: true };
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  app.post("/api/plaid/accounts/import-to-book", requireAuth, async (req, res) => {
+    const userId = (req.user as any).id;
+    const kind = req.body?.kind;
+    const accountIds = req.body?.accountIds;
+    if ((kind !== "asset" && kind !== "liability") || !Array.isArray(accountIds) || accountIds.length === 0) {
+      return res.status(400).json({ message: "Choose one or more connected accounts to import" });
+    }
+    if (accountIds.length > 100) {
+      return res.status(400).json({ message: "Imports are limited to 100 connected accounts at a time" });
+    }
+
+    const selectedIds = Array.from(new Set(accountIds.map((id: unknown) => Number(id)).filter(Number.isInteger)));
+    const skippedReasons: Record<string, number> = {};
+    const addSkipped = (reason: string) => {
+      skippedReasons[reason] = (skippedReasons[reason] ?? 0) + 1;
+    };
+    let inserted = 0;
+
+    for (const accountId of selectedIds) {
+      try {
+        const result = await importPlaidAccountToBook(userId, accountId, kind);
+        if (result.imported) inserted++;
+        else addSkipped(result.reason ?? "could not be imported");
+      } catch (error) {
+        console.error("[plaid] import to book failed", error);
+        addSkipped("could not be imported");
+      }
+    }
+
+    res.status(201).json({
+      inserted,
+      updated: 0,
+      skipped: Object.values(skippedReasons).reduce((total, count) => total + count, 0),
+      skippedReasons,
+    });
+  });
 
   app.get("/api/plaid/create-link-token", requireAuth, async (req, res) => {
     try {
@@ -681,7 +867,8 @@ Use markdown formatting with headers and bold key numbers.`;
         lastSynced: null,
       });
 
-      // Immediately fetch and store accounts, plus mirror them into assets/liabilities
+      // Immediately fetch and store accounts. Users select which accounts to add
+      // from the Assets or Liabilities import flow.
       const accountsRes = await plaid.accountsGet({ access_token });
       for (const acct of accountsRes.data.accounts) {
         const stored = await storage.upsertPlaidAccount({

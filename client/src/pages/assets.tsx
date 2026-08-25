@@ -5,13 +5,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useLastUpdated } from "@/hooks/use-last-updated";
 import { ExportMenu } from "@/components/export-menu";
+import { BookEntryDialog } from "@/components/book-entry-import";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Plus, Pencil, Trash2, Wallet, TrendingUp, ChevronDown, Clock, Link2, LayoutGrid, Table2, ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
 import { type Asset, type PlaidAccount, ASSET_CATEGORIES } from "@shared/schema";
@@ -268,6 +268,12 @@ export default function AssetsPage() {
     setDialogOpen(true);
   };
 
+  const handleImported = () => {
+    queryClient.invalidateQueries({ queryKey: ["/api/assets"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/plaid/accounts"] });
+    markUpdated();
+  };
+
   if (isLoading) {
     return (
       <div className="p-6 space-y-4">
@@ -308,19 +314,18 @@ export default function AssetsPage() {
         </div>
         <div className="flex items-center gap-2">
           <ExportMenu data={exportData} />
-          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger asChild>
-            <Button onClick={openCreate} data-testid="button-add-asset">
+          <Button onClick={openCreate} className="h-9" data-testid="button-add-asset">
               <Plus className="h-4 w-4 mr-2" /> Add Asset
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-lg">
-            <DialogHeader>
-              <DialogTitle>{editingAsset ? "Edit Asset" : "Add New Asset"}</DialogTitle>
-            </DialogHeader>
-            <AssetForm asset={editingAsset} onClose={() => setDialogOpen(false)} onUpdated={markUpdated} />
-          </DialogContent>
-        </Dialog>
+          </Button>
+          <BookEntryDialog
+            open={dialogOpen}
+            onOpenChange={setDialogOpen}
+            title={editingAsset ? "Edit Asset" : "Add New Asset"}
+            kind="asset"
+            categories={ASSET_CATEGORIES}
+            onImported={handleImported}
+            manualContent={<AssetForm asset={editingAsset} onClose={() => setDialogOpen(false)} onUpdated={markUpdated} />}
+          />
         </div>
       </div>
 
@@ -403,7 +408,7 @@ export default function AssetsPage() {
             <Wallet className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
             <h3 className="text-lg font-semibold mb-1">No assets yet</h3>
             <p className="text-sm text-muted-foreground mb-4">Start tracking your wealth by adding your first asset.</p>
-            <Button onClick={openCreate} data-testid="button-add-first-asset">
+            <Button onClick={openCreate} className="h-9" data-testid="button-add-first-asset">
               <Plus className="h-4 w-4 mr-2" /> Add Your First Asset
             </Button>
           </CardContent>

@@ -2,3 +2,4 @@
 ---
 - [Supabase client init](supabase-client-init.md) — use synchronous singleton with hardcoded anon keys; never fetch /api/config (causes HMR race conditions)
 - [Application database schema](application-database-schema.md) — the app database can differ from the workspace SQL target; verify schema changes through the app connection.
+- [Plaid book imports](plaid-book-imports.md) — users choose which connected accounts enter their book; background sync updates only already-linked entries.

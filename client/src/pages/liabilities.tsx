@@ -5,13 +5,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useLastUpdated } from "@/hooks/use-last-updated";
 import { ExportMenu } from "@/components/export-menu";
+import { BookEntryDialog } from "@/components/book-entry-import";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Plus, Pencil, Trash2, CreditCard, TrendingDown, ChevronDown, Clock, Link2, LayoutGrid, Table2, ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
 import { type Liability, type PlaidAccount, LIABILITY_CATEGORIES } from "@shared/schema";
@@ -283,6 +283,12 @@ export default function LiabilitiesPage() {
     setDialogOpen(true);
   };
 
+  const handleImported = () => {
+    queryClient.invalidateQueries({ queryKey: ["/api/liabilities"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/plaid/accounts"] });
+    markUpdated();
+  };
+
   if (isLoading) {
     return (
       <div className="p-6 space-y-4">
@@ -324,19 +330,18 @@ export default function LiabilitiesPage() {
         </div>
         <div className="flex items-center gap-2">
           <ExportMenu data={exportData} />
-          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger asChild>
-            <Button onClick={openCreate} data-testid="button-add-liability">
+          <Button onClick={openCreate} className="h-9" data-testid="button-add-liability">
               <Plus className="h-4 w-4 mr-2" /> Add Liability
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-lg">
-            <DialogHeader>
-              <DialogTitle>{editingLiability ? "Edit Liability" : "Add New Liability"}</DialogTitle>
-            </DialogHeader>
-            <LiabilityForm liability={editingLiability} onClose={() => setDialogOpen(false)} onUpdated={markUpdated} />
-          </DialogContent>
-        </Dialog>
+          </Button>
+          <BookEntryDialog
+            open={dialogOpen}
+            onOpenChange={setDialogOpen}
+            title={editingLiability ? "Edit Liability" : "Add New Liability"}
+            kind="liability"
+            categories={LIABILITY_CATEGORIES}
+            onImported={handleImported}
+            manualContent={<LiabilityForm liability={editingLiability} onClose={() => setDialogOpen(false)} onUpdated={markUpdated} />}
+          />
         </div>
       </div>
 
@@ -419,7 +424,7 @@ export default function LiabilitiesPage() {
             <CreditCard className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
             <h3 className="text-lg font-semibold mb-1">No liabilities</h3>
             <p className="text-sm text-muted-foreground mb-4">Track your debts by adding your first liability.</p>
-            <Button onClick={openCreate} data-testid="button-add-first-liability">
+            <Button onClick={openCreate} className="h-9" data-testid="button-add-first-liability">
               <Plus className="h-4 w-4 mr-2" /> Add Your First Liability
             </Button>
           </CardContent>
