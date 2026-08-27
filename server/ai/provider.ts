@@ -3,6 +3,7 @@ import OpenAI from "openai";
 const ADVISOR_MODEL = "gpt-4o-mini";
 const MAX_INPUT_CHARACTERS = 28_000;
 const MAX_COMPLETION_TOKENS = 1_800;
+const AI_NOT_CONFIGURED_MESSAGE = "Replit-managed AI is not enabled for this app yet. No personal OpenAI key is configured.";
 
 export const AI_ADVISOR_LIMITS = {
   maxQuestionCharacters: 2_000,
@@ -25,11 +26,7 @@ function createClient(): OpenAI {
   const apiKey = process.env.AI_INTEGRATIONS_OPENAI_API_KEY;
   const baseURL = process.env.AI_INTEGRATIONS_OPENAI_BASE_URL;
   if (!apiKey || !baseURL) {
-    console.error("AI integration configuration unavailable", {
-      hasApiKey: Boolean(apiKey),
-      hasBaseURL: Boolean(baseURL),
-    });
-    throw new AIProviderError();
+    throw new AIProviderError(AI_NOT_CONFIGURED_MESSAGE);
   }
 
   return new OpenAI({ apiKey, baseURL });
