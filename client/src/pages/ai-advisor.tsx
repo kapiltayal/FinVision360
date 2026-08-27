@@ -52,6 +52,8 @@ function StreamingResponse({
 
   useEffect(() => {
     let cancelled = false;
+    const abortController = new AbortController();
+    let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
 
     async function stream() {
       setIsStreaming(true);
@@ -65,11 +67,15 @@ function StreamingResponse({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body),
           credentials: "include",
+          signal: abortController.signal,
         });
 
-        if (!res.ok) throw new Error("Request failed");
+        if (!res.ok) {
+          const errorBody = await res.json().catch(() => null);
+          throw new Error(errorBody?.message || "Unable to generate advice right now.");
+        }
 
-        const reader = res.body?.getReader();
+        reader = res.body?.getReader();
         if (!reader) throw new Error("No response body");
 
         const decoder = new TextDecoder();
@@ -101,14 +107,19 @@ function StreamingResponse({
           }
         }
       } catch (err: any) {
+        if (abortController.signal.aborted) return;
         setError(err.message || "Something went wrong");
       } finally {
-        setIsStreaming(false);
+        if (!abortController.signal.aborted) setIsStreaming(false);
       }
     }
 
     stream();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+      abortController.abort();
+      void reader?.cancel().catch(() => {});
+    };
   }, [endpoint, JSON.stringify(body)]);
 
   useEffect(() => {
@@ -163,51 +174,17 @@ export default function AIAdvisorPage() {
   const [forecastYears, setForecastYears] = useState("10");
   const [forecastSubmitted, setForecastSubmitted] = useState<any>(null);
 
-  const totalAssets = assets.reduce((sum, a) => sum + parseFloat(a.value || "0"), 0);
-  const totalLiabilities = liabilities.reduce((sum, l) => sum + parseFloat(l.balance || "0"), 0);
-  const weightedAssetRate = totalAssets > 0
-    ? assets.reduce((sum, a) => sum + parseFloat(a.value || "0") * parseFloat(a.interestRate || "0"), 0) / totalAssets
-    : 0;
-  const weightedLiabilityRate = totalLiabilities > 0
-    ? liabilities.reduce((sum, l) => sum + parseFloat(l.balance || "0") * parseFloat(l.interestRate || "0"), 0) / totalLiabilities
-    : 0;
-
   const handleScenarioSubmit = () => {
     if (!scenarioQuery.trim()) return;
-    setScenarioSubmitted({
-      scenario: scenarioQuery,
-      assets: {
-        totalValue: totalAssets,
-        weightedRate: weightedAssetRate.toFixed(2),
-        items: assets.map((a) => ({ name: a.name, category: a.category, value: a.value, rate: a.interestRate })),
-      },
-      liabilities: {
-        totalBalance: totalLiabilities,
-        weightedRate: weightedLiabilityRate.toFixed(2),
-        items: liabilities.map((l) => ({ name: l.name, category: l.category, balance: l.balance, rate: l.interestRate })),
-      },
-    });
+    setScenarioSubmitted({ scenario: scenarioQuery.trim() });
   };
 
   const handleDebtSubmit = () => {
-    setDebtSubmitted({
-      liabilities: liabilities.map((l) => ({
-        name: l.name,
-        category: l.category,
-        balance: l.balance,
-        interestRate: l.interestRate,
-        minimumPayment: l.minimumPayment,
-      })),
-      monthlyBudget: parseFloat(debtBudget) || 0,
-    });
+    setDebtSubmitted({ monthlyBudget: debtBudget });
   };
 
   const handleForecastSubmit = () => {
-    setForecastSubmitted({
-      assets: assets.map((a) => ({ name: a.name, value: a.value, interestRate: a.interestRate, category: a.category })),
-      liabilities: liabilities.map((l) => ({ name: l.name, balance: l.balance, interestRate: l.interestRate, category: l.category })),
-      yearsToForecast: parseInt(forecastYears) || 10,
-    });
+    setForecastSubmitted({ yearsToForecast: forecastYears });
   };
 
   const scenarioSuggestions = [

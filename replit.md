@@ -7,7 +7,7 @@ A comprehensive personal finance application that helps users track assets, liab
 - **Frontend**: React + TypeScript with Vite, TailwindCSS, shadcn/ui components
 - **Backend**: Express.js + TypeScript
 - **Database**: PostgreSQL with Drizzle ORM (Replit built-in)
-- **AI**: OpenAI (requires `OPENAI_API_KEY` secret for AI Advisor features)
+- **AI**: Replit AI Integrations (managed OpenAI-compatible ModelFarm provider for AI Advisor features)
 - **Auth**: Passport.js with local strategy, session-based with pg-session-store
 
 ## Key Features
@@ -52,7 +52,7 @@ A comprehensive personal finance application that helps users track assets, liab
 ## Environment
 - `DATABASE_URL` - PostgreSQL connection (auto-configured by Replit)
 - `SESSION_SECRET` - Session encryption key (auto-configured by Replit)
-- `OPENAI_API_KEY` - OpenAI API key (required for AI Advisor features)
+- Replit injects native AI Integration configuration for the server at runtime; no separately managed AI key is required for AI Advisor.
 
 ## Running the App
 - **Dev**: `npm run dev` (starts Express + Vite dev server on port 5000)
@@ -71,6 +71,6 @@ A comprehensive personal finance application that helps users track assets, liab
 
 ## Notes
 - The app runs on port 5000 (both API and frontend via Vite middleware in dev)
-- AI features (AI Advisor page) require `OPENAI_API_KEY` to be set; rest of app works without it
+- AI Advisor uses the centralized Replit-native AI provider. Keep provider/model configuration in that server utility rather than adding model identifiers or client setup to routes or UI.
 - Demo data is seeded automatically in development mode
 - Most major bank websites (Ally, Marcus, Discover) use JavaScript-rendered rates that can't be scraped via static HTML — use manual entry for specific bank APYs
