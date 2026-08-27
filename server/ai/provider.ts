@@ -25,6 +25,10 @@ function createClient(): OpenAI {
   const apiKey = process.env.AI_INTEGRATIONS_OPENAI_API_KEY;
   const baseURL = process.env.AI_INTEGRATIONS_OPENAI_BASE_URL;
   if (!apiKey || !baseURL) {
+    console.error("AI integration configuration unavailable", {
+      hasApiKey: Boolean(apiKey),
+      hasBaseURL: Boolean(baseURL),
+    });
     throw new AIProviderError();
   }
 
