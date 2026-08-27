@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Brain, Lightbulb, TrendingUp, CreditCard, Loader2, Sparkles, Send } from "lucide-react";
 import { type Asset, type Liability } from "@shared/schema";
+import { getAccessToken } from "@/lib/supabase";
 
 function escapeHtml(text: string): string {
   return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -62,9 +63,13 @@ function StreamingResponse({
       onStart?.();
 
       try {
+        const accessToken = await getAccessToken();
         const res = await fetch(endpoint, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+          },
           body: JSON.stringify(body),
           credentials: "include",
           signal: abortController.signal,
