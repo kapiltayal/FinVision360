@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, serial, integer, numeric, timestamp, boolean, date } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, serial, integer, numeric, timestamp, boolean, date, uniqueIndex } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -62,6 +62,34 @@ export const insertLiabilitySchema = createInsertSchema(liabilities).omit({
 
 export type InsertLiability = z.infer<typeof insertLiabilitySchema>;
 export type Liability = typeof liabilities.$inferSelect;
+
+export const assetTypeList = pgTable("Asset_type_list", {
+  id: serial("id").primaryKey(),
+  type: text("type").notNull(),
+  parentCategory: text("parent_category").notNull(),
+  subCategory: text("sub_category").notNull(),
+  description: text("description").notNull(),
+  rateOfReturn: numeric("rate_of_return", { precision: 10, scale: 8 }).notNull(),
+  rateOfReturnInflationAdjusted: numeric("rate_of_return_inflation_adjusted", { precision: 10, scale: 8 }).notNull(),
+}, (table) => ({
+  hierarchyUnique: uniqueIndex("asset_type_list_hierarchy_unique").on(table.parentCategory, table.subCategory),
+}));
+
+export type AssetTypeList = typeof assetTypeList.$inferSelect;
+export type InsertAssetTypeList = typeof assetTypeList.$inferInsert;
+
+export const liabilitiesTypeList = pgTable("liabilities_type_list", {
+  id: serial("id").primaryKey(),
+  type: text("type").notNull(),
+  parentCategory: text("parent_category").notNull(),
+  subCategory: text("sub_category").notNull(),
+  description: text("description").notNull(),
+}, (table) => ({
+  hierarchyUnique: uniqueIndex("liabilities_type_list_hierarchy_unique").on(table.parentCategory, table.subCategory),
+}));
+
+export type LiabilitiesTypeList = typeof liabilitiesTypeList.$inferSelect;
+export type InsertLiabilitiesTypeList = typeof liabilitiesTypeList.$inferInsert;
 
 export const insurancePolicies = pgTable("insurance_policies", {
   id: serial("id").primaryKey(),
