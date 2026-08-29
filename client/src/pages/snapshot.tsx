@@ -294,12 +294,18 @@ export default function SnapshotPage() {
           <div className="absolute inset-0"
             style={{ backgroundImage: "radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px)", backgroundSize: "32px 32px" }} />
         </div>
-        <div className="relative px-6 py-10 md:py-12">
-          <p className="text-blue-400 text-xs font-bold tracking-[0.2em] uppercase mb-2">Financial Snapshot</p>
-          <h1 className="text-3xl md:text-4xl font-bold text-white mb-2 leading-tight">
-            {firstName}&apos;s Financial Snapshot{age !== null ? <span className="text-2xl md:text-3xl font-normal text-blue-300 ml-3">(Age: {age})</span> : null}
-          </h1>
-          <p className="text-slate-400 text-sm">Your complete financial picture &nbsp;·&nbsp; as of {today}</p>
+        <div className="relative max-w-7xl mx-auto px-5 py-5 md:px-8 md:py-6">
+          <div className="flex flex-col gap-2.5 sm:flex-row sm:items-end sm:justify-between sm:gap-6">
+            <div className="min-w-0">
+              <p className="text-blue-300 text-[10px] font-bold tracking-[0.24em] uppercase mb-1">Financial Snapshot</p>
+              <h1 className="text-2xl md:text-3xl font-bold text-white leading-tight tracking-tight">
+                {firstName}&apos;s Financial Snapshot{age !== null ? <span className="text-lg md:text-xl font-normal text-blue-200 ml-2.5 whitespace-nowrap">(Age: {age})</span> : null}
+              </h1>
+            </div>
+            <p className="shrink-0 text-slate-300 text-xs sm:pb-1">
+              <span className="text-slate-400">As of</span>{" "}{today}
+            </p>
+          </div>
         </div>
       </div>
 
