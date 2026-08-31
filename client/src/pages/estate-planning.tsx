@@ -449,7 +449,7 @@ export default function EstatePlanningPage() {
                                   <Input
                                     data-testid={`input-beneficiary-percentage-${asset.id}-${index}`}
                                     type="number"
-                                    min="0.01"
+                                    min="0"
                                     max="100"
                                     step="1"
                                     value={draft.percentage}
