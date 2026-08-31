@@ -7,4 +7,4 @@ The database exposed through the workspace SQL tool may not be the same PostgreS
 
 **Why:** Schema changes need to be validated against the connection used by the running server, not just against a separate workspace-managed database.
 
-**How to apply:** Prefer the project's Drizzle schema and normal publish workflow. If a local Drizzle push is blocked by an interactive rename prompt, verify that the intended create operation actually ran against the app connection before treating the schema as applied. Never add startup-time DDL to work around this.
+**How to apply:** Prefer the project's Drizzle schema and normal publish workflow. If a local Drizzle push is blocked by an interactive rename or unrelated destructive prompt, do not accept data loss; verify the intended change against the app connection before treating it as applied. Never add startup-time DDL to work around this.

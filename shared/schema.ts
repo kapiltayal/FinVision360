@@ -67,7 +67,7 @@ export const assetTypeList = pgTable("Asset_type_list", {
   id: serial("id").primaryKey(),
   type: text("type").notNull(),
   parentCategory: text("parent_category").notNull(),
-  subCategory: text("sub_category").notNull(),
+  subCategory: text("category").notNull(),
   description: text("description").notNull(),
   rateOfReturn: numeric("rate_of_return", { precision: 10, scale: 8 }).notNull(),
   rateOfReturnInflationAdjusted: numeric("rate_of_return_inflation_adjusted", { precision: 10, scale: 8 }).notNull(),
@@ -82,7 +82,7 @@ export const liabilitiesTypeList = pgTable("liabilities_type_list", {
   id: serial("id").primaryKey(),
   type: text("type").notNull(),
   parentCategory: text("parent_category").notNull(),
-  subCategory: text("sub_category").notNull(),
+  subCategory: text("category").notNull(),
   description: text("description").notNull(),
 }, (table) => ({
   hierarchyUnique: uniqueIndex("liabilities_type_list_hierarchy_unique").on(table.parentCategory, table.subCategory),

@@ -9,7 +9,7 @@ async function main() {
       id SERIAL PRIMARY KEY,
       type TEXT NOT NULL,
       parent_category TEXT NOT NULL,
-      sub_category TEXT NOT NULL,
+      category TEXT NOT NULL,
       description TEXT NOT NULL,
       rate_of_return NUMERIC(10, 8) NOT NULL,
       rate_of_return_inflation_adjusted NUMERIC(10, 8) NOT NULL
@@ -19,15 +19,15 @@ async function main() {
       id SERIAL PRIMARY KEY,
       type TEXT NOT NULL,
       parent_category TEXT NOT NULL,
-      sub_category TEXT NOT NULL,
+      category TEXT NOT NULL,
       description TEXT NOT NULL
     );
 
     CREATE UNIQUE INDEX IF NOT EXISTS asset_type_list_hierarchy_unique
-      ON "Asset_type_list" (parent_category, sub_category);
+      ON "Asset_type_list" (parent_category, category);
 
     CREATE UNIQUE INDEX IF NOT EXISTS liabilities_type_list_hierarchy_unique
-      ON liabilities_type_list (parent_category, sub_category);
+      ON liabilities_type_list (parent_category, category);
   `);
 
   await seedDatabase();
