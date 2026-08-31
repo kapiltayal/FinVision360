@@ -69,3 +69,35 @@ export async function streamAdvisorCompletion(
   }, { signal });
   return stream;
 }
+
+/**
+ * A deliberately non-streaming completion for import classification.  Keeping
+ * this separate from the advisor stream makes it possible for callers to
+ * distinguish an unavailable provider (where deterministic matching is OK)
+ * from an unusable successful model response.
+ */
+export async function completeIngestionClassification(
+  prompt: string,
+  signal?: AbortSignal,
+): Promise<string> {
+  const messages: AdvisorMessage[] = [
+    {
+      role: "system",
+      content: "Return only a JSON object. Do not include markdown or commentary.",
+    },
+    { role: "user", content: prompt },
+  ];
+  try {
+    const completion = await createClient().chat.completions.create({
+      model: ADVISOR_MODEL,
+      messages: validateMessages(messages),
+      stream: false,
+      max_completion_tokens: MAX_COMPLETION_TOKENS,
+      response_format: { type: "json_object" },
+    }, { signal });
+    return completion.choices[0]?.message?.content ?? "";
+  } catch (error) {
+    if (error instanceof AIProviderError) throw error;
+    throw new AIProviderError();
+  }
+}

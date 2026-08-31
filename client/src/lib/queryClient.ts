@@ -4,7 +4,12 @@ import { getAccessToken } from "./supabase";
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
     const text = (await res.text()) || res.statusText;
-    throw new Error(`${res.status}: ${text}`);
+    let message = text;
+    try {
+      const body = JSON.parse(text);
+      if (typeof body.message === "string") message = body.message;
+    } catch {}
+    throw new Error(message);
   }
 }
 
@@ -23,13 +28,14 @@ export async function apiRequest(
   data?: unknown,
 ): Promise<Response> {
   const authHeaders = await getAuthHeaders();
+  const isFormData = data instanceof FormData;
   const res = await fetch(url, {
     method,
     headers: {
-      ...(data ? { "Content-Type": "application/json" } : {}),
+      ...(data && !isFormData ? { "Content-Type": "application/json" } : {}),
       ...authHeaders,
     },
-    body: data ? JSON.stringify(data) : undefined,
+    body: data ? (isFormData ? data : JSON.stringify(data)) : undefined,
   });
   await throwIfResNotOk(res);
   return res;

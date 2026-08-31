@@ -4,7 +4,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
@@ -14,8 +13,9 @@ import { ExportMenu } from "@/components/export-menu";
 import { BookEntryDialog } from "@/components/book-entry-import";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Plus, Pencil, Trash2, Wallet, TrendingUp, ChevronDown, Clock, Link2, LayoutGrid, Table2, ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
-import { type Asset, type PlaidAccount, ASSET_CATEGORIES } from "@shared/schema";
-import { formatCurrency, formatPercent, getCategoryLabel } from "@/lib/format";
+import { type Asset, type PlaidAccount } from "@shared/schema";
+import { formatCurrency, formatPercent } from "@/lib/format";
+import { type BookCategory, categoryLabel, groupedBookCategories } from "@/lib/book-categories";
 
 type AssetSortKey = "category" | "name" | "institution" | "value" | "rate";
 type SortDirection = "asc" | "desc";
@@ -61,17 +61,19 @@ function AssetSortHeader({
 
 function AssetForm({
   asset,
+  categories,
   onClose,
   onUpdated,
 }: {
   asset?: Asset;
+  categories: BookCategory[];
   onClose: () => void;
   onUpdated?: () => void;
 }) {
   const { toast } = useToast();
   const [form, setForm] = useState({
     name: asset?.name || "",
-    category: asset?.category || "bank_account",
+    category: asset?.category || "",
     value: asset?.value || "",
     interestRate: asset?.interestRate || "0",
     institution: asset?.institution || "",
@@ -106,6 +108,10 @@ function AssetForm({
       toast({ title: "Required fields missing", variant: "destructive" });
       return;
     }
+    if (!categories.some((category) => category.category === form.category)) {
+      toast({ title: "Select a valid category", variant: "destructive" });
+      return;
+    }
     if (asset) {
       updateMutation.mutate(form);
     } else {
@@ -130,16 +136,23 @@ function AssetForm({
         </div>
         <div className="space-y-2">
           <Label>Category</Label>
-          <Select value={form.category} onValueChange={(v) => setForm({ ...form, category: v })}>
-            <SelectTrigger data-testid="select-asset-category">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {ASSET_CATEGORIES.map((c) => (
-                <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <select
+            data-testid="select-asset-category"
+            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+            value={form.category}
+            onChange={(e) => setForm({ ...form, category: e.target.value })}
+            required
+          >
+            <option value="" disabled>Select a category</option>
+            {asset && !categories.some((category) => category.category === asset.category) && (
+              <option value={asset.category} disabled>{asset.category} (legacy category)</option>
+            )}
+            {groupedBookCategories(categories).map(([parent, entries]) => (
+              <optgroup key={parent} label={parent}>
+                {entries.map((category) => <option key={`${category.parentCategory}-${category.category}`} value={category.category}>{category.category}</option>)}
+              </optgroup>
+            ))}
+          </select>
         </div>
         <div className="space-y-2">
           <Label>Value ($)</Label>
@@ -205,7 +218,8 @@ export default function AssetsPage() {
   });
   const { toast } = useToast();
   const { formattedDate, markUpdated } = useLastUpdated("assets");
-  const { data: assets = [], isLoading } = useQuery<Asset[]>({ queryKey: ["/api/assets"] });
+  const { data: assets = [], isLoading: assetsLoading } = useQuery<Asset[]>({ queryKey: ["/api/assets"] });
+  const { data: categories = [], isLoading: categoriesLoading } = useQuery<BookCategory[]>({ queryKey: ["/api/assets/categories"] });
   const { data: plaidData } = useQuery<{ accounts: PlaidAccount[]; items: any[] }>({ queryKey: ["/api/plaid/accounts"] });
   const plaidLinkedAssetIds = new Set((plaidData?.accounts ?? []).map((a) => a.linkedAssetId).filter(Boolean));
 
@@ -227,7 +241,7 @@ export default function AssetsPage() {
     sorted.sort((a, b) => {
       let comparison = 0;
       if (sortConfig.key === "category") {
-        comparison = getCategoryLabel(ASSET_CATEGORIES, a.category).localeCompare(getCategoryLabel(ASSET_CATEGORIES, b.category));
+        comparison = categoryLabel(categories, a.category).localeCompare(categoryLabel(categories, b.category));
       } else if (sortConfig.key === "name") {
         comparison = a.name.localeCompare(b.name);
       } else if (sortConfig.key === "institution") {
@@ -239,7 +253,7 @@ export default function AssetsPage() {
       }
 
       if (comparison === 0 && sortConfig.key !== "category") {
-        comparison = getCategoryLabel(ASSET_CATEGORIES, a.category).localeCompare(getCategoryLabel(ASSET_CATEGORIES, b.category));
+        comparison = categoryLabel(categories, a.category).localeCompare(categoryLabel(categories, b.category));
       }
       if (comparison === 0) {
         comparison = parseFloat(a.value || "0") - parseFloat(b.value || "0");
@@ -248,7 +262,7 @@ export default function AssetsPage() {
       return sortConfig.direction === "asc" ? comparison : -comparison;
     });
     return sorted;
-  }, [assets, sortConfig]);
+  }, [assets, categories, sortConfig]);
 
   const handleSort = (key: AssetSortKey) => {
     setSortConfig((current) => (
@@ -274,7 +288,7 @@ export default function AssetsPage() {
     markUpdated();
   };
 
-  if (isLoading) {
+  if (assetsLoading || categoriesLoading) {
     return (
       <div className="p-6 space-y-4">
         <Skeleton className="h-8 w-32" />
@@ -293,7 +307,7 @@ export default function AssetsPage() {
       columns: ["Name", "Category", "Value ($)", "Interest Rate (%)", "Institution", "Notes"],
       rows: assets.map((a) => [
         a.name,
-        getCategoryLabel(ASSET_CATEGORIES, a.category),
+        categoryLabel(categories, a.category),
         parseFloat(a.value || "0"),
         parseFloat(a.interestRate || "0"),
         a.institution || "",
@@ -322,9 +336,8 @@ export default function AssetsPage() {
             onOpenChange={setDialogOpen}
             title={editingAsset ? "Edit Asset" : "Add New Asset"}
             kind="asset"
-            categories={ASSET_CATEGORIES}
             onImported={handleImported}
-            manualContent={<AssetForm asset={editingAsset} onClose={() => setDialogOpen(false)} onUpdated={markUpdated} />}
+            manualContent={<AssetForm asset={editingAsset} categories={categories} onClose={() => setDialogOpen(false)} onUpdated={markUpdated} />}
           />
         </div>
       </div>
@@ -430,7 +443,7 @@ export default function AssetsPage() {
               <tbody className="divide-y">
                 {sortedAssets.map((asset) => (
                   <tr key={asset.id} className="hover:bg-muted/30" data-testid={`table-row-asset-${asset.id}`}>
-                    <td className="px-5 py-3 text-muted-foreground">{getCategoryLabel(ASSET_CATEGORIES, asset.category)}</td>
+                    <td className="px-5 py-3 text-muted-foreground">{categoryLabel(categories, asset.category)}</td>
                     <td className="px-5 py-3 font-medium">
                       <div className="flex items-center gap-1.5">
                         <span className="max-w-52 truncate">{asset.name}</span>
@@ -473,7 +486,7 @@ export default function AssetsPage() {
               groups[cat].push(asset);
               return groups;
             }, {} as Record<string, typeof assets>)
-          ).map(([category, categoryAssets], idx, arr) => {
+          ).sort(([a], [b]) => categoryLabel(categories, a).localeCompare(categoryLabel(categories, b))).map(([category, categoryAssets], idx, arr) => {
             const isOpen = openCategory === category;
             const categoryTotal = categoryAssets.reduce((sum, a) => sum + parseFloat(a.value || "0"), 0);
             const categoryWeightedRate = categoryTotal > 0
@@ -492,7 +505,7 @@ export default function AssetsPage() {
                       <Wallet className="h-4 w-4 text-primary" />
                     </div>
                     <div>
-                      <p className="font-semibold text-sm">{getCategoryLabel(ASSET_CATEGORIES, category)}</p>
+                      <p className="font-semibold text-sm">{categoryLabel(categories, category)}</p>
                       <p className="text-xs text-muted-foreground">{categoryAssets.length} {categoryAssets.length === 1 ? "account" : "accounts"}</p>
                     </div>
                   </div>

@@ -9,8 +9,45 @@ import { AI_ADVISOR_LIMITS, AIProviderError, type AdvisorMessage, streamAdvisorC
 import { scrapeBank, DEFAULT_BANK_CONFIGS, type BankSelectorConfig } from "./scraper";
 import { Products, CountryCode } from "plaid";
 import { getPlaidClient } from "./plaid";
+import multer from "multer";
+import {
+  aiClassify, deterministicClassify, extractJsonRows, isEmptySample, parseUpload,
+  hasRecognizableStructure, type Category, type IngestionKind, type RawRow,
+} from "./asset-liability-ingestion";
 
 const MAX_PENSION_AMOUNT = 9_999_999_999_999.99;
+const ingestionUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024, files: 1 } });
+const INVALID_FILE_TYPE = "Invalid file type. Please upload a valid CSV or JSON file.";
+const CORRUPT_FILE = "File content could not be read or appears corrupted.";
+const NO_DETECTIONS = "Could not detect any valid assets or liabilities in this file.";
+const ingestionUploadFile = (req: any, res: any, next: any) => {
+  ingestionUpload.single("file")(req, res, (error: unknown) => {
+    if (error instanceof multer.MulterError && error.code === "LIMIT_FILE_SIZE") {
+      return res.status(413).json({ message: "File is too large. Maximum file size is 5 MiB." });
+    }
+    if (error) return res.status(400).json({ message: CORRUPT_FILE });
+    next();
+  });
+};
+
+function isSupportedUpload(file: Express.Multer.File): boolean {
+  const ext = file.originalname.toLowerCase().match(/\.([a-z0-9]+)$/)?.[1];
+  const allowed: Record<string, string[]> = {
+    csv: ["text/csv", "application/csv", "text/plain"],
+    tsv: ["text/tab-separated-values", "text/tsv", "text/plain"],
+    txt: ["text/plain", "text/csv", "text/tab-separated-values"],
+    xls: ["application/vnd.ms-excel"],
+    xlsx: ["application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"],
+  };
+  if (!ext || !allowed[ext]?.includes(file.mimetype.toLowerCase())) return false;
+  if (ext === "xls") {
+    return file.buffer.subarray(0, 4).equals(Buffer.from([0xd0, 0xcf, 0x11, 0xe0]));
+  }
+  if (ext === "xlsx") {
+    return file.buffer.subarray(0, 4).equals(Buffer.from([0x50, 0x4b, 0x03, 0x04]));
+  }
+  return !file.buffer.includes(0);
+}
 
 function parsePensionInput(body: any):
   | { value: { name: string; amount: string; frequency: "monthly" | "annual"; startAge: number; notes: string | null } }
@@ -125,6 +162,48 @@ export async function registerRoutes(
 ): Promise<Server> {
   setupAuth(app);
 
+  async function categoriesFor(kind: IngestionKind): Promise<Category[]> {
+    return kind === "asset" ? storage.getAssetCategories() : storage.getLiabilityCategories();
+  }
+
+  async function hasValidCategory(kind: IngestionKind, category: unknown): Promise<boolean> {
+    const value = typeof category === "string" ? category.trim() : "";
+    return !!value && (await categoriesFor(kind)).some((item) => item.category === value);
+  }
+
+  async function ingestBookEntries(req: any, res: any, kind: IngestionKind) {
+    let rows: RawRow[] | null;
+    if (req.file) {
+      if (!isSupportedUpload(req.file)) return res.status(400).json({ message: INVALID_FILE_TYPE });
+      rows = parseUpload(req.file);
+    } else {
+      rows = extractJsonRows(req.body);
+    }
+    if (!rows || isEmptySample(rows) || !hasRecognizableStructure(kind, rows)) {
+      return res.status(400).json({ message: CORRUPT_FILE });
+    }
+    if (rows.length > 500) return res.status(400).json({ message: "Imports are limited to 500 entries at a time" });
+
+    const categories = await categoriesFor(kind);
+    let classified: RawRow[];
+    try {
+      classified = await aiClassify(kind, rows, categories);
+    } catch (error) {
+      if (error instanceof AIProviderError) {
+        classified = deterministicClassify(rows, categories);
+      } else {
+        // A malformed/empty answer is a completed AI call, so fallback must not run.
+        return res.status(400).json({ message: NO_DETECTIONS });
+      }
+    }
+    const valid = classified.filter((entry) =>
+      categories.some((item) => item.category === (typeof entry.category === "string" ? entry.category.trim() : "")),
+    );
+    if (!valid.length) return res.status(400).json({ message: NO_DETECTIONS });
+    req.body = { entries: valid };
+    await importBookEntries(req, res, kind);
+  }
+
   async function importBookEntries(req: any, res: any, kind: "asset" | "liability") {
     const entries = req.body?.entries;
     if (!Array.isArray(entries) || entries.length === 0) {
@@ -135,6 +214,7 @@ export async function registerRoutes(
     }
 
     const userId = (req.user as any).id;
+    const validCategories = new Set((await categoriesFor(kind)).map((item) => item.category));
     const skippedReasons: Record<string, number> = {};
     const addSkipped = (reason: string) => {
       skippedReasons[reason] = (skippedReasons[reason] ?? 0) + 1;
@@ -154,6 +234,10 @@ export async function registerRoutes(
 
       if (!name || !category) {
         addSkipped("missing name or category");
+        continue;
+      }
+      if (!validCategories.has(category)) {
+        addSkipped("invalid category");
         continue;
       }
       if (!Number.isFinite(amount) || (kind === "asset" && amount < 0)) {
@@ -217,11 +301,21 @@ export async function registerRoutes(
     res.json(result);
   });
 
+  app.get("/api/asset-categories", requireAuth, async (_req, res) => {
+    res.json(await storage.getAssetCategories());
+  });
+  app.get("/api/assets/categories", requireAuth, async (_req, res) => {
+    res.json(await storage.getAssetCategories());
+  });
+
   app.post("/api/assets", requireAuth, async (req, res) => {
     const userId = (req.user as any).id;
     const { name, category, value, interestRate, institution, notes } = req.body;
     if (!name || !category || !value) {
       return res.status(400).json({ message: "Name, category, and value are required" });
+    }
+    if (!await hasValidCategory("asset", category)) {
+      return res.status(400).json({ message: "Invalid category" });
     }
     const asset = await storage.createAsset({ userId, name, category, value, interestRate, institution, notes });
     res.status(201).json(asset);
@@ -231,10 +325,17 @@ export async function registerRoutes(
     await importBookEntries(req, res, "asset");
   });
 
+  app.post("/api/assets/ingest", requireAuth, ingestionUploadFile, async (req, res) => {
+    await ingestBookEntries(req, res, "asset");
+  });
+
   app.patch("/api/assets/:id", requireAuth, async (req, res) => {
     const userId = (req.user as any).id;
     const id = parseInt(req.params.id);
     const { name, category, value, interestRate, institution, notes } = req.body;
+    if (category !== undefined && !await hasValidCategory("asset", category)) {
+      return res.status(400).json({ message: "Invalid category" });
+    }
     const updated = await storage.updateAsset(id, userId, { name, category, value, interestRate, institution, notes });
     if (!updated) return res.status(404).json({ message: "Asset not found" });
     res.json(updated);
@@ -253,11 +354,21 @@ export async function registerRoutes(
     res.json(result);
   });
 
+  app.get("/api/liability-categories", requireAuth, async (_req, res) => {
+    res.json(await storage.getLiabilityCategories());
+  });
+  app.get("/api/liabilities/categories", requireAuth, async (_req, res) => {
+    res.json(await storage.getLiabilityCategories());
+  });
+
   app.post("/api/liabilities", requireAuth, async (req, res) => {
     const userId = (req.user as any).id;
     const { name, category, balance, interestRate, minimumPayment, institution, notes } = req.body;
     if (!name || !category || !balance) {
       return res.status(400).json({ message: "Name, category, and balance are required" });
+    }
+    if (!await hasValidCategory("liability", category)) {
+      return res.status(400).json({ message: "Invalid category" });
     }
     const liability = await storage.createLiability({ userId, name, category, balance, interestRate, minimumPayment, institution, notes });
     res.status(201).json(liability);
@@ -267,10 +378,17 @@ export async function registerRoutes(
     await importBookEntries(req, res, "liability");
   });
 
+  app.post("/api/liabilities/ingest", requireAuth, ingestionUploadFile, async (req, res) => {
+    await ingestBookEntries(req, res, "liability");
+  });
+
   app.patch("/api/liabilities/:id", requireAuth, async (req, res) => {
     const userId = (req.user as any).id;
     const id = parseInt(req.params.id);
     const { name, category, balance, interestRate, minimumPayment, institution, notes } = req.body;
+    if (category !== undefined && !await hasValidCategory("liability", category)) {
+      return res.status(400).json({ message: "Invalid category" });
+    }
     const updated = await storage.updateLiability(id, userId, { name, category, balance, interestRate, minimumPayment, institution, notes });
     if (!updated) return res.status(404).json({ message: "Liability not found" });
     res.json(updated);
@@ -753,20 +871,21 @@ Include a year-by-year overview, useful milestones, a conservative/base/optimist
   function mapPlaidToBook(type: string, subtype: string | null): PlaidBookMapping {
     const st = (subtype ?? "").toLowerCase();
     if (type === "depository") {
-      if (st === "savings" || st === "money market" || st === "cd") return { kind: "asset", category: "savings_account" };
-      return { kind: "asset", category: "bank_account" };
+      if (st === "savings" || st === "money market" || st === "cd") return { kind: "asset", category: "Savings Account" };
+      return { kind: "asset", category: "Checking Account" };
     }
     if (type === "investment" || type === "brokerage") {
       if (st.includes("401k") || st.includes("ira") || st.includes("roth") || st.includes("retirement") || st.includes("403b") || st.includes("pension"))
-        return { kind: "asset", category: "retirement_fund" };
-      return { kind: "asset", category: "investment" };
+        return { kind: "asset", category: st.includes("ira") || st.includes("roth") ? "Individual Retirement" : "Employer Retirement" };
+      return { kind: "asset", category: "Stocks, ETFs, Mutual fund" };
     }
-    if (type === "credit") return { kind: "liability", category: "credit_card" };
+    if (type === "credit") return { kind: "liability", category: "Credit Cards" };
     if (type === "loan") {
-      if (st === "mortgage" || st === "home equity") return { kind: "liability", category: "mortgage" };
-      if (st === "auto") return { kind: "liability", category: "auto_loan" };
-      if (st === "student") return { kind: "liability", category: "student_loan" };
-      return { kind: "liability", category: "personal_loan" };
+      if (st === "mortgage") return { kind: "liability", category: "Primary Mortgage" };
+      if (st === "home equity") return { kind: "liability", category: "Home Equity (HELOC / HEL)" };
+      if (st === "auto") return { kind: "liability", category: "Auto Loans" };
+      if (st === "student") return { kind: "liability", category: "Student Loans" };
+      return { kind: "liability", category: "Personal Loans" };
     }
     return { kind: "skip" };
   }
@@ -835,6 +954,11 @@ Include a year-by-year overview, useful milestones, a conservative/base/optimist
       if (account.linkedAssetId || account.linkedLiabilityId) {
         await client.query("COMMIT");
         return { imported: false, reason: "already imported" };
+      }
+      const validCategories = new Set((await categoriesFor(expectedKind)).map((item) => item.category));
+      if (!validCategories.has(mapping.category)) {
+        await client.query("COMMIT");
+        return { imported: false, reason: "invalid category mapping" };
       }
 
       const balance = Math.abs(parseFloat(account.currentBalance ?? "0") || 0).toFixed(2);

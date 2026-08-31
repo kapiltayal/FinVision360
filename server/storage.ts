@@ -1,4 +1,4 @@
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, asc } from "drizzle-orm";
 import { db, pool } from "./db";
 import {
   type User, type InsertUser,
@@ -16,7 +16,7 @@ import {
   type EstateDocument, type InsertEstateDocument,
   type EstateContact, type InsertEstateContact,
   type Feedback, type InsertFeedback,
-  users, assets, liabilities, retirement401kGoals, retirementPensions, insurancePolicies, recommendationSettings,
+  users, assets, liabilities, assetTypeList, liabilitiesTypeList, retirement401kGoals, retirementPensions, insurancePolicies, recommendationSettings,
   bankConfigs, bankRates, plaidItems, plaidAccounts,
   estateBeneficiaries, estateDocuments, estateContacts, feedback, contactus, socialSecuritySettings,
   userGoals,
@@ -43,6 +43,8 @@ export interface IStorage {
   createLiability(liability: InsertLiability): Promise<Liability>;
   updateLiability(id: number, userId: string, data: Partial<InsertLiability>): Promise<Liability | undefined>;
   deleteLiability(id: number, userId: string): Promise<void>;
+  getAssetCategories(): Promise<Array<{ parentCategory: string; category: string; description: string }>>;
+  getLiabilityCategories(): Promise<Array<{ parentCategory: string; category: string; description: string }>>;
 
   getRetirement401kGoal(userId: string): Promise<Retirement401kGoal | undefined>;
   upsertRetirement401kGoal(goal: InsertRetirement401kGoal): Promise<Retirement401kGoal>;
@@ -187,6 +189,22 @@ export class DatabaseStorage implements IStorage {
 
   async deleteLiability(id: number, userId: string): Promise<void> {
     await db.delete(liabilities).where(and(eq(liabilities.id, id), eq(liabilities.userId, userId)));
+  }
+
+  async getAssetCategories(): Promise<Array<{ parentCategory: string; category: string; description: string }>> {
+    return db.select({
+      parentCategory: assetTypeList.parentCategory,
+      category: assetTypeList.subCategory,
+      description: assetTypeList.description,
+    }).from(assetTypeList).orderBy(asc(assetTypeList.parentCategory), asc(assetTypeList.subCategory));
+  }
+
+  async getLiabilityCategories(): Promise<Array<{ parentCategory: string; category: string; description: string }>> {
+    return db.select({
+      parentCategory: liabilitiesTypeList.parentCategory,
+      category: liabilitiesTypeList.subCategory,
+      description: liabilitiesTypeList.description,
+    }).from(liabilitiesTypeList).orderBy(asc(liabilitiesTypeList.parentCategory), asc(liabilitiesTypeList.subCategory));
   }
 
   async getRetirement401kGoal(userId: string): Promise<Retirement401kGoal | undefined> {

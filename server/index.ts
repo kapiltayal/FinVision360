@@ -15,6 +15,7 @@ declare module "http" {
 
 app.use(
   express.json({
+    limit: "5mb",
     verify: (req, _res, buf) => {
       req.rawBody = buf;
     },
@@ -150,7 +151,10 @@ app.use((req, res, next) => {
   }
   await registerRoutes(httpServer, app);
 
-  app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
+  app.use((err: any, req: Request, res: Response, next: NextFunction) => {
+    if (err?.type === "entity.too.large" && /^\/api\/(assets|liabilities)\/ingest$/.test(req.path)) {
+      return res.status(413).json({ message: "Payload is too large. Maximum payload size is 5MB." });
+    }
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
 

@@ -4,7 +4,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
@@ -14,8 +13,9 @@ import { ExportMenu } from "@/components/export-menu";
 import { BookEntryDialog } from "@/components/book-entry-import";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Plus, Pencil, Trash2, CreditCard, TrendingDown, ChevronDown, Clock, Link2, LayoutGrid, Table2, ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
-import { type Liability, type PlaidAccount, LIABILITY_CATEGORIES } from "@shared/schema";
-import { formatCurrency, formatPercent, getCategoryLabel } from "@/lib/format";
+import { type Liability, type PlaidAccount } from "@shared/schema";
+import { formatCurrency, formatPercent } from "@/lib/format";
+import { type BookCategory, categoryLabel, groupedBookCategories } from "@/lib/book-categories";
 
 type LiabilitySortKey = "category" | "name" | "institution" | "balance" | "rate" | "minimumPayment";
 type SortDirection = "asc" | "desc";
@@ -61,17 +61,19 @@ function LiabilitySortHeader({
 
 function LiabilityForm({
   liability,
+  categories,
   onClose,
   onUpdated,
 }: {
   liability?: Liability;
+  categories: BookCategory[];
   onClose: () => void;
   onUpdated?: () => void;
 }) {
   const { toast } = useToast();
   const [form, setForm] = useState({
     name: liability?.name || "",
-    category: liability?.category || "credit_card",
+    category: liability?.category || "",
     balance: liability?.balance || "",
     interestRate: liability?.interestRate || "0",
     minimumPayment: liability?.minimumPayment || "0",
@@ -107,6 +109,10 @@ function LiabilityForm({
       toast({ title: "Required fields missing", variant: "destructive" });
       return;
     }
+    if (!categories.some((category) => category.category === form.category)) {
+      toast({ title: "Select a valid category", variant: "destructive" });
+      return;
+    }
     if (liability) {
       updateMutation.mutate(form);
     } else {
@@ -131,16 +137,23 @@ function LiabilityForm({
         </div>
         <div className="space-y-2">
           <Label>Category</Label>
-          <Select value={form.category} onValueChange={(v) => setForm({ ...form, category: v })}>
-            <SelectTrigger data-testid="select-liability-category">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {LIABILITY_CATEGORIES.map((c) => (
-                <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <select
+            data-testid="select-liability-category"
+            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+            value={form.category}
+            onChange={(e) => setForm({ ...form, category: e.target.value })}
+            required
+          >
+            <option value="" disabled>Select a category</option>
+            {liability && !categories.some((category) => category.category === liability.category) && (
+              <option value={liability.category} disabled>{liability.category} (legacy category)</option>
+            )}
+            {groupedBookCategories(categories).map(([parent, entries]) => (
+              <optgroup key={parent} label={parent}>
+                {entries.map((category) => <option key={`${category.parentCategory}-${category.category}`} value={category.category}>{category.category}</option>)}
+              </optgroup>
+            ))}
+          </select>
         </div>
         <div className="space-y-2">
           <Label>Balance ($)</Label>
@@ -217,7 +230,8 @@ export default function LiabilitiesPage() {
   });
   const { toast } = useToast();
   const { formattedDate, markUpdated } = useLastUpdated("liabilities");
-  const { data: liabilities = [], isLoading } = useQuery<Liability[]>({ queryKey: ["/api/liabilities"] });
+  const { data: liabilities = [], isLoading: liabilitiesLoading } = useQuery<Liability[]>({ queryKey: ["/api/liabilities"] });
+  const { data: categories = [], isLoading: categoriesLoading } = useQuery<BookCategory[]>({ queryKey: ["/api/liabilities/categories"] });
   const { data: plaidData } = useQuery<{ accounts: PlaidAccount[]; items: any[] }>({ queryKey: ["/api/plaid/accounts"] });
   const plaidLinkedLiabilityIds = new Set((plaidData?.accounts ?? []).map((a) => a.linkedLiabilityId).filter(Boolean));
 
@@ -240,7 +254,7 @@ export default function LiabilitiesPage() {
     sorted.sort((a, b) => {
       let comparison = 0;
       if (sortConfig.key === "category") {
-        comparison = getCategoryLabel(LIABILITY_CATEGORIES, a.category).localeCompare(getCategoryLabel(LIABILITY_CATEGORIES, b.category));
+        comparison = categoryLabel(categories, a.category).localeCompare(categoryLabel(categories, b.category));
       } else if (sortConfig.key === "name") {
         comparison = a.name.localeCompare(b.name);
       } else if (sortConfig.key === "institution") {
@@ -254,7 +268,7 @@ export default function LiabilitiesPage() {
       }
 
       if (comparison === 0 && sortConfig.key !== "category") {
-        comparison = getCategoryLabel(LIABILITY_CATEGORIES, a.category).localeCompare(getCategoryLabel(LIABILITY_CATEGORIES, b.category));
+        comparison = categoryLabel(categories, a.category).localeCompare(categoryLabel(categories, b.category));
       }
       if (comparison === 0) {
         comparison = parseFloat(a.balance || "0") - parseFloat(b.balance || "0");
@@ -263,7 +277,7 @@ export default function LiabilitiesPage() {
       return sortConfig.direction === "asc" ? comparison : -comparison;
     });
     return sorted;
-  }, [liabilities, sortConfig]);
+  }, [liabilities, categories, sortConfig]);
 
   const handleSort = (key: LiabilitySortKey) => {
     setSortConfig((current) => (
@@ -289,7 +303,7 @@ export default function LiabilitiesPage() {
     markUpdated();
   };
 
-  if (isLoading) {
+  if (liabilitiesLoading || categoriesLoading) {
     return (
       <div className="p-6 space-y-4">
         <Skeleton className="h-8 w-32" />
@@ -308,7 +322,7 @@ export default function LiabilitiesPage() {
       columns: ["Name", "Category", "Balance ($)", "Interest Rate (%)", "Min Payment ($)", "Institution", "Notes"],
       rows: liabilities.map((l) => [
         l.name,
-        getCategoryLabel(LIABILITY_CATEGORIES, l.category),
+        categoryLabel(categories, l.category),
         parseFloat(l.balance || "0"),
         parseFloat(l.interestRate || "0"),
         parseFloat(l.minimumPayment || "0"),
@@ -338,9 +352,8 @@ export default function LiabilitiesPage() {
             onOpenChange={setDialogOpen}
             title={editingLiability ? "Edit Liability" : "Add New Liability"}
             kind="liability"
-            categories={LIABILITY_CATEGORIES}
             onImported={handleImported}
-            manualContent={<LiabilityForm liability={editingLiability} onClose={() => setDialogOpen(false)} onUpdated={markUpdated} />}
+            manualContent={<LiabilityForm liability={editingLiability} categories={categories} onClose={() => setDialogOpen(false)} onUpdated={markUpdated} />}
           />
         </div>
       </div>
@@ -447,7 +460,7 @@ export default function LiabilitiesPage() {
               <tbody className="divide-y">
                 {sortedLiabilities.map((liability) => (
                   <tr key={liability.id} className="hover:bg-muted/30" data-testid={`table-row-liability-${liability.id}`}>
-                    <td className="px-5 py-3 text-muted-foreground">{getCategoryLabel(LIABILITY_CATEGORIES, liability.category)}</td>
+                    <td className="px-5 py-3 text-muted-foreground">{categoryLabel(categories, liability.category)}</td>
                     <td className="px-5 py-3 font-medium">
                       <div className="flex items-center gap-1.5">
                         <span className="max-w-52 truncate">{liability.name}</span>
@@ -495,7 +508,7 @@ export default function LiabilitiesPage() {
               groups[cat].push(liability);
               return groups;
             }, {} as Record<string, typeof liabilities>)
-          ).map(([category, categoryLiabilities], idx, arr) => {
+          ).sort(([a], [b]) => categoryLabel(categories, a).localeCompare(categoryLabel(categories, b))).map(([category, categoryLiabilities], idx, arr) => {
             const isOpen = openCategory === category;
             const categoryTotal = categoryLiabilities.reduce((sum, l) => sum + parseFloat(l.balance || "0"), 0);
             const categoryWeightedRate = categoryTotal > 0
@@ -515,7 +528,7 @@ export default function LiabilitiesPage() {
                       <CreditCard className="h-4 w-4 text-destructive" />
                     </div>
                     <div>
-                      <p className="font-semibold text-sm">{getCategoryLabel(LIABILITY_CATEGORIES, category)}</p>
+                      <p className="font-semibold text-sm">{categoryLabel(categories, category)}</p>
                       <p className="text-xs text-muted-foreground">{categoryLiabilities.length} {categoryLiabilities.length === 1 ? "account" : "accounts"}</p>
                     </div>
                   </div>

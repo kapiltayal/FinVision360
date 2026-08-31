@@ -536,15 +536,19 @@ export default function DashboardPage() {
   );
   const netAnnualReturn = earnedAnnual - paidAnnual;
 
-  const assetsByCategory = ASSET_CATEGORIES.map((cat) => {
-    const total = includedAssets.filter((a) => a.category === cat.value).reduce((sum, a) => sum + parseFloat(a.value || "0"), 0);
-    return { name: cat.label, value: total };
-  }).filter((c) => c.value > 0);
+  const assetsByCategory = Array.from(new Set(includedAssets.map((asset) => asset.category))).map((category) => ({
+    name: getCategoryLabel(ASSET_CATEGORIES, category),
+    value: includedAssets
+      .filter((asset) => asset.category === category)
+      .reduce((sum, asset) => sum + parseFloat(asset.value || "0"), 0),
+  })).filter((category) => category.value > 0);
 
-  const liabilitiesByCategory = LIABILITY_CATEGORIES.map((cat) => {
-    const total = includedLiabilities.filter((l) => l.category === cat.value).reduce((sum, l) => sum + parseFloat(l.balance || "0"), 0);
-    return { name: cat.label, value: total };
-  }).filter((c) => c.value > 0);
+  const liabilitiesByCategory = Array.from(new Set(includedLiabilities.map((liability) => liability.category))).map((category) => ({
+    name: getCategoryLabel(LIABILITY_CATEGORIES, category),
+    value: includedLiabilities
+      .filter((liability) => liability.category === category)
+      .reduce((sum, liability) => sum + parseFloat(liability.balance || "0"), 0),
+  })).filter((category) => category.value > 0);
 
   const assetBarItems = [...includedAssets]
     .sort((a, b) => parseFloat(b.value || "0") - parseFloat(a.value || "0"))

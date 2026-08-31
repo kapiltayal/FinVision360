@@ -7,14 +7,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export type BookEntryKind = "asset" | "liability";
-
-type CategoryOption = { value: string; label: string };
 
 type PlaidAccount = {
   id: number;
@@ -42,108 +37,6 @@ type ImportResponse = {
   skippedReasons: Record<string, number>;
 };
 
-type CsvEntry = {
-  name: string;
-  category: string;
-  value?: string;
-  balance?: string;
-  interestRate?: string;
-  minimumPayment?: string;
-  institution?: string;
-  notes?: string;
-};
-
-function detectDelimiter(line: string) {
-  const counts = { "\t": 0, ",": 0, ";": 0, "|": 0 };
-  for (const character of line) {
-    if (character in counts) (counts as Record<string, number>)[character]++;
-  }
-  return Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0];
-}
-
-function parseCSVText(text: string): string[][] {
-  if (!text.trim()) return [];
-  const delimiter = detectDelimiter(text.split(/\r?\n/, 1)[0]);
-  const rows: string[][] = [];
-  let row: string[] = [];
-  let cell = "";
-  let quoted = false;
-  let quoteClosed = false;
-
-  const finishCell = () => {
-    row.push(cell.trim());
-    cell = "";
-    quoteClosed = false;
-  };
-  const finishRow = () => {
-    finishCell();
-    if (row.some((value) => value)) rows.push(row);
-    row = [];
-  };
-
-  for (let index = 0; index < text.length; index++) {
-    const character = text[index];
-    if (character === '"') {
-      if (quoted) {
-        if (text[index + 1] === '"') {
-          cell += '"';
-          index++;
-        } else {
-          quoted = false;
-          quoteClosed = true;
-        }
-      } else {
-        if (cell.length || quoteClosed) throw new Error("Quotes must begin at the start of a CSV field.");
-        quoted = true;
-      }
-      continue;
-    }
-    if (quoteClosed) {
-      if (character !== delimiter && character !== "\r" && character !== "\n") {
-        throw new Error("Unexpected characters after a quoted CSV field.");
-      }
-    }
-    if (character === delimiter && !quoted) {
-      finishCell();
-      continue;
-    }
-    if ((character === "\n" || character === "\r") && !quoted) {
-      if (character === "\r" && text[index + 1] === "\n") index++;
-      finishRow();
-      continue;
-    }
-    cell += character;
-  }
-  if (quoted) throw new Error("The CSV contains an unclosed quoted field.");
-  if (cell.length || row.length) finishRow();
-  return rows;
-}
-
-function guessColumn(headers: string[], keywords: string[]) {
-  const normalized = headers.map((header) => header.toLowerCase().trim());
-  for (const keyword of keywords) {
-    const index = normalized.findIndex((header) => header.includes(keyword));
-    if (index !== -1) return String(index);
-  }
-  return "";
-}
-
-function parseMoney(value: string) {
-  const trimmed = value.trim();
-  if (!trimmed) return Number.NaN;
-  const negative = trimmed.startsWith("(") && trimmed.endsWith(")");
-  const number = Number(trimmed.replace(/[$,\s()]/g, ""));
-  return negative ? -number : number;
-}
-
-function categoryForValue(categories: readonly CategoryOption[], value: string | undefined, fallback: string) {
-  const normalized = value?.trim().toLowerCase();
-  if (!normalized) return fallback;
-  return categories.find((category) =>
-    category.value.toLowerCase() === normalized || category.label.toLowerCase() === normalized
-  )?.value ?? fallback;
-}
-
 function skippedDescription(skippedReasons: Record<string, number>) {
   return Object.entries(skippedReasons)
     .filter(([, count]) => count > 0)
@@ -153,30 +46,22 @@ function skippedDescription(skippedReasons: Record<string, number>) {
 
 export function BookEntryCsvImportPanel({
   kind,
-  categories,
   onImported,
 }: {
   kind: BookEntryKind;
-  categories: readonly CategoryOption[];
   onImported: () => void;
 }) {
   const { toast } = useToast();
   const fileRef = useRef<HTMLInputElement>(null);
-  const [rows, setRows] = useState<string[][]>([]);
-  const [headers, setHeaders] = useState<string[]>([]);
-  const [columnMap, setColumnMap] = useState({
-    name: "",
-    category: "",
-    amount: "",
-    interestRate: "",
-    minimumPayment: "",
-    institution: "",
-    notes: "",
-  });
+  const [file, setFile] = useState<File | null>(null);
   const [result, setResult] = useState<ImportResponse | null>(null);
 
   const importMutation = useMutation({
-    mutationFn: (entries: CsvEntry[]) => apiRequest("POST", `/api/${kind}s/import`, { entries }).then((response) => response.json() as Promise<ImportResponse>),
+    mutationFn: (selectedFile: File) => {
+      const data = new FormData();
+      data.append("file", selectedFile);
+      return apiRequest("POST", `/api/${kind}s/ingest`, data).then((response) => response.json() as Promise<ImportResponse>);
+    },
     onSuccess: (data) => {
       setResult(data);
       onImported();
@@ -186,8 +71,8 @@ export function BookEntryCsvImportPanel({
       });
     },
     onError: (error: Error) => toast({
-      title: "CSV import failed",
-      description: error.message || "Please check the file and try again.",
+      title: "File import failed",
+      description: error.message,
       variant: "destructive",
     }),
   });
@@ -195,111 +80,19 @@ export function BookEntryCsvImportPanel({
   const handleFile = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (loadEvent) => {
-      let parsed: string[][];
-      try {
-        parsed = parseCSVText(String(loadEvent.target?.result ?? ""));
-      } catch (error) {
-        setRows([]);
-        setHeaders([]);
-        toast({
-          title: "CSV could not be read",
-          description: error instanceof Error ? error.message : "Please correct the file and try again.",
-          variant: "destructive",
-        });
-        return;
-      }
-      if (parsed.length < 2) {
-        setRows([]);
-        setHeaders([]);
-        toast({ title: "CSV needs a header and at least one row", variant: "destructive" });
-        return;
-      }
-      const nextHeaders = parsed[0];
-      const nextRows = parsed.slice(1).filter((row) => row.some((cell) => cell.trim()));
-      setHeaders(nextHeaders);
-      setRows(nextRows);
-      setResult(null);
-      setColumnMap({
-        name: guessColumn(nextHeaders, ["name", "account", "description", "asset", "liability"]),
-        category: guessColumn(nextHeaders, ["category", "type", "subtype"]),
-        amount: guessColumn(nextHeaders, kind === "asset"
-          ? ["value", "balance", "amount", "market"]
-          : ["balance", "amount", "value", "owed"]),
-        interestRate: guessColumn(nextHeaders, ["interest", "rate", "apr"]),
-        minimumPayment: guessColumn(nextHeaders, ["minimum payment", "min payment", "payment"]),
-        institution: guessColumn(nextHeaders, ["institution", "bank", "provider", "lender"]),
-        notes: guessColumn(nextHeaders, ["notes", "note", "memo", "comment"]),
-      });
-    };
-    reader.readAsText(file);
+    const extension = file.name.split(".").pop()?.toLowerCase();
+    if (!extension || !["csv", "tsv", "txt", "xls", "xlsx"].includes(extension)) {
+      toast({ title: "Invalid file type", description: "Invalid file type. Please upload a valid CSV or JSON file.", variant: "destructive" });
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast({ title: "File is too large", description: "Maximum file size is 5MB.", variant: "destructive" });
+      return;
+    }
+    setFile(file);
+    setResult(null);
     event.target.value = "";
   };
-
-  const buildEntries = () => {
-    const get = (row: string[], column: string) => column === "" ? "" : (row[Number(column)] ?? "").trim();
-    const entries: CsvEntry[] = [];
-    const skippedReasons: Record<string, number> = {};
-    const addSkipped = (reason: string) => { skippedReasons[reason] = (skippedReasons[reason] ?? 0) + 1; };
-
-    rows.forEach((row) => {
-      const name = get(row, columnMap.name);
-      const rawAmount = get(row, columnMap.amount);
-      const amount = parseMoney(rawAmount);
-      if (!name) {
-        addSkipped("missing name");
-        return;
-      }
-      if (!Number.isFinite(amount) || (kind === "asset" && amount < 0)) {
-        addSkipped("invalid amount");
-        return;
-      }
-      const entry: CsvEntry = {
-        name,
-        category: categoryForValue(categories, get(row, columnMap.category), categories[0].value),
-        [kind === "asset" ? "value" : "balance"]: (kind === "liability" ? Math.abs(amount) : amount).toFixed(2),
-        interestRate: "0",
-        institution: get(row, columnMap.institution) || undefined,
-        notes: get(row, columnMap.notes) || undefined,
-      };
-      const rawInterest = get(row, columnMap.interestRate);
-      if (rawInterest) {
-        const interest = parseMoney(rawInterest);
-        if (!Number.isFinite(interest) || interest < 0) {
-          addSkipped("invalid interest rate");
-          return;
-        }
-        entry.interestRate = interest.toFixed(2);
-      }
-      if (kind === "liability") {
-        entry.minimumPayment = "0";
-        const rawPayment = get(row, columnMap.minimumPayment);
-        if (rawPayment) {
-          const payment = parseMoney(rawPayment);
-          if (!Number.isFinite(payment) || payment < 0) {
-            addSkipped("invalid minimum payment");
-            return;
-          }
-          entry.minimumPayment = payment.toFixed(2);
-        }
-      }
-      entries.push(entry);
-    });
-    return { entries, skippedReasons };
-  };
-
-  const columnOptions = [
-    { key: "name", label: "Name", required: true },
-    { key: "category", label: "Category", required: false },
-    { key: "amount", label: kind === "asset" ? "Value / balance" : "Balance / amount", required: true },
-    { key: "interestRate", label: "Interest / return rate", required: false },
-    ...(kind === "liability" ? [{ key: "minimumPayment", label: "Minimum payment", required: false }] : []),
-    { key: "institution", label: "Institution", required: false },
-    { key: "notes", label: "Notes", required: false },
-  ];
-  const requiredColumnsReady = Boolean(columnMap.name && columnMap.amount && rows.length);
-  const preview = rows.slice(0, 5);
 
   return (
     <div className="space-y-4">
@@ -313,77 +106,29 @@ export function BookEntryCsvImportPanel({
         }}
       >
         <FileSpreadsheet className="mx-auto mb-2 h-8 w-8 text-blue-500" />
-        <p className="text-sm font-medium">Click to upload CSV / TSV / TXT</p>
+        <p className="text-sm font-medium">Click to upload a file</p>
         <p className="mt-1 text-xs text-muted-foreground">
-          {kind === "asset"
-            ? "Include columns for name and value. Category and other details are optional."
-            : "Include columns for name and balance. Negative balances are treated as amounts owed."}
+          Upload CSV, TSV, TXT, XLS, or XLSX (maximum 5 MiB). The server will map your data.
         </p>
-        <input ref={fileRef} type="file" accept=".csv,.tsv,.txt" className="hidden" onChange={handleFile} />
+        <input ref={fileRef} type="file" accept=".csv,.tsv,.txt,.xls,.xlsx" className="hidden" onChange={handleFile} />
       </div>
 
-      {rows.length > 0 && (
+      {file && (
         <div className="space-y-4">
           <div className="flex items-center justify-between gap-2">
-            <p className="text-sm font-medium text-emerald-600">{rows.length} rows detected</p>
+            <p className="text-sm font-medium text-emerald-600">{file.name}</p>
             <Button type="button" variant="ghost" size="sm" onClick={() => fileRef.current?.click()}>
               <Upload className="mr-1.5 h-3.5 w-3.5" /> Choose another file
             </Button>
           </div>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {columnOptions.map((column) => (
-              <div key={column.key}>
-                <Label className="text-xs">
-                  {column.label}{column.required ? " *" : ""}
-                </Label>
-                <Select
-                  value={columnMap[column.key as keyof typeof columnMap] || "none"}
-                  onValueChange={(value) => setColumnMap((current) => ({ ...current, [column.key]: value === "none" ? "" : value }))}
-                >
-                  <SelectTrigger className="mt-1 text-xs"><SelectValue placeholder="Select column" /></SelectTrigger>
-                  <SelectContent>
-                    {!column.required && <SelectItem value="none">— none —</SelectItem>}
-                    {headers.map((header, index) => (
-                      <SelectItem key={index} value={String(index)}>{header || `Column ${index + 1}`}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            ))}
-          </div>
-
-          {preview.length > 0 && (
-            <div className="overflow-x-auto rounded-lg border text-xs">
-              <table className="w-full">
-                <thead className="bg-muted/50">
-                  <tr>{headers.map((header, index) => <th key={index} className="px-3 py-2 text-left font-medium text-muted-foreground">{header || `Column ${index + 1}`}</th>)}</tr>
-                </thead>
-                <tbody>
-                  {preview.map((row, rowIndex) => (
-                    <tr key={rowIndex} className="border-t">
-                      {headers.map((_, columnIndex) => <td key={columnIndex} className="max-w-[150px] truncate px-3 py-1.5">{row[columnIndex] ?? ""}</td>)}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-
           <Button
             type="button"
             className="w-full"
-            disabled={!requiredColumnsReady || importMutation.isPending}
-            onClick={() => {
-              const { entries, skippedReasons } = buildEntries();
-              if (!entries.length) {
-                toast({ title: "No valid rows to import", description: skippedDescription(skippedReasons), variant: "destructive" });
-                return;
-              }
-              importMutation.mutate(entries);
-            }}
+            disabled={importMutation.isPending}
+            onClick={() => importMutation.mutate(file)}
           >
             {importMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
-            {importMutation.isPending ? "Importing…" : `Import ${rows.length} ${kind}${rows.length === 1 ? "" : "s"}`}
+            {importMutation.isPending ? "Importing…" : "Import file"}
           </Button>
         </div>
       )}
@@ -403,21 +148,17 @@ export function BookEntryCsvImportPanel({
   );
 }
 
-function plaidBookKind(type: string, subtype: string | null): { kind: BookEntryKind | "skip"; category?: string } {
+function plaidBookKind(type: string, subtype: string | null): { kind: BookEntryKind | "skip" } {
   const normalizedSubtype = (subtype ?? "").toLowerCase();
   if (type === "depository") {
-    return { kind: "asset", category: ["savings", "money market", "cd"].includes(normalizedSubtype) ? "savings_account" : "bank_account" };
+    return { kind: "asset" };
   }
   if (type === "investment" || type === "brokerage") {
-    const retirement = ["401k", "ira", "roth", "retirement", "403b", "pension"].some((term) => normalizedSubtype.includes(term));
-    return { kind: "asset", category: retirement ? "retirement_fund" : "investment" };
+    return { kind: "asset" };
   }
-  if (type === "credit") return { kind: "liability", category: "credit_card" };
+  if (type === "credit") return { kind: "liability" };
   if (type === "loan") {
-    if (["mortgage", "home equity"].includes(normalizedSubtype)) return { kind: "liability", category: "mortgage" };
-    if (normalizedSubtype === "auto") return { kind: "liability", category: "auto_loan" };
-    if (normalizedSubtype === "student") return { kind: "liability", category: "student_loan" };
-    return { kind: "liability", category: "personal_loan" };
+    return { kind: "liability" };
   }
   return { kind: "skip" };
 }
@@ -503,7 +244,6 @@ export function BookEntryConnectedAccountsPanel({
       </div>
       <div className="space-y-2">
         {eligibleAccounts.map((account) => {
-          const mapping = plaidBookKind(account.type, account.subtype);
           const linked = kind === "asset" ? account.linkedAssetId || account.linkedLiabilityId : account.linkedAssetId || account.linkedLiabilityId;
           const available = !linked;
           return (
@@ -522,7 +262,9 @@ export function BookEntryConnectedAccountsPanel({
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium">{account.name}</p>
-                  <p className="truncate text-xs text-muted-foreground">{institutionById.get(account.plaidItemId)} · {mapping.category?.replace(/_/g, " ")}</p>
+                  <p className="truncate text-xs text-muted-foreground">
+                    {institutionById.get(account.plaidItemId)} · {(account.subtype || account.type).replace(/_/g, " ")}
+                  </p>
                 </div>
                 <div className="text-right">
                   <p className="text-sm font-semibold">{new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(Math.abs(parseFloat(account.currentBalance || "0") || 0))}</p>
@@ -557,7 +299,6 @@ export function BookEntryDialog({
   onOpenChange,
   title,
   kind,
-  categories,
   manualContent,
   onImported,
 }: {
@@ -565,7 +306,6 @@ export function BookEntryDialog({
   onOpenChange: (open: boolean) => void;
   title: string;
   kind: BookEntryKind;
-  categories: readonly CategoryOption[];
   manualContent: React.ReactNode;
   onImported: () => void;
 }) {
@@ -583,11 +323,11 @@ export function BookEntryDialog({
           <Tabs value={tab} onValueChange={setTab}>
             <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="manual"><Wallet className="mr-1.5 h-3.5 w-3.5" />Manual</TabsTrigger>
-              <TabsTrigger value="csv"><FileSpreadsheet className="mr-1.5 h-3.5 w-3.5" />Import CSV</TabsTrigger>
+              <TabsTrigger value="csv"><FileSpreadsheet className="mr-1.5 h-3.5 w-3.5" />Import File</TabsTrigger>
               <TabsTrigger value="connected"><Landmark className="mr-1.5 h-3.5 w-3.5" />Connected Accounts</TabsTrigger>
             </TabsList>
             <TabsContent value="manual" className="mt-4">{manualContent}</TabsContent>
-            <TabsContent value="csv" className="mt-4"><BookEntryCsvImportPanel kind={kind} categories={categories} onImported={onImported} /></TabsContent>
+            <TabsContent value="csv" className="mt-4"><BookEntryCsvImportPanel kind={kind} onImported={onImported} /></TabsContent>
             <TabsContent value="connected" className="mt-4"><BookEntryConnectedAccountsPanel kind={kind} onImported={onImported} /></TabsContent>
           </Tabs>
         )}
