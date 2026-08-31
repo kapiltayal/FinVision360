@@ -30,10 +30,10 @@ const baseNavItems = [
   { title: "Financial Snapshot", url: "/snapshot", icon: Sparkles },
   { title: "Net Worth", url: "/", icon: LayoutDashboard, matches: ["/", "/assets", "/liabilities"] },
   { title: "Income & Expenses", url: "/income-expenses", icon: ArrowLeftRight, matches: ["/income-expenses", "/income-expenses/finance-tracker", "/finance-tracker"] },
+  { title: "Goals & Tracking", url: "/goals", icon: Target },
   { title: "Retirement", url: "/retirement", icon: Landmark },
   { title: "Insurance", url: "/insurance", icon: ShieldCheck },
   { title: "Estate & Legacy", url: "/estate-planning", icon: ScrollText },
-  { title: "Goals & Tracking", url: "/goals", icon: Target },
   { title: "AI Advisor", url: "/ai-advisor", icon: Brain },
 ];
 
