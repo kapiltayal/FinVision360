@@ -596,10 +596,58 @@ Include a year-by-year overview, useful milestones, a conservative/base/optimist
 
   app.put("/api/estate/beneficiaries", requireAuth, async (req, res) => {
     const userId = (req.user as any).id;
-    const { assetId, hasBeneficiary, beneficiaryName, notes } = req.body;
-    if (!assetId) return res.status(400).json({ message: "assetId is required" });
-    const record = await storage.upsertEstateBeneficiary({ userId, assetId, hasBeneficiary: !!hasBeneficiary, beneficiaryName, notes });
-    res.json(record);
+    const assetId = Number(req.body?.assetId);
+    const hasBeneficiary = req.body?.hasBeneficiary === true;
+    const rawBeneficiaries = req.body?.beneficiaries;
+
+    if (!Number.isInteger(assetId) || assetId <= 0) {
+      return res.status(400).json({ message: "assetId is required" });
+    }
+    if (!hasBeneficiary) {
+      if (rawBeneficiaries !== undefined && !Array.isArray(rawBeneficiaries)) {
+        return res.status(400).json({ message: "beneficiaries must be an array" });
+      }
+    } else if (!Array.isArray(rawBeneficiaries) || rawBeneficiaries.length === 0) {
+      return res.status(400).json({ message: "Add at least one beneficiary before marking this asset assigned" });
+    }
+
+    const beneficiaries: Array<{ name: string; percentage: number; notes: string | null }> = [];
+    for (const beneficiary of rawBeneficiaries ?? []) {
+      const name = typeof beneficiary?.name === "string"
+        ? beneficiary.name.trim()
+        : typeof beneficiary?.beneficiaryName === "string"
+          ? beneficiary.beneficiaryName.trim()
+          : "";
+      const percentage = Number(beneficiary?.percentage ?? beneficiary?.allocationPercentage);
+      const notes = typeof beneficiary?.notes === "string" ? beneficiary.notes.trim() : "";
+
+      if (!name) return res.status(400).json({ message: "Each beneficiary must have a name" });
+      if (!Number.isFinite(percentage) || percentage <= 0 || percentage > 100) {
+        return res.status(400).json({ message: "Each allocation must be greater than 0% and no more than 100%" });
+      }
+      const percentageInHundredths = Math.round(percentage * 100);
+      if (Math.abs(percentage * 100 - percentageInHundredths) > 0.000001) {
+        return res.status(400).json({ message: "Allocations can have no more than two decimal places" });
+      }
+      beneficiaries.push({ name, percentage: percentageInHundredths / 100, notes: notes || null });
+    }
+
+    const totalInHundredths = beneficiaries.reduce(
+      (sum, beneficiary) => sum + Math.round(beneficiary.percentage * 100),
+      0,
+    );
+    if (hasBeneficiary && totalInHundredths !== 10000) {
+      const total = totalInHundredths / 100;
+      return res.status(400).json({ message: `Allocations must total 100% (currently ${total.toFixed(2)}%)` });
+    }
+
+    try {
+      const record = await storage.saveEstateBeneficiary({ userId, assetId, hasBeneficiary, beneficiaries });
+      res.json(record);
+    } catch (error: any) {
+      if (error?.statusCode === 404) return res.status(404).json({ message: "Asset not found" });
+      throw error;
+    }
   });
 
   app.get("/api/estate/documents", requireAuth, async (req, res) => {

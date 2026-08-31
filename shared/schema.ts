@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, serial, integer, numeric, timestamp, boolean, date, uniqueIndex } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, serial, integer, numeric, timestamp, boolean, date, uniqueIndex, index, check } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -297,6 +297,29 @@ export const estateBeneficiaries = pgTable("estate_beneficiaries", {
 export const insertEstateBeneficiarySchema = createInsertSchema(estateBeneficiaries).omit({ id: true });
 export type InsertEstateBeneficiary = z.infer<typeof insertEstateBeneficiarySchema>;
 export type EstateBeneficiary = typeof estateBeneficiaries.$inferSelect;
+
+export const estateBeneficiaryEntries = pgTable("estate_beneficiary_entries", {
+  id: serial("id").primaryKey(),
+  designationId: integer("designation_id").notNull().references(() => estateBeneficiaries.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  assetId: integer("asset_id").notNull().references(() => assets.id, { onDelete: "cascade" }),
+  beneficiaryName: text("beneficiary_name").notNull(),
+  allocationPercentage: numeric("allocation_percentage", { precision: 5, scale: 2 }).notNull(),
+  notes: text("notes"),
+}, (table) => ({
+  designationIdx: index("estate_beneficiary_entries_designation_idx").on(table.designationId),
+  allocationRange: check(
+    "estate_beneficiary_entries_allocation_range",
+    sql`${table.allocationPercentage} > 0 AND ${table.allocationPercentage} <= 100`,
+  ),
+}));
+
+export const insertEstateBeneficiaryEntrySchema = createInsertSchema(estateBeneficiaryEntries).omit({ id: true });
+export type InsertEstateBeneficiaryEntry = z.infer<typeof insertEstateBeneficiaryEntrySchema>;
+export type EstateBeneficiaryEntry = typeof estateBeneficiaryEntries.$inferSelect;
+export type EstateBeneficiaryWithEntries = EstateBeneficiary & {
+  beneficiaries: EstateBeneficiaryEntry[];
+};
 
 export const estateDocuments = pgTable("estate_documents", {
   id: serial("id").primaryKey(),

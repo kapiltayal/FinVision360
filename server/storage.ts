@@ -12,7 +12,7 @@ import {
   type BankRate, type InsertBankRate,
   type PlaidItem, type InsertPlaidItem,
   type PlaidAccount, type InsertPlaidAccount,
-  type EstateBeneficiary, type InsertEstateBeneficiary,
+  type EstateBeneficiaryWithEntries,
   type EstateDocument, type InsertEstateDocument,
   type EstateContact, type InsertEstateContact,
   type Feedback, type InsertFeedback,
@@ -83,8 +83,13 @@ export interface IStorage {
   deletePlaidAccountsByItem(plaidItemId: number): Promise<void>;
   updatePlaidItem(id: number, data: Partial<PlaidItem>): Promise<PlaidItem | undefined>;
 
-  getEstateBeneficiaries(userId: string): Promise<EstateBeneficiary[]>;
-  upsertEstateBeneficiary(data: InsertEstateBeneficiary): Promise<EstateBeneficiary>;
+  getEstateBeneficiaries(userId: string): Promise<EstateBeneficiaryWithEntries[]>;
+  saveEstateBeneficiary(data: {
+    userId: string;
+    assetId: number;
+    hasBeneficiary: boolean;
+    beneficiaries: Array<{ name: string; percentage: number; notes: string | null }>;
+  }): Promise<EstateBeneficiaryWithEntries>;
 
   getEstateDocuments(userId: string): Promise<EstateDocument[]>;
   upsertEstateDocument(data: InsertEstateDocument): Promise<EstateDocument>;
@@ -363,27 +368,116 @@ export class DatabaseStorage implements IStorage {
     await db.delete(plaidAccounts).where(eq(plaidAccounts.plaidItemId, plaidItemId));
   }
 
-  async getEstateBeneficiaries(userId: string): Promise<EstateBeneficiary[]> {
+  async getEstateBeneficiaries(userId: string): Promise<EstateBeneficiaryWithEntries[]> {
     const res = await pool.query(
-      `SELECT id, user_id AS "userId", asset_id AS "assetId", has_beneficiary AS "hasBeneficiary", beneficiary_name AS "beneficiaryName", notes
-       FROM estate_beneficiaries WHERE user_id = $1`,
+      `SELECT
+         d.id,
+         d.user_id AS "userId",
+         d.asset_id AS "assetId",
+         d.has_beneficiary AS "hasBeneficiary",
+         d.beneficiary_name AS "beneficiaryName",
+         d.notes,
+         COALESCE(
+           json_agg(
+             json_build_object(
+               'id', e.id,
+               'designationId', e.designation_id,
+               'userId', e.user_id,
+               'assetId', e.asset_id,
+               'beneficiaryName', e.beneficiary_name,
+               'allocationPercentage', e.allocation_percentage,
+               'notes', e.notes
+             ) ORDER BY e.id
+           ) FILTER (WHERE e.id IS NOT NULL),
+           CASE
+             WHEN NULLIF(BTRIM(d.beneficiary_name), '') IS NOT NULL THEN
+               json_build_array(json_build_object(
+                 'id', -d.id,
+                 'designationId', d.id,
+                 'userId', d.user_id,
+                 'assetId', d.asset_id,
+                 'beneficiaryName', d.beneficiary_name,
+                 'allocationPercentage', '100.00',
+                 'notes', d.notes
+               ))
+             ELSE '[]'::json
+           END
+         ) AS beneficiaries
+       FROM estate_beneficiaries d
+       LEFT JOIN estate_beneficiary_entries e ON e.designation_id = d.id
+       WHERE d.user_id = $1
+       GROUP BY d.id
+       ORDER BY d.asset_id`,
       [userId]
     );
     return res.rows;
   }
 
-  async upsertEstateBeneficiary(data: InsertEstateBeneficiary): Promise<EstateBeneficiary> {
-    const res = await pool.query(
-      `INSERT INTO estate_beneficiaries (user_id, asset_id, has_beneficiary, beneficiary_name, notes)
-       VALUES ($1, $2, $3, $4, $5)
-       ON CONFLICT (user_id, asset_id) DO UPDATE
-         SET has_beneficiary = EXCLUDED.has_beneficiary,
-             beneficiary_name = EXCLUDED.beneficiary_name,
-             notes = EXCLUDED.notes
-       RETURNING id, user_id AS "userId", asset_id AS "assetId", has_beneficiary AS "hasBeneficiary", beneficiary_name AS "beneficiaryName", notes`,
-      [data.userId, data.assetId, data.hasBeneficiary, data.beneficiaryName ?? null, data.notes ?? null]
-    );
-    return res.rows[0];
+  async saveEstateBeneficiary(data: {
+    userId: string;
+    assetId: number;
+    hasBeneficiary: boolean;
+    beneficiaries: Array<{ name: string; percentage: number; notes: string | null }>;
+  }): Promise<EstateBeneficiaryWithEntries> {
+    const client = await pool.connect();
+    let committed = false;
+    try {
+      await client.query("BEGIN");
+
+      const asset = await client.query(
+        "SELECT id FROM assets WHERE id = $1 AND user_id = $2",
+        [data.assetId, data.userId],
+      );
+      if (asset.rowCount === 0) {
+        throw Object.assign(new Error("Asset not found"), { statusCode: 404 });
+      }
+
+      const designation = await client.query(
+        `INSERT INTO estate_beneficiaries (user_id, asset_id, has_beneficiary, beneficiary_name, notes)
+         VALUES ($1, $2, $3, NULL, NULL)
+         ON CONFLICT (user_id, asset_id) DO UPDATE
+           SET has_beneficiary = EXCLUDED.has_beneficiary
+         RETURNING id, user_id AS "userId", asset_id AS "assetId",
+           has_beneficiary AS "hasBeneficiary", beneficiary_name AS "beneficiaryName", notes`,
+        [data.userId, data.assetId, data.hasBeneficiary],
+      );
+      const designationRecord = designation.rows[0];
+
+      if (data.hasBeneficiary) {
+        await client.query("DELETE FROM estate_beneficiary_entries WHERE designation_id = $1", [designationRecord.id]);
+        for (const beneficiary of data.beneficiaries) {
+          await client.query(
+            `INSERT INTO estate_beneficiary_entries
+              (designation_id, user_id, asset_id, beneficiary_name, allocation_percentage, notes)
+             VALUES ($1, $2, $3, $4, $5, $6)`,
+            [
+              designationRecord.id,
+              data.userId,
+              data.assetId,
+              beneficiary.name,
+              beneficiary.percentage.toFixed(2),
+              beneficiary.notes,
+            ],
+          );
+        }
+        await client.query(
+          "UPDATE estate_beneficiaries SET beneficiary_name = NULL, notes = NULL WHERE id = $1",
+          [designationRecord.id],
+        );
+      }
+
+      await client.query("COMMIT");
+      committed = true;
+      const result = await this.getEstateBeneficiaries(data.userId);
+      const saved = result.find((record) => record.assetId === data.assetId);
+      if (!saved) throw new Error("Saved beneficiary designation could not be loaded");
+      return saved;
+    } catch (error) {
+      if (!committed) await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
   async getEstateDocuments(userId: string): Promise<EstateDocument[]> {

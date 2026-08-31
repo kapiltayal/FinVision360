@@ -18,10 +18,16 @@ import {
   ChevronDown, ChevronRight, Save,
 } from "lucide-react";
 import {
-  type Asset, type EstateBeneficiary, type EstateDocument, type EstateContact,
+  type Asset, type EstateBeneficiaryWithEntries, type EstateDocument, type EstateContact,
   ASSET_CATEGORIES, ESTATE_DOCUMENT_TYPES, ESTATE_CONTACT_ROLES,
 } from "@shared/schema";
 import { getCategoryLabel } from "@/lib/format";
+
+type BeneficiaryDraft = {
+  name: string;
+  percentage: string;
+  notes: string;
+};
 
 // ── Contact form ─────────────────────────────────────────────────────────────
 
@@ -111,11 +117,11 @@ export default function EstatePlanningPage() {
   const [contactDialogOpen, setContactDialogOpen] = useState(false);
   const [editingContact, setEditingContact] = useState<EstateContact | undefined>();
   const [expandedAsset, setExpandedAsset] = useState<number | null>(null);
-  // Local edits for beneficiary name/notes — only committed when user clicks Save
-  const [benEdits, setBenEdits] = useState<Record<number, { name: string; notes: string }>>({});
+  // Local beneficiary edits are only committed when the user clicks Save.
+  const [benEdits, setBenEdits] = useState<Record<number, BeneficiaryDraft[]>>({});
 
   const { data: assets = [], isLoading: aLoading } = useQuery<Asset[]>({ queryKey: ["/api/assets"] });
-  const { data: beneficiaries = [], isLoading: bLoading } = useQuery<EstateBeneficiary[]>({ queryKey: ["/api/estate/beneficiaries"] });
+  const { data: beneficiaries = [], isLoading: bLoading } = useQuery<EstateBeneficiaryWithEntries[]>({ queryKey: ["/api/estate/beneficiaries"] });
   const { data: documents = [], isLoading: dLoading } = useQuery<EstateDocument[]>({ queryKey: ["/api/estate/documents"] });
   const { data: contacts = [], isLoading: cLoading } = useQuery<EstateContact[]>({ queryKey: ["/api/estate/contacts"] });
 
@@ -129,38 +135,46 @@ export default function EstatePlanningPage() {
 
   // ── Beneficiary toggle (hasBeneficiary on/off) — optimistic ───────────────
   const toggleBeneficiaryMutation = useMutation({
-    mutationFn: (data: { assetId: number; hasBeneficiary: boolean; beneficiaryName?: string | null; notes?: string | null }) =>
+    mutationFn: (data: { assetId: number; hasBeneficiary: boolean; beneficiaries?: Array<{ name: string; percentage: number; notes: string | null }> }) =>
       apiRequest("PUT", "/api/estate/beneficiaries", data),
     onMutate: async (vars) => {
       await qc.cancelQueries({ queryKey: ["/api/estate/beneficiaries"] });
-      const prev = qc.getQueryData<EstateBeneficiary[]>(["/api/estate/beneficiaries"]);
-      qc.setQueryData<EstateBeneficiary[]>(["/api/estate/beneficiaries"], (old = []) => {
+      const prev = qc.getQueryData<EstateBeneficiaryWithEntries[]>(["/api/estate/beneficiaries"]);
+      qc.setQueryData<EstateBeneficiaryWithEntries[]>(["/api/estate/beneficiaries"], (old = []) => {
         const idx = old.findIndex((b) => b.assetId === vars.assetId);
         if (idx >= 0) {
           const updated = [...old];
           updated[idx] = { ...updated[idx], hasBeneficiary: vars.hasBeneficiary };
           return updated;
         }
-        return [...old, { id: -1, userId: "", assetId: vars.assetId, hasBeneficiary: vars.hasBeneficiary, beneficiaryName: vars.beneficiaryName ?? null, notes: vars.notes ?? null }];
+        return [...old, {
+          id: -1,
+          userId: "",
+          assetId: vars.assetId,
+          hasBeneficiary: vars.hasBeneficiary,
+          beneficiaryName: null,
+          notes: null,
+          beneficiaries: [],
+        }];
       });
       return { prev };
     },
-    onError: (_e, _v, ctx) => {
+    onError: (e: any, _v, ctx) => {
       if (ctx?.prev) qc.setQueryData(["/api/estate/beneficiaries"], ctx.prev);
-      toast({ title: "Failed to save", variant: "destructive" });
+      toast({ title: "Failed to save", description: e.message, variant: "destructive" });
     },
     onSettled: () => qc.invalidateQueries({ queryKey: ["/api/estate/beneficiaries"] }),
   });
 
-  // ── Beneficiary name/notes save ───────────────────────────────────────────
+  // ── Beneficiary list save ──────────────────────────────────────────────────
   const saveBenDetailsMutation = useMutation({
-    mutationFn: (data: { assetId: number; hasBeneficiary: boolean; beneficiaryName: string | null; notes: string | null }) =>
+    mutationFn: (data: { assetId: number; hasBeneficiary: boolean; beneficiaries: Array<{ name: string; percentage: number; notes: string | null }> }) =>
       apiRequest("PUT", "/api/estate/beneficiaries", data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["/api/estate/beneficiaries"] });
-      toast({ title: "Beneficiary details saved" });
+      toast({ title: "Beneficiaries saved" });
     },
-    onError: () => toast({ title: "Failed to save", variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Failed to save", description: e.message, variant: "destructive" }),
   });
 
   // ── Document toggle — optimistic ──────────────────────────────────────────
@@ -200,13 +214,37 @@ export default function EstatePlanningPage() {
 
   const roleLabel = (role: string) => ESTATE_CONTACT_ROLES.find((r) => r.value === role)?.label || role;
 
-  const openExpand = (assetId: number, ben: EstateBeneficiary | undefined) => {
+  const openExpand = (assetId: number, ben: EstateBeneficiaryWithEntries | undefined) => {
     setExpandedAsset(assetId);
+    setBenEdits((prev) => {
+      if (prev[assetId]) return prev;
+      const existing = ben?.beneficiaries?.map((beneficiary) => ({
+        name: beneficiary.beneficiaryName,
+        percentage: String(beneficiary.allocationPercentage),
+        notes: beneficiary.notes || "",
+      })) || [];
+      const legacy = existing.length === 0 && ben?.beneficiaryName
+        ? [{ name: ben.beneficiaryName, percentage: "100", notes: ben.notes || "" }]
+        : existing;
+      return { ...prev, [assetId]: legacy.length > 0 ? legacy : [{ name: "", percentage: "100", notes: "" }] };
+    });
+  };
+
+  const updateBeneficiaryDraft = (assetId: number, index: number, field: keyof BeneficiaryDraft, value: string) => {
     setBenEdits((prev) => ({
       ...prev,
-      [assetId]: { name: ben?.beneficiaryName || "", notes: ben?.notes || "" },
+      [assetId]: (prev[assetId] || []).map((draft, draftIndex) =>
+        draftIndex === index ? { ...draft, [field]: value } : draft
+      ),
     }));
   };
+
+  const draftsToPayload = (drafts: BeneficiaryDraft[]) =>
+    drafts.map((draft) => ({
+      name: draft.name.trim(),
+      percentage: Number(draft.percentage),
+      notes: draft.notes.trim() || null,
+    }));
 
   if (isLoading) {
     return (
@@ -277,8 +315,12 @@ export default function EstatePlanningPage() {
                         </div>
                       </div>
                       <div className="flex items-center gap-3 shrink-0">
-                        {hasBen && ben?.beneficiaryName && (
-                          <span className="text-xs text-muted-foreground hidden sm:inline truncate max-w-[120px]">{ben.beneficiaryName}</span>
+                        {hasBen && (
+                          <span className="text-xs text-muted-foreground hidden sm:inline truncate max-w-[180px]">
+                            {ben?.beneficiaries?.length
+                              ? ben.beneficiaries.map((beneficiary) => beneficiary.beneficiaryName).join(", ")
+                              : "Details needed"}
+                          </span>
                         )}
                         <Badge variant={hasBen ? "default" : "secondary"} className="text-xs">
                           {hasBen ? "Assigned" : "Not assigned"}
@@ -287,13 +329,26 @@ export default function EstatePlanningPage() {
                           data-testid={`switch-beneficiary-${asset.id}`}
                           checked={hasBen}
                           onCheckedChange={(checked) => {
-                            toggleBeneficiaryMutation.mutate({
-                              assetId: asset.id,
-                              hasBeneficiary: checked,
-                              beneficiaryName: ben?.beneficiaryName ?? null,
-                              notes: ben?.notes ?? null,
-                            });
-                            if (checked && !isExpanded) openExpand(asset.id, ben);
+                            if (!checked) {
+                              toggleBeneficiaryMutation.mutate({ assetId: asset.id, hasBeneficiary: false });
+                              return;
+                            }
+                            const existing = ben?.beneficiaries || [];
+                            const total = existing.reduce((sum, beneficiary) => sum + Number(beneficiary.allocationPercentage), 0);
+                            if (existing.length > 0 && Math.abs(total - 100) < 0.001) {
+                              toggleBeneficiaryMutation.mutate({
+                                assetId: asset.id,
+                                hasBeneficiary: true,
+                                beneficiaries: existing.map((beneficiary) => ({
+                                  name: beneficiary.beneficiaryName,
+                                  percentage: Number(beneficiary.allocationPercentage),
+                                  notes: beneficiary.notes,
+                                })),
+                              });
+                            } else {
+                              openExpand(asset.id, ben);
+                              toast({ title: "Add beneficiary details first", description: "Enter names and allocations totaling 100%, then save." });
+                            }
                           }}
                         />
                         <Button
@@ -317,31 +372,91 @@ export default function EstatePlanningPage() {
                     {/* Expanded detail panel */}
                     {isExpanded && (
                       <div className="pb-3 px-1 mb-2">
-                        <div className="bg-muted/30 rounded-lg p-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
-                          <div className="space-y-1.5">
-                            <Label className="text-xs">Beneficiary Name</Label>
-                            <Input
-                              data-testid={`input-beneficiary-name-${asset.id}`}
-                              value={localEdit?.name ?? ""}
-                              onChange={(e) =>
-                                setBenEdits((prev) => ({ ...prev, [asset.id]: { ...prev[asset.id], name: e.target.value } }))
-                              }
-                              placeholder="e.g., John Doe"
-                              className="h-8 text-sm"
-                            />
+                        <div className="bg-muted/30 rounded-lg p-3 space-y-3">
+                          <div className="flex items-center justify-between gap-3">
+                            <div>
+                              <Label className="text-xs">Beneficiaries</Label>
+                              <p className="text-[11px] text-muted-foreground">Add each person and their share of this asset.</p>
+                            </div>
+                            <span className={`text-xs font-medium ${
+                              (localEdit || []).reduce((sum, draft) => sum + (Number(draft.percentage) || 0), 0) === 100
+                                ? "text-emerald-600"
+                                : "text-amber-600"
+                            }`}>
+                              Allocation: {(localEdit || []).reduce((sum, draft) => sum + (Number(draft.percentage) || 0), 0).toFixed(2)}%
+                            </span>
                           </div>
-                          <div className="space-y-1.5">
-                            <Label className="text-xs">Notes</Label>
-                            <Input
-                              data-testid={`input-beneficiary-notes-${asset.id}`}
-                              value={localEdit?.notes ?? ""}
-                              onChange={(e) =>
-                                setBenEdits((prev) => ({ ...prev, [asset.id]: { ...prev[asset.id], notes: e.target.value } }))
-                              }
-                              placeholder="e.g., 50% to each"
-                              className="h-8 text-sm"
-                            />
+                          <div className="space-y-3">
+                            {(localEdit || []).map((draft, index) => (
+                              <div key={index} className="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_7rem_auto] gap-2 items-end">
+                                <div className="space-y-1">
+                                  <Label className="text-[11px]">Name</Label>
+                                  <Input
+                                    data-testid={`input-beneficiary-name-${asset.id}${index ? `-${index}` : ""}`}
+                                    value={draft.name}
+                                    onChange={(e) => updateBeneficiaryDraft(asset.id, index, "name", e.target.value)}
+                                    placeholder="e.g., John Doe"
+                                    className="h-8 text-sm"
+                                  />
+                                </div>
+                                <div className="space-y-1">
+                                  <Label className="text-[11px]">Allocation (%)</Label>
+                                  <Input
+                                    data-testid={`input-beneficiary-percentage-${asset.id}-${index}`}
+                                    type="number"
+                                    min="0.01"
+                                    max="100"
+                                    step="0.01"
+                                    value={draft.percentage}
+                                    onChange={(e) => updateBeneficiaryDraft(asset.id, index, "percentage", e.target.value)}
+                                    className="h-8 text-sm"
+                                  />
+                                </div>
+                                <Button
+                                  type="button"
+                                  size="icon"
+                                  variant="ghost"
+                                  className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                  onClick={() => setBenEdits((prev) => ({
+                                    ...prev,
+                                    [asset.id]: (prev[asset.id] || []).filter((_, draftIndex) => draftIndex !== index),
+                                  }))}
+                                  aria-label={`Remove beneficiary ${index + 1}`}
+                                  data-testid={`button-remove-beneficiary-${asset.id}-${index}`}
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                                <div className="space-y-1 sm:col-span-3">
+                                  <Label className="text-[11px]">Notes (optional)</Label>
+                                  <Input
+                                    data-testid={`input-beneficiary-notes-${asset.id}${index ? `-${index}` : ""}`}
+                                    value={draft.notes}
+                                    onChange={(e) => updateBeneficiaryDraft(asset.id, index, "notes", e.target.value)}
+                                    placeholder="e.g., Spouse"
+                                    className="h-8 text-sm"
+                                  />
+                                </div>
+                              </div>
+                            ))}
                           </div>
+                          {((localEdit || []).some((draft) => !draft.name.trim() || !Number.isFinite(Number(draft.percentage)) || Number(draft.percentage) <= 0 || Number(draft.percentage) > 100) ||
+                            Math.abs((localEdit || []).reduce((sum, draft) => sum + (Number(draft.percentage) || 0), 0) - 100) > 0.001) && (
+                            <p className="text-xs text-amber-600">
+                              Enter a name and valid allocation for every row. Allocations must total exactly 100%.
+                            </p>
+                          )}
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setBenEdits((prev) => ({
+                              ...prev,
+                              [asset.id]: [...(prev[asset.id] || []), { name: "", percentage: "0", notes: "" }],
+                            }))}
+                            data-testid={`button-add-beneficiary-${asset.id}`}
+                          >
+                            <Plus className="h-3.5 w-3.5 mr-1.5" /> Add Beneficiary
+                          </Button>
                         </div>
                         <div className="flex justify-end mt-2">
                           <Button
@@ -349,16 +464,25 @@ export default function EstatePlanningPage() {
                             onClick={() =>
                               saveBenDetailsMutation.mutate({
                                 assetId: asset.id,
-                                hasBeneficiary: hasBen,
-                                beneficiaryName: localEdit?.name?.trim() || null,
-                                notes: localEdit?.notes?.trim() || null,
+                                hasBeneficiary: true,
+                                beneficiaries: draftsToPayload(localEdit || []),
                               })
                             }
-                            disabled={saveBenDetailsMutation.isPending}
+                            disabled={
+                              saveBenDetailsMutation.isPending ||
+                              !(localEdit || []).length ||
+                              (localEdit || []).some((draft) =>
+                                !draft.name.trim() ||
+                                !Number.isFinite(Number(draft.percentage)) ||
+                                Number(draft.percentage) <= 0 ||
+                                Number(draft.percentage) > 100
+                              ) ||
+                              Math.abs((localEdit || []).reduce((sum, draft) => sum + (Number(draft.percentage) || 0), 0) - 100) > 0.001
+                            }
                             data-testid={`button-save-beneficiary-${asset.id}`}
                           >
                             <Save className="h-3.5 w-3.5 mr-1.5" />
-                            {saveBenDetailsMutation.isPending ? "Saving..." : "Save"}
+                            {saveBenDetailsMutation.isPending ? "Saving..." : "Save & Assign"}
                           </Button>
                         </div>
                       </div>
