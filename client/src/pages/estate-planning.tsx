@@ -272,12 +272,12 @@ export default function EstatePlanningPage() {
         <p className="text-muted-foreground">Track key steps to protect and pass on your assets</p>
         <div className="flex flex-wrap gap-4 mt-3">
           <div className="flex items-center gap-1.5 text-sm">
-            <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-            <span className="text-muted-foreground">Documents: <span className="font-semibold text-foreground">{docsComplete}/{ESTATE_DOCUMENT_TYPES.length}</span></span>
-          </div>
-          <div className="flex items-center gap-1.5 text-sm">
             <UserCheck className="h-4 w-4 text-blue-500" />
             <span className="text-muted-foreground">Beneficiaries assigned: <span className="font-semibold text-foreground">{assetsWithBeneficiary}/{assets.length}</span></span>
+          </div>
+          <div className="flex items-center gap-1.5 text-sm">
+            <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+            <span className="text-muted-foreground">Documents: <span className="font-semibold text-foreground">{docsComplete}/{ESTATE_DOCUMENT_TYPES.length}</span></span>
           </div>
           <div className="flex items-center gap-1.5 text-sm">
             <Users className="h-4 w-4 text-violet-500" />
