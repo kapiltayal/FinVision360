@@ -79,10 +79,30 @@ interface Goal {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
+function parseDateOnly(value: string | null): Date | null {
+  if (!value) return null;
+  const datePart = value.slice(0, 10);
+  const parts = datePart.split("-").map(Number);
+  if (parts.length !== 3 || parts.some(Number.isNaN)) return null;
+  return new Date(parts[0], parts[1] - 1, parts[2]);
+}
+
 function daysRemaining(targetDate: string | null): number | null {
-  if (!targetDate) return null;
-  const diff = new Date(targetDate).getTime() - Date.now();
+  const target = parseDateOnly(targetDate);
+  if (!target) return null;
+  const today = new Date();
+  const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const diff = target.getTime() - todayStart.getTime();
   return Math.ceil(diff / (1000 * 60 * 60 * 24));
+}
+
+function formatDateInputValue(value: string | null): string {
+  return value ? value.slice(0, 10) : "";
+}
+
+function formatGoalDate(value: string | null, options: Intl.DateTimeFormatOptions): string {
+  const date = parseDateOnly(value);
+  return date ? date.toLocaleDateString("en-US", options) : "";
 }
 
 function formatDaysRemaining(days: number | null): string {
@@ -92,6 +112,22 @@ function formatDaysRemaining(days: number | null): string {
   if (days < 30) return `${days}d left`;
   if (days < 365) return `${Math.round(days / 30)}mo left`;
   return `${(days / 365).toFixed(1)}yr left`;
+}
+
+function monthlySavingsRequired(
+  targetAmount: number,
+  currentAmount: number,
+  targetDate: string | null,
+): number | null {
+  const remaining = Math.max(0, targetAmount - currentAmount);
+  if (remaining === 0) return 0;
+  const days = daysRemaining(targetDate);
+  if (days === null) return null;
+
+  // Treat any partial month as a full monthly contribution so the goal is
+  // fully funded by its deadline, including goals that are already overdue.
+  const months = Math.max(1, Math.ceil(days / 30.4375));
+  return remaining / months;
 }
 
 // ── Empty form ────────────────────────────────────────────────────────────────
@@ -126,8 +162,18 @@ export default function GoalsPage() {
     ).length;
     const totalTarget = goals.reduce((s, g) => s + parseFloat(g.targetAmount), 0);
     const totalCurrent = goals.reduce((s, g) => s + parseFloat(g.currentAmount), 0);
+    const monthlyRequired = goals.reduce(
+      (s, g) =>
+        s +
+        (monthlySavingsRequired(
+          parseFloat(g.targetAmount),
+          parseFloat(g.currentAmount),
+          g.targetDate,
+        ) ?? 0),
+      0,
+    );
     const overallPct = totalTarget > 0 ? Math.min(100, (totalCurrent / totalTarget) * 100) : 0;
-    return { total, completed, totalTarget, totalCurrent, overallPct };
+    return { total, completed, totalTarget, totalCurrent, monthlyRequired, overallPct };
   }, [goals]);
 
   // Mutations
@@ -147,6 +193,7 @@ export default function GoalsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/goals"] });
       toast({ title: "Goal updated" });
+      setDialogOpen(false);
       setEditGoal(null);
       setProgressGoal(null);
     },
@@ -176,7 +223,7 @@ export default function GoalsPage() {
       category: goal.category as CategoryValue,
       targetAmount: goal.targetAmount,
       currentAmount: goal.currentAmount,
-      targetDate: goal.targetDate ?? "",
+      targetDate: formatDateInputValue(goal.targetDate),
       notes: goal.notes ?? "",
     });
     setEditGoal(goal);
@@ -269,8 +316,8 @@ export default function GoalsPage() {
                 <TrendingUp className="h-5 w-5 text-[#1C91D4]" />
               </div>
               <div>
-                <p className="text-xs text-muted-foreground">Total Saved</p>
-                <p className="text-lg font-bold">{formatCurrency(stats.totalCurrent)}</p>
+                <p className="text-xs text-muted-foreground">Monthly Savings Required</p>
+                <p className="text-lg font-bold">{formatCurrency(stats.monthlyRequired)}</p>
               </div>
             </div>
           </CardContent>
@@ -353,6 +400,7 @@ export default function GoalsPage() {
                     const pct = target > 0 ? Math.min(100, (current / target) * 100) : 0;
                     const days = daysRemaining(goal.targetDate);
                     const overdue = days !== null && days < 0;
+                    const monthlyRequired = monthlySavingsRequired(target, current, goal.targetDate);
 
                     return (
                       <Card key={goal.id} className="stat-card-3d border flex flex-col">
@@ -385,22 +433,33 @@ export default function GoalsPage() {
                             </div>
                           </div>
 
-                          {/* Deadline */}
-                          <div className="flex items-center gap-1.5 text-xs">
+                          {/* Deadline and monthly savings needed */}
+                          <div className="space-y-1 text-xs">
                             {goal.targetDate ? (
                               <>
-                                <Calendar className={`h-3.5 w-3.5 ${overdue ? "text-rose-500" : "text-muted-foreground"}`} />
-                                <span className={overdue ? "text-rose-500 font-medium" : "text-muted-foreground"}>
-                                  {new Date(goal.targetDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
-                                  {" · "}
-                                  {formatDaysRemaining(days)}
-                                </span>
+                                <div className="flex items-center gap-1.5">
+                                  <Calendar className={`h-3.5 w-3.5 ${overdue ? "text-rose-500" : "text-muted-foreground"}`} />
+                                  <span className={overdue ? "text-rose-500 font-medium" : "text-muted-foreground"}>
+                                    {formatGoalDate(goal.targetDate, { month: "short", day: "numeric", year: "numeric" })}
+                                    {" · "}
+                                    {formatDaysRemaining(days)}
+                                  </span>
+                                </div>
+                                {monthlyRequired !== null && (
+                                  <div className="flex items-center gap-1.5 text-muted-foreground">
+                                    <TrendingUp className="h-3.5 w-3.5 text-[#1C91D4]" />
+                                    <span>
+                                      Monthly savings needed:{" "}
+                                      <span className="font-medium text-foreground">{formatCurrency(monthlyRequired)}</span>
+                                    </span>
+                                  </div>
+                                )}
                               </>
                             ) : (
-                              <>
+                              <div className="flex items-center gap-1.5">
                                 <Clock className="h-3.5 w-3.5 text-muted-foreground" />
                                 <span className="text-muted-foreground">No deadline set</span>
-                              </>
+                              </div>
                             )}
                           </div>
 
@@ -476,7 +535,9 @@ export default function GoalsPage() {
                                 {formatCurrency(target)} achieved
                                 {goal.targetDate && (
                                   <span className="ml-2">
-                                    · target was {new Date(goal.targetDate).toLocaleDateString("en-US", { month: "short", year: "numeric" })}
+                                    · target was {formatGoalDate(goal.targetDate, { month: "short", year: "numeric" })}
+                                    {" · "}
+                                    <span className="font-medium text-emerald-700 dark:text-emerald-400">$0/mo needed</span>
                                   </span>
                                 )}
                               </p>
