@@ -29,6 +29,14 @@ type BeneficiaryDraft = {
   notes: string;
 };
 
+type EstateTab = "beneficiaries" | "documents" | "contacts";
+
+const ESTATE_TABS: { key: EstateTab; label: string; icon: typeof UserCheck }[] = [
+  { key: "beneficiaries", label: "Beneficiaries", icon: UserCheck },
+  { key: "documents", label: "Documents", icon: ScrollText },
+  { key: "contacts", label: "Contacts", icon: Users },
+];
+
 // ── Contact form ─────────────────────────────────────────────────────────────
 
 function ContactForm({ contact, onClose }: { contact?: EstateContact; onClose: () => void }) {
@@ -117,6 +125,7 @@ export default function EstatePlanningPage() {
   const [contactDialogOpen, setContactDialogOpen] = useState(false);
   const [editingContact, setEditingContact] = useState<EstateContact | undefined>();
   const [expandedAsset, setExpandedAsset] = useState<number | null>(null);
+  const [activeTab, setActiveTab] = useState<EstateTab>("beneficiaries");
   // Local beneficiary edits are only committed when the user clicks Save.
   const [benEdits, setBenEdits] = useState<Record<number, BeneficiaryDraft[]>>({});
 
@@ -277,8 +286,44 @@ export default function EstatePlanningPage() {
         </div>
       </div>
 
+      {/* Section navigation */}
+      <div className="border-b">
+        <div className="flex items-center gap-1 overflow-x-auto">
+          {ESTATE_TABS.map((tab) => {
+            const count = tab.key === "beneficiaries"
+              ? assetsWithBeneficiary
+              : tab.key === "documents"
+                ? docsComplete
+                : contacts.length;
+            const Icon = tab.icon;
+
+            return (
+              <button
+                key={tab.key}
+                type="button"
+                onClick={() => setActiveTab(tab.key)}
+                data-testid={`tab-estate-${tab.key}`}
+                className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
+                  activeTab === tab.key
+                    ? "border-primary text-primary"
+                    : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
+                }`}
+              >
+                <Icon className="h-4 w-4" />
+                {tab.label}
+                <span className={`ml-1 text-xs px-1.5 py-0.5 rounded-full ${
+                  activeTab === tab.key ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
+                }`}>
+                  {tab.key === "documents" ? `${count}/${ESTATE_DOCUMENT_TYPES.length}` : count}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
       {/* ── Section A: Beneficiary Designations ── */}
-      <Card>
+      {activeTab === "beneficiaries" && <Card>
         <CardHeader className="pb-3">
           <div className="flex items-center gap-2">
             <div className="h-8 w-8 rounded-md bg-blue-500/10 flex items-center justify-center">
@@ -493,10 +538,10 @@ export default function EstatePlanningPage() {
             </div>
           )}
         </CardContent>
-      </Card>
+      </Card>}
 
       {/* ── Section B: Estate Planning Documents ── */}
-      <Card>
+      {activeTab === "documents" && <Card>
         <CardHeader className="pb-3">
           <div className="flex items-center gap-2">
             <div className="h-8 w-8 rounded-md bg-emerald-500/10 flex items-center justify-center">
@@ -550,10 +595,10 @@ export default function EstatePlanningPage() {
             Click any item to toggle its status. Consult a licensed estate attorney for personalized guidance.
           </p>
         </CardContent>
-      </Card>
+      </Card>}
 
       {/* ── Section C: Key Contacts ── */}
-      <Card>
+      {activeTab === "contacts" && <Card>
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -629,7 +674,7 @@ export default function EstatePlanningPage() {
             </div>
           )}
         </CardContent>
-      </Card>
+      </Card>}
 
       {/* Contact dialog */}
       <Dialog open={contactDialogOpen} onOpenChange={setContactDialogOpen}>
