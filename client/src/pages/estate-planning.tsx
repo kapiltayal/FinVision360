@@ -451,7 +451,7 @@ export default function EstatePlanningPage() {
                                     type="number"
                                     min="0.01"
                                     max="100"
-                                    step="0.01"
+                                    step="1"
                                     value={draft.percentage}
                                     onChange={(e) => updateBeneficiaryDraft(asset.id, index, "percentage", e.target.value)}
                                     className="h-8 text-sm"
