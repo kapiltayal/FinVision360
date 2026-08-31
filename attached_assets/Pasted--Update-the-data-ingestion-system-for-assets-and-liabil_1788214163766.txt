@@ -1,0 +1,30 @@
+
+Update the data ingestion system for assets and liabilities utilizing our existing Replit AI integration:
+1. Database & Mapping Rules
+
+* Use the existing Assets_type_list and liabilities_type_list tables.
+* Both tables utilize parent_category and category columns.
+* Every ingested item must map to a valid category.
+
+2. Manual Input Form (UI)
+
+* Update the asset and liability creation forms (category field) with a dynamically populated dropdown.
+* Fetch data from Assets_type_list and liabilities_type_list.
+* Format the dropdown using a grouped selection structure (<optgroup>). Group items by parent_category and list category choices underneath.
+* Make parent_category unselectable headers. The user must only be able to select a specific category.
+
+3. File Upload & API Integration
+
+* Enforce a strict 5MB file size limit. Show a clear error message if a file exceeds 5MB.
+* Accept CSV, TSV, TXT, and Excel (.xls, .xlsx) files
+* Create a backend endpoint to handle these files and incoming API payloads.
+* Route the raw extracted text/data directly through our existing Replit AI integration model.
+* Prompt the existing AI model to read the incoming transaction text and map it to the closest matching category from the database.
+* Fallback: If the AI integration call fails, drops, or times out, immediately trigger a programmatic backup script (e.g., direct string/keyword matching against the database) to complete the ingestion seamlessly.
+
+4. Garbage File Handling & Validation
+
+File Type Validation: Verify the true file extension and MIME type before processing. Reject any file that is not a true CSV or JSON file with an explicit alert: "Invalid file type. Please upload a valid CSV or JSON file."
+Structure Check: Parse the first few rows of the file. If it contains completely empty rows, binary corruption strings, or lacks recognizable text columns, immediately abort the execution. Return a 400 Bad Request with the message "File content could not be read or appears corrupted."
+AI Response Guardrail: Ensure that the system checks the AI model's output. If the AI returns an empty array, an error, or states it cannot read the text, do not fall back to programmatic matching. Instead, notify the user: "Could not detect any valid assets or liabilities in this file."
+
