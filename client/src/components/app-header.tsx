@@ -2,8 +2,6 @@ import { useLocation, Link } from "wouter";
 import { useEffect, useState } from "react";
 import {
   LayoutDashboard,
-  Wallet,
-  CreditCard,
   Target,
   ShieldCheck,
   Brain,
@@ -16,7 +14,6 @@ import {
   Sparkles,
   Link2,
   ScrollText,
-  Receipt,
 } from "lucide-react";
 import logoPath from "@assets/FinVision360_Logo_H_(transparent)_1776714495394.png";
 import { Button } from "@/components/ui/button";
@@ -31,11 +28,8 @@ import { useAuth, useLogout } from "@/hooks/use-auth";
 
 const baseNavItems = [
   { title: "Financial Snapshot", url: "/snapshot", icon: Sparkles },
-  { title: "Net Worth", url: "/", icon: LayoutDashboard },
-  { title: "Assets", url: "/assets", icon: Wallet },
-  { title: "Liabilities", url: "/liabilities", icon: CreditCard },
-  { title: "Income & Expenses", url: "/income-expenses", icon: ArrowLeftRight },
-  { title: "Finance Tracker", url: "/finance-tracker", icon: Receipt },
+  { title: "Net Worth", url: "/", icon: LayoutDashboard, matches: ["/", "/assets", "/liabilities"] },
+  { title: "Income & Expenses", url: "/income-expenses", icon: ArrowLeftRight, matches: ["/income-expenses", "/income-expenses/finance-tracker", "/finance-tracker"] },
   { title: "Retirement", url: "/retirement", icon: Landmark },
   { title: "Insurance", url: "/insurance", icon: ShieldCheck },
   { title: "Estate & Legacy", url: "/estate-planning", icon: ScrollText },
@@ -70,9 +64,11 @@ export function AppHeader() {
     };
   }, [user?.id]);
 
-  const currentPage = baseNavItems.find(
-    (item) => location === item.url || (item.url !== "/" && location.startsWith(item.url))
-  );
+  const isNavItemActive = (item: (typeof baseNavItems)[number]) =>
+    item.matches?.includes(location) ||
+    location === item.url ||
+    (item.url !== "/" && location.startsWith(item.url));
+  const currentPage = baseNavItems.find(isNavItemActive);
   const currentAdminPage = adminNavItems.find(
     (item) => location === item.url || (item.url !== "/" && location.startsWith(item.url))
   );
@@ -120,7 +116,7 @@ export function AppHeader() {
               >
                 <item.icon className="h-4 w-4 shrink-0" />
                 <span className="flex-1">{item.title}</span>
-                {(location === item.url || (item.url !== "/" && location.startsWith(item.url))) && (
+                {isNavItemActive(item) && (
                   <span className="text-primary">✓</span>
                 )}
               </Link>

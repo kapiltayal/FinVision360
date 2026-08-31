@@ -12,16 +12,14 @@ import { useAuth, useSupabaseSession } from "@/hooks/use-auth";
 import { Skeleton } from "@/components/ui/skeleton";
 import NotFound from "@/pages/not-found";
 import LandingPage from "@/pages/landing";
-import DashboardPage from "@/pages/dashboard";
 import SnapshotPage from "@/pages/snapshot";
-import AssetsPage from "@/pages/assets";
-import LiabilitiesPage from "@/pages/liabilities";
+import NetWorthPage from "@/pages/net-worth";
 import RetirementPage from "@/pages/retirement";
 import InsurancePage from "@/pages/insurance";
 import AIAdvisorPage from "@/pages/ai-advisor";
 import EstatePlanningPage from "@/pages/estate-planning";
 import SettingsPage from "@/pages/settings";
-import IncomeExpensesPage from "@/pages/income-expenses";
+import IncomeExpensesTabsPage from "@/pages/income-expenses-tabs";
 import BankRatesPage from "@/pages/bank-rates";
 import ConnectedAccountsPage from "@/pages/connected-accounts";
 import AboutPage from "@/pages/about";
@@ -31,7 +29,6 @@ import FAQPage from "@/pages/faq";
 import ContactPage from "@/pages/contact";
 import GoalsPage from "@/pages/goals";
 import ResetPasswordPage from "@/pages/reset-password";
-import FinanceTrackerPage from "@/pages/finance-tracker";
 
 function AuthenticatedApp() {
   const [location] = useLocation();
@@ -45,19 +42,20 @@ function AuthenticatedApp() {
           <div className="flex-1">
             <Switch>
               <Route path="/snapshot" component={SnapshotPage} />
-              <Route path="/" component={DashboardPage} />
+              <Route path="/" component={NetWorthPage} />
               <Route path="/home" component={LandingPage} />
-              <Route path="/assets" component={AssetsPage} />
-              <Route path="/liabilities" component={LiabilitiesPage} />
+              <Route path="/assets" component={NetWorthPage} />
+              <Route path="/liabilities" component={NetWorthPage} />
               <Route path="/retirement" component={RetirementPage} />
               <Route path="/retirement/social-security" component={RetirementPage} />
               <Route path="/retirement/401k" component={RetirementPage} />
               <Route path="/retirement/pension" component={RetirementPage} />
-              <Route path="/income-expenses" component={IncomeExpensesPage} />
+              <Route path="/income-expenses" component={IncomeExpensesTabsPage} />
+              <Route path="/income-expenses/finance-tracker" component={IncomeExpensesTabsPage} />
               <Route path="/insurance" component={InsurancePage} />
               <Route path="/estate-planning" component={EstatePlanningPage} />
               <Route path="/goals" component={GoalsPage} />
-              <Route path="/finance-tracker" component={FinanceTrackerPage} />
+              <Route path="/finance-tracker" component={IncomeExpensesTabsPage} />
               <Route path="/ai-advisor" component={AIAdvisorPage} />
               <Route path="/settings" component={SettingsPage} />
               <Route path="/bank-rates" component={BankRatesPage} />
