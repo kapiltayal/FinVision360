@@ -519,7 +519,7 @@ export default function LiabilitiesPage() {
             const accountCount = categoryGroups.reduce((sum, group) => sum + group.entries.length, 0);
             return (
             <section key={parentCategory} className="border-b last:border-b-0">
-              <div className="flex items-center gap-3 border-b bg-muted/40 px-5 py-3">
+              <div className="flex items-center gap-3 border-b-2 border-destructive/25 bg-muted/75 px-5 py-3 dark:bg-muted/55">
                 <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-destructive/10">
                   <Layers3 className="h-4 w-4 text-destructive" />
                 </div>
