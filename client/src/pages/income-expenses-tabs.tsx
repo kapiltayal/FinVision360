@@ -12,7 +12,7 @@ export default function IncomeExpensesTabsPage() {
   const [location] = useLocation();
 
   return (
-    <div className="flex flex-col">
+    <div className="flex flex-col h-full overflow-hidden">
       <div className="border-b bg-background shrink-0">
         <div className="flex items-center gap-1 px-4 overflow-x-auto">
           {tabs.map((tab) => {
@@ -39,7 +39,7 @@ export default function IncomeExpensesTabsPage() {
           })}
         </div>
       </div>
-      <div>
+      <div className="flex-1 overflow-y-auto">
         <Switch>
           <Route path="/income-expenses" component={IncomeExpensesPage} />
           <Route path="/income-expenses/finance-tracker" component={FinanceTrackerPage} />
