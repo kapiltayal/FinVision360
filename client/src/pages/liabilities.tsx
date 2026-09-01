@@ -149,9 +149,24 @@ function LiabilityForm({
               <option value={liability.category} disabled>{liability.category} (legacy category)</option>
             )}
             {groupedBookCategories(categories).map(([parent, entries]) => (
-              <optgroup key={parent} label={parent}>
-                {entries.map((category) => <option key={`${category.parentCategory}-${category.category}`} value={category.category}>{category.category}</option>)}
-              </optgroup>
+              [
+                <option
+                  key={`parent-${parent}`}
+                  value={`__parent_${parent}`}
+                  disabled
+                  className="bg-muted font-semibold tracking-wide text-muted-foreground"
+                >
+                  {parent}
+                </option>,
+                ...entries.map((category) => (
+                  <option
+                    key={`${category.parentCategory}-${category.category}`}
+                    value={category.category}
+                  >
+                    {category.category}
+                  </option>
+                )),
+              ]
             ))}
           </select>
         </div>
