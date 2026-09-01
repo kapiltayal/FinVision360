@@ -35,37 +35,33 @@ function AuthenticatedApp() {
   const showFooter = location !== "/home";
 
   return (
-    <div className="flex flex-col h-screen w-full">
+    <div className="flex min-h-screen w-full flex-col">
       <AppHeader />
-      <main className="flex-1 min-h-0 overflow-y-auto">
-        <div className="min-h-full flex flex-col">
-          <div className="flex-1">
-            <Switch>
-              <Route path="/snapshot" component={SnapshotPage} />
-              <Route path="/" component={NetWorthPage} />
-              <Route path="/home" component={LandingPage} />
-              <Route path="/assets" component={NetWorthPage} />
-              <Route path="/liabilities" component={NetWorthPage} />
-              <Route path="/retirement" component={RetirementPage} />
-              <Route path="/retirement/social-security" component={RetirementPage} />
-              <Route path="/retirement/401k" component={RetirementPage} />
-              <Route path="/retirement/pension" component={RetirementPage} />
-              <Route path="/income-expenses" component={IncomeExpensesTabsPage} />
-              <Route path="/income-expenses/finance-tracker" component={IncomeExpensesTabsPage} />
-              <Route path="/insurance" component={InsurancePage} />
-              <Route path="/estate-planning" component={EstatePlanningPage} />
-              <Route path="/goals" component={GoalsPage} />
-              <Route path="/finance-tracker" component={IncomeExpensesTabsPage} />
-              <Route path="/ai-advisor" component={AIAdvisorPage} />
-              <Route path="/settings" component={SettingsPage} />
-              <Route path="/bank-rates" component={BankRatesPage} />
-              <Route path="/connected-accounts" component={ConnectedAccountsPage} />
-              <Route component={NotFound} />
-            </Switch>
-          </div>
-          {showFooter && <AppFooter />}
-        </div>
+      <main className="flex-1">
+        <Switch>
+          <Route path="/snapshot" component={SnapshotPage} />
+          <Route path="/" component={NetWorthPage} />
+          <Route path="/home" component={LandingPage} />
+          <Route path="/assets" component={NetWorthPage} />
+          <Route path="/liabilities" component={NetWorthPage} />
+          <Route path="/retirement" component={RetirementPage} />
+          <Route path="/retirement/social-security" component={RetirementPage} />
+          <Route path="/retirement/401k" component={RetirementPage} />
+          <Route path="/retirement/pension" component={RetirementPage} />
+          <Route path="/income-expenses" component={IncomeExpensesTabsPage} />
+          <Route path="/income-expenses/finance-tracker" component={IncomeExpensesTabsPage} />
+          <Route path="/insurance" component={InsurancePage} />
+          <Route path="/estate-planning" component={EstatePlanningPage} />
+          <Route path="/goals" component={GoalsPage} />
+          <Route path="/finance-tracker" component={IncomeExpensesTabsPage} />
+          <Route path="/ai-advisor" component={AIAdvisorPage} />
+          <Route path="/settings" component={SettingsPage} />
+          <Route path="/bank-rates" component={BankRatesPage} />
+          <Route path="/connected-accounts" component={ConnectedAccountsPage} />
+          <Route component={NotFound} />
+        </Switch>
       </main>
+      {showFooter && <AppFooter />}
       <FeedbackButton />
     </div>
   );
