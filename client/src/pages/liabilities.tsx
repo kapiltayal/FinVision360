@@ -529,7 +529,6 @@ export default function LiabilitiesPage() {
                     {categoryGroups.length} {categoryGroups.length === 1 ? "category" : "categories"} · {accountCount} {accountCount === 1 ? "account" : "accounts"}
                   </p>
                 </div>
-                <div className="hidden flex-1 border-t border-dashed border-destructive/20 sm:block" />
               </div>
               {categoryGroups.map(({ category, entries: categoryLiabilities }, idx) => {
                 const isOpen = openCategory === category;
