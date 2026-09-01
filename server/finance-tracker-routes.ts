@@ -142,6 +142,20 @@ function isValidIsoDate(value: string): boolean {
   return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
 }
 
+function isValidMonth(value: unknown): value is string {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}$/.test(value)) return false;
+  const date = new Date(`${value}-01T00:00:00Z`);
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 7) === value;
+}
+
+function monthBounds(month: string): { startDate: string; endDate: string } {
+  const [year, monthNumber] = month.split("-").map(Number);
+  return {
+    startDate: `${month}-01`,
+    endDate: isoDate(new Date(Date.UTC(year, monthNumber, 0))),
+  };
+}
+
 function isPlaidTransfer(transaction: PlaidTransaction): boolean {
   const primary = transaction.personal_finance_category?.primary?.toUpperCase() ?? "";
   const detailed = transaction.personal_finance_category?.detailed?.toUpperCase() ?? "";
@@ -213,6 +227,143 @@ async function detectAndMarkRecurring(userId: string): Promise<number> {
 
 // ─── ROUTE REGISTRATION ───────────────────────────────────────────────────────
 export function registerFinanceTrackerRoutes(app: Express) {
+  // GET /api/budget-plan — saved plan plus source data for one calendar month
+  app.get("/api/budget-plan", requireAuth, async (req, res) => {
+    try {
+      const userId = (req.user as any).id;
+      const month = req.query.month;
+      if (!isValidMonth(month)) {
+        return res.status(400).json({ message: "month must use YYYY-MM format" });
+      }
+
+      const { startDate, endDate } = monthBounds(month);
+      const [
+        { rows: planRows },
+        { rows: actualRows },
+        { rows: liabilityRows },
+        { rows: goalRows },
+      ] = await Promise.all([
+        pool.query(
+          `SELECT plan_key, planned_amount
+           FROM budget_plans
+           WHERE user_id = $1 AND month = $2::date
+           ORDER BY plan_key`,
+          [userId, startDate],
+        ),
+        pool.query(
+          `SELECT type, COALESCE(NULLIF(subcategory, ''), 'unassigned') AS subcategory,
+                  COALESCE(SUM(amount), 0) AS actual_amount
+           FROM transactions
+           WHERE user_id = $1 AND date >= $2::date AND date <= $3::date
+           GROUP BY type, COALESCE(NULLIF(subcategory, ''), 'unassigned')
+           ORDER BY type, subcategory`,
+          [userId, startDate, endDate],
+        ),
+        pool.query(
+          `SELECT id, name, category, balance, minimum_payment
+           FROM liabilities
+           WHERE user_id = $1
+           ORDER BY balance::numeric DESC, name`,
+          [userId],
+        ),
+        pool.query(
+          `SELECT id, title, category, target_amount, current_amount, target_date
+           FROM user_goals
+           WHERE user_id = $1
+           ORDER BY target_date NULLS LAST, title`,
+          [userId],
+        ),
+      ]);
+
+      return res.json({
+        month,
+        plans: planRows.map((row) => ({
+          planKey: row.plan_key,
+          plannedAmount: Number(row.planned_amount),
+        })),
+        actuals: actualRows.map((row) => ({
+          type: row.type,
+          category: row.subcategory,
+          amount: Number(row.actual_amount),
+        })),
+        liabilities: liabilityRows.map((row) => ({
+          id: row.id,
+          name: row.name,
+          category: row.category,
+          balance: Number(row.balance),
+          minimumPayment: Number(row.minimum_payment ?? 0),
+        })),
+        goals: goalRows.map((row) => ({
+          id: row.id,
+          title: row.title,
+          category: row.category,
+          targetAmount: Number(row.target_amount),
+          currentAmount: Number(row.current_amount),
+          targetDate: normalizeDateValue(row.target_date),
+        })),
+      });
+    } catch (error) {
+      console.error("[GET /api/budget-plan] error:", error);
+      return res.status(500).json({ message: "Failed to load the monthly budget plan" });
+    }
+  });
+
+  // PUT /api/budget-plan — create or update one monthly plan line
+  app.put("/api/budget-plan", requireAuth, async (req, res) => {
+    try {
+      const userId = (req.user as any).id;
+      const { month, planKey, plannedAmount } = req.body ?? {};
+      if (!isValidMonth(month)) {
+        return res.status(400).json({ message: "month must use YYYY-MM format" });
+      }
+      const normalizedKey = typeof planKey === "string" ? planKey.trim() : "";
+      const amount = Number(plannedAmount);
+      if (!normalizedKey || normalizedKey.length > 250) {
+        return res.status(400).json({ message: "A valid plan category is required" });
+      }
+      if (!Number.isFinite(amount) || amount < 0 || amount > 999_999_999_999.99) {
+        return res.status(400).json({ message: "Planned amount must be a valid non-negative number" });
+      }
+
+      const { rows } = await pool.query(
+        `INSERT INTO budget_plans (user_id, month, plan_key, planned_amount)
+         VALUES ($1, $2::date, $3, $4)
+         ON CONFLICT (user_id, month, plan_key)
+         DO UPDATE SET planned_amount = EXCLUDED.planned_amount, updated_at = NOW()
+         RETURNING plan_key, planned_amount`,
+        [userId, `${month}-01`, normalizedKey, amount.toFixed(2)],
+      );
+
+      return res.json({
+        planKey: rows[0].plan_key,
+        plannedAmount: Number(rows[0].planned_amount),
+      });
+    } catch (error) {
+      console.error("[PUT /api/budget-plan] error:", error);
+      return res.status(500).json({ message: "Failed to save the monthly budget plan" });
+    }
+  });
+
+  // DELETE /api/budget-plan — remove one custom/saved line from a month
+  app.delete("/api/budget-plan", requireAuth, async (req, res) => {
+    try {
+      const userId = (req.user as any).id;
+      const { month, planKey } = req.query;
+      if (!isValidMonth(month) || typeof planKey !== "string" || !planKey.trim()) {
+        return res.status(400).json({ message: "month and planKey are required" });
+      }
+      await pool.query(
+        `DELETE FROM budget_plans
+         WHERE user_id = $1 AND month = $2::date AND plan_key = $3`,
+        [userId, `${month}-01`, planKey.trim()],
+      );
+      return res.status(204).send();
+    } catch (error) {
+      console.error("[DELETE /api/budget-plan] error:", error);
+      return res.status(500).json({ message: "Failed to remove the budget plan line" });
+    }
+  });
+
   // GET /api/transactions — list with optional filters
   app.get("/api/transactions", requireAuth, async (req, res) => {
     try {

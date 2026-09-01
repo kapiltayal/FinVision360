@@ -454,6 +454,31 @@ export const userGoals = pgTable("user_goals", {
 export type UserGoal = typeof userGoals.$inferSelect;
 export type InsertUserGoal = typeof userGoals.$inferInsert;
 
+// ── Monthly Budget Plans ─────────────────────────────────────────────────────
+
+export const budgetPlans = pgTable("budget_plans", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  month: date("month").notNull(),
+  planKey: varchar("plan_key", { length: 250 }).notNull(),
+  plannedAmount: numeric("planned_amount", { precision: 12, scale: 2 }).notNull().default("0"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  userMonthKeyUnique: uniqueIndex("budget_plans_user_month_key_unique").on(
+    table.userId,
+    table.month,
+    table.planKey,
+  ),
+  plannedAmountNonNegative: check(
+    "budget_plans_planned_amount_non_negative",
+    sql`${table.plannedAmount} >= 0`,
+  ),
+}));
+
+export type BudgetPlan = typeof budgetPlans.$inferSelect;
+export type InsertBudgetPlan = typeof budgetPlans.$inferInsert;
+
 // ── Estate Contact Roles ─────────────────────────────────────────────────────
 
 export const ESTATE_CONTACT_ROLES = [
