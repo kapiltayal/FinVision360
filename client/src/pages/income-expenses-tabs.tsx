@@ -1,11 +1,13 @@
 import { useLocation, Link, Switch, Route } from "wouter";
-import { ArrowLeftRight, Receipt } from "lucide-react";
+import { ArrowLeftRight, ClipboardList, Receipt } from "lucide-react";
 import IncomeExpensesPage from "./income-expenses";
 import FinanceTrackerPage from "./finance-tracker";
+import BudgetingPlanPage from "./budgeting-plan";
 
 const tabs = [
-  { title: "Income & Expenses", url: "/income-expenses", icon: ArrowLeftRight },
-  { title: "Finance Tracker", url: "/income-expenses/finance-tracker", icon: Receipt },
+  { title: "Historical Monthly Expenses", url: "/income-expenses", icon: Receipt },
+  { title: "Budgeting Plan", url: "/income-expenses/budgeting-plan", icon: ClipboardList },
+  { title: "Transactions", url: "/income-expenses/finance-tracker", icon: ArrowLeftRight },
 ];
 
 export default function IncomeExpensesTabsPage() {
@@ -42,6 +44,7 @@ export default function IncomeExpensesTabsPage() {
       <div>
         <Switch>
           <Route path="/income-expenses" component={IncomeExpensesPage} />
+          <Route path="/income-expenses/budgeting-plan" component={BudgetingPlanPage} />
           <Route path="/income-expenses/finance-tracker" component={FinanceTrackerPage} />
           <Route path="/finance-tracker" component={FinanceTrackerPage} />
         </Switch>
