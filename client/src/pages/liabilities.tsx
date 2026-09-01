@@ -12,12 +12,12 @@ import { useLastUpdated } from "@/hooks/use-last-updated";
 import { ExportMenu } from "@/components/export-menu";
 import { BookEntryDialog } from "@/components/book-entry-import";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { Plus, Pencil, Trash2, CreditCard, TrendingDown, ChevronDown, Clock, Link2, LayoutGrid, Table2, ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
+import { Plus, Pencil, Trash2, CreditCard, TrendingDown, ChevronDown, Clock, Link2, LayoutGrid, Table2, Layers3, ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
 import { type Liability, type PlaidAccount } from "@shared/schema";
 import { formatCurrency, formatPercent } from "@/lib/format";
-import { type BookCategory, categoryLabel, groupedBookCategories } from "@/lib/book-categories";
+import { type BookCategory, categoryLabel, categoryParent, groupedBookCategories, groupedBookEntries } from "@/lib/book-categories";
 
-type LiabilitySortKey = "category" | "name" | "institution" | "balance" | "rate" | "minimumPayment";
+type LiabilitySortKey = "parentCategory" | "category" | "name" | "institution" | "balance" | "rate" | "minimumPayment";
 type SortDirection = "asc" | "desc";
 
 function LiabilitySortHeader({
@@ -225,7 +225,7 @@ export default function LiabilitiesPage() {
   const [openCategory, setOpenCategory] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"cards" | "table">("cards");
   const [sortConfig, setSortConfig] = useState<{ key: LiabilitySortKey; direction: SortDirection }>({
-    key: "category",
+    key: "parentCategory",
     direction: "asc",
   });
   const { toast } = useToast();
@@ -253,8 +253,12 @@ export default function LiabilitiesPage() {
     const sorted = [...liabilities];
     sorted.sort((a, b) => {
       let comparison = 0;
-      if (sortConfig.key === "category") {
-        comparison = categoryLabel(categories, a.category).localeCompare(categoryLabel(categories, b.category));
+      const parentA = categoryParent(categories, a.category);
+      const parentB = categoryParent(categories, b.category);
+      const categoryA = categoryLabel(categories, a.category);
+      const categoryB = categoryLabel(categories, b.category);
+      if (sortConfig.key === "parentCategory" || sortConfig.key === "category") {
+        comparison = parentA.localeCompare(parentB) || categoryA.localeCompare(categoryB);
       } else if (sortConfig.key === "name") {
         comparison = a.name.localeCompare(b.name);
       } else if (sortConfig.key === "institution") {
@@ -267,8 +271,8 @@ export default function LiabilitiesPage() {
         comparison = parseFloat(a.minimumPayment || "0") - parseFloat(b.minimumPayment || "0");
       }
 
-      if (comparison === 0 && sortConfig.key !== "category") {
-        comparison = categoryLabel(categories, a.category).localeCompare(categoryLabel(categories, b.category));
+      if (comparison === 0 && sortConfig.key !== "parentCategory" && sortConfig.key !== "category") {
+        comparison = parentA.localeCompare(parentB) || categoryA.localeCompare(categoryB);
       }
       if (comparison === 0) {
         comparison = parseFloat(a.balance || "0") - parseFloat(b.balance || "0");
@@ -283,7 +287,7 @@ export default function LiabilitiesPage() {
     setSortConfig((current) => (
       current.key === key
         ? { key, direction: current.direction === "asc" ? "desc" : "asc" }
-        : { key, direction: key === "category" || key === "name" || key === "institution" ? "asc" : "desc" }
+        : { key, direction: key === "parentCategory" || key === "category" || key === "name" || key === "institution" ? "asc" : "desc" }
     ));
   };
 
@@ -331,6 +335,14 @@ export default function LiabilitiesPage() {
       ]),
     }],
   };
+  const groupedLiabilities = groupedBookEntries(liabilities, categories);
+  const liabilitiesByParent = new Map<string, typeof groupedLiabilities>();
+  groupedLiabilities.forEach((group) => {
+    const parentGroups = liabilitiesByParent.get(group.parentCategory) ?? [];
+    parentGroups.push(group);
+    liabilitiesByParent.set(group.parentCategory, parentGroups);
+  });
+  const parentLiabilityGroups = Array.from(liabilitiesByParent.entries());
 
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
@@ -448,6 +460,7 @@ export default function LiabilitiesPage() {
             <table className="w-full text-sm" data-testid="table-liabilities">
               <thead className="border-b bg-muted/50">
                 <tr className="text-left">
+                  <LiabilitySortHeader label="Parent Category" column="parentCategory" sortConfig={sortConfig} onSort={handleSort} />
                   <LiabilitySortHeader label="Category" column="category" sortConfig={sortConfig} onSort={handleSort} />
                   <LiabilitySortHeader label="Name" column="name" sortConfig={sortConfig} onSort={handleSort} />
                   <LiabilitySortHeader label="Institution" column="institution" sortConfig={sortConfig} onSort={handleSort} />
@@ -460,6 +473,7 @@ export default function LiabilitiesPage() {
               <tbody className="divide-y">
                 {sortedLiabilities.map((liability) => (
                   <tr key={liability.id} className="hover:bg-muted/30" data-testid={`table-row-liability-${liability.id}`}>
+                    <td className="px-5 py-3 font-medium text-foreground/80">{categoryParent(categories, liability.category)}</td>
                     <td className="px-5 py-3 text-muted-foreground">{categoryLabel(categories, liability.category)}</td>
                     <td className="px-5 py-3 font-medium">
                       <div className="flex items-center gap-1.5">
@@ -501,107 +515,119 @@ export default function LiabilitiesPage() {
         </Card>
       ) : (
         <Card>
-          {Object.entries(
-            liabilities.reduce((groups, liability) => {
-              const cat = liability.category;
-              if (!groups[cat]) groups[cat] = [];
-              groups[cat].push(liability);
-              return groups;
-            }, {} as Record<string, typeof liabilities>)
-          ).sort(([a], [b]) => categoryLabel(categories, a).localeCompare(categoryLabel(categories, b))).map(([category, categoryLiabilities], idx, arr) => {
-            const isOpen = openCategory === category;
-            const categoryTotal = categoryLiabilities.reduce((sum, l) => sum + parseFloat(l.balance || "0"), 0);
-            const categoryWeightedRate = categoryTotal > 0
-              ? categoryLiabilities.reduce((sum, l) => sum + parseFloat(l.balance || "0") * parseFloat(l.interestRate || "0"), 0) / categoryTotal
-              : 0;
-            const categoryMinPayment = categoryLiabilities.reduce((sum, l) => sum + parseFloat(l.minimumPayment || "0"), 0);
-
+          {parentLiabilityGroups.map(([parentCategory, categoryGroups]) => {
+            const accountCount = categoryGroups.reduce((sum, group) => sum + group.entries.length, 0);
             return (
-              <div key={category} className={idx < arr.length - 1 ? "border-b" : ""}>
-                <button
-                  onClick={() => setOpenCategory(isOpen ? null : category)}
-                  data-testid={`accordion-category-${category}`}
-                  className="w-full flex items-center justify-between px-5 py-4 hover:bg-muted/70 transition-colors text-left"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="h-8 w-8 rounded-md bg-destructive/10 flex items-center justify-center shrink-0">
-                      <CreditCard className="h-4 w-4 text-destructive" />
-                    </div>
-                    <div>
-                      <p className="font-semibold text-sm">{categoryLabel(categories, category)}</p>
-                      <p className="text-xs text-muted-foreground">{categoryLiabilities.length} {categoryLiabilities.length === 1 ? "account" : "accounts"}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-4">
-                    <div className="text-right hidden sm:block">
-                      <p className="text-sm font-semibold">{formatCurrency(categoryTotal)}</p>
-                      <div className="flex items-center gap-2 justify-end">
-                        {categoryWeightedRate > 0 && (
-                          <p className="text-xs text-red-500 dark:text-red-400">{formatPercent(categoryWeightedRate)} rate</p>
-                        )}
-                        {categoryMinPayment > 0 && (
-                          <p className="text-xs text-muted-foreground">{formatCurrency(categoryMinPayment)}/mo</p>
-                        )}
-                      </div>
-                    </div>
-                    <ChevronDown className={`h-4 w-4 text-muted-foreground shrink-0 transition-transform duration-300 ${isOpen ? "rotate-180" : ""}`} />
-                  </div>
-                </button>
+            <section key={parentCategory} className="border-b last:border-b-0">
+              <div className="flex items-center gap-3 border-b bg-muted/40 px-5 py-3">
+                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-destructive/10">
+                  <Layers3 className="h-4 w-4 text-destructive" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs font-bold uppercase tracking-wider text-foreground/80">{parentCategory}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {categoryGroups.length} {categoryGroups.length === 1 ? "category" : "categories"} · {accountCount} {accountCount === 1 ? "account" : "accounts"}
+                  </p>
+                </div>
+                <div className="hidden flex-1 border-t border-dashed border-destructive/20 sm:block" />
+              </div>
+              {categoryGroups.map(({ category, entries: categoryLiabilities }, idx) => {
+                const isOpen = openCategory === category;
+                const categoryTotal = categoryLiabilities.reduce((sum, l) => sum + parseFloat(l.balance || "0"), 0);
+                const categoryWeightedRate = categoryTotal > 0
+                  ? categoryLiabilities.reduce((sum, l) => sum + parseFloat(l.balance || "0") * parseFloat(l.interestRate || "0"), 0) / categoryTotal
+                  : 0;
+                const categoryMinPayment = categoryLiabilities.reduce((sum, l) => sum + parseFloat(l.minimumPayment || "0"), 0);
 
-                <div className={`grid transition-[grid-template-rows] duration-300 ease-in-out ${isOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]"}`}>
-                  <div className="overflow-hidden">
-                    <div className="px-5 pb-5 pt-1 border-t bg-muted/60">
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pt-4">
-                        {categoryLiabilities.map((liability) => (
-                          <Card key={liability.id} className="hover-elevate bg-background" data-testid={`card-liability-${liability.id}`}>
-                            <CardContent className="p-5">
-                              <div className="flex items-start justify-between gap-1 mb-3">
-                                <div className="min-w-0">
-                                  <div className="flex items-center gap-1.5">
-                                    <h3 className="font-semibold truncate">{liability.name}</h3>
-                                    {plaidLinkedLiabilityIds.has(liability.id) && (
-                                      <Link2 className="h-3.5 w-3.5 shrink-0 text-blue-500" aria-label="Synced via Plaid" />
+                return (
+                  <div key={category} className={idx < categoryGroups.length - 1 ? "border-b" : ""}>
+                    <button
+                      onClick={() => setOpenCategory(isOpen ? null : category)}
+                      data-testid={`accordion-category-${category}`}
+                      className="w-full flex items-center justify-between px-5 py-4 hover:bg-muted/70 transition-colors text-left"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="h-8 w-8 rounded-md bg-destructive/10 flex items-center justify-center shrink-0">
+                          <CreditCard className="h-4 w-4 text-destructive" />
+                        </div>
+                        <div>
+                          <p className="font-semibold text-sm">{categoryLabel(categories, category)}</p>
+                          <p className="text-xs text-muted-foreground">{categoryLiabilities.length} {categoryLiabilities.length === 1 ? "account" : "accounts"}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <div className="text-right hidden sm:block">
+                          <p className="text-sm font-semibold">{formatCurrency(categoryTotal)}</p>
+                          <div className="flex items-center gap-2 justify-end">
+                            {categoryWeightedRate > 0 && (
+                              <p className="text-xs text-red-500 dark:text-red-400">{formatPercent(categoryWeightedRate)} rate</p>
+                            )}
+                            {categoryMinPayment > 0 && (
+                              <p className="text-xs text-muted-foreground">{formatCurrency(categoryMinPayment)}/mo</p>
+                            )}
+                          </div>
+                        </div>
+                        <ChevronDown className={`h-4 w-4 text-muted-foreground shrink-0 transition-transform duration-300 ${isOpen ? "rotate-180" : ""}`} />
+                      </div>
+                    </button>
+
+                    <div className={`grid transition-[grid-template-rows] duration-300 ease-in-out ${isOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]"}`}>
+                      <div className="overflow-hidden">
+                        <div className="px-5 pb-5 pt-1 border-t bg-muted/60">
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pt-4">
+                            {categoryLiabilities.map((liability) => (
+                              <Card key={liability.id} className="hover-elevate bg-background" data-testid={`card-liability-${liability.id}`}>
+                                <CardContent className="p-5">
+                                  <div className="flex items-start justify-between gap-1 mb-3">
+                                    <div className="min-w-0">
+                                      <div className="flex items-center gap-1.5">
+                                        <h3 className="font-semibold truncate">{liability.name}</h3>
+                                        {plaidLinkedLiabilityIds.has(liability.id) && (
+                                          <Link2 className="h-3.5 w-3.5 shrink-0 text-blue-500" aria-label="Synced via Plaid" />
+                                        )}
+                                      </div>
+                                      {liability.institution && (
+                                        <p className="text-xs text-muted-foreground mt-0.5 truncate">{liability.institution}</p>
+                                      )}
+                                    </div>
+                                    <div className="flex gap-1 shrink-0">
+                                      <Button size="icon" variant="ghost" onClick={() => openEdit(liability)} data-testid={`button-edit-liability-${liability.id}`}>
+                                        <Pencil className="h-4 w-4" />
+                                      </Button>
+                                      <Button size="icon" variant="ghost" onClick={() => deleteMutation.mutate(liability.id)} data-testid={`button-delete-liability-${liability.id}`}>
+                                        <Trash2 className="h-4 w-4" />
+                                      </Button>
+                                    </div>
+                                  </div>
+                                  <div className="space-y-2">
+                                    <div className="flex items-center justify-between">
+                                      <span className="text-sm text-muted-foreground">Balance</span>
+                                      <span className="text-lg font-bold">{formatCurrency(liability.balance)}</span>
+                                    </div>
+                                    {parseFloat(liability.interestRate || "0") > 0 && (
+                                      <div className="flex items-center justify-between">
+                                        <span className="text-sm text-muted-foreground">Interest Rate</span>
+                                        <span className="text-sm font-medium text-red-600 dark:text-red-400">{formatPercent(liability.interestRate || "0")}</span>
+                                      </div>
+                                    )}
+                                    {parseFloat(liability.minimumPayment || "0") > 0 && (
+                                      <div className="flex items-center justify-between">
+                                        <span className="text-sm text-muted-foreground">Min Payment</span>
+                                        <span className="text-sm">{formatCurrency(liability.minimumPayment || "0")}/mo</span>
+                                      </div>
                                     )}
                                   </div>
-                                  {liability.institution && (
-                                    <p className="text-xs text-muted-foreground mt-0.5 truncate">{liability.institution}</p>
-                                  )}
-                                </div>
-                                <div className="flex gap-1 shrink-0">
-                                  <Button size="icon" variant="ghost" onClick={() => openEdit(liability)} data-testid={`button-edit-liability-${liability.id}`}>
-                                    <Pencil className="h-4 w-4" />
-                                  </Button>
-                                  <Button size="icon" variant="ghost" onClick={() => deleteMutation.mutate(liability.id)} data-testid={`button-delete-liability-${liability.id}`}>
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
-                                </div>
-                              </div>
-                              <div className="space-y-2">
-                                <div className="flex items-center justify-between">
-                                  <span className="text-sm text-muted-foreground">Balance</span>
-                                  <span className="text-lg font-bold">{formatCurrency(liability.balance)}</span>
-                                </div>
-                                {parseFloat(liability.interestRate || "0") > 0 && (
-                                  <div className="flex items-center justify-between">
-                                    <span className="text-sm text-muted-foreground">Interest Rate</span>
-                                    <span className="text-sm font-medium text-red-600 dark:text-red-400">{formatPercent(liability.interestRate || "0")}</span>
-                                  </div>
-                                )}
-                                {parseFloat(liability.minimumPayment || "0") > 0 && (
-                                  <div className="flex items-center justify-between">
-                                    <span className="text-sm text-muted-foreground">Min Payment</span>
-                                    <span className="text-sm">{formatCurrency(liability.minimumPayment || "0")}/mo</span>
-                                  </div>
-                                )}
-                              </div>
-                            </CardContent>
-                          </Card>
-                        ))}
+                                </CardContent>
+                              </Card>
+                            ))}
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              </div>
+                );
+              })}
+            </section>
             );
           })}
         </Card>

@@ -12,12 +12,12 @@ import { useLastUpdated } from "@/hooks/use-last-updated";
 import { ExportMenu } from "@/components/export-menu";
 import { BookEntryDialog } from "@/components/book-entry-import";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { Plus, Pencil, Trash2, Wallet, TrendingUp, ChevronDown, Clock, Link2, LayoutGrid, Table2, ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
+import { Plus, Pencil, Trash2, Wallet, TrendingUp, ChevronDown, Clock, Link2, LayoutGrid, Table2, Layers3, ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
 import { type Asset, type PlaidAccount } from "@shared/schema";
 import { formatCurrency, formatPercent } from "@/lib/format";
-import { type BookCategory, categoryLabel, groupedBookCategories } from "@/lib/book-categories";
+import { type BookCategory, categoryLabel, categoryParent, groupedBookCategories, groupedBookEntries } from "@/lib/book-categories";
 
-type AssetSortKey = "category" | "name" | "institution" | "value" | "rate";
+type AssetSortKey = "parentCategory" | "category" | "name" | "institution" | "value" | "rate";
 type SortDirection = "asc" | "desc";
 
 function AssetSortHeader({
@@ -213,7 +213,7 @@ export default function AssetsPage() {
   const [openCategory, setOpenCategory] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"cards" | "table">("cards");
   const [sortConfig, setSortConfig] = useState<{ key: AssetSortKey; direction: SortDirection }>({
-    key: "category",
+    key: "parentCategory",
     direction: "asc",
   });
   const { toast } = useToast();
@@ -240,8 +240,12 @@ export default function AssetsPage() {
     const sorted = [...assets];
     sorted.sort((a, b) => {
       let comparison = 0;
-      if (sortConfig.key === "category") {
-        comparison = categoryLabel(categories, a.category).localeCompare(categoryLabel(categories, b.category));
+      const parentA = categoryParent(categories, a.category);
+      const parentB = categoryParent(categories, b.category);
+      const categoryA = categoryLabel(categories, a.category);
+      const categoryB = categoryLabel(categories, b.category);
+      if (sortConfig.key === "parentCategory" || sortConfig.key === "category") {
+        comparison = parentA.localeCompare(parentB) || categoryA.localeCompare(categoryB);
       } else if (sortConfig.key === "name") {
         comparison = a.name.localeCompare(b.name);
       } else if (sortConfig.key === "institution") {
@@ -252,8 +256,8 @@ export default function AssetsPage() {
         comparison = parseFloat(a.interestRate || "0") - parseFloat(b.interestRate || "0");
       }
 
-      if (comparison === 0 && sortConfig.key !== "category") {
-        comparison = categoryLabel(categories, a.category).localeCompare(categoryLabel(categories, b.category));
+      if (comparison === 0 && sortConfig.key !== "parentCategory" && sortConfig.key !== "category") {
+        comparison = parentA.localeCompare(parentB) || categoryA.localeCompare(categoryB);
       }
       if (comparison === 0) {
         comparison = parseFloat(a.value || "0") - parseFloat(b.value || "0");
@@ -268,7 +272,7 @@ export default function AssetsPage() {
     setSortConfig((current) => (
       current.key === key
         ? { key, direction: current.direction === "asc" ? "desc" : "asc" }
-        : { key, direction: key === "category" || key === "name" || key === "institution" ? "asc" : "desc" }
+        : { key, direction: key === "parentCategory" || key === "category" || key === "name" || key === "institution" ? "asc" : "desc" }
     ));
   };
 
@@ -315,6 +319,14 @@ export default function AssetsPage() {
       ]),
     }],
   };
+  const groupedAssets = groupedBookEntries(assets, categories);
+  const assetsByParent = new Map<string, typeof groupedAssets>();
+  groupedAssets.forEach((group) => {
+    const parentGroups = assetsByParent.get(group.parentCategory) ?? [];
+    parentGroups.push(group);
+    assetsByParent.set(group.parentCategory, parentGroups);
+  });
+  const parentAssetGroups = Array.from(assetsByParent.entries());
 
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
@@ -432,6 +444,7 @@ export default function AssetsPage() {
             <table className="w-full text-sm" data-testid="table-assets">
               <thead className="border-b bg-muted/50">
                 <tr className="text-left">
+                  <AssetSortHeader label="Parent Category" column="parentCategory" sortConfig={sortConfig} onSort={handleSort} />
                   <AssetSortHeader label="Category" column="category" sortConfig={sortConfig} onSort={handleSort} />
                   <AssetSortHeader label="Name" column="name" sortConfig={sortConfig} onSort={handleSort} />
                   <AssetSortHeader label="Institution" column="institution" sortConfig={sortConfig} onSort={handleSort} />
@@ -443,6 +456,7 @@ export default function AssetsPage() {
               <tbody className="divide-y">
                 {sortedAssets.map((asset) => (
                   <tr key={asset.id} className="hover:bg-muted/30" data-testid={`table-row-asset-${asset.id}`}>
+                    <td className="px-5 py-3 font-medium text-foreground/80">{categoryParent(categories, asset.category)}</td>
                     <td className="px-5 py-3 text-muted-foreground">{categoryLabel(categories, asset.category)}</td>
                     <td className="px-5 py-3 font-medium">
                       <div className="flex items-center gap-1.5">
@@ -479,95 +493,107 @@ export default function AssetsPage() {
         </Card>
       ) : (
         <Card>
-          {Object.entries(
-            assets.reduce((groups, asset) => {
-              const cat = asset.category;
-              if (!groups[cat]) groups[cat] = [];
-              groups[cat].push(asset);
-              return groups;
-            }, {} as Record<string, typeof assets>)
-          ).sort(([a], [b]) => categoryLabel(categories, a).localeCompare(categoryLabel(categories, b))).map(([category, categoryAssets], idx, arr) => {
-            const isOpen = openCategory === category;
-            const categoryTotal = categoryAssets.reduce((sum, a) => sum + parseFloat(a.value || "0"), 0);
-            const categoryWeightedRate = categoryTotal > 0
-              ? categoryAssets.reduce((sum, a) => sum + parseFloat(a.value || "0") * parseFloat(a.interestRate || "0"), 0) / categoryTotal
-              : 0;
-
+          {parentAssetGroups.map(([parentCategory, categoryGroups]) => {
+            const accountCount = categoryGroups.reduce((sum, group) => sum + group.entries.length, 0);
             return (
-              <div key={category} className={idx < arr.length - 1 ? "border-b" : ""}>
-                <button
-                  onClick={() => setOpenCategory(isOpen ? null : category)}
-                  data-testid={`accordion-category-${category}`}
-                  className="w-full flex items-center justify-between px-5 py-4 hover:bg-muted/70 transition-colors text-left"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="h-8 w-8 rounded-md bg-primary/10 flex items-center justify-center shrink-0">
-                      <Wallet className="h-4 w-4 text-primary" />
-                    </div>
-                    <div>
-                      <p className="font-semibold text-sm">{categoryLabel(categories, category)}</p>
-                      <p className="text-xs text-muted-foreground">{categoryAssets.length} {categoryAssets.length === 1 ? "account" : "accounts"}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-4">
-                    <div className="text-right hidden sm:block">
-                      <p className="text-sm font-semibold">{formatCurrency(categoryTotal)}</p>
-                      {categoryWeightedRate > 0 && (
-                        <p className="text-xs text-emerald-600 dark:text-emerald-400">{formatPercent(categoryWeightedRate)} avg rate</p>
-                      )}
-                    </div>
-                    <ChevronDown className={`h-4 w-4 text-muted-foreground shrink-0 transition-transform duration-300 ${isOpen ? "rotate-180" : ""}`} />
-                  </div>
-                </button>
+            <section key={parentCategory} className="border-b last:border-b-0">
+              <div className="flex items-center gap-3 border-b bg-muted/40 px-5 py-3">
+                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary/10">
+                  <Layers3 className="h-4 w-4 text-primary" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs font-bold uppercase tracking-wider text-foreground/80">{parentCategory}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {categoryGroups.length} {categoryGroups.length === 1 ? "category" : "categories"} · {accountCount} {accountCount === 1 ? "account" : "accounts"}
+                  </p>
+                </div>
+                <div className="hidden flex-1 border-t border-dashed border-primary/20 sm:block" />
+              </div>
+              {categoryGroups.map(({ category, entries: categoryAssets }, idx) => {
+                const isOpen = openCategory === category;
+                const categoryTotal = categoryAssets.reduce((sum, a) => sum + parseFloat(a.value || "0"), 0);
+                const categoryWeightedRate = categoryTotal > 0
+                  ? categoryAssets.reduce((sum, a) => sum + parseFloat(a.value || "0") * parseFloat(a.interestRate || "0"), 0) / categoryTotal
+                  : 0;
 
-                <div className={`grid transition-[grid-template-rows] duration-300 ease-in-out ${isOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]"}`}>
-                  <div className="overflow-hidden">
-                    <div className="px-5 pb-5 pt-1 border-t bg-muted/60">
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pt-4">
-                        {categoryAssets.map((asset) => (
-                          <Card key={asset.id} className="hover-elevate bg-background" data-testid={`card-asset-${asset.id}`}>
-                            <CardContent className="p-5">
-                              <div className="flex items-start justify-between gap-1 mb-3">
-                                <div className="min-w-0">
-                                  <div className="flex items-center gap-1.5">
-                                    <h3 className="font-semibold truncate">{asset.name}</h3>
-                                    {plaidLinkedAssetIds.has(asset.id) && (
-                                      <Link2 className="h-3.5 w-3.5 shrink-0 text-blue-500" aria-label="Synced via Plaid" />
+                return (
+                  <div key={category} className={idx < categoryGroups.length - 1 ? "border-b" : ""}>
+                    <button
+                      onClick={() => setOpenCategory(isOpen ? null : category)}
+                      data-testid={`accordion-category-${category}`}
+                      className="w-full flex items-center justify-between px-5 py-4 hover:bg-muted/70 transition-colors text-left"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="h-8 w-8 rounded-md bg-primary/10 flex items-center justify-center shrink-0">
+                          <Wallet className="h-4 w-4 text-primary" />
+                        </div>
+                        <div>
+                          <p className="font-semibold text-sm">{categoryLabel(categories, category)}</p>
+                          <p className="text-xs text-muted-foreground">{categoryAssets.length} {categoryAssets.length === 1 ? "account" : "accounts"}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <div className="text-right hidden sm:block">
+                          <p className="text-sm font-semibold">{formatCurrency(categoryTotal)}</p>
+                          {categoryWeightedRate > 0 && (
+                            <p className="text-xs text-emerald-600 dark:text-emerald-400">{formatPercent(categoryWeightedRate)} avg rate</p>
+                          )}
+                        </div>
+                        <ChevronDown className={`h-4 w-4 text-muted-foreground shrink-0 transition-transform duration-300 ${isOpen ? "rotate-180" : ""}`} />
+                      </div>
+                    </button>
+
+                    <div className={`grid transition-[grid-template-rows] duration-300 ease-in-out ${isOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]"}`}>
+                      <div className="overflow-hidden">
+                        <div className="px-5 pb-5 pt-1 border-t bg-muted/60">
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pt-4">
+                            {categoryAssets.map((asset) => (
+                              <Card key={asset.id} className="hover-elevate bg-background" data-testid={`card-asset-${asset.id}`}>
+                                <CardContent className="p-5">
+                                  <div className="flex items-start justify-between gap-1 mb-3">
+                                    <div className="min-w-0">
+                                      <div className="flex items-center gap-1.5">
+                                        <h3 className="font-semibold truncate">{asset.name}</h3>
+                                        {plaidLinkedAssetIds.has(asset.id) && (
+                                          <Link2 className="h-3.5 w-3.5 shrink-0 text-blue-500" aria-label="Synced via Plaid" />
+                                        )}
+                                      </div>
+                                      {asset.institution && (
+                                        <p className="text-xs text-muted-foreground mt-0.5 truncate">{asset.institution}</p>
+                                      )}
+                                    </div>
+                                    <div className="flex gap-1 shrink-0">
+                                      <Button size="icon" variant="ghost" onClick={() => openEdit(asset)} data-testid={`button-edit-asset-${asset.id}`}>
+                                        <Pencil className="h-4 w-4" />
+                                      </Button>
+                                      <Button size="icon" variant="ghost" onClick={() => deleteMutation.mutate(asset.id)} data-testid={`button-delete-asset-${asset.id}`}>
+                                        <Trash2 className="h-4 w-4" />
+                                      </Button>
+                                    </div>
+                                  </div>
+                                  <div className="space-y-2">
+                                    <div className="flex items-center justify-between">
+                                      <span className="text-sm text-muted-foreground">Value</span>
+                                      <span className="text-lg font-bold">{formatCurrency(asset.value)}</span>
+                                    </div>
+                                    {parseFloat(asset.interestRate || "0") > 0 && (
+                                      <div className="flex items-center justify-between">
+                                        <span className="text-sm text-muted-foreground">Rate of Return</span>
+                                        <span className="text-sm font-medium text-emerald-600 dark:text-emerald-400">{formatPercent(asset.interestRate || "0")}</span>
+                                      </div>
                                     )}
                                   </div>
-                                  {asset.institution && (
-                                    <p className="text-xs text-muted-foreground mt-0.5 truncate">{asset.institution}</p>
-                                  )}
-                                </div>
-                                <div className="flex gap-1 shrink-0">
-                                  <Button size="icon" variant="ghost" onClick={() => openEdit(asset)} data-testid={`button-edit-asset-${asset.id}`}>
-                                    <Pencil className="h-4 w-4" />
-                                  </Button>
-                                  <Button size="icon" variant="ghost" onClick={() => deleteMutation.mutate(asset.id)} data-testid={`button-delete-asset-${asset.id}`}>
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
-                                </div>
-                              </div>
-                              <div className="space-y-2">
-                                <div className="flex items-center justify-between">
-                                  <span className="text-sm text-muted-foreground">Value</span>
-                                  <span className="text-lg font-bold">{formatCurrency(asset.value)}</span>
-                                </div>
-                                {parseFloat(asset.interestRate || "0") > 0 && (
-                                  <div className="flex items-center justify-between">
-                                    <span className="text-sm text-muted-foreground">Rate of Return</span>
-                                    <span className="text-sm font-medium text-emerald-600 dark:text-emerald-400">{formatPercent(asset.interestRate || "0")}</span>
-                                  </div>
-                                )}
-                              </div>
-                            </CardContent>
-                          </Card>
-                        ))}
+                                </CardContent>
+                              </Card>
+                            ))}
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              </div>
+                );
+              })}
+            </section>
             );
           })}
         </Card>
