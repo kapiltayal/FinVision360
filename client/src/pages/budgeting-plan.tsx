@@ -8,6 +8,7 @@ import {
   CalendarDays,
   Check,
   ChevronDown,
+  ChevronUp,
   CircleDollarSign,
   Copy,
   Landmark,
@@ -261,6 +262,13 @@ function PlanAmountInput({
     if (amount !== value) onSave(amount);
   }
 
+  function changeBy(delta: number) {
+    const current = Number(draft);
+    const next = Math.max(0, (Number.isFinite(current) ? current : 0) + delta);
+    setDraft(String(next));
+    onSave(next);
+  }
+
   return (
     <div className="relative ml-auto w-28">
       <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
@@ -277,9 +285,31 @@ function PlanAmountInput({
           if (event.key === "Enter") event.currentTarget.blur();
         }}
         placeholder={suggested ? `${Math.round(suggested).toLocaleString()}` : "0"}
-        className="h-7 rounded-md border-transparent bg-muted/60 pl-6 pr-7 text-right text-sm font-medium tabular-nums shadow-none transition-colors hover:bg-muted focus-visible:border-primary focus-visible:bg-background focus-visible:ring-2 focus-visible:ring-primary/15"
+        className="h-7 appearance-none rounded-md border-transparent bg-muted/60 pl-6 pr-8 text-right text-sm font-medium tabular-nums shadow-none transition-colors hover:bg-muted focus-visible:border-primary focus-visible:bg-background focus-visible:ring-2 focus-visible:ring-primary/15 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
         aria-label="Planned monthly amount"
       />
+      <span className="absolute right-1 top-1/2 flex h-5 -translate-y-1/2 flex-col justify-center">
+        <button
+          type="button"
+          tabIndex={-1}
+          className="flex h-2.5 w-4 items-center justify-center rounded-sm text-muted-foreground hover:bg-background hover:text-foreground"
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={() => changeBy(1)}
+          aria-label="Increase planned amount by one dollar"
+        >
+          <ChevronUp className="h-3 w-3" />
+        </button>
+        <button
+          type="button"
+          tabIndex={-1}
+          className="flex h-2.5 w-4 items-center justify-center rounded-sm text-muted-foreground hover:bg-background hover:text-foreground"
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={() => changeBy(-1)}
+          aria-label="Decrease planned amount by one dollar"
+        >
+          <ChevronDown className="h-3 w-3" />
+        </button>
+      </span>
       {saving && (
         <Loader2 className="absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 animate-spin text-primary" />
       )}
@@ -402,7 +432,7 @@ function StatementSection({
               <TableHead className="h-9 font-semibold text-foreground">Category</TableHead>
               <TableHead className="h-9 w-28 px-1 font-semibold text-foreground">12-month trend</TableHead>
               <TableHead className="h-9 w-28 px-1 text-right font-semibold text-foreground">Monthly average</TableHead>
-              {onCopy && <TableHead className="h-9 w-10 px-1 text-center font-semibold text-foreground">Copy</TableHead>}
+              {onCopy && <TableHead className="h-9 w-16 border-l border-border/60 px-3 text-center font-semibold text-foreground">Copy</TableHead>}
               <TableHead className="h-9 text-right font-semibold text-foreground">Monthly plan</TableHead>
               <TableHead className="h-9 text-right font-semibold text-foreground">Actual</TableHead>
               <TableHead className="h-9 text-right font-semibold text-foreground">Variance</TableHead>
@@ -427,7 +457,7 @@ function StatementSection({
                     {formatCurrency(row.average)}
                   </TableCell>
                   {onCopy && (
-                    <TableCell className="px-1 py-1 text-center">
+                    <TableCell className="border-l border-border/60 px-3 py-1 text-center">
                       <Button
                         type="button"
                         size="icon"
