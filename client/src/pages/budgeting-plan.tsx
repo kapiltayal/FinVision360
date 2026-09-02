@@ -9,6 +9,7 @@ import {
   Check,
   ChevronDown,
   CircleDollarSign,
+  Copy,
   Landmark,
   Loader2,
   Plus,
@@ -143,13 +144,13 @@ type StatementRow = {
 
 function currentMonthValue(): string {
   const today = new Date();
-  return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`;
+  return `${today.getUTCFullYear()}-${String(today.getUTCMonth() + 1).padStart(2, "0")}`;
 }
 
 function shiftMonth(value: string, amount: number): string {
   const [year, month] = value.split("-").map(Number);
-  const shifted = new Date(year, month - 1 + amount, 1);
-  return `${shifted.getFullYear()}-${String(shifted.getMonth() + 1).padStart(2, "0")}`;
+  const shifted = new Date(Date.UTC(year, month - 1 + amount, 1));
+  return `${shifted.getUTCFullYear()}-${String(shifted.getUTCMonth() + 1).padStart(2, "0")}`;
 }
 
 function formatMonth(value: string): string {
@@ -157,6 +158,13 @@ function formatMonth(value: string): string {
     month: "long",
     year: "numeric",
   });
+}
+
+function getMonthWindow(currentMonth: string): { first: string; last: string } {
+  return {
+    first: shiftMonth(currentMonth, -12),
+    last: shiftMonth(currentMonth, 11),
+  };
 }
 
 function TrendSparkline({
@@ -261,7 +269,7 @@ function PlanAmountInput({
       <Input
         type="number"
         min="0"
-        step="0.01"
+        step="1"
         value={draft}
         onChange={(event) => setDraft(event.target.value)}
         onBlur={commit}
@@ -333,6 +341,7 @@ function StatementSection({
   savingKey,
   onSave,
   onRemove,
+  onCopy,
   footer,
 }: {
   title: string;
@@ -343,9 +352,10 @@ function StatementSection({
   savingKey: string | null;
   onSave: (key: string, amount: number) => void;
   onRemove?: (key: string) => void;
+  onCopy?: (key: string, amount: number) => void;
   footer?: ReactNode;
 }) {
-  const [isOpen, setIsOpen] = useState(true);
+  const [isOpen, setIsOpen] = useState(false);
   const plannedTotal = rows.reduce((sum, row) => sum + (row.planned ?? 0), 0);
   const actualTotal = rows.reduce((sum, row) => sum + row.actual, 0);
 
@@ -372,14 +382,14 @@ function StatementSection({
             </CardTitle>
             <p className="mt-1 text-xs text-muted-foreground">{subtitle}</p>
           </div>
-          <div className="flex gap-4 text-xs sm:text-right">
+          <div className="flex gap-4 text-sm sm:text-right">
             <div>
-              <p className="text-muted-foreground">Plan</p>
-              <p className="font-semibold">{formatCurrency(plannedTotal)}</p>
+              <p className="font-medium text-muted-foreground">Plan</p>
+              <p className="text-base font-semibold">{formatCurrency(plannedTotal)}</p>
             </div>
             <div>
-              <p className="text-muted-foreground">Actual</p>
-              <p className="font-semibold">{formatCurrency(actualTotal)}</p>
+              <p className="font-medium text-muted-foreground">Actual</p>
+              <p className="text-base font-semibold">{formatCurrency(actualTotal)}</p>
             </div>
           </div>
           </div>
@@ -390,12 +400,13 @@ function StatementSection({
           <TableHeader>
             <TableRow className="border-b-2 bg-slate-100/90 hover:bg-slate-100/90 dark:bg-slate-900/90 dark:hover:bg-slate-900/90">
               <TableHead className="h-9 font-semibold text-foreground">Category</TableHead>
-              <TableHead className="h-9 font-semibold text-foreground">12-month trend</TableHead>
-              <TableHead className="h-9 text-right font-semibold text-foreground">Monthly average</TableHead>
-              <TableHead className="text-right">Monthly plan</TableHead>
-              <TableHead className="text-right">Actual</TableHead>
-              <TableHead className="text-right">Variance</TableHead>
-              {onRemove && <TableHead className="w-12" />}
+              <TableHead className="h-9 w-28 px-1 font-semibold text-foreground">12-month trend</TableHead>
+              <TableHead className="h-9 w-28 px-1 text-right font-semibold text-foreground">Monthly average</TableHead>
+              {onCopy && <TableHead className="h-9 w-10 px-1 text-center font-semibold text-foreground">Copy</TableHead>}
+              <TableHead className="h-9 text-right font-semibold text-foreground">Monthly plan</TableHead>
+              <TableHead className="h-9 text-right font-semibold text-foreground">Actual</TableHead>
+              <TableHead className="h-9 text-right font-semibold text-foreground">Variance</TableHead>
+              {onRemove && <TableHead className="h-9 w-12" />}
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -409,12 +420,27 @@ function StatementSection({
               return (
                 <TableRow key={row.key} className="h-11">
                   <TableCell className="py-1.5 font-medium">{row.label}</TableCell>
-                  <TableCell className="py-1">
+                  <TableCell className="px-1 py-1">
                     <TrendSparkline data={row.history} tone={tone} />
                   </TableCell>
-                  <TableCell className="py-1.5 text-right text-sm font-medium tabular-nums">
+                  <TableCell className="px-1 py-1.5 text-right text-sm font-medium tabular-nums">
                     {formatCurrency(row.average)}
                   </TableCell>
+                  {onCopy && (
+                    <TableCell className="px-1 py-1 text-center">
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="ghost"
+                        className="h-7 w-7 text-muted-foreground hover:text-primary"
+                        onClick={() => onCopy(row.key, row.average)}
+                        title={`Copy ${formatCurrency(row.average)} to ${row.label} plan`}
+                        aria-label={`Copy ${formatCurrency(row.average)} monthly average to ${row.label} plan`}
+                      >
+                        <Copy className="h-3.5 w-3.5" />
+                      </Button>
+                    </TableCell>
+                  )}
                   <TableCell className="py-1.5 text-right">
                     <PlanAmountInput
                       value={row.planned}
@@ -465,12 +491,14 @@ function StatementSection({
 export default function BudgetingPlanPage() {
   const { toast } = useToast();
   const currentMonth = currentMonthValue();
-  const lastPlanMonth = shiftMonth(currentMonth, 11);
+  const monthWindow = getMonthWindow(currentMonth);
+  const firstPlanMonth = monthWindow.first;
+  const lastPlanMonth = monthWindow.last;
   const [month, setMonth] = useState(currentMonth);
   const [savingKey, setSavingKey] = useState<string | null>(null);
   const [newCategory, setNewCategory] = useState("");
-  const [debtOpen, setDebtOpen] = useState(true);
-  const [goalsOpen, setGoalsOpen] = useState(true);
+  const [debtOpen, setDebtOpen] = useState(false);
+  const [goalsOpen, setGoalsOpen] = useState(false);
   const queryKey = `/api/budget-plan?month=${month}`;
 
   const { data, isLoading } = useQuery<BudgetPlanData>({
@@ -607,6 +635,41 @@ export default function BudgetingPlanPage() {
     });
   }, [actualMap, data?.actuals, data?.plans, historyMap, historyMonths, planMap]);
 
+  const copyAllMutation = useMutation({
+    mutationFn: async ({
+      targetMonth,
+      rows,
+    }: {
+      targetMonth: string;
+      rows: StatementRow[];
+    }) => {
+      await apiRequest("PUT", "/api/budget-plan/bulk", {
+        month: targetMonth,
+        plans: rows.map((row) => ({
+            planKey: row.key,
+            plannedAmount: row.average,
+        })),
+      });
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: [`/api/budget-plan?month=${variables.targetMonth}`],
+      });
+      toast({
+        title: "Monthly averages copied",
+        description: `Income and expense averages were copied to ${formatMonth(variables.targetMonth)}.`,
+      });
+    },
+    onError: (error: Error) => {
+      queryClient.invalidateQueries({ queryKey: [queryKey] });
+      toast({
+        title: "Could not copy monthly averages",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const actualIncome = (data?.actuals ?? [])
     .filter((line) => line.type === "income")
     .reduce((sum, line) => sum + line.amount, 0);
@@ -621,11 +684,13 @@ export default function BudgetingPlanPage() {
     0,
   );
   const plannedDebtPayments = (data?.liabilities ?? []).reduce(
-    (sum, liability) => sum + (planMap.get(`debt:${liability.id}`) ?? 0),
+    (sum, liability) =>
+      sum + (planMap.get(`debt:${liability.id}`) ?? liability.minimumPayment),
     0,
   );
   const plannedGoals = (data?.goals ?? []).reduce(
-    (sum, goal) => sum + (planMap.get(`goal:${goal.id}`) ?? 0),
+    (sum, goal) =>
+      sum + (planMap.get(`goal:${goal.id}`) ?? monthlyGoalRequirement(goal, month)),
     0,
   );
   const plannedOutflows = plannedLivingExpenses + plannedDebtPayments + plannedGoals;
@@ -660,7 +725,11 @@ export default function BudgetingPlanPage() {
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="text-2xl font-bold">Budgeting Plan</h1>
               <Badge variant={month === currentMonth ? "default" : "secondary"}>
-                {month === currentMonth ? "Current month" : "Future plan"}
+                {month === currentMonth
+                  ? "Current month"
+                  : month < currentMonth
+                    ? "Historical month"
+                    : "Future plan"}
               </Badge>
             </div>
             <p className="mt-1 text-sm text-muted-foreground">
@@ -675,11 +744,11 @@ export default function BudgetingPlanPage() {
             <Button
               size="icon"
               variant="outline"
-              disabled={month <= currentMonth}
+              disabled={month <= firstPlanMonth}
               onClick={() =>
                 setMonth((value) => {
                   const previous = shiftMonth(value, -1);
-                  return previous < currentMonth ? currentMonth : previous;
+                  return previous < firstPlanMonth ? firstPlanMonth : previous;
                 })
               }
               aria-label="Previous month"
@@ -689,14 +758,14 @@ export default function BudgetingPlanPage() {
             <Input
               type="month"
               value={month}
-              min={currentMonth}
+              min={firstPlanMonth}
               max={lastPlanMonth}
               onChange={(event) => {
                 const value = event.target.value;
                 if (!value) return;
                 setMonth(
-                  value < currentMonth
-                    ? currentMonth
+                  value < firstPlanMonth
+                    ? firstPlanMonth
                     : value > lastPlanMonth
                       ? lastPlanMonth
                       : value,
@@ -769,8 +838,28 @@ export default function BudgetingPlanPage() {
                 Enter plan amounts below. Changes save automatically when you leave a field.
               </p>
             </div>
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              {savingKey ? (
+            <div className="flex flex-wrap items-center justify-end gap-3">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() =>
+                  copyAllMutation.mutate({
+                    targetMonth: month,
+                    rows: [...incomeRows, ...expenseRows],
+                  })
+                }
+                disabled={copyAllMutation.isPending || historyMonths.length === 0}
+              >
+                {copyAllMutation.isPending ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Copy className="mr-2 h-4 w-4" />
+                )}
+                Copy all averages to plan
+              </Button>
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              {savingKey || copyAllMutation.isPending ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
                   Saving
@@ -781,6 +870,7 @@ export default function BudgetingPlanPage() {
                   Plan saved
                 </>
               )}
+              </div>
             </div>
           </div>
 
@@ -792,6 +882,7 @@ export default function BudgetingPlanPage() {
             tone="income"
             savingKey={savingKey}
             onSave={savePlanLine}
+            onCopy={savePlanLine}
           />
 
           <StatementSection
@@ -802,6 +893,7 @@ export default function BudgetingPlanPage() {
               tone="expense"
               savingKey={savingKey}
               onSave={savePlanLine}
+              onCopy={savePlanLine}
               onRemove={(key) => removeMutation.mutate(key)}
               footer={
                 <div className="flex flex-col gap-2 border-t bg-muted/20 p-3 sm:flex-row">
@@ -843,14 +935,14 @@ export default function BudgetingPlanPage() {
                     Plan by debt using Liabilities data; categorized debt-payment actuals appear as the section total
                   </p>
                 </div>
-                <div className="flex gap-4 text-xs">
+                <div className="flex gap-4 text-sm">
                   <div>
-                    <p className="text-muted-foreground">Planned</p>
-                    <p className="font-semibold">{formatCurrency(plannedDebtPayments)}</p>
+                    <p className="font-medium text-muted-foreground">Planned</p>
+                    <p className="text-base font-semibold">{formatCurrency(plannedDebtPayments)}</p>
                   </div>
                   <div>
-                    <p className="text-muted-foreground">Actual</p>
-                    <p className="font-semibold">{formatCurrency(actualDebtPayments)}</p>
+                    <p className="font-medium text-muted-foreground">Actual</p>
+                    <p className="text-base font-semibold">{formatCurrency(actualDebtPayments)}</p>
                   </div>
                 </div>
                 </div>
@@ -888,7 +980,7 @@ export default function BudgetingPlanPage() {
                           </TableCell>
                           <TableCell className="py-1.5">
                             <PlanAmountInput
-                              value={planMap.get(key)}
+                              value={planMap.get(key) ?? liability.minimumPayment}
                               suggested={liability.minimumPayment}
                               saving={savingKey === key}
                               onSave={(amount) => savePlanLine(key, amount)}
@@ -919,14 +1011,14 @@ export default function BudgetingPlanPage() {
                     Plan by goal using current goal data; categorized savings-transfer actuals appear as the section total
                   </p>
                 </div>
-                <div className="flex gap-4 text-xs">
+                <div className="flex gap-4 text-sm">
                   <div>
-                    <p className="text-muted-foreground">Planned</p>
-                    <p className="font-semibold">{formatCurrency(plannedGoals)}</p>
+                    <p className="font-medium text-muted-foreground">Planned</p>
+                    <p className="text-base font-semibold">{formatCurrency(plannedGoals)}</p>
                   </div>
                   <div>
-                    <p className="text-muted-foreground">Savings transfers</p>
-                    <p className="font-semibold">{formatCurrency(actualGoalContributions)}</p>
+                    <p className="font-medium text-muted-foreground">Savings transfers</p>
+                    <p className="text-base font-semibold">{formatCurrency(actualGoalContributions)}</p>
                   </div>
                 </div>
                 </div>
@@ -977,7 +1069,7 @@ export default function BudgetingPlanPage() {
                           </TableCell>
                           <TableCell className="py-1.5">
                             <PlanAmountInput
-                              value={planMap.get(key)}
+                              value={planMap.get(key) ?? required}
                               suggested={required}
                               saving={savingKey === key}
                               onSave={(amount) => savePlanLine(key, amount)}

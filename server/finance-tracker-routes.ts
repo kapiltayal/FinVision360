@@ -158,7 +158,7 @@ function monthBounds(month: string): { startDate: string; endDate: string } {
 
 function budgetPlanMonthRange(): { firstMonth: string; lastMonth: string } {
   const now = new Date();
-  const first = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+  const first = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 12, 1));
   const last = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 11, 1));
   return {
     firstMonth: isoDate(first).slice(0, 7),
@@ -249,7 +249,7 @@ export function registerFinanceTrackerRoutes(app: Express) {
       const userId = (req.user as any).id;
       const month = req.query.month;
       if (!isAllowedBudgetPlanMonth(month)) {
-        return res.status(400).json({ message: "Budget month must be between this month and 11 months from now" });
+        return res.status(400).json({ message: "Budget month must be within the previous 12 months or next 11 months" });
       }
 
       const { startDate, endDate } = monthBounds(month);
@@ -324,13 +324,65 @@ export function registerFinanceTrackerRoutes(app: Express) {
     }
   });
 
+  // PUT /api/budget-plan/bulk — atomically create or update multiple monthly plan lines
+  app.put("/api/budget-plan/bulk", requireAuth, async (req, res) => {
+    try {
+      const userId = (req.user as any).id;
+      const { month, plans } = req.body ?? {};
+      if (!isAllowedBudgetPlanMonth(month)) {
+        return res.status(400).json({ message: "Budget month must be within the previous 12 months or next 11 months" });
+      }
+      if (!Array.isArray(plans) || plans.length === 0 || plans.length > 100) {
+        return res.status(400).json({ message: "Provide between 1 and 100 plan lines" });
+      }
+
+      const normalizedPlans = plans.map((plan) => ({
+        plan_key: typeof plan?.planKey === "string" ? plan.planKey.trim() : "",
+        planned_amount: Number(plan?.plannedAmount),
+      }));
+      const keys = new Set(normalizedPlans.map((plan) => plan.plan_key));
+      const hasInvalidPlan = normalizedPlans.some(
+        (plan) =>
+          !plan.plan_key ||
+          plan.plan_key.length > 250 ||
+          !Number.isFinite(plan.planned_amount) ||
+          plan.planned_amount < 0 ||
+          plan.planned_amount > 999_999_999_999.99,
+      );
+      if (hasInvalidPlan || keys.size !== normalizedPlans.length) {
+        return res.status(400).json({ message: "Every plan line must have a unique valid category and non-negative amount" });
+      }
+
+      const { rows } = await pool.query(
+        `INSERT INTO budget_plans (user_id, month, plan_key, planned_amount)
+         SELECT $1, $2::date, item.plan_key, item.planned_amount
+         FROM jsonb_to_recordset($3::jsonb)
+           AS item(plan_key text, planned_amount numeric)
+         ON CONFLICT (user_id, month, plan_key)
+         DO UPDATE SET planned_amount = EXCLUDED.planned_amount, updated_at = NOW()
+         RETURNING plan_key, planned_amount`,
+        [userId, `${month}-01`, JSON.stringify(normalizedPlans)],
+      );
+
+      return res.json({
+        plans: rows.map((row) => ({
+          planKey: row.plan_key,
+          plannedAmount: Number(row.planned_amount),
+        })),
+      });
+    } catch (error) {
+      console.error("[PUT /api/budget-plan/bulk] error:", error);
+      return res.status(500).json({ message: "Failed to copy monthly averages to the budget plan" });
+    }
+  });
+
   // PUT /api/budget-plan — create or update one monthly plan line
   app.put("/api/budget-plan", requireAuth, async (req, res) => {
     try {
       const userId = (req.user as any).id;
       const { month, planKey, plannedAmount } = req.body ?? {};
       if (!isAllowedBudgetPlanMonth(month)) {
-        return res.status(400).json({ message: "Budget month must be between this month and 11 months from now" });
+        return res.status(400).json({ message: "Budget month must be within the previous 12 months or next 11 months" });
       }
       const normalizedKey = typeof planKey === "string" ? planKey.trim() : "";
       const amount = Number(plannedAmount);
