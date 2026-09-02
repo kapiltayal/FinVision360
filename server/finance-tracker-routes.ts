@@ -156,6 +156,22 @@ function monthBounds(month: string): { startDate: string; endDate: string } {
   };
 }
 
+function budgetPlanMonthRange(): { firstMonth: string; lastMonth: string } {
+  const now = new Date();
+  const first = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+  const last = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 11, 1));
+  return {
+    firstMonth: isoDate(first).slice(0, 7),
+    lastMonth: isoDate(last).slice(0, 7),
+  };
+}
+
+function isAllowedBudgetPlanMonth(value: unknown): value is string {
+  if (!isValidMonth(value)) return false;
+  const { firstMonth, lastMonth } = budgetPlanMonthRange();
+  return value >= firstMonth && value <= lastMonth;
+}
+
 function isPlaidTransfer(transaction: PlaidTransaction): boolean {
   const primary = transaction.personal_finance_category?.primary?.toUpperCase() ?? "";
   const detailed = transaction.personal_finance_category?.detailed?.toUpperCase() ?? "";
@@ -232,8 +248,8 @@ export function registerFinanceTrackerRoutes(app: Express) {
     try {
       const userId = (req.user as any).id;
       const month = req.query.month;
-      if (!isValidMonth(month)) {
-        return res.status(400).json({ message: "month must use YYYY-MM format" });
+      if (!isAllowedBudgetPlanMonth(month)) {
+        return res.status(400).json({ message: "Budget month must be between this month and 11 months from now" });
       }
 
       const { startDate, endDate } = monthBounds(month);
@@ -313,8 +329,8 @@ export function registerFinanceTrackerRoutes(app: Express) {
     try {
       const userId = (req.user as any).id;
       const { month, planKey, plannedAmount } = req.body ?? {};
-      if (!isValidMonth(month)) {
-        return res.status(400).json({ message: "month must use YYYY-MM format" });
+      if (!isAllowedBudgetPlanMonth(month)) {
+        return res.status(400).json({ message: "Budget month must be between this month and 11 months from now" });
       }
       const normalizedKey = typeof planKey === "string" ? planKey.trim() : "";
       const amount = Number(plannedAmount);
@@ -349,8 +365,8 @@ export function registerFinanceTrackerRoutes(app: Express) {
     try {
       const userId = (req.user as any).id;
       const { month, planKey } = req.query;
-      if (!isValidMonth(month) || typeof planKey !== "string" || !planKey.trim()) {
-        return res.status(400).json({ message: "month and planKey are required" });
+      if (!isAllowedBudgetPlanMonth(month) || typeof planKey !== "string" || !planKey.trim()) {
+        return res.status(400).json({ message: "A valid budget month and planKey are required" });
       }
       await pool.query(
         `DELETE FROM budget_plans
@@ -455,19 +471,50 @@ export function registerFinanceTrackerRoutes(app: Express) {
       const monthCount = (endYear - startYear) * 12 + (endMonthNumber - startMonthNumber) + 1;
       const endDate = isoDate(new Date(Date.UTC(endYear, endMonthNumber, 0)));
 
-      const { rows } = await pool.query(
-        `SELECT
-           type,
-           subcategory,
-           COALESCE(SUM(amount), 0) AS total,
-           COUNT(*) AS transaction_count
-         FROM transactions
-         WHERE user_id = $1
-           AND date >= $2
-           AND date <= $3
-         GROUP BY type, subcategory
-         ORDER BY type, total DESC, subcategory ASC`,
-        [userId, startMonth, endDate],
+      const [{ rows }, { rows: monthlyRows }] = await Promise.all([
+        pool.query(
+          `SELECT
+             type,
+             COALESCE(NULLIF(subcategory, ''), 'unassigned') AS subcategory,
+             COALESCE(SUM(amount), 0) AS total,
+             COUNT(*) AS transaction_count
+           FROM transactions
+           WHERE user_id = $1
+             AND date >= $2
+             AND date <= $3
+           GROUP BY type, COALESCE(NULLIF(subcategory, ''), 'unassigned')
+           ORDER BY type, total DESC, subcategory ASC`,
+          [userId, startMonth, endDate],
+        ),
+        pool.query(
+          `SELECT
+             DATE_TRUNC('month', date)::DATE AS month,
+             type,
+             COALESCE(NULLIF(subcategory, ''), 'unassigned') AS subcategory,
+             COALESCE(SUM(amount), 0) AS amount
+           FROM transactions
+           WHERE user_id = $1
+             AND date >= $2
+             AND date <= $3
+           GROUP BY month, type, COALESCE(NULLIF(subcategory, ''), 'unassigned')
+           ORDER BY month ASC`,
+          [userId, startMonth, endDate],
+        ),
+      ]);
+
+      const periodMonths: string[] = [];
+      for (
+        let cursor = new Date(Date.UTC(startYear, startMonthNumber - 1, 1));
+        cursor <= new Date(Date.UTC(endYear, endMonthNumber - 1, 1));
+        cursor = new Date(Date.UTC(cursor.getUTCFullYear(), cursor.getUTCMonth() + 1, 1))
+      ) {
+        periodMonths.push(isoDate(cursor).slice(0, 7));
+      }
+      const monthlyAmounts = new Map(
+        monthlyRows.map((row) => [
+          `${row.type}:${row.subcategory || "unassigned"}:${normalizeDateValue(row.month)?.slice(0, 7)}`,
+          Number(row.amount),
+        ]),
       );
 
       const categories = rows.map((row) => ({
@@ -476,6 +523,10 @@ export function registerFinanceTrackerRoutes(app: Express) {
         total: Number(row.total),
         average: Number(row.total) / monthCount,
         transactionCount: Number(row.transaction_count),
+        history: periodMonths.map((month) => ({
+          month,
+          amount: monthlyAmounts.get(`${row.type}:${row.subcategory || "unassigned"}:${month}`) ?? 0,
+        })),
       }));
       const income = categories
         .filter((category) => category.type === "income")
