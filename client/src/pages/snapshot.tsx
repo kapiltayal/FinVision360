@@ -56,11 +56,14 @@ const EMERGENCY_CASH_CATEGORIES = new Set([
 ]);
 
 type Priority = "high" | "medium" | "low";
+type RecommendationGroup = "earn" | "save" | "other";
 interface Rec {
   priority: Priority;
   title: string;
   description: string;
   color: string;
+  group: RecommendationGroup;
+  monthlyPotential: number;
 }
 
 type CashFlowSummary = {
@@ -213,6 +216,8 @@ export default function SnapshotPage() {
         title: "Build Your Emergency Fund",
         description: `You have ${formatCurrency(savingsBalance)} saved. Target at least ${formatCurrency(emergencyTarget)} — 3 months of expenses — to weather unexpected events.`,
         color: "#ef4444",
+        group: "save",
+        monthlyPotential: Math.max(emergencyTarget - savingsBalance, 0) / 12,
       });
     }
 
@@ -226,6 +231,8 @@ export default function SnapshotPage() {
           title: "Eliminate High-Interest Debt",
           description: `${formatCurrency(ccTotal)} in credit card debt at ~${avgRate.toFixed(1)}% APR is costly. Use the avalanche method to pay off the highest-rate cards first.`,
           color: "#f97316",
+          group: "save",
+          monthlyPotential: (ccTotal * (avgRate / 100)) / 12,
         });
       }
     }
@@ -236,6 +243,8 @@ export default function SnapshotPage() {
         title: "Increase Your Savings Rate",
         description: `Your savings rate is ${savingsRate.toFixed(1)}%. Increasing to 20% or more accelerates wealth building — try trimming discretionary spending first.`,
         color: "#eab308",
+        group: "save",
+        monthlyPotential: Math.max(totalMonthlyIncome * (0.2 - savingsRate / 100), 0),
       });
     }
 
@@ -246,6 +255,8 @@ export default function SnapshotPage() {
         title: "Fill Insurance Gaps",
         description: `You appear to be missing ${missingCritical.join(" and ")} insurance. These are foundational protections — review your coverage needs.`,
         color: "#8b5cf6",
+        group: "other",
+        monthlyPotential: 0,
       });
     }
 
@@ -255,6 +266,8 @@ export default function SnapshotPage() {
         title: "Start Saving for Retirement",
         description: "No retirement assets detected. Contributing even a small amount today takes advantage of compounding — start with your employer's 401k match.",
         color: "#1C91D4",
+        group: "save",
+        monthlyPotential: 0,
       });
     }
 
@@ -264,11 +277,25 @@ export default function SnapshotPage() {
         title: "Great Financial Health!",
         description: "Your finances look strong. Stay consistent with contributions, review your insurance annually, and keep your emergency fund topped up.",
         color: "#22c55e",
+        group: "other",
+        monthlyPotential: 0,
       });
     }
 
     return recs.slice(0, 4);
   }, [assets, liabilities, totalMonthlyExpenses, totalMonthlyIncome, savingsRate, coverageMap, retirementAssets, k401Balance]);
+
+  const recommendationGroups: {
+    key: RecommendationGroup;
+    label: string;
+    description: string;
+    accent: string;
+    Icon: React.ElementType;
+  }[] = [
+    { key: "earn", label: "Earn", description: "Ways to grow your income", accent: "#0ea5e9", Icon: TrendingUp },
+    { key: "save", label: "Save", description: "Ways to keep more of your money", accent: "#10b981", Icon: PiggyBank },
+    { key: "other", label: "Other", description: "Protection and planning priorities", accent: "#8b5cf6", Icon: Landmark },
+  ];
 
   if (isLoading) {
     return (
@@ -628,34 +655,88 @@ export default function SnapshotPage() {
 
         {/* ── Recommendations ── */}
         <SnapshotCard title="Financial Recommendations" accent="#6366f1" icon={Lightbulb} className="md:col-span-3">
-          <div className="space-y-3">
-            {recommendations.map((rec, i) => (
-              <div
-                key={i}
-                className="flex items-start gap-3 p-3 rounded-xl border"
-                style={{
-                  borderColor: `${rec.color}28`,
-                  background: `${rec.color}0a`,
-                }}
-                data-testid={`recommendation-${i}`}
-              >
-                <span style={{ color: rec.color }} className="mt-0.5">
-                  {priorityIcon(rec.priority)}
-                </span>
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold leading-snug mb-0.5" style={{ color: rec.color }}>
-                    {rec.title}
-                  </p>
-                  <p className="text-xs text-muted-foreground leading-relaxed">{rec.description}</p>
-                </div>
-                <span
-                  className="shrink-0 text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-full"
-                  style={{ background: `${rec.color}20`, color: rec.color }}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {recommendationGroups.map((group) => {
+              const groupRecommendations = recommendations.filter((rec) => rec.group === group.key);
+              const totalPotential = groupRecommendations.reduce((sum, rec) => sum + rec.monthlyPotential, 0);
+              const GroupIcon = group.Icon;
+
+              return (
+                <div
+                  key={group.key}
+                  className="rounded-2xl border border-slate-200/70 dark:border-slate-700/60 bg-slate-50/70 dark:bg-slate-950/40 p-4"
+                  data-testid={`recommendation-group-${group.key}`}
                 >
-                  {rec.priority}
-                </span>
-              </div>
-            ))}
+                  <div className="flex items-center gap-2 mb-3">
+                    <div
+                      className="h-8 w-8 rounded-lg flex items-center justify-center"
+                      style={{ background: `${group.accent}18` }}
+                    >
+                      <GroupIcon className="h-4 w-4" style={{ color: group.accent }} />
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold" style={{ color: group.accent }}>{group.label}</p>
+                      <p className="text-[11px] text-muted-foreground">{group.description}</p>
+                    </div>
+                  </div>
+
+                  {group.key !== "other" && (
+                    <div
+                      className="rounded-xl px-3 py-2.5 mb-3 border"
+                      style={{
+                        borderColor: `${group.accent}35`,
+                        background: `${group.accent}0d`,
+                      }}
+                      data-testid={`recommendation-${group.key}-potential`}
+                    >
+                      <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                        Total {group.label.toLowerCase()} potential
+                      </p>
+                      <p className="text-xl font-bold tabular-nums mt-0.5" style={{ color: group.accent }}>
+                        {formatCurrency(totalPotential)}
+                        <span className="text-xs font-medium text-muted-foreground ml-1">/mo</span>
+                      </p>
+                      <p className="text-[10px] text-muted-foreground mt-0.5">Estimated from current recommendations</p>
+                    </div>
+                  )}
+
+                  <div className="space-y-3">
+                    {groupRecommendations.length > 0 ? groupRecommendations.map((rec, i) => (
+                      <div
+                        key={`${group.key}-${i}`}
+                        className="flex items-start gap-3 p-3 rounded-xl border bg-white/70 dark:bg-slate-900/60"
+                        style={{ borderColor: `${rec.color}28` }}
+                        data-testid={`recommendation-${group.key}-${i}`}
+                      >
+                        <span style={{ color: rec.color }} className="mt-0.5">
+                          {priorityIcon(rec.priority)}
+                        </span>
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold leading-snug mb-0.5" style={{ color: rec.color }}>
+                            {rec.title}
+                          </p>
+                          <p className="text-xs text-muted-foreground leading-relaxed">{rec.description}</p>
+                        </div>
+                        <span
+                          className="shrink-0 text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-full"
+                          style={{ background: `${rec.color}20`, color: rec.color }}
+                        >
+                          {rec.priority}
+                        </span>
+                      </div>
+                    )) : (
+                      <div className="rounded-xl border border-dashed border-slate-200 dark:border-slate-700 px-3 py-5 text-center">
+                        <GroupIcon className="h-5 w-5 mx-auto mb-2 text-muted-foreground/50" />
+                        <p className="text-xs font-medium text-muted-foreground">No opportunities identified</p>
+                        <p className="text-[11px] text-muted-foreground/70 mt-1">
+                          We’ll add recommendations here as more financial data becomes available.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </SnapshotCard>
 
