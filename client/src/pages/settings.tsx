@@ -499,22 +499,34 @@ export default function SettingsPage() {
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <Label htmlFor="state" className="text-xs font-medium text-muted-foreground uppercase tracking-wide">State</Label>
-                    <Select
-                      value={profile.state || "none"}
-                      onValueChange={(value) => setProfile({ ...profile, state: value === "none" ? "" : value })}
-                      disabled={profile.country !== "USA"}
-                    >
-                      <SelectTrigger id="state" data-testid="select-settings-state">
-                        <SelectValue placeholder={profile.country === "USA" ? "Select state" : "Not applicable"} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">Select state</SelectItem>
-                        {US_STATE_OPTIONS.map((option) => (
-                          <SelectItem key={option.value} value={option.value}>{option.label} ({option.value})</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <Label htmlFor="state" className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                      {profile.country === "USA" ? "State" : "State / Province / Region"}
+                    </Label>
+                    {profile.country === "USA" ? (
+                      <Select
+                        value={profile.state || "none"}
+                        onValueChange={(value) => setProfile({ ...profile, state: value === "none" ? "" : value })}
+                      >
+                        <SelectTrigger id="state" data-testid="select-settings-state">
+                          <SelectValue placeholder="Select state" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">Select state</SelectItem>
+                          {US_STATE_OPTIONS.map((option) => (
+                            <SelectItem key={option.value} value={option.value}>{option.label} ({option.value})</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <Input
+                        id="state"
+                        data-testid="input-settings-state"
+                        value={profile.state}
+                        onChange={(e) => setProfile({ ...profile, state: e.target.value })}
+                        placeholder="State, province, or region"
+                        autoComplete="address-level1"
+                      />
+                    )}
                   </div>
                   <div className="space-y-1.5">
                     <Label htmlFor="postalCode" className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
