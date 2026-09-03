@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -125,7 +125,6 @@ export default function EstatePlanningPage() {
   const [contactDialogOpen, setContactDialogOpen] = useState(false);
   const [editingContact, setEditingContact] = useState<EstateContact | undefined>();
   const [expandedAsset, setExpandedAsset] = useState<number | null>(null);
-  const [openCategory, setOpenCategory] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<EstateTab>("beneficiaries");
   // Local beneficiary edits are only committed when the user clicks Save.
   const [benEdits, setBenEdits] = useState<Record<number, BeneficiaryDraft[]>>({});
@@ -365,234 +364,225 @@ export default function EstatePlanningPage() {
                         </p>
                       </div>
                     </div>
-                    {categoryGroups.map(({ category, entries: categoryAssets }, idx) => {
-                      const isOpen = openCategory === category;
-                      return (
-                        <div key={category} className={idx < categoryGroups.length - 1 ? "border-b" : ""}>
-                          <button
-                            type="button"
-                            onClick={() => setOpenCategory(isOpen ? null : category)}
-                            data-testid={`accordion-beneficiary-category-${category}`}
-                            className="w-full flex items-center justify-between px-5 py-4 hover:bg-muted/70 transition-colors text-left"
-                          >
-                            <div className="flex items-center gap-3">
-                              <div className="h-8 w-8 rounded-md bg-primary/10 flex items-center justify-center shrink-0">
-                                <Wallet className="h-4 w-4 text-primary" />
-                              </div>
-                              <div>
-                                <p className="font-semibold text-sm">{categoryLabel(categories, category)}</p>
-                                <p className="text-xs text-muted-foreground">
-                                  {categoryAssets.length} {categoryAssets.length === 1 ? "account" : "accounts"}
-                                </p>
-                              </div>
-                            </div>
-                            <ChevronDown className={`h-4 w-4 text-muted-foreground shrink-0 transition-transform duration-300 ${isOpen ? "rotate-180" : ""}`} />
-                          </button>
+                    <div className="overflow-x-auto">
+                      <table className="w-full min-w-[720px] text-sm" data-testid={`table-beneficiaries-${parentCategory}`}>
+                        <thead className="border-b bg-muted/50">
+                          <tr className="text-left">
+                            <th scope="col" className="px-5 py-3 font-medium">Category</th>
+                            <th scope="col" className="px-5 py-3 font-medium">Account</th>
+                            <th scope="col" className="px-5 py-3 font-medium">Beneficiary</th>
+                            <th scope="col" className="px-5 py-3 font-medium">Status</th>
+                            <th scope="col" className="px-5 py-3 text-center font-medium">Assign</th>
+                            <th scope="col" className="w-12 px-3 py-3" />
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y">
+                          {categoryGroups.flatMap(({ category, entries: categoryAssets }) =>
+                            categoryAssets.map((asset) => {
+                              const ben = beneficiaryMap.get(asset.id);
+                              const hasBen = ben?.hasBeneficiary ?? false;
+                              const isExpanded = expandedAsset === asset.id;
+                              const localEdit = benEdits[asset.id];
 
-                          <div className={`grid transition-[grid-template-rows] duration-300 ease-in-out ${isOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]"}`}>
-                            <div className="overflow-hidden">
-                              <div className="divide-y border-t bg-muted/30 px-5">
-                                {categoryAssets.map((asset) => {
-                                  const ben = beneficiaryMap.get(asset.id);
-                                  const hasBen = ben?.hasBeneficiary ?? false;
-                                  const isExpanded = expandedAsset === asset.id;
-                                  const localEdit = benEdits[asset.id];
+                              return (
+                                <Fragment key={asset.id}>
+                                  <tr className="hover:bg-muted/30" data-testid={`beneficiary-row-${asset.id}`}>
+                                    <td className="px-5 py-3 text-muted-foreground">{categoryLabel(categories, category)}</td>
+                                    <td className="px-5 py-3">
+                                      <p className="font-medium">{asset.name}</p>
+                                      {asset.institution && (
+                                        <p className="text-xs text-muted-foreground">{asset.institution}</p>
+                                      )}
+                                    </td>
+                                    <td className="max-w-56 px-5 py-3 text-muted-foreground">
+                                      <span className="block truncate">
+                                        {hasBen
+                                          ? ben?.beneficiaries?.length
+                                            ? ben.beneficiaries.map((beneficiary) => beneficiary.beneficiaryName).join(", ")
+                                            : "Details needed"
+                                          : "—"}
+                                      </span>
+                                    </td>
+                                    <td className="px-5 py-3">
+                                      <Badge variant={hasBen ? "default" : "secondary"} className="text-xs">
+                                        {hasBen ? "Assigned" : "Not assigned"}
+                                      </Badge>
+                                    </td>
+                                    <td className="px-5 py-3 text-center">
+                                      <Switch
+                                        data-testid={`switch-beneficiary-${asset.id}`}
+                                        checked={hasBen}
+                                        onCheckedChange={(checked) => {
+                                          if (!checked) {
+                                            toggleBeneficiaryMutation.mutate({ assetId: asset.id, hasBeneficiary: false });
+                                            return;
+                                          }
+                                          const existing = ben?.beneficiaries || [];
+                                          const total = existing.reduce((sum, beneficiary) => sum + Number(beneficiary.allocationPercentage), 0);
+                                          if (existing.length > 0 && Math.abs(total - 100) < 0.001) {
+                                            toggleBeneficiaryMutation.mutate({
+                                              assetId: asset.id,
+                                              hasBeneficiary: true,
+                                              beneficiaries: existing.map((beneficiary) => ({
+                                                name: beneficiary.beneficiaryName,
+                                                percentage: Number(beneficiary.allocationPercentage),
+                                                notes: beneficiary.notes,
+                                              })),
+                                            });
+                                          } else {
+                                            openExpand(asset.id, ben);
+                                            toast({ title: "Add beneficiary details first", description: "Enter names and allocations totaling 100%, then save." });
+                                          }
+                                        }}
+                                      />
+                                    </td>
+                                    <td className="px-3 py-3 text-right">
+                                      <Button
+                                        size="icon"
+                                        variant="ghost"
+                                        className="h-7 w-7"
+                                        onClick={() => {
+                                          if (isExpanded) {
+                                            setExpandedAsset(null);
+                                          } else {
+                                            openExpand(asset.id, ben);
+                                          }
+                                        }}
+                                        data-testid={`button-expand-beneficiary-${asset.id}`}
+                                      >
+                                        {isExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+                                      </Button>
+                                    </td>
+                                  </tr>
 
-                                  return (
-                  <div key={asset.id} data-testid={`beneficiary-row-${asset.id}`}>
-                    {/* Row */}
-                    <div className="flex items-center justify-between py-3 px-1 gap-3">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className="h-7 w-7 rounded bg-primary/10 flex items-center justify-center shrink-0">
-                          <Wallet className="h-3.5 w-3.5 text-primary" />
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-sm font-medium truncate">{asset.name}</p>
-                          <p className="text-xs text-muted-foreground">{asset.institution || categoryLabel(categories, asset.category)}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3 shrink-0">
-                        {hasBen && (
-                          <span className="text-xs text-muted-foreground hidden sm:inline truncate max-w-[180px]">
-                            {ben?.beneficiaries?.length
-                              ? ben.beneficiaries.map((beneficiary) => beneficiary.beneficiaryName).join(", ")
-                              : "Details needed"}
-                          </span>
-                        )}
-                        <Badge variant={hasBen ? "default" : "secondary"} className="text-xs">
-                          {hasBen ? "Assigned" : "Not assigned"}
-                        </Badge>
-                        <Switch
-                          data-testid={`switch-beneficiary-${asset.id}`}
-                          checked={hasBen}
-                          onCheckedChange={(checked) => {
-                            if (!checked) {
-                              toggleBeneficiaryMutation.mutate({ assetId: asset.id, hasBeneficiary: false });
-                              return;
-                            }
-                            const existing = ben?.beneficiaries || [];
-                            const total = existing.reduce((sum, beneficiary) => sum + Number(beneficiary.allocationPercentage), 0);
-                            if (existing.length > 0 && Math.abs(total - 100) < 0.001) {
-                              toggleBeneficiaryMutation.mutate({
-                                assetId: asset.id,
-                                hasBeneficiary: true,
-                                beneficiaries: existing.map((beneficiary) => ({
-                                  name: beneficiary.beneficiaryName,
-                                  percentage: Number(beneficiary.allocationPercentage),
-                                  notes: beneficiary.notes,
-                                })),
-                              });
-                            } else {
-                              openExpand(asset.id, ben);
-                              toast({ title: "Add beneficiary details first", description: "Enter names and allocations totaling 100%, then save." });
-                            }
-                          }}
-                        />
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-7 w-7"
-                          onClick={() => {
-                            if (isExpanded) {
-                              setExpandedAsset(null);
-                            } else {
-                              openExpand(asset.id, ben);
-                            }
-                          }}
-                          data-testid={`button-expand-beneficiary-${asset.id}`}
-                        >
-                          {isExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
-                        </Button>
-                      </div>
-                    </div>
-
-                    {/* Expanded detail panel */}
-                    {isExpanded && (
-                      <div className="pb-3 px-1 mb-2">
-                        <div className="bg-muted/30 rounded-lg p-3 space-y-3">
-                          <div className="flex items-center justify-between gap-3">
-                            <div>
-                              <Label className="text-xs">Beneficiaries</Label>
-                              <p className="text-[11px] text-muted-foreground">Add each person and their share of this asset.</p>
-                            </div>
-                            <span className={`text-xs font-medium ${
-                              (localEdit || []).reduce((sum, draft) => sum + (Number(draft.percentage) || 0), 0) === 100
-                                ? "text-emerald-600"
-                                : "text-amber-600"
-                            }`}>
-                              Allocation: {(localEdit || []).reduce((sum, draft) => sum + (Number(draft.percentage) || 0), 0).toFixed(2)}%
-                            </span>
-                          </div>
-                          <div className="space-y-3">
-                            {(localEdit || []).map((draft, index) => (
-                              <div key={index} className="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_7rem_auto] gap-2 items-end">
-                                <div className="space-y-1">
-                                  <Label className="text-[11px]">Name</Label>
-                                  <Input
-                                    data-testid={`input-beneficiary-name-${asset.id}${index ? `-${index}` : ""}`}
-                                    value={draft.name}
-                                    onChange={(e) => updateBeneficiaryDraft(asset.id, index, "name", e.target.value)}
-                                    placeholder="e.g., John Doe"
-                                    className="h-8 text-sm"
-                                  />
-                                </div>
-                                <div className="space-y-1">
-                                  <Label className="text-[11px]">Allocation (%)</Label>
-                                  <Input
-                                    data-testid={`input-beneficiary-percentage-${asset.id}-${index}`}
-                                    type="number"
-                                    min="0"
-                                    max="100"
-                                    step="1"
-                                    value={draft.percentage}
-                                    onChange={(e) => updateBeneficiaryDraft(asset.id, index, "percentage", e.target.value)}
-                                    className="h-8 text-sm"
-                                  />
-                                </div>
-                                <Button
-                                  type="button"
-                                  size="icon"
-                                  variant="ghost"
-                                  className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                                  onClick={() => setBenEdits((prev) => ({
-                                    ...prev,
-                                    [asset.id]: (prev[asset.id] || []).filter((_, draftIndex) => draftIndex !== index),
-                                  }))}
-                                  aria-label={`Remove beneficiary ${index + 1}`}
-                                  data-testid={`button-remove-beneficiary-${asset.id}-${index}`}
-                                >
-                                  <Trash2 className="h-3.5 w-3.5" />
-                                </Button>
-                                <div className="space-y-1 sm:col-span-3">
-                                  <Label className="text-[11px]">Notes (optional)</Label>
-                                  <Input
-                                    data-testid={`input-beneficiary-notes-${asset.id}${index ? `-${index}` : ""}`}
-                                    value={draft.notes}
-                                    onChange={(e) => updateBeneficiaryDraft(asset.id, index, "notes", e.target.value)}
-                                    placeholder="e.g., Spouse"
-                                    className="h-8 text-sm"
-                                  />
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                          {((localEdit || []).some((draft) => !draft.name.trim() || !Number.isFinite(Number(draft.percentage)) || Number(draft.percentage) <= 0 || Number(draft.percentage) > 100) ||
-                            Math.abs((localEdit || []).reduce((sum, draft) => sum + (Number(draft.percentage) || 0), 0) - 100) > 0.001) && (
-                            <p className="text-xs text-amber-600">
-                              Enter a name and valid allocation for every row. Allocations must total exactly 100%.
-                            </p>
+                                  {isExpanded && (
+                                    <tr>
+                                      <td colSpan={6} className="bg-muted/20 p-0">
+                                        <div className="border-t px-5 py-3">
+                                          <div className="rounded-lg bg-muted/30 p-3 space-y-3">
+                                            <div className="flex items-center justify-between gap-3">
+                                              <div>
+                                                <Label className="text-xs">Beneficiaries</Label>
+                                                <p className="text-[11px] text-muted-foreground">Add each person and their share of this asset.</p>
+                                              </div>
+                                              <span className={`text-xs font-medium ${
+                                                (localEdit || []).reduce((sum, draft) => sum + (Number(draft.percentage) || 0), 0) === 100
+                                                  ? "text-emerald-600"
+                                                  : "text-amber-600"
+                                              }`}>
+                                                Allocation: {(localEdit || []).reduce((sum, draft) => sum + (Number(draft.percentage) || 0), 0).toFixed(2)}%
+                                              </span>
+                                            </div>
+                                            <div className="space-y-3">
+                                              {(localEdit || []).map((draft, index) => (
+                                                <div key={index} className="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_7rem_auto] gap-2 items-end">
+                                                  <div className="space-y-1">
+                                                    <Label className="text-[11px]">Name</Label>
+                                                    <Input
+                                                      data-testid={`input-beneficiary-name-${asset.id}${index ? `-${index}` : ""}`}
+                                                      value={draft.name}
+                                                      onChange={(e) => updateBeneficiaryDraft(asset.id, index, "name", e.target.value)}
+                                                      placeholder="e.g., John Doe"
+                                                      className="h-8 text-sm"
+                                                    />
+                                                  </div>
+                                                  <div className="space-y-1">
+                                                    <Label className="text-[11px]">Allocation (%)</Label>
+                                                    <Input
+                                                      data-testid={`input-beneficiary-percentage-${asset.id}-${index}`}
+                                                      type="number"
+                                                      min="0"
+                                                      max="100"
+                                                      step="1"
+                                                      value={draft.percentage}
+                                                      onChange={(e) => updateBeneficiaryDraft(asset.id, index, "percentage", e.target.value)}
+                                                      className="h-8 text-sm"
+                                                    />
+                                                  </div>
+                                                  <Button
+                                                    type="button"
+                                                    size="icon"
+                                                    variant="ghost"
+                                                    className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                                    onClick={() => setBenEdits((prev) => ({
+                                                      ...prev,
+                                                      [asset.id]: (prev[asset.id] || []).filter((_, draftIndex) => draftIndex !== index),
+                                                    }))}
+                                                    aria-label={`Remove beneficiary ${index + 1}`}
+                                                    data-testid={`button-remove-beneficiary-${asset.id}-${index}`}
+                                                  >
+                                                    <Trash2 className="h-3.5 w-3.5" />
+                                                  </Button>
+                                                  <div className="space-y-1 sm:col-span-3">
+                                                    <Label className="text-[11px]">Notes (optional)</Label>
+                                                    <Input
+                                                      data-testid={`input-beneficiary-notes-${asset.id}${index ? `-${index}` : ""}`}
+                                                      value={draft.notes}
+                                                      onChange={(e) => updateBeneficiaryDraft(asset.id, index, "notes", e.target.value)}
+                                                      placeholder="e.g., Spouse"
+                                                      className="h-8 text-sm"
+                                                    />
+                                                  </div>
+                                                </div>
+                                              ))}
+                                            </div>
+                                            {((localEdit || []).some((draft) => !draft.name.trim() || !Number.isFinite(Number(draft.percentage)) || Number(draft.percentage) <= 0 || Number(draft.percentage) > 100) ||
+                                              Math.abs((localEdit || []).reduce((sum, draft) => sum + (Number(draft.percentage) || 0), 0) - 100) > 0.001) && (
+                                              <p className="text-xs text-amber-600">
+                                                Enter a name and valid allocation for every row. Allocations must total exactly 100%.
+                                              </p>
+                                            )}
+                                            <Button
+                                              type="button"
+                                              variant="outline"
+                                              size="sm"
+                                              onClick={() => setBenEdits((prev) => ({
+                                                ...prev,
+                                                [asset.id]: [...(prev[asset.id] || []), { name: "", percentage: "0", notes: "" }],
+                                              }))}
+                                              data-testid={`button-add-beneficiary-${asset.id}`}
+                                            >
+                                              <Plus className="h-3.5 w-3.5 mr-1.5" /> Add Beneficiary
+                                            </Button>
+                                          </div>
+                                          <div className="flex justify-end mt-2">
+                                            <Button
+                                              size="sm"
+                                              onClick={() =>
+                                                saveBenDetailsMutation.mutate({
+                                                  assetId: asset.id,
+                                                  hasBeneficiary: true,
+                                                  beneficiaries: draftsToPayload(localEdit || []),
+                                                })
+                                              }
+                                              disabled={
+                                                saveBenDetailsMutation.isPending ||
+                                                !(localEdit || []).length ||
+                                                (localEdit || []).some((draft) =>
+                                                  !draft.name.trim() ||
+                                                  !Number.isFinite(Number(draft.percentage)) ||
+                                                  Number(draft.percentage) <= 0 ||
+                                                  Number(draft.percentage) > 100
+                                                ) ||
+                                                Math.abs((localEdit || []).reduce((sum, draft) => sum + (Number(draft.percentage) || 0), 0) - 100) > 0.001
+                                              }
+                                              data-testid={`button-save-beneficiary-${asset.id}`}
+                                            >
+                                              <Save className="h-3.5 w-3.5 mr-1.5" />
+                                              {saveBenDetailsMutation.isPending ? "Saving..." : "Save & Assign"}
+                                            </Button>
+                                          </div>
+                                        </div>
+                                      </td>
+                                    </tr>
+                                  )}
+                                </Fragment>
+                              );
+                            }),
                           )}
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setBenEdits((prev) => ({
-                              ...prev,
-                              [asset.id]: [...(prev[asset.id] || []), { name: "", percentage: "0", notes: "" }],
-                            }))}
-                            data-testid={`button-add-beneficiary-${asset.id}`}
-                          >
-                            <Plus className="h-3.5 w-3.5 mr-1.5" /> Add Beneficiary
-                          </Button>
-                        </div>
-                        <div className="flex justify-end mt-2">
-                          <Button
-                            size="sm"
-                            onClick={() =>
-                              saveBenDetailsMutation.mutate({
-                                assetId: asset.id,
-                                hasBeneficiary: true,
-                                beneficiaries: draftsToPayload(localEdit || []),
-                              })
-                            }
-                            disabled={
-                              saveBenDetailsMutation.isPending ||
-                              !(localEdit || []).length ||
-                              (localEdit || []).some((draft) =>
-                                !draft.name.trim() ||
-                                !Number.isFinite(Number(draft.percentage)) ||
-                                Number(draft.percentage) <= 0 ||
-                                Number(draft.percentage) > 100
-                              ) ||
-                              Math.abs((localEdit || []).reduce((sum, draft) => sum + (Number(draft.percentage) || 0), 0) - 100) > 0.001
-                            }
-                            data-testid={`button-save-beneficiary-${asset.id}`}
-                          >
-                            <Save className="h-3.5 w-3.5 mr-1.5" />
-                            {saveBenDetailsMutation.isPending ? "Saving..." : "Save & Assign"}
-                          </Button>
-                        </div>
-                      </div>
-                    )}
-                                  </div>
-                                  );
-                                })}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
+                        </tbody>
+                      </table>
+                    </div>
                   </section>
                 );
               })}
