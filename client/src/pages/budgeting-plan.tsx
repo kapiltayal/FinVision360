@@ -182,14 +182,13 @@ function TrendSparkline({
 
   const stroke = tone === "income" ? "#059669" : "#e11d48";
   return (
-    <div className="h-16 w-28 pt-8" aria-label={`${data.length}-month trend`}>
+    <div className="h-12 w-28 pt-4" aria-label={`${data.length}-month trend`}>
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={data} margin={{ top: 3, right: 3, bottom: 3, left: 3 }}>
           <XAxis dataKey="month" hide />
           <RechartsTooltip
-            position={{ y: -64 }}
+            position={{ y: -52 }}
             allowEscapeViewBox={{ y: true }}
-            wrapperStyle={{ zIndex: 20 }}
             cursor={{ stroke: "hsl(var(--border))", strokeDasharray: "2 2" }}
             formatter={(value: number) => [formatCurrency(Number(value)), "Amount"]}
             labelFormatter={(label) => formatMonth(String(label))}
