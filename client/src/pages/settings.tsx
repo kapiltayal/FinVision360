@@ -156,6 +156,7 @@ export default function SettingsPage() {
     city: "",
     state: "",
     postalCode: "",
+    country: "USA",
   });
   useEffect(() => {
     if (user) {
@@ -166,6 +167,7 @@ export default function SettingsPage() {
         city: (user as any).city || "",
         state: (user as any).state || "",
         postalCode: (user as any).postalCode || "",
+        country: (user as any).country || "USA",
       });
     }
   }, [user]);
@@ -519,6 +521,17 @@ export default function SettingsPage() {
                       autoComplete="postal-code"
                     />
                   </div>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="country" className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Country</Label>
+                  <Input
+                    id="country"
+                    data-testid="input-settings-country"
+                    value={profile.country}
+                    onChange={(e) => setProfile({ ...profile, country: e.target.value })}
+                    placeholder="USA"
+                    autoComplete="country-name"
+                  />
                 </div>
                 <p className="text-xs text-muted-foreground">
                   Address details are optional and saved with your profile.

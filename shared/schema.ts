@@ -15,6 +15,7 @@ export const users = pgTable("users", {
   city: text("city"),
   state: text("state"),
   postalCode: text("postal_code"),
+  country: text("country").default("USA"),
 });
 
 export const insertUserSchema = createInsertSchema(users).pick({
@@ -26,6 +27,7 @@ export const insertUserSchema = createInsertSchema(users).pick({
   city: true,
   state: true,
   postalCode: true,
+  country: true,
 }).partial({ supabaseId: true });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
