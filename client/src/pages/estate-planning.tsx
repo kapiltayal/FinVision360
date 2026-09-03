@@ -15,13 +15,13 @@ import { apiRequest } from "@/lib/queryClient";
 import {
   ScrollText, Users, UserCheck, Plus, Pencil, Trash2,
   CheckCircle2, Circle, Wallet, Phone, Mail, Building2,
-  ChevronDown, ChevronRight, Save,
+  ChevronDown, ChevronRight, Save, Layers3,
 } from "lucide-react";
 import {
   type Asset, type EstateBeneficiaryWithEntries, type EstateDocument, type EstateContact,
-  ASSET_CATEGORIES, ESTATE_DOCUMENT_TYPES, ESTATE_CONTACT_ROLES,
+  ESTATE_DOCUMENT_TYPES, ESTATE_CONTACT_ROLES,
 } from "@shared/schema";
-import { getCategoryLabel } from "@/lib/format";
+import { type BookCategory, categoryLabel, groupedBookEntries } from "@/lib/book-categories";
 
 type BeneficiaryDraft = {
   name: string;
@@ -125,19 +125,29 @@ export default function EstatePlanningPage() {
   const [contactDialogOpen, setContactDialogOpen] = useState(false);
   const [editingContact, setEditingContact] = useState<EstateContact | undefined>();
   const [expandedAsset, setExpandedAsset] = useState<number | null>(null);
+  const [openCategory, setOpenCategory] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<EstateTab>("beneficiaries");
   // Local beneficiary edits are only committed when the user clicks Save.
   const [benEdits, setBenEdits] = useState<Record<number, BeneficiaryDraft[]>>({});
 
   const { data: assets = [], isLoading: aLoading } = useQuery<Asset[]>({ queryKey: ["/api/assets"] });
+  const { data: categories = [], isLoading: categoriesLoading } = useQuery<BookCategory[]>({ queryKey: ["/api/assets/categories"] });
   const { data: beneficiaries = [], isLoading: bLoading } = useQuery<EstateBeneficiaryWithEntries[]>({ queryKey: ["/api/estate/beneficiaries"] });
   const { data: documents = [], isLoading: dLoading } = useQuery<EstateDocument[]>({ queryKey: ["/api/estate/documents"] });
   const { data: contacts = [], isLoading: cLoading } = useQuery<EstateContact[]>({ queryKey: ["/api/estate/contacts"] });
 
-  const isLoading = aLoading || bLoading || dLoading || cLoading;
+  const isLoading = aLoading || categoriesLoading || bLoading || dLoading || cLoading;
 
   const beneficiaryMap = new Map(beneficiaries.map((b) => [b.assetId, b]));
   const documentMap = new Map(documents.map((d) => [d.documentType, d]));
+  const groupedAssets = groupedBookEntries(assets, categories);
+  const assetsByParent = new Map<string, typeof groupedAssets>();
+  groupedAssets.forEach((group) => {
+    const parentGroups = assetsByParent.get(group.parentCategory) ?? [];
+    parentGroups.push(group);
+    assetsByParent.set(group.parentCategory, parentGroups);
+  });
+  const parentAssetGroups = Array.from(assetsByParent.entries());
 
   const docsComplete = ESTATE_DOCUMENT_TYPES.filter((d) => documentMap.get(d.key)?.isComplete).length;
   const assetsWithBeneficiary = beneficiaries.filter((b) => b.hasBeneficiary).length;
@@ -339,14 +349,56 @@ export default function EstatePlanningPage() {
           {assets.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-6">No assets found. Add assets first to track beneficiary designations.</p>
           ) : (
-            <div className="divide-y">
-              {assets.map((asset) => {
-                const ben = beneficiaryMap.get(asset.id);
-                const hasBen = ben?.hasBeneficiary ?? false;
-                const isExpanded = expandedAsset === asset.id;
-                const localEdit = benEdits[asset.id];
-
+            <div>
+              {parentAssetGroups.map(([parentCategory, categoryGroups]) => {
+                const accountCount = categoryGroups.reduce((sum, group) => sum + group.entries.length, 0);
                 return (
+                  <section key={parentCategory} className="border-b last:border-b-0">
+                    <div className="flex items-center gap-3 border-b-2 border-primary/25 bg-muted/75 px-5 py-3 dark:bg-muted/55">
+                      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary/10">
+                        <Layers3 className="h-4 w-4 text-primary" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold uppercase tracking-wider text-foreground/80">{parentCategory}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {categoryGroups.length} {categoryGroups.length === 1 ? "category" : "categories"} · {accountCount} {accountCount === 1 ? "account" : "accounts"}
+                        </p>
+                      </div>
+                    </div>
+                    {categoryGroups.map(({ category, entries: categoryAssets }, idx) => {
+                      const isOpen = openCategory === category;
+                      return (
+                        <div key={category} className={idx < categoryGroups.length - 1 ? "border-b" : ""}>
+                          <button
+                            type="button"
+                            onClick={() => setOpenCategory(isOpen ? null : category)}
+                            data-testid={`accordion-beneficiary-category-${category}`}
+                            className="w-full flex items-center justify-between px-5 py-4 hover:bg-muted/70 transition-colors text-left"
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className="h-8 w-8 rounded-md bg-primary/10 flex items-center justify-center shrink-0">
+                                <Wallet className="h-4 w-4 text-primary" />
+                              </div>
+                              <div>
+                                <p className="font-semibold text-sm">{categoryLabel(categories, category)}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {categoryAssets.length} {categoryAssets.length === 1 ? "account" : "accounts"}
+                                </p>
+                              </div>
+                            </div>
+                            <ChevronDown className={`h-4 w-4 text-muted-foreground shrink-0 transition-transform duration-300 ${isOpen ? "rotate-180" : ""}`} />
+                          </button>
+
+                          <div className={`grid transition-[grid-template-rows] duration-300 ease-in-out ${isOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]"}`}>
+                            <div className="overflow-hidden">
+                              <div className="divide-y border-t bg-muted/30 px-5">
+                                {categoryAssets.map((asset) => {
+                                  const ben = beneficiaryMap.get(asset.id);
+                                  const hasBen = ben?.hasBeneficiary ?? false;
+                                  const isExpanded = expandedAsset === asset.id;
+                                  const localEdit = benEdits[asset.id];
+
+                                  return (
                   <div key={asset.id} data-testid={`beneficiary-row-${asset.id}`}>
                     {/* Row */}
                     <div className="flex items-center justify-between py-3 px-1 gap-3">
@@ -356,7 +408,7 @@ export default function EstatePlanningPage() {
                         </div>
                         <div className="min-w-0">
                           <p className="text-sm font-medium truncate">{asset.name}</p>
-                          <p className="text-xs text-muted-foreground">{getCategoryLabel(ASSET_CATEGORIES, asset.category)}</p>
+                          <p className="text-xs text-muted-foreground">{asset.institution || categoryLabel(categories, asset.category)}</p>
                         </div>
                       </div>
                       <div className="flex items-center gap-3 shrink-0">
@@ -532,7 +584,16 @@ export default function EstatePlanningPage() {
                         </div>
                       </div>
                     )}
-                  </div>
+                                  </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </section>
                 );
               })}
             </div>
