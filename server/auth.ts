@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { type Express, type Request, type Response, type NextFunction } from "express";
 import { storage } from "./storage";
+import { COUNTRY_OPTIONS, US_STATE_OPTIONS } from "@shared/profile-options";
 
 // Node.js < 22 has no native WebSocket — polyfill for @supabase/realtime-js
 import ws from "ws";
@@ -73,15 +74,29 @@ export function setupAuth(app: Express) {
   app.patch("/api/auth/user", requireAuth, async (req: any, res) => {
     const userId = req.user.id;
     const { fullName, email, dateOfBirth, streetAddress, city, state, postalCode, country } = req.body;
+    const normalizedCountry = typeof country === "string" && country.trim() ? country.trim() : "USA";
+    const normalizedState = typeof state === "string" ? state.trim() : "";
+    const normalizedPostalCode = typeof postalCode === "string" ? postalCode.trim() : "";
+
+    if (!COUNTRY_OPTIONS.some((option) => option.value === normalizedCountry)) {
+      return res.status(400).json({ message: "Please select a valid country." });
+    }
+    if (normalizedCountry === "USA" && normalizedState && !US_STATE_OPTIONS.some((option) => option.value === normalizedState)) {
+      return res.status(400).json({ message: "Please select a valid U.S. state." });
+    }
+    if (normalizedCountry === "USA" && normalizedPostalCode && !/^\d{5}(?:-\d{4})?$/.test(normalizedPostalCode)) {
+      return res.status(400).json({ message: "U.S. ZIP codes must use 5 digits or ZIP+4 format (#####-####)." });
+    }
+
     const updated = await storage.updateUser(userId, {
       fullName,
       email,
       dateOfBirth,
       streetAddress,
       city,
-      state,
-      postalCode,
-      country,
+      state: normalizedCountry === "USA" ? normalizedState : "",
+      postalCode: normalizedPostalCode,
+      country: normalizedCountry,
     });
     if (!updated) return res.status(404).json({ message: "User not found" });
     res.json(updated);

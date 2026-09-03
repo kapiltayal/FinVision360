@@ -12,6 +12,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useLastUpdated } from "@/hooks/use-last-updated";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useAuth, useChangePassword } from "@/hooks/use-auth";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { COUNTRY_OPTIONS, US_STATE_OPTIONS } from "@shared/profile-options";
 import {
   User, Lock, Save, PiggyBank, CreditCard, Shield,
   KeyRound, BadgeCheck, SlidersHorizontal, Clock, Camera, Upload, X,
@@ -498,40 +500,59 @@ export default function SettingsPage() {
                   </div>
                   <div className="space-y-1.5">
                     <Label htmlFor="state" className="text-xs font-medium text-muted-foreground uppercase tracking-wide">State</Label>
-                    <Input
-                      id="state"
-                      data-testid="input-settings-state"
-                      value={profile.state}
-                      onChange={(e) => setProfile({ ...profile, state: e.target.value })}
-                      placeholder="IL"
-                      maxLength={50}
-                      autoComplete="address-level1"
-                    />
+                    <Select
+                      value={profile.state || "none"}
+                      onValueChange={(value) => setProfile({ ...profile, state: value === "none" ? "" : value })}
+                      disabled={profile.country !== "USA"}
+                    >
+                      <SelectTrigger id="state" data-testid="select-settings-state">
+                        <SelectValue placeholder={profile.country === "USA" ? "Select state" : "Not applicable"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Select state</SelectItem>
+                        {US_STATE_OPTIONS.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>{option.label} ({option.value})</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div className="space-y-1.5">
-                    <Label htmlFor="postalCode" className="text-xs font-medium text-muted-foreground uppercase tracking-wide">ZIP Code</Label>
+                    <Label htmlFor="postalCode" className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                      {profile.country === "USA" ? "ZIP Code" : "Postal Code"}
+                    </Label>
                     <Input
                       id="postalCode"
                       data-testid="input-settings-postal-code"
                       value={profile.postalCode}
                       onChange={(e) => setProfile({ ...profile, postalCode: e.target.value })}
-                      placeholder="60601"
+                      placeholder={profile.country === "USA" ? "60601" : "Postal code"}
                       maxLength={10}
-                      inputMode="numeric"
+                      inputMode={profile.country === "USA" ? "numeric" : "text"}
+                      pattern={profile.country === "USA" ? "\\d{5}(-\\d{4})?" : undefined}
+                      title={profile.country === "USA" ? "Enter a 5-digit ZIP code or ZIP+4 (#####-####)." : undefined}
                       autoComplete="postal-code"
                     />
                   </div>
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="country" className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Country</Label>
-                  <Input
-                    id="country"
-                    data-testid="input-settings-country"
-                    value={profile.country}
-                    onChange={(e) => setProfile({ ...profile, country: e.target.value })}
-                    placeholder="USA"
-                    autoComplete="country-name"
-                  />
+                  <Select
+                    value={profile.country || "USA"}
+                    onValueChange={(value) => setProfile({
+                      ...profile,
+                      country: value,
+                      state: value === "USA" ? profile.state : "",
+                    })}
+                  >
+                    <SelectTrigger id="country" data-testid="select-settings-country">
+                      <SelectValue placeholder="Select country" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {COUNTRY_OPTIONS.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>{option.label} ({option.value})</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <p className="text-xs text-muted-foreground">
                   Address details are optional and saved with your profile.
