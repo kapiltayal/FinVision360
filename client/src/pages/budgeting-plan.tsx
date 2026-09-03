@@ -187,6 +187,7 @@ function TrendSparkline({
         <LineChart data={data} margin={{ top: 3, right: 3, bottom: 3, left: 3 }}>
           <XAxis dataKey="month" hide />
           <RechartsTooltip
+            position={{ y: -44 }}
             cursor={{ stroke: "hsl(var(--border))", strokeDasharray: "2 2" }}
             formatter={(value: number) => [formatCurrency(Number(value)), "Amount"]}
             labelFormatter={(label) => formatMonth(String(label))}
