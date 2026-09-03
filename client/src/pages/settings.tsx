@@ -149,9 +149,25 @@ export default function SettingsPage() {
   };
 
   // ── Profile state ───────────────────────────────────────────────────────────
-  const [profile, setProfile] = useState({ fullName: "", dateOfBirth: "" });
+  const [profile, setProfile] = useState({
+    fullName: "",
+    dateOfBirth: "",
+    streetAddress: "",
+    city: "",
+    state: "",
+    postalCode: "",
+  });
   useEffect(() => {
-    if (user) setProfile({ fullName: user.fullName || "", dateOfBirth: (user as any).dateOfBirth || "" });
+    if (user) {
+      setProfile({
+        fullName: user.fullName || "",
+        dateOfBirth: (user as any).dateOfBirth || "",
+        streetAddress: (user as any).streetAddress || "",
+        city: (user as any).city || "",
+        state: (user as any).state || "",
+        postalCode: (user as any).postalCode || "",
+      });
+    }
   }, [user]);
 
   const [passwords, setPasswords] = useState({
@@ -455,6 +471,58 @@ export default function SettingsPage() {
                     );
                   })()}
                 </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="streetAddress" className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Street Address</Label>
+                  <Input
+                    id="streetAddress"
+                    data-testid="input-settings-street-address"
+                    value={profile.streetAddress}
+                    onChange={(e) => setProfile({ ...profile, streetAddress: e.target.value })}
+                    placeholder="123 Main Street"
+                    autoComplete="street-address"
+                  />
+                </div>
+                <div className="grid gap-4 sm:grid-cols-3">
+                  <div className="space-y-1.5 sm:col-span-1">
+                    <Label htmlFor="city" className="text-xs font-medium text-muted-foreground uppercase tracking-wide">City</Label>
+                    <Input
+                      id="city"
+                      data-testid="input-settings-city"
+                      value={profile.city}
+                      onChange={(e) => setProfile({ ...profile, city: e.target.value })}
+                      placeholder="Chicago"
+                      autoComplete="address-level2"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="state" className="text-xs font-medium text-muted-foreground uppercase tracking-wide">State</Label>
+                    <Input
+                      id="state"
+                      data-testid="input-settings-state"
+                      value={profile.state}
+                      onChange={(e) => setProfile({ ...profile, state: e.target.value })}
+                      placeholder="IL"
+                      maxLength={50}
+                      autoComplete="address-level1"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="postalCode" className="text-xs font-medium text-muted-foreground uppercase tracking-wide">ZIP Code</Label>
+                    <Input
+                      id="postalCode"
+                      data-testid="input-settings-postal-code"
+                      value={profile.postalCode}
+                      onChange={(e) => setProfile({ ...profile, postalCode: e.target.value })}
+                      placeholder="60601"
+                      maxLength={10}
+                      inputMode="numeric"
+                      autoComplete="postal-code"
+                    />
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Address details are optional and saved with your profile.
+                </p>
                 <div className="flex justify-end pt-1">
                   <Button type="submit" disabled={updateProfileMutation.isPending} data-testid="button-save-profile">
                     <Save className="h-4 w-4 mr-2" />

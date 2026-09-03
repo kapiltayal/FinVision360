@@ -11,12 +11,21 @@ export const users = pgTable("users", {
   supabaseId: text("supabase_id").unique(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   dateOfBirth: date("date_of_birth"),
+  streetAddress: text("street_address"),
+  city: text("city"),
+  state: text("state"),
+  postalCode: text("postal_code"),
 });
 
 export const insertUserSchema = createInsertSchema(users).pick({
   fullName: true,
   email: true,
   supabaseId: true,
+  dateOfBirth: true,
+  streetAddress: true,
+  city: true,
+  state: true,
+  postalCode: true,
 }).partial({ supabaseId: true });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;

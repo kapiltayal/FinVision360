@@ -5,3 +5,4 @@
 - [Plaid book imports](plaid-book-imports.md) — users choose which connected accounts enter their book; background sync updates only already-linked entries.
 - [Native AI integration provisioning](native-ai-integration.md) — Replit-managed AI uses Agent provisioning, not the third-party connector inventory or a personal provider key.
 - [Financial ingestion AI trust boundary](financial-ingestion-ai-trust.md) — AI assigns categories only; source values and server-owned row identities remain authoritative.
+- [Additive schema changes](additive-schema-changes.md) — avoid broad schema pushes when unrelated drift triggers destructive prompts; use narrowly scoped additive dev DDL.
