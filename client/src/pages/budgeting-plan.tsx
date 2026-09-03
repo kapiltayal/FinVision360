@@ -23,6 +23,7 @@ import {
 import {
   Line,
   LineChart,
+  XAxis,
   ResponsiveContainer,
   Tooltip as RechartsTooltip,
 } from "recharts";
@@ -184,6 +185,7 @@ function TrendSparkline({
     <div className="h-8 w-28" aria-label={`${data.length}-month trend`}>
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={data} margin={{ top: 3, right: 3, bottom: 3, left: 3 }}>
+          <XAxis dataKey="month" hide />
           <RechartsTooltip
             cursor={{ stroke: "hsl(var(--border))", strokeDasharray: "2 2" }}
             formatter={(value: number) => [formatCurrency(Number(value)), "Amount"]}
@@ -706,8 +708,6 @@ export default function BudgetingPlanPage() {
   const actualExpenses = (data?.actuals ?? [])
     .filter((line) => line.type === "expense")
     .reduce((sum, line) => sum + line.amount, 0);
-  const actualDebtPayments = actualMap.get("expense:debt_payment") ?? 0;
-  const actualGoalContributions = actualMap.get("expense:savings_transfer") ?? 0;
   const plannedIncome = incomeRows.reduce((sum, row) => sum + (row.planned ?? 0), 0);
   const plannedLivingExpenses = expenseRows.reduce(
     (sum, row) => sum + (row.planned ?? 0),
@@ -962,17 +962,13 @@ export default function BudgetingPlanPage() {
                     Debt payments
                   </CardTitle>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    Plan by debt using Liabilities data; categorized debt-payment actuals appear as the section total
+                    Plan by debt using Liabilities data; actual debt payments cannot be assigned reliably
                   </p>
                 </div>
                 <div className="flex gap-4 text-sm">
                   <div>
                     <p className="font-medium text-muted-foreground">Planned</p>
                     <p className="text-base font-semibold">{formatCurrency(plannedDebtPayments)}</p>
-                  </div>
-                  <div>
-                    <p className="font-medium text-muted-foreground">Actual</p>
-                    <p className="text-base font-semibold">{formatCurrency(actualDebtPayments)}</p>
                   </div>
                 </div>
                 </div>
@@ -1038,17 +1034,13 @@ export default function BudgetingPlanPage() {
                     Goals & planned contributions
                   </CardTitle>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    Plan by goal using current goal data; categorized savings-transfer actuals appear as the section total
+                    Plan by goal using current goal data; actual contributions cannot be assigned reliably
                   </p>
                 </div>
                 <div className="flex gap-4 text-sm">
                   <div>
                     <p className="font-medium text-muted-foreground">Planned</p>
                     <p className="text-base font-semibold">{formatCurrency(plannedGoals)}</p>
-                  </div>
-                  <div>
-                    <p className="font-medium text-muted-foreground">Savings transfers</p>
-                    <p className="text-base font-semibold">{formatCurrency(actualGoalContributions)}</p>
                   </div>
                 </div>
                 </div>
