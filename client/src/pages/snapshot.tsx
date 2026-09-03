@@ -46,6 +46,14 @@ const INSURANCE_TYPES = [
 
 const CARD_SHADOW = "0 2px 4px rgba(0,0,0,0.05), 0 6px 16px rgba(0,0,0,0.07), 0 16px 32px rgba(0,0,0,0.04)";
 const CARD_SHADOW_HOVER = "0 4px 8px rgba(0,0,0,0.07), 0 12px 28px rgba(0,0,0,0.1), 0 28px 48px rgba(0,0,0,0.07)";
+const EMERGENCY_CASH_CATEGORIES = new Set([
+  "savings_account",
+  "cash",
+  "bank_account",
+  "Savings Account",
+  "Cash & Digital Wallets",
+  "Checking Account",
+]);
 
 type Priority = "high" | "medium" | "low";
 interface Rec {
@@ -177,7 +185,7 @@ export default function SnapshotPage() {
 
   const emergencyFunds = useMemo(() =>
     assets
-      .filter(a => ["savings_account", "cash", "bank_account"].includes(a.category))
+      .filter(a => EMERGENCY_CASH_CATEGORIES.has(a.category))
       .reduce((s, a) => s + parseFloat(a.value || "0"), 0),
     [assets]);
 
@@ -196,7 +204,7 @@ export default function SnapshotPage() {
     const recs: Rec[] = [];
 
     const savingsBalance = assets
-      .filter(a => ["savings_account", "cash"].includes(a.category))
+      .filter(a => EMERGENCY_CASH_CATEGORIES.has(a.category))
       .reduce((s, a) => s + parseFloat(a.value || "0"), 0);
     const emergencyTarget = totalMonthlyExpenses * 3;
     if (emergencyTarget > 0 && savingsBalance < emergencyTarget) {
