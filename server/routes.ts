@@ -1226,8 +1226,7 @@ Include a year-by-year overview, useful milestones, a conservative/base/optimist
         }
       }
 
-      // Use live totals for the current calendar month. This replaces a stored
-      // snapshot for the same month instead of appending a non-date "Current" category.
+      // Read live totals separately from the complete historical snapshots.
       const { rows: [currentAssets] } = await pool.query<{ total: string }>(
         `SELECT COALESCE(SUM(value::numeric), 0) AS total FROM assets WHERE user_id = $1`,
         [userId],
@@ -1238,16 +1237,17 @@ Include a year-by-year overview, useful milestones, a conservative/base/optimist
       );
       const curAssets = parseFloat(currentAssets.total);
       const curLiabilities = parseFloat(currentLiabilities.total);
-      const currentMonth = new Date().toISOString().slice(0, 7);
-      byMonth[currentMonth] = {
-        date: Date.parse(`${currentMonth}-01T00:00:00.000Z`),
-        assets: curAssets,
-        liabilities: curLiabilities,
-      };
 
       const data = Object.entries(byMonth)
         .sort(([a], [b]) => a.localeCompare(b))
         .map(([, v]) => ({ ...v, netWorth: v.assets - v.liabilities }));
+      data.push({
+        date: Date.now(),
+        assets: curAssets,
+        liabilities: curLiabilities,
+        netWorth: curAssets - curLiabilities,
+        isCurrent: true,
+      });
 
       res.json(data);
     } catch (err) {

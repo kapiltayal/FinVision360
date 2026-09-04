@@ -46,6 +46,7 @@ interface NetWorthHistoryPoint {
   assets: number;
   liabilities: number;
   netWorth: number;
+  isCurrent?: boolean;
 }
 
 function StatCard({
@@ -344,12 +345,14 @@ function NetWorthHistoryChart({ data }: { data: NetWorthHistoryPoint[] }) {
       year: "numeric",
       timeZone: "UTC",
     });
+  const formatHistoryTick = (value: number) =>
+    data.find((point) => point.date === value)?.isCurrent ? "Current" : formatHistoryMonth(value);
 
   const HistoryTooltip = ({ active, payload, label }: any) => {
     if (!active || !payload?.length) return null;
     return (
       <div className="bg-popover border border-border rounded-md px-3 py-2 shadow-md space-y-1 min-w-[160px]">
-        <p className="text-xs font-semibold text-muted-foreground">{formatHistoryMonth(Number(label))}</p>
+        <p className="text-xs font-semibold text-muted-foreground">{formatHistoryTick(Number(label))}</p>
         {payload.map((p: any) => (
           <div key={p.dataKey} className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-1.5">
@@ -380,7 +383,7 @@ function NetWorthHistoryChart({ data }: { data: NetWorthHistoryPoint[] }) {
       tick={{ fontSize: 11 }}
       tickLine={false}
       axisLine={false}
-      tickFormatter={formatHistoryMonth}
+      tickFormatter={formatHistoryTick}
     />
   );
   const yAxis = (
