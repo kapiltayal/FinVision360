@@ -42,11 +42,10 @@ type HistoryChartType = "line" | "bar";
 type HistorySeries = "assets" | "liabilities" | "netWorth";
 
 interface NetWorthHistoryPoint {
-  date: number;
+  month: string;
   assets: number;
   liabilities: number;
   netWorth: number;
-  isCurrent?: boolean;
 }
 
 function StatCard({
@@ -339,20 +338,11 @@ function NetWorthHistoryChart({ data }: { data: NetWorthHistoryPoint[] }) {
     { key: "netWorth", label: "Net Worth", color: NW_NET_COLOR },
   ];
 
-  const formatHistoryMonth = (value: number) =>
-    new Date(value).toLocaleDateString("en-US", {
-      month: "short",
-      year: "numeric",
-      timeZone: "UTC",
-    });
-  const formatHistoryTick = (value: number) =>
-    data.find((point) => point.date === value)?.isCurrent ? "Current" : formatHistoryMonth(value);
-
   const HistoryTooltip = ({ active, payload, label }: any) => {
     if (!active || !payload?.length) return null;
     return (
       <div className="bg-popover border border-border rounded-md px-3 py-2 shadow-md space-y-1 min-w-[160px]">
-        <p className="text-xs font-semibold text-muted-foreground">{formatHistoryTick(Number(label))}</p>
+        <p className="text-xs font-semibold text-muted-foreground">{label}</p>
         {payload.map((p: any) => (
           <div key={p.dataKey} className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-1.5">
@@ -371,21 +361,7 @@ function NetWorthHistoryChart({ data }: { data: NetWorthHistoryPoint[] }) {
     margin: { top: 4, right: 8, left: 8, bottom: 0 },
   };
 
-  const xAxis = (
-    <XAxis
-      dataKey="date"
-      type="number"
-      scale="time"
-      domain={["dataMin", "dataMax"]}
-      ticks={data.map((point) => point.date)}
-      interval="preserveStartEnd"
-      minTickGap={12}
-      tick={{ fontSize: 11 }}
-      tickLine={false}
-      axisLine={false}
-      tickFormatter={formatHistoryTick}
-    />
-  );
+  const xAxis = <XAxis dataKey="month" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />;
   const yAxis = (
     <YAxis
       tick={{ fontSize: 11 }}

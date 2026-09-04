@@ -1209,24 +1209,25 @@ Include a year-by-year overview, useful milestones, a conservative/base/optimist
         [userId],
       );
 
-      // Merge snapshots by calendar month, represented as UTC timestamps so
-      // the client can render a true time-series axis.
-      const byMonth: Record<string, { date: number; assets: number; liabilities: number }> = {};
+      // Merge by month label
+      const byMonth: Record<string, { month: string; assets: number; liabilities: number }> = {};
       for (const r of assetRows) {
         const key = r.month.toISOString().slice(0, 7);
-        const date = Date.parse(`${key}-01T00:00:00.000Z`);
-        byMonth[key] = { date, assets: parseFloat(r.total), liabilities: 0 };
+        const label = new Date(r.month).toLocaleDateString("en-US", { month: "short", year: "numeric" });
+        byMonth[key] = { month: label, assets: parseFloat(r.total), liabilities: 0 };
       }
       for (const r of liabilityRows) {
         const key = r.month.toISOString().slice(0, 7);
+        const label = new Date(r.month).toLocaleDateString("en-US", { month: "short", year: "numeric" });
         if (byMonth[key]) byMonth[key].liabilities = parseFloat(r.total);
-        else {
-          const date = Date.parse(`${key}-01T00:00:00.000Z`);
-          byMonth[key] = { date, assets: 0, liabilities: parseFloat(r.total) };
-        }
+        else byMonth[key] = { month: label, assets: 0, liabilities: parseFloat(r.total) };
       }
 
-      // Read live totals separately from the complete historical snapshots.
+      const data = Object.entries(byMonth)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([, v]) => ({ ...v, netWorth: v.assets - v.liabilities }));
+
+      // Append live "Current" snapshot from the assets/liabilities tables
       const { rows: [currentAssets] } = await pool.query<{ total: string }>(
         `SELECT COALESCE(SUM(value::numeric), 0) AS total FROM assets WHERE user_id = $1`,
         [userId],
@@ -1237,17 +1238,7 @@ Include a year-by-year overview, useful milestones, a conservative/base/optimist
       );
       const curAssets = parseFloat(currentAssets.total);
       const curLiabilities = parseFloat(currentLiabilities.total);
-
-      const data = Object.entries(byMonth)
-        .sort(([a], [b]) => a.localeCompare(b))
-        .map(([, v]) => ({ ...v, netWorth: v.assets - v.liabilities }));
-      data.push({
-        date: Date.now(),
-        assets: curAssets,
-        liabilities: curLiabilities,
-        netWorth: curAssets - curLiabilities,
-        isCurrent: true,
-      });
+      data.push({ month: "Current", assets: curAssets, liabilities: curLiabilities, netWorth: curAssets - curLiabilities });
 
       res.json(data);
     } catch (err) {
