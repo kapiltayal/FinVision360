@@ -42,7 +42,9 @@ type HistoryChartType = "line" | "bar";
 type HistorySeries = "assets" | "liabilities" | "netWorth";
 
 interface NetWorthHistoryPoint {
-  month: string;
+  month?: string;
+  date?: number;
+  isCurrent?: boolean;
   assets: number;
   liabilities: number;
   netWorth: number;
@@ -323,6 +325,18 @@ function NetWorthHistoryChart({ data }: { data: NetWorthHistoryPoint[] }) {
   const [activeSeries, setActiveSeries] = useState<Set<HistorySeries>>(
     new Set<HistorySeries>(["assets", "liabilities", "netWorth"]),
   );
+  const chartData = data.map((point) => ({
+    ...point,
+    xAxisLabel: point.isCurrent
+      ? "Current"
+      : typeof point.date === "number"
+        ? new Intl.DateTimeFormat("en-US", {
+            month: "short",
+            year: "numeric",
+            timeZone: "UTC",
+          }).format(new Date(point.date))
+        : point.month || "",
+  }));
 
   const toggleSeries = (s: HistorySeries) =>
     setActiveSeries((prev) => {
@@ -357,11 +371,22 @@ function NetWorthHistoryChart({ data }: { data: NetWorthHistoryPoint[] }) {
   };
 
   const commonProps = {
-    data,
-    margin: { top: 4, right: 8, left: 8, bottom: 0 },
+    data: chartData,
+    margin: { top: 4, right: 8, left: 8, bottom: 8 },
   };
 
-  const xAxis = <XAxis dataKey="month" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />;
+  const xAxis = (
+    <XAxis
+      dataKey="xAxisLabel"
+      tick={{ fontSize: 11 }}
+      tickLine={false}
+      axisLine={false}
+      tickMargin={10}
+      minTickGap={28}
+      interval="preserveStartEnd"
+      height={32}
+    />
+  );
   const yAxis = (
     <YAxis
       tick={{ fontSize: 11 }}
