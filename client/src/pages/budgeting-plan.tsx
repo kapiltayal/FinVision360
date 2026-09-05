@@ -281,8 +281,12 @@ function PlanAmountInput({
     suggested !== undefined &&
     Math.round(draftAmount * 100) === Math.round(suggested * 100);
   const inputState =
-    draftAmount === undefined || !Number.isFinite(draftAmount)
-      ? "empty"
+    draftAmount === undefined
+      ? suggested !== undefined
+        ? "prepopulated"
+        : "empty"
+      : !Number.isFinite(draftAmount)
+        ? "empty"
       : matchesSuggested
         ? "prepopulated"
         : "changed";
@@ -902,7 +906,7 @@ export default function BudgetingPlanPage() {
               <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
                 <span className="inline-flex items-center gap-1.5">
                   <span className="h-3 w-3 rounded-sm border border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/45" />
-                  Pre-populated
+                  Pre-populated / suggested
                 </span>
                 <span className="inline-flex items-center gap-1.5">
                   <span className="h-3 w-3 rounded-sm border border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-950/45" />
