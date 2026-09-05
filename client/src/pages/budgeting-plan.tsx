@@ -238,11 +238,13 @@ function monthlyGoalRequirement(goal: GoalLine, planMonth: string): number {
 function PlanAmountInput({
   value,
   suggested,
+  suggestedLabel,
   saving,
   onSave,
 }: {
   value?: number;
   suggested?: number;
+  suggestedLabel?: string;
   saving: boolean;
   onSave: (amount: number) => void;
 }) {
@@ -272,6 +274,31 @@ function PlanAmountInput({
     onSave(next);
   }
 
+  const draftAmount = draft.trim() === "" ? undefined : Number(draft);
+  const matchesSuggested =
+    draftAmount !== undefined &&
+    Number.isFinite(draftAmount) &&
+    suggested !== undefined &&
+    Math.round(draftAmount * 100) === Math.round(suggested * 100);
+  const inputState =
+    draftAmount === undefined || !Number.isFinite(draftAmount)
+      ? "empty"
+      : matchesSuggested
+        ? "prepopulated"
+        : "changed";
+  const stateClass =
+    inputState === "prepopulated"
+      ? "border-blue-200 bg-blue-50 hover:bg-blue-100/80 focus-visible:border-blue-400 focus-visible:bg-blue-50 dark:border-blue-800 dark:bg-blue-950/45 dark:hover:bg-blue-950/65"
+      : inputState === "changed"
+        ? "border-amber-300 bg-amber-50 hover:bg-amber-100/80 focus-visible:border-amber-500 focus-visible:bg-amber-50 dark:border-amber-700 dark:bg-amber-950/45 dark:hover:bg-amber-950/65"
+        : "border-transparent bg-muted/60 hover:bg-muted focus-visible:border-primary focus-visible:bg-background";
+  const stateDescription =
+    inputState === "prepopulated"
+      ? `Pre-populated${suggestedLabel ? ` from ${suggestedLabel}` : ""}`
+      : inputState === "changed"
+        ? "Changed by you"
+        : "No plan amount entered";
+
   return (
     <div className="relative ml-auto w-28">
       <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
@@ -288,8 +315,10 @@ function PlanAmountInput({
           if (event.key === "Enter") event.currentTarget.blur();
         }}
         placeholder={suggested ? `${Math.round(suggested).toLocaleString()}` : "0"}
-        className="h-7 appearance-none rounded-md border-transparent bg-muted/60 pl-6 pr-8 text-right text-sm font-medium tabular-nums shadow-none transition-colors hover:bg-muted focus-visible:border-primary focus-visible:bg-background focus-visible:ring-2 focus-visible:ring-primary/15 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+        className={`h-7 appearance-none rounded-md pl-6 pr-8 text-right text-sm font-medium tabular-nums shadow-none transition-colors focus-visible:ring-2 focus-visible:ring-primary/15 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none ${stateClass}`}
         aria-label="Planned monthly amount"
+        aria-description={stateDescription}
+        title={stateDescription}
       />
       <span className="absolute right-1 top-1/2 flex h-5 -translate-y-1/2 flex-col justify-center">
         <button
@@ -477,6 +506,8 @@ function StatementSection({
                   <TableCell className="py-1.5 text-right">
                     <PlanAmountInput
                       value={row.planned}
+                      suggested={row.average}
+                      suggestedLabel="the 12-month average"
                       saving={savingKey === row.key}
                       onSave={(amount) => onSave(row.key, amount)}
                     />
@@ -868,6 +899,16 @@ export default function BudgetingPlanPage() {
               <p className="text-sm text-muted-foreground">
                 Enter plan amounts below. Changes save automatically when you leave a field.
               </p>
+              <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="h-3 w-3 rounded-sm border border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/45" />
+                  Pre-populated
+                </span>
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="h-3 w-3 rounded-sm border border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-950/45" />
+                  Changed by you
+                </span>
+              </div>
             </div>
             <div className="flex flex-wrap items-center justify-end gap-3">
               <Button
@@ -1009,6 +1050,7 @@ export default function BudgetingPlanPage() {
                             <PlanAmountInput
                               value={planMap.get(key) ?? liability.minimumPayment}
                               suggested={liability.minimumPayment}
+                              suggestedLabel="the minimum payment"
                               saving={savingKey === key}
                               onSave={(amount) => savePlanLine(key, amount)}
                             />
@@ -1094,6 +1136,7 @@ export default function BudgetingPlanPage() {
                             <PlanAmountInput
                               value={planMap.get(key) ?? required}
                               suggested={required}
+                              suggestedLabel="the required monthly contribution"
                               saving={savingKey === key}
                               onSave={(amount) => savePlanLine(key, amount)}
                             />
