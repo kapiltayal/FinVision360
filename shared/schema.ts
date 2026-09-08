@@ -102,6 +102,24 @@ export const liabilitiesTypeList = pgTable("liabilities_type_list", {
 export type LiabilitiesTypeList = typeof liabilitiesTypeList.$inferSelect;
 export type InsertLiabilitiesTypeList = typeof liabilitiesTypeList.$inferInsert;
 
+export const transactionTypeList = pgTable("transaction_type_list", {
+  id: serial("id").primaryKey(),
+  type: text("type").notNull(),
+  parentCategory: text("parent_category").notNull(),
+  category: text("category").notNull(),
+  needVsWant: text("need_vs_want"),
+  description: text("description").notNull(),
+}, (table) => ({
+  hierarchyUnique: uniqueIndex("transaction_type_list_hierarchy_unique").on(
+    table.type,
+    table.parentCategory,
+    table.category,
+  ),
+}));
+
+export type TransactionTypeList = typeof transactionTypeList.$inferSelect;
+export type InsertTransactionTypeList = typeof transactionTypeList.$inferInsert;
+
 export const insurancePolicies = pgTable("insurance_policies", {
   id: serial("id").primaryKey(),
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),

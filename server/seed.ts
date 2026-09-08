@@ -1,7 +1,8 @@
 import { sql } from "drizzle-orm";
 import { db } from "./db";
-import { assetTypeList, liabilitiesTypeList } from "@shared/schema";
+import { assetTypeList, liabilitiesTypeList, transactionTypeList } from "@shared/schema";
 import { assetTypeListSeedData, liabilitiesTypeListSeedData } from "./seed-data/asset-liability-types";
+import { transactionTypeListSeedData } from "./seed-data/transaction-types";
 
 export async function seedDatabase() {
   await db.insert(assetTypeList)
@@ -22,6 +23,20 @@ export async function seedDatabase() {
       target: [liabilitiesTypeList.parentCategory, liabilitiesTypeList.subCategory],
       set: {
         type: sql`excluded.type`,
+        description: sql`excluded.description`,
+      },
+    });
+
+  await db.insert(transactionTypeList)
+    .values(transactionTypeListSeedData)
+    .onConflictDoUpdate({
+      target: [
+        transactionTypeList.type,
+        transactionTypeList.parentCategory,
+        transactionTypeList.category,
+      ],
+      set: {
+        needVsWant: sql`excluded.need_vs_want`,
         description: sql`excluded.description`,
       },
     });
