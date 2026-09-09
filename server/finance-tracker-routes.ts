@@ -12,6 +12,7 @@ const transactionUpload = multer({ storage: multer.memoryStorage(), limits: { fi
 const CORRUPT_TRANSACTION_FILE = "File content could not be read or appears corrupted.";
 const NO_TRANSACTION_DETECTIONS = "Could not detect any valid transactions in this file.";
 const INVALID_TRANSACTION_FILE_TYPE = "File type is not supported or does not match its contents.";
+const UNASSIGNED_TRANSACTION_CATEGORY = "unassigned";
 type CanonicalTransactionCategory = {
   type: string; parentCategory: string; category: string; needVsWant: string | null; description: string;
   storedCategory: string; storedParentCategory: string;
@@ -944,7 +945,6 @@ export function registerFinanceTrackerRoutes(app: Express) {
         !deterministicTransactionCategory(categories, t.description || "", t.type),
       );
       const aiMatches = await aiTransactionCategories(unmapped.map(({ t }) => t), categories);
-      if (unmapped.length && !aiMatches) return res.status(400).json({ message: NO_TRANSACTION_DETECTIONS });
       for (const [sourceIndex, selected] of Array.from((aiMatches || new Map()).entries())) {
         const target = unmapped[sourceIndex]?.t;
         if (target) {
@@ -955,6 +955,7 @@ export function registerFinanceTrackerRoutes(app: Express) {
       importClient = await pool.connect();
       await importClient.query("BEGIN");
       let inserted = 0;
+      let uncategorized = 0;
       const skippedReasons: Record<string, number> = {};
       const addSkipped = (reason: string) => {
         skippedReasons[reason] = (skippedReasons[reason] ?? 0) + 1;
@@ -981,18 +982,18 @@ export function registerFinanceTrackerRoutes(app: Express) {
 
         try {
           const supplied = t.subcategory ?? t.category;
-          if (t.parentCategory !== undefined && supplied === undefined) { addSkipped("Invalid category"); continue; }
           const selected = supplied !== undefined
             ? categoryForInput(categories, t.type, supplied, t.parentCategory)
             : deterministicTransactionCategory(categories, t.description, t.type);
-          if (!selected) { addSkipped("Invalid category"); continue; }
-          // Imports deliberately default to the DB category's classification.
-          const finalNW = selected.needVsWant?.toLowerCase() ?? "na";
+          const finalCategory = selected?.storedCategory ?? UNASSIGNED_TRANSACTION_CATEGORY;
+          const finalParentCategory = selected?.storedParentCategory ?? null;
+          const finalNW = selected?.needVsWant?.toLowerCase() ?? "na";
+          if (!selected) uncategorized++;
 
           await importClient.query(
             `INSERT INTO transactions (user_id, date, description, merchant, amount, type, parent_category, subcategory, needs_want, source, notes)
              VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'upload',$10)`,
-            [userId, t.date, t.description, t.merchant || t.description, Math.abs(parseFloat(t.amount)), t.type, selected.storedParentCategory, selected.storedCategory, finalNW, t.notes || null]
+            [userId, t.date, t.description, t.merchant || t.description, Math.abs(parseFloat(t.amount)), t.type, finalParentCategory, finalCategory, finalNW, t.notes || null]
           );
           inserted++;
         } catch (error) {
@@ -1011,7 +1012,7 @@ export function registerFinanceTrackerRoutes(app: Express) {
       importClient.release();
       importClient = null;
       const recurringMarked = await detectAndMarkRecurring(userId);
-      res.json({ inserted, skipped, skippedReasons, recurringMarked });
+      res.json({ inserted, uncategorized, skipped, skippedReasons, recurringMarked });
     } catch (e) {
       if (importClient) {
         await importClient.query("ROLLBACK").catch(() => undefined);
@@ -1067,7 +1068,6 @@ export function registerFinanceTrackerRoutes(app: Express) {
         if (!row.subcategory && !row.parentCategory && !deterministicTransactionCategory(categories, row.description, row.type)) unknownIndexes.push(index);
       });
       const ai = await aiTransactionCategories(unknownIndexes.map((index) => rows[index]), categories);
-      if (unknownIndexes.length && !ai) return res.status(400).json({ message: NO_TRANSACTION_DETECTIONS });
       unknownIndexes.forEach((index, sourceIndex) => {
         const category = ai?.get(sourceIndex);
         if (category) {
@@ -1076,27 +1076,22 @@ export function registerFinanceTrackerRoutes(app: Express) {
           normalized[index].parentCategory = category.storedParentCategory;
         }
       });
-      // Reuse the bulk validation and persistence path. Invalid/AI-unmapped
-      // rows are never assigned an invented fallback category.
-      const possible = normalized.filter((row) =>
-        !row.parentCategory && (row.subcategory || deterministicTransactionCategory(categories, row.description, row.type)) ||
-        Boolean(row.subcategory),
-      );
-      if (!possible.length) return res.status(400).json({ message: NO_TRANSACTION_DETECTIONS });
       req.body = { transactions: normalized };
       // The handler is deliberately implemented in-line by dispatching to the
       // same route logic would recurse, so persist the validated rows here.
       ingestionClient = await pool.connect();
       await ingestionClient.query("BEGIN");
-      let inserted = 0; const skippedReasons: Record<string, number> = {};
+      let inserted = 0; let uncategorized = 0; const skippedReasons: Record<string, number> = {};
       for (const t of normalized) {
         if (!isValidIsoDate(t.date) || !t.description || !Number.isFinite(t.amount) || t.amount === 0) { skippedReasons["Invalid transaction"] = (skippedReasons["Invalid transaction"] || 0) + 1; continue; }
-        if (t.parentCategory && !t.subcategory) { skippedReasons["Invalid category"] = (skippedReasons["Invalid category"] || 0) + 1; continue; }
         const selected = categoryForInput(categories, t.type, t.subcategory, t.parentCategory) || deterministicTransactionCategory(categories, t.description, t.type);
-        if (!selected) { skippedReasons["Invalid category"] = (skippedReasons["Invalid category"] || 0) + 1; continue; }
+        const finalCategory = selected?.storedCategory ?? UNASSIGNED_TRANSACTION_CATEGORY;
+        const finalParentCategory = selected?.storedParentCategory ?? null;
+        const finalNeedWant = selected?.needVsWant?.toLowerCase() || "na";
+        if (!selected) uncategorized++;
         await ingestionClient.query(`INSERT INTO transactions (user_id,date,description,merchant,amount,type,parent_category,subcategory,needs_want,source,notes)
           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'upload',$10)`,
-          [(req.user as any).id, t.date, t.description, t.merchant || t.description, Math.abs(t.amount), t.type, selected.storedParentCategory, selected.storedCategory, selected.needVsWant?.toLowerCase() || "na", t.notes || null]);
+          [(req.user as any).id, t.date, t.description, t.merchant || t.description, Math.abs(t.amount), t.type, finalParentCategory, finalCategory, finalNeedWant, t.notes || null]);
         inserted++;
       }
       if (!inserted) {
@@ -1108,7 +1103,7 @@ export function registerFinanceTrackerRoutes(app: Express) {
       await ingestionClient.query("COMMIT");
       ingestionClient.release();
       ingestionClient = null;
-      res.json({ inserted, skipped: Object.values(skippedReasons).reduce((a, b) => a + b, 0), skippedReasons, recurringMarked: await detectAndMarkRecurring((req.user as any).id) });
+      res.json({ inserted, uncategorized, skipped: Object.values(skippedReasons).reduce((a, b) => a + b, 0), skippedReasons, recurringMarked: await detectAndMarkRecurring((req.user as any).id) });
     } catch (error) {
       if (ingestionClient) {
         await ingestionClient.query("ROLLBACK").catch(() => undefined);

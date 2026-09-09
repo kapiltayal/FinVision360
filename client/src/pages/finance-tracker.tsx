@@ -56,6 +56,7 @@ type Stats = {
 };
 type ImportResult = {
   inserted: number;
+  uncategorized: number;
   skipped: number;
   skippedReasons: Record<string, number>;
 };
@@ -758,6 +759,7 @@ export default function FinanceTrackerPage() {
     onSuccess: (res: any) => res.json().then((d: any) => {
       const importResult: ImportResult = {
         inserted: Number(d.inserted ?? 0),
+        uncategorized: Number(d.uncategorized ?? 0),
         skipped: Number(d.skipped ?? 0),
         skippedReasons: d.skippedReasons ?? {},
       };
@@ -769,9 +771,12 @@ export default function FinanceTrackerPage() {
       setDataIntakeOpen(false);
       setLastImportResult(importResult);
       toast({
-        title: "Transaction file upload complete",
+        title: importResult.uncategorized > 0 ? "Upload complete — categories missing" : "Transaction file upload complete",
         description: [
           `${importResult.inserted} uploaded · ${importResult.skipped} not uploaded.`,
+          importResult.uncategorized > 0
+            ? `${importResult.uncategorized} uploaded transaction${importResult.uncategorized === 1 ? " needs" : "s need"} category review.`
+            : "",
           "Showing All Time so uploaded dates are visible.",
           d.recurringMarked ? `${d.recurringMarked} marked as recurring` : "",
         ].filter(Boolean).join(" "),
@@ -944,16 +949,32 @@ export default function FinanceTrackerPage() {
         </Card>
       )}
       {lastImportResult && (
-        <div className="flex items-start justify-between gap-3 rounded-lg border border-emerald-200 bg-emerald-50/70 p-3 dark:border-emerald-900/60 dark:bg-emerald-950/20" role="status">
+        <div
+          className={`flex items-start justify-between gap-3 rounded-lg border p-3 ${
+            lastImportResult.uncategorized > 0
+              ? "border-amber-300 bg-amber-50/80 dark:border-amber-800 dark:bg-amber-950/30"
+              : "border-emerald-200 bg-emerald-50/70 dark:border-emerald-900/60 dark:bg-emerald-950/20"
+          }`}
+          role={lastImportResult.uncategorized > 0 ? "alert" : "status"}
+        >
           <div className="flex items-start gap-2.5">
-            <Upload className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+            {lastImportResult.uncategorized > 0
+              ? <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+              : <Upload className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />}
             <div className="text-sm">
-              <p className="font-medium text-emerald-800 dark:text-emerald-300">Transaction file upload complete</p>
-              <p className="mt-0.5 text-emerald-700 dark:text-emerald-400">
+              <p className={`font-medium ${lastImportResult.uncategorized > 0 ? "text-amber-900 dark:text-amber-200" : "text-emerald-800 dark:text-emerald-300"}`}>
+                {lastImportResult.uncategorized > 0 ? "Upload complete — category review needed" : "Transaction file upload complete"}
+              </p>
+              <p className={`mt-0.5 ${lastImportResult.uncategorized > 0 ? "text-amber-800 dark:text-amber-300" : "text-emerald-700 dark:text-emerald-400"}`}>
                 <strong>{lastImportResult.inserted}</strong> uploaded · <strong>{lastImportResult.skipped}</strong> not uploaded
               </p>
+              {lastImportResult.uncategorized > 0 && (
+                <p className="mt-1 text-xs font-medium text-amber-800 dark:text-amber-300">
+                  {lastImportResult.uncategorized} uploaded transaction{lastImportResult.uncategorized === 1 ? " has" : "s have"} a missing category. Filter by "Unassigned" to review.
+                </p>
+              )}
               {lastImportResult.skipped > 0 && (
-                <p className="mt-1 text-xs text-emerald-700 dark:text-emerald-400">
+                <p className={`mt-1 text-xs ${lastImportResult.uncategorized > 0 ? "text-amber-800 dark:text-amber-300" : "text-emerald-700 dark:text-emerald-400"}`}>
                   Not uploaded: {Object.entries(lastImportResult.skippedReasons)
                     .filter(([, count]) => count > 0)
                     .map(([reason, count]) => `${count} ${reason.toLowerCase()}`)
@@ -962,7 +983,7 @@ export default function FinanceTrackerPage() {
               )}
             </div>
           </div>
-          <Button size="icon" variant="ghost" className="h-7 w-7 text-emerald-700 hover:text-emerald-900 dark:text-emerald-400" onClick={() => setLastImportResult(null)}>
+          <Button size="icon" variant="ghost" className={`h-7 w-7 ${lastImportResult.uncategorized > 0 ? "text-amber-800 hover:text-amber-950 dark:text-amber-300" : "text-emerald-700 hover:text-emerald-900 dark:text-emerald-400"}`} onClick={() => setLastImportResult(null)}>
             <X className="h-4 w-4" />
             <span className="sr-only">Dismiss upload summary</span>
           </Button>
