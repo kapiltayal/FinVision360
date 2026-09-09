@@ -120,6 +120,55 @@ export const transactionTypeList = pgTable("transaction_type_list", {
 export type TransactionTypeList = typeof transactionTypeList.$inferSelect;
 export type InsertTransactionTypeList = typeof transactionTypeList.$inferInsert;
 
+// Kept in the shared schema even though the finance tracker currently uses
+// parameterized SQL for its hot paths.
+export const transactions = pgTable("transactions", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull(),
+  date: date("date").notNull(),
+  description: text("description").notNull(),
+  merchant: text("merchant"),
+  amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
+  type: text("type").notNull(),
+  parentCategory: text("parent_category"),
+  subcategory: text("subcategory").notNull().default("unassigned"),
+  needsWant: text("needs_want"),
+  isUserModified: boolean("is_user_modified").notNull().default(false),
+  isRecurring: boolean("is_recurring").default(false),
+  recurringType: text("recurring_type"),
+  source: text("source").notNull().default("manual"),
+  plaidTransactionId: text("plaid_transaction_id"),
+  plaidAccountId: text("plaid_account_id"),
+  plaidAccountName: text("plaid_account_name"),
+  plaidInstitutionName: text("plaid_institution_name"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+}, (table) => ({
+  userIdIndex: index("idx_transactions_user_id").on(table.userId),
+  dateIndex: index("idx_transactions_date").on(table.date),
+  typeIndex: index("idx_transactions_type").on(table.type),
+  plaidUnique: uniqueIndex("idx_transactions_plaid_unique")
+    .on(table.userId, table.plaidTransactionId)
+    .where(sql`${table.plaidTransactionId} IS NOT NULL`),
+  typeCheck: check("transactions_type_check", sql`${table.type} IN ('income', 'expense')`),
+  needsWantCheck: check("transactions_needs_want_check", sql`${table.needsWant} IN ('need', 'want', 'na')`),
+  recurringTypeCheck: check("transactions_recurring_type_check", sql`${table.recurringType} IN ('subscription', 'recurring_bill')`),
+  sourceCheck: check("transactions_source_check", sql`${table.source} IN ('manual', 'plaid', 'upload', 'import')`),
+}));
+
+export const transactionChangeHistory = pgTable("transaction_change_history", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull(),
+  transactionId: integer("transaction_id").notNull(),
+  field: text("field").notNull(),
+  oldValue: text("old_value"),
+  newValue: text("new_value"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  transactionIndex: index("idx_transaction_change_history_transaction").on(table.transactionId),
+}));
+
 export const insurancePolicies = pgTable("insurance_policies", {
   id: serial("id").primaryKey(),
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),

@@ -4,6 +4,124 @@ import type { Express } from "express";
 import type { Transaction as PlaidTransaction } from "plaid";
 import { getPlaidClient } from "./plaid";
 import { storage } from "./storage";
+import multer from "multer";
+import { parseUpload, isEmptySample, type RawRow } from "./asset-liability-ingestion";
+import { completeIngestionClassification } from "./ai/provider";
+
+const transactionUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024, files: 1 } });
+const CORRUPT_TRANSACTION_FILE = "File content could not be read or appears corrupted.";
+const NO_TRANSACTION_DETECTIONS = "Could not detect any valid transactions in this file.";
+const INVALID_TRANSACTION_FILE_TYPE = "File type is not supported or does not match its contents.";
+type CanonicalTransactionCategory = {
+  type: string; parentCategory: string; category: string; needVsWant: string | null; description: string;
+  storedCategory: string; storedParentCategory: string;
+};
+
+function categoryKey(value: unknown): string {
+  return typeof value === "string" ? value.toLowerCase().replace(/&/g, " and ").replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "") : "";
+}
+async function canonicalTransactionCategories(): Promise<CanonicalTransactionCategory[]> {
+  const { rows } = await pool.query(
+    `SELECT type, parent_category, category, need_vs_want, description FROM transaction_type_list ORDER BY type, parent_category, category`,
+  );
+  return rows.map((row) => ({
+    type: String(row.type), parentCategory: String(row.parent_category), category: String(row.category),
+    needVsWant: row.need_vs_want ? String(row.need_vs_want) : null, description: String(row.description),
+    // Values persisted to transactions are the authoritative DB labels.
+    // categoryKey is strictly an input compatibility/matching concern.
+    storedCategory: String(row.category), storedParentCategory: String(row.parent_category),
+  }));
+}
+function supportedTransactionFile(file: Express.Multer.File): boolean {
+  const ext = file.originalname.toLowerCase().match(/\.([a-z0-9]+)$/)?.[1];
+  const allowed: Record<string, string[]> = {
+    csv: ["text/csv", "application/csv", "text/plain"], tsv: ["text/tab-separated-values", "text/tsv", "text/plain"],
+    txt: ["text/plain", "text/csv", "text/tab-separated-values"], xls: ["application/vnd.ms-excel"],
+    xlsx: ["application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"],
+  };
+  if (!ext || !allowed[ext]?.includes(file.mimetype.toLowerCase())) return false;
+  if (ext === "xls") return file.buffer.subarray(0, 4).equals(Buffer.from([0xd0, 0xcf, 0x11, 0xe0]));
+  if (ext === "xlsx") return file.buffer.subarray(0, 4).equals(Buffer.from([0x50, 0x4b, 0x03, 0x04]));
+  return file.buffer.length > 0 && !file.buffer.includes(0);
+}
+function transactionUploadFile(req: any, res: any, next: any) {
+  transactionUpload.single("file")(req, res, (error: unknown) => {
+    if (error instanceof multer.MulterError && error.code === "LIMIT_FILE_SIZE") return res.status(413).json({ message: "File is too large. Maximum file size is 5 MiB." });
+    if (error) return res.status(400).json({ message: CORRUPT_TRANSACTION_FILE });
+    next();
+  });
+}
+
+function field(row: RawRow, ...names: string[]): string {
+  const found = Object.entries(row).find(([key]) => names.includes(categoryKey(key)));
+  return found && (typeof found[1] === "string" || typeof found[1] === "number") ? String(found[1]).trim() : "";
+}
+function categoryForInput(
+  categories: CanonicalTransactionCategory[], type: "income" | "expense", value: unknown, parentValue?: unknown,
+): CanonicalTransactionCategory | undefined {
+  const key = categoryKey(value);
+  const parent = categoryKey(parentValue);
+  if (!key) return undefined;
+  return categories.find((item) => item.type.toLowerCase() === type &&
+    categoryKey(item.category) === key &&
+    (!parent || categoryKey(item.parentCategory) === parent));
+}
+function isNeedWant(value: unknown): value is "need" | "want" | "na" {
+  return value === "need" || value === "want" || value === "na";
+}
+const legacyCategoryAliases: Record<string, string> = {
+  salary: "salary_wages", business: "business_income", bonus: "bonuses_commissions",
+  freelance: "freelance_consulting", dividend: "dividends", rental: "rental_income",
+  capital_gains: "capital_gains", refund: "refunds", gift: "gifts", housing: "housing_rent",
+  dining_out: "dining_out", debt_payment: "debt_payment", other_expense: "other_expense",
+};
+function deterministicTransactionCategory(
+  categories: CanonicalTransactionCategory[], description: string, type: "income" | "expense",
+): CanonicalTransactionCategory | undefined {
+  const automatic = autoCategorizeFn(description, type);
+  return categoryForInput(categories, type, legacyCategoryAliases[automatic.subcategory] || automatic.subcategory);
+}
+async function aiTransactionCategories(
+  rows: RawRow[], categories: CanonicalTransactionCategory[],
+): Promise<Map<number, CanonicalTransactionCategory> | null> {
+  if (!rows.length) return new Map();
+  const allowed = categories.filter((item) => item.type === "Income" || item.type === "Expense")
+    .map(({ type, parentCategory, category, needVsWant, description }) => ({ type, parentCategory, category, needVsWant, description }));
+  try {
+    const content = await completeIngestionClassification(JSON.stringify({
+      task: "Return JSON {entries:[{sourceIndex:number,type:'income'|'expense',category:'exact provided category'}]}. Classify only clear transactions. Categories must be copied exactly from categories; never invent values.",
+      categories: allowed, rows: rows.map((row, sourceIndex) => ({ sourceIndex, row })),
+    }));
+    const entries = JSON.parse(content)?.entries;
+    if (!Array.isArray(entries) || !entries.length) return null;
+    const result = new Map<number, CanonicalTransactionCategory>();
+    for (const entry of entries) {
+      const index = Number(entry?.sourceIndex);
+      if (!Number.isInteger(index) || index < 0 || index >= rows.length || result.has(index)) continue;
+      const type = entry?.type === "income" || entry?.type === "expense" ? entry.type : "";
+      const match = type ? categoryForInput(categories, type, entry?.category) : undefined;
+      if (match) result.set(index, match);
+    }
+    return result.size ? result : null;
+  } catch {
+    return null;
+  }
+}
+
+function normalizeTransactionDate(value: unknown): string | null {
+  if (value instanceof Date && !Number.isNaN(value.getTime())) return value.toISOString().slice(0, 10);
+  if (typeof value !== "string" && typeof value !== "number") return null;
+  const raw = String(value).trim();
+  const iso = raw.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})(?:[ T].*)?$/);
+  const us = raw.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})(?:[ T].*)?$/);
+  const parts = iso ? [Number(iso[1]), Number(iso[2]), Number(iso[3])] :
+    us ? [Number(us[3]), Number(us[1]), Number(us[2])] : null;
+  if (!parts) return null;
+  const [year, month, day] = parts;
+  const candidate = new Date(Date.UTC(year, month - 1, day));
+  return candidate.getUTCFullYear() === year && candidate.getUTCMonth() === month - 1 && candidate.getUTCDate() === day
+    ? `${year.toString().padStart(4, "0")}-${month.toString().padStart(2, "0")}-${day.toString().padStart(2, "0")}` : null;
+}
 
 function normalizeDateValue(value: unknown): string | null {
   if (value instanceof Date) return value.toISOString().slice(0, 10);
@@ -195,7 +313,7 @@ function normalizeMerchant(description: string): string {
 
 async function detectAndMarkRecurring(userId: string): Promise<number> {
   const { rows } = await pool.query(
-    `SELECT id, date, description, amount, type FROM transactions WHERE user_id = $1 ORDER BY date ASC`,
+    `SELECT id, date, description, amount, type FROM transactions WHERE user_id = $1 AND NOT is_user_modified ORDER BY date ASC`,
     [userId]
   );
 
@@ -243,6 +361,16 @@ async function detectAndMarkRecurring(userId: string): Promise<number> {
 
 // ─── ROUTE REGISTRATION ───────────────────────────────────────────────────────
 export function registerFinanceTrackerRoutes(app: Express) {
+  // Canonical selectable categories.  Display labels remain DB-owned while the
+  // storage keys are deliberately lowercase to match existing transactions.
+  app.get("/api/transaction-categories", requireAuth, async (_req, res) => {
+    try {
+      res.json(await canonicalTransactionCategories());
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ message: "Failed to fetch transaction categories" });
+    }
+  });
   // GET /api/budget-plan — saved plan plus source data for one calendar month
   app.get("/api/budget-plan", requireAuth, async (req, res) => {
     try {
@@ -761,19 +889,28 @@ export function registerFinanceTrackerRoutes(app: Express) {
   app.post("/api/transactions", requireAuth, async (req, res) => {
     try {
       const userId = (req.user as any).id;
-      const { date, description, amount, type, subcategory, needsWant, isRecurring, recurringType, notes, source = "manual" } = req.body;
+      const { date, description, amount, type, subcategory, category, parentCategory, needsWant, isRecurring, recurringType, notes, source = "manual" } = req.body;
 
       if (!date || !description || amount === undefined || !type)
         return res.status(400).json({ message: "date, description, amount, type are required" });
+      const normalizedDate = normalizeTransactionDate(date);
+      if (!normalizedDate) return res.status(400).json({ message: "Invalid transaction date" });
 
-      let cat = autoCategorizeFn(description, type);
-      const finalSubcat = subcategory && subcategory !== "unassigned" ? subcategory : cat.subcategory;
-      const finalNW = needsWant || cat.needsWant;
+      if (type !== "income" && type !== "expense") return res.status(400).json({ message: "Invalid transaction type" });
+      const categories = await canonicalTransactionCategories();
+      const supplied = subcategory ?? category;
+      if (parentCategory !== undefined && supplied === undefined) return res.status(400).json({ message: "Invalid category" });
+      const selected = supplied !== undefined
+        ? categoryForInput(categories, type, supplied, parentCategory)
+        : deterministicTransactionCategory(categories, description, type);
+      if (!selected) return res.status(400).json({ message: "Invalid category" });
+      if (needsWant !== undefined && !isNeedWant(needsWant)) return res.status(400).json({ message: "Invalid Need / Want value" });
+      const finalNW = needsWant ?? selected.needVsWant?.toLowerCase() ?? "na";
 
       const { rows } = await pool.query(
-        `INSERT INTO transactions (user_id, date, description, merchant, amount, type, subcategory, needs_want, is_recurring, recurring_type, source, notes)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
-        [userId, date, description, description, Math.abs(parseFloat(amount)), type, finalSubcat, finalNW,
+        `INSERT INTO transactions (user_id, date, description, merchant, amount, type, parent_category, subcategory, needs_want, is_recurring, recurring_type, source, notes)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING *`,
+        [userId, normalizedDate, description, description, Math.abs(parseFloat(amount)), type, selected.storedParentCategory, selected.storedCategory, finalNW,
          isRecurring ?? false, isRecurring && recurringType ? recurringType : null, source, notes || null]
       );
 
@@ -786,13 +923,37 @@ export function registerFinanceTrackerRoutes(app: Express) {
 
   // POST /api/transactions/bulk — CSV import
   app.post("/api/transactions/bulk", requireAuth, async (req, res) => {
+    let importClient: any;
     try {
       const userId = (req.user as any).id;
       const { transactions, rejected: clientRejected = {} } = req.body;
 
       if (!Array.isArray(transactions))
         return res.status(400).json({ message: "transactions array required" });
+      if (transactions.length > 500) return res.status(400).json({ message: "Imports are limited to 500 entries at a time" });
+      for (const transaction of transactions) {
+        if (transaction && typeof transaction === "object") {
+          transaction.date = normalizeTransactionDate(transaction.date) || transaction.date;
+        }
+      }
 
+      const categories = await canonicalTransactionCategories();
+      const unmapped = transactions.map((t, index) => ({ t, index })).filter(({ t }) =>
+        (t?.type === "income" || t?.type === "expense") &&
+        t.subcategory === undefined && t.category === undefined &&
+        !deterministicTransactionCategory(categories, t.description || "", t.type),
+      );
+      const aiMatches = await aiTransactionCategories(unmapped.map(({ t }) => t), categories);
+      if (unmapped.length && !aiMatches) return res.status(400).json({ message: NO_TRANSACTION_DETECTIONS });
+      for (const [sourceIndex, selected] of Array.from((aiMatches || new Map()).entries())) {
+        const target = unmapped[sourceIndex]?.t;
+        if (target) {
+          target.subcategory = selected.storedCategory;
+          target.parentCategory = selected.storedParentCategory;
+        }
+      }
+      importClient = await pool.connect();
+      await importClient.query("BEGIN");
       let inserted = 0;
       const skippedReasons: Record<string, number> = {};
       const addSkipped = (reason: string) => {
@@ -807,9 +968,9 @@ export function registerFinanceTrackerRoutes(app: Express) {
       }
 
       for (const t of transactions) {
-        if (!t.date) { addSkipped("Missing or invalid date"); continue; }
+        if (!t.date || !isValidIsoDate(t.date)) { addSkipped("Missing or invalid date"); continue; }
         if (!t.description) { addSkipped("Missing description"); continue; }
-        if (t.amount === undefined || t.amount === null || !Number.isFinite(Number(t.amount))) {
+        if (t.amount === undefined || t.amount === null || !Number.isFinite(Number(t.amount)) || Number(t.amount) === 0) {
           addSkipped("Missing or invalid amount");
           continue;
         }
@@ -819,26 +980,141 @@ export function registerFinanceTrackerRoutes(app: Express) {
         }
 
         try {
-          const cat = autoCategorizeFn(t.description, t.type);
-          const finalSubcat = t.subcategory && t.subcategory !== "unassigned" ? t.subcategory : cat.subcategory;
-          const finalNW = t.needsWant || cat.needsWant;
+          const supplied = t.subcategory ?? t.category;
+          if (t.parentCategory !== undefined && supplied === undefined) { addSkipped("Invalid category"); continue; }
+          const selected = supplied !== undefined
+            ? categoryForInput(categories, t.type, supplied, t.parentCategory)
+            : deterministicTransactionCategory(categories, t.description, t.type);
+          if (!selected) { addSkipped("Invalid category"); continue; }
+          // Imports deliberately default to the DB category's classification.
+          const finalNW = selected.needVsWant?.toLowerCase() ?? "na";
 
-          await pool.query(
-            `INSERT INTO transactions (user_id, date, description, merchant, amount, type, subcategory, needs_want, source, notes)
-             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'upload',$9)`,
-            [userId, t.date, t.description, t.merchant || t.description, Math.abs(parseFloat(t.amount)), t.type, finalSubcat, finalNW, t.notes || null]
+          await importClient.query(
+            `INSERT INTO transactions (user_id, date, description, merchant, amount, type, parent_category, subcategory, needs_want, source, notes)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'upload',$10)`,
+            [userId, t.date, t.description, t.merchant || t.description, Math.abs(parseFloat(t.amount)), t.type, selected.storedParentCategory, selected.storedCategory, finalNW, t.notes || null]
           );
           inserted++;
-        } catch {
-          addSkipped("Could not save record");
+        } catch (error) {
+          throw error;
         }
       }
 
-      const recurringMarked = inserted ? await detectAndMarkRecurring(userId) : 0;
+       if (!inserted) {
+         await importClient.query("ROLLBACK");
+         importClient.release();
+         importClient = null;
+         return res.status(400).json({ message: NO_TRANSACTION_DETECTIONS });
+       }
       const skipped = Object.values(skippedReasons).reduce((total, count) => total + count, 0);
+      await importClient.query("COMMIT");
+      importClient.release();
+      importClient = null;
+      const recurringMarked = await detectAndMarkRecurring(userId);
       res.json({ inserted, skipped, skippedReasons, recurringMarked });
     } catch (e) {
+      if (importClient) {
+        await importClient.query("ROLLBACK").catch(() => undefined);
+        importClient.release();
+      }
       console.error(e);
+      res.status(500).json({ message: "Failed to import transactions" });
+    }
+  });
+
+  // Multipart counterpart to the JSON bulk endpoint. Parsing, archive bounds,
+  // UTF-8 checks, and spreadsheet handling are shared with the other imports.
+  app.post("/api/transactions/ingest", requireAuth, transactionUploadFile, async (req: any, res) => {
+    let ingestionClient: any;
+    try {
+      if (!req.file || !supportedTransactionFile(req.file)) {
+        return res.status(400).json({ message: INVALID_TRANSACTION_FILE_TYPE });
+      }
+      const rows = parseUpload(req.file);
+      const inspect = rows?.slice(0, 10) ?? [];
+      const recognizable = inspect.some((row) => {
+        const date = field(row, "date", "transactiondate", "posteddate");
+        const description = field(row, "description", "merchant", "name", "memo", "text");
+        const amount = field(row, "amount", "value", "debit", "credit");
+        return !!description && (!!amount || (Boolean(date) && Object.keys(row).length >= 2));
+      });
+      if (!rows || isEmptySample(rows) || !recognizable) {
+        return res.status(400).json({ message: CORRUPT_TRANSACTION_FILE });
+      }
+      if (rows.length > 500) return res.status(400).json({ message: "Imports are limited to 500 entries at a time" });
+      const categories = await canonicalTransactionCategories();
+      const normalized = rows.map((row) => {
+        const parseMoney = (value: string) => Number(value.replace(/[$,\s]/g, "").replace(/^\((.*)\)$/, "-$1"));
+        const rawAmount = field(row, "amount", "value");
+        const rawDebit = field(row, "debit");
+        const rawCredit = field(row, "credit");
+        const amount = parseMoney(rawAmount || rawDebit || rawCredit);
+        const explicitType = field(row, "type", "transactiontype").toLowerCase();
+        return {
+          date: normalizeTransactionDate(field(row, "date", "transactiondate", "posteddate")) || "",
+          description: field(row, "description", "merchant", "name", "memo", "text"),
+          merchant: field(row, "merchant", "description", "name"),
+          amount,
+          type: (explicitType === "income" || explicitType === "credit" || (!rawAmount && !!rawCredit)
+            ? "income" : "expense") as "income" | "expense",
+          subcategory: field(row, "subcategory", "category"),
+          parentCategory: field(row, "parentcategory"),
+          notes: field(row, "notes", "memo"),
+        };
+      });
+      const unknownIndexes: number[] = [];
+      normalized.forEach((row, index) => {
+        if (!row.subcategory && !row.parentCategory && !deterministicTransactionCategory(categories, row.description, row.type)) unknownIndexes.push(index);
+      });
+      const ai = await aiTransactionCategories(unknownIndexes.map((index) => rows[index]), categories);
+      if (unknownIndexes.length && !ai) return res.status(400).json({ message: NO_TRANSACTION_DETECTIONS });
+      unknownIndexes.forEach((index, sourceIndex) => {
+        const category = ai?.get(sourceIndex);
+        if (category) {
+          normalized[index].type = category.type.toLowerCase() as "income" | "expense";
+          normalized[index].subcategory = category.storedCategory;
+          normalized[index].parentCategory = category.storedParentCategory;
+        }
+      });
+      // Reuse the bulk validation and persistence path. Invalid/AI-unmapped
+      // rows are never assigned an invented fallback category.
+      const possible = normalized.filter((row) =>
+        !row.parentCategory && (row.subcategory || deterministicTransactionCategory(categories, row.description, row.type)) ||
+        Boolean(row.subcategory),
+      );
+      if (!possible.length) return res.status(400).json({ message: NO_TRANSACTION_DETECTIONS });
+      req.body = { transactions: normalized };
+      // The handler is deliberately implemented in-line by dispatching to the
+      // same route logic would recurse, so persist the validated rows here.
+      ingestionClient = await pool.connect();
+      await ingestionClient.query("BEGIN");
+      let inserted = 0; const skippedReasons: Record<string, number> = {};
+      for (const t of normalized) {
+        if (!isValidIsoDate(t.date) || !t.description || !Number.isFinite(t.amount) || t.amount === 0) { skippedReasons["Invalid transaction"] = (skippedReasons["Invalid transaction"] || 0) + 1; continue; }
+        if (t.parentCategory && !t.subcategory) { skippedReasons["Invalid category"] = (skippedReasons["Invalid category"] || 0) + 1; continue; }
+        const selected = categoryForInput(categories, t.type, t.subcategory, t.parentCategory) || deterministicTransactionCategory(categories, t.description, t.type);
+        if (!selected) { skippedReasons["Invalid category"] = (skippedReasons["Invalid category"] || 0) + 1; continue; }
+        await ingestionClient.query(`INSERT INTO transactions (user_id,date,description,merchant,amount,type,parent_category,subcategory,needs_want,source,notes)
+          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'upload',$10)`,
+          [(req.user as any).id, t.date, t.description, t.merchant || t.description, Math.abs(t.amount), t.type, selected.storedParentCategory, selected.storedCategory, selected.needVsWant?.toLowerCase() || "na", t.notes || null]);
+        inserted++;
+      }
+      if (!inserted) {
+        await ingestionClient.query("ROLLBACK");
+        ingestionClient.release();
+        ingestionClient = null;
+        return res.status(400).json({ message: NO_TRANSACTION_DETECTIONS });
+      }
+      await ingestionClient.query("COMMIT");
+      ingestionClient.release();
+      ingestionClient = null;
+      res.json({ inserted, skipped: Object.values(skippedReasons).reduce((a, b) => a + b, 0), skippedReasons, recurringMarked: await detectAndMarkRecurring((req.user as any).id) });
+    } catch (error) {
+      if (ingestionClient) {
+        await ingestionClient.query("ROLLBACK").catch(() => undefined);
+        ingestionClient.release();
+      }
+      console.error(error);
       res.status(500).json({ message: "Failed to import transactions" });
     }
   });
@@ -898,6 +1174,7 @@ export function registerFinanceTrackerRoutes(app: Express) {
       }
 
       const plaid = getPlaidClient();
+      const canonicalCategories = await canonicalTransactionCategories();
       const accountByPlaidId = new Map(allAccounts.map((account) => [account.plaidAccountId, account]));
 
       let inserted = 0;
@@ -969,12 +1246,20 @@ export function registerFinanceTrackerRoutes(app: Express) {
             const merchant = (transaction.merchant_name || transaction.name || description).trim();
             const type: "income" | "expense" = amount < 0 ? "income" : "expense";
             const category = categorizePlaidTransaction(transaction, description, type);
+            const canonicalCategory = categoryForInput(
+              canonicalCategories, type, legacyCategoryAliases[category.subcategory] || category.subcategory,
+            ) || deterministicTransactionCategory(canonicalCategories, description, type);
+            if (!canonicalCategory) {
+              skipped++;
+              skippedInvalid++;
+              continue;
+            }
             const institutionName = item.institutionName || "Connected Institution";
             const { rows } = await pool.query(
               `INSERT INTO transactions (
-                 user_id, date, description, merchant, amount, type, subcategory, needs_want,
+                 user_id, date, description, merchant, amount, type, parent_category, subcategory, needs_want,
                  source, plaid_transaction_id, plaid_account_id, plaid_account_name, plaid_institution_name
-               ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'plaid',$9,$10,$11,$12)
+                ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'plaid',$10,$11,$12,$13)
                ON CONFLICT (user_id, plaid_transaction_id)
                  WHERE plaid_transaction_id IS NOT NULL
                DO UPDATE SET
@@ -983,8 +1268,9 @@ export function registerFinanceTrackerRoutes(app: Express) {
                  merchant=EXCLUDED.merchant,
                  amount=EXCLUDED.amount,
                  type=EXCLUDED.type,
-                 subcategory=EXCLUDED.subcategory,
-                 needs_want=EXCLUDED.needs_want,
+                  parent_category=CASE WHEN transactions.is_user_modified THEN transactions.parent_category ELSE EXCLUDED.parent_category END,
+                  subcategory=CASE WHEN transactions.is_user_modified THEN transactions.subcategory ELSE EXCLUDED.subcategory END,
+                  needs_want=CASE WHEN transactions.is_user_modified THEN transactions.needs_want ELSE EXCLUDED.needs_want END,
                  source='plaid',
                  plaid_account_id=EXCLUDED.plaid_account_id,
                  plaid_account_name=EXCLUDED.plaid_account_name,
@@ -998,8 +1284,9 @@ export function registerFinanceTrackerRoutes(app: Express) {
                 merchant,
                 Math.abs(amount),
                 type,
-                category.subcategory,
-                category.needsWant,
+                canonicalCategory.storedParentCategory,
+                canonicalCategory.storedCategory,
+                canonicalCategory.needVsWant?.toLowerCase() || "na",
                 transaction.transaction_id,
                 transaction.account_id,
                 account.name,
@@ -1051,21 +1338,45 @@ export function registerFinanceTrackerRoutes(app: Express) {
 
   // PATCH /api/transactions/:id
   app.patch("/api/transactions/:id", requireAuth, async (req, res) => {
+    let editClient: any;
     try {
       const userId = (req.user as any).id;
       const id = parseInt(req.params.id);
       if (!Number.isInteger(id)) return res.status(400).json({ message: "Invalid transaction id" });
+      editClient = await pool.connect();
+      await editClient.query("BEGIN");
+      const abortEdit = async (status: number, message: string) => {
+        await editClient.query("ROLLBACK");
+        editClient.release();
+        editClient = null;
+        return res.status(status).json({ message });
+      };
 
       const {
-        date, description, amount, type, subcategory, needsWant, isRecurring, recurringType, notes,
+        date, description, amount, type, subcategory, category, parentCategory, needsWant, isRecurring, recurringType, notes,
         applyToMerchant = false, merchantFields = [],
       } = req.body;
-      const { rows: existingRows } = await pool.query(
-        `SELECT * FROM transactions WHERE id = $1 AND user_id = $2`,
+      const { rows: existingRows } = await editClient.query(
+        `SELECT * FROM transactions WHERE id = $1 AND user_id = $2 FOR UPDATE`,
         [id, userId],
       );
       const existing = existingRows[0];
-      if (!existing) return res.status(404).json({ message: "Not found" });
+      if (!existing) return abortEdit(404, "Not found");
+      const categories = await canonicalTransactionCategories();
+      if (type !== undefined && type !== "income" && type !== "expense") return abortEdit(400, "Invalid transaction type");
+      const requestedType = type === "income" || type === "expense" ? type : existing.type;
+      const requestedCategory = subcategory ?? category;
+      const selectedCategory = requestedCategory !== undefined
+        ? categoryForInput(categories, requestedType, requestedCategory, parentCategory)
+        : undefined;
+      if (requestedCategory !== undefined && !selectedCategory) return abortEdit(400, "Invalid category");
+      if (type !== undefined && type !== existing.type && !selectedCategory) {
+        return abortEdit(400, "A valid category is required when changing transaction type");
+      }
+      if (needsWant !== undefined && !isNeedWant(needsWant)) return abortEdit(400, "Invalid Need / Want value");
+      if (parentCategory !== undefined && requestedCategory === undefined) {
+        return abortEdit(400, "A category is required when setting a parent category");
+      }
 
       const updates: string[] = [];
       const params: any[] = [];
@@ -1083,7 +1394,9 @@ export function registerFinanceTrackerRoutes(app: Express) {
         addUpdate("amount", Math.abs(Number(amount)));
       }
       if (type !== undefined && type !== existing.type) addUpdate("type", type);
-      if (subcategory !== undefined && subcategory !== existing.subcategory) addUpdate("subcategory", subcategory);
+      if (selectedCategory && selectedCategory.storedCategory !== existing.subcategory) addUpdate("subcategory", selectedCategory.storedCategory);
+      if (selectedCategory && selectedCategory.storedParentCategory !== existing.parent_category) addUpdate("parent_category", selectedCategory.storedParentCategory);
+      if (selectedCategory && needsWant === undefined && (selectedCategory.needVsWant?.toLowerCase() || "na") !== existing.needs_want) addUpdate("needs_want", selectedCategory.needVsWant?.toLowerCase() || "na");
       if (needsWant !== undefined && needsWant !== existing.needs_want) addUpdate("needs_want", needsWant);
       if (isRecurring !== undefined && Boolean(isRecurring) !== Boolean(existing.is_recurring)) {
         addUpdate("is_recurring", Boolean(isRecurring));
@@ -1096,9 +1409,14 @@ export function registerFinanceTrackerRoutes(app: Express) {
       if (notes !== undefined && notes !== existing.notes) addUpdate("notes", notes || null);
 
       let transaction = existing;
+      let primaryChanged = false;
       if (updates.length > 0) {
+        const modifiesClassification = updates.some((update) =>
+          /^(parent_category|subcategory|needs_want|is_recurring|recurring_type)\s*=/.test(update),
+        );
+        if (modifiesClassification) updates.push("is_user_modified = TRUE");
         params.push(id, userId);
-        const { rows } = await pool.query(
+        const { rows } = await editClient.query(
           `UPDATE transactions
            SET ${updates.join(", ")}, updated_at = NOW()
            WHERE id = $${params.length - 1} AND user_id = $${params.length}
@@ -1106,33 +1424,59 @@ export function registerFinanceTrackerRoutes(app: Express) {
           params,
         );
         transaction = rows[0];
+        primaryChanged = true;
+        const audited = [
+          ["parent_category", existing.parent_category, transaction.parent_category],
+          ["subcategory", existing.subcategory, transaction.subcategory],
+          ["needs_want", existing.needs_want, transaction.needs_want],
+          ["is_recurring", existing.is_recurring, transaction.is_recurring],
+          ["recurring_type", existing.recurring_type, transaction.recurring_type],
+        ].filter(([, oldValue, newValue]) => String(oldValue ?? "") !== String(newValue ?? ""));
+        for (const [field, oldValue, newValue] of audited) {
+          await editClient.query(
+            `INSERT INTO transaction_change_history (user_id, transaction_id, field, old_value, new_value) VALUES ($1,$2,$3,$4,$5)`,
+            [userId, id, field, oldValue == null ? null : String(oldValue), newValue == null ? null : String(newValue)],
+          );
+        }
       }
 
       const allowedMerchantFields = new Set(["subcategory", "needsWant", "recurring"]);
       const scopedFields = Array.isArray(merchantFields)
         ? merchantFields.filter((field): field is string => allowedMerchantFields.has(field))
         : [];
-      let updatedCount = 1;
+       let updatedCount = 1;
 
       if (applyToMerchant === true && scopedFields.length > 0) {
-        if (scopedFields.includes("subcategory") && subcategory === undefined) {
-          return res.status(400).json({ message: "A category is required for a merchant-wide category update" });
+        if (scopedFields.includes("subcategory") && requestedCategory === undefined) {
+          return abortEdit(400, "A category is required for a merchant-wide category update");
         }
         if (scopedFields.includes("needsWant") && needsWant === undefined) {
-          return res.status(400).json({ message: "A Need / Want value is required for a merchant-wide update" });
+          return abortEdit(400, "A Need / Want value is required for a merchant-wide update");
         }
         if (scopedFields.includes("recurring") && typeof isRecurring !== "boolean") {
-          return res.status(400).json({ message: "A recurring value is required for a merchant-wide update" });
+          return abortEdit(400, "A recurring value is required for a merchant-wide update");
         }
 
         const merchantKey = normalizeMerchant(existing.merchant || existing.description);
-        const { rows: candidateRows } = await pool.query(
-          `SELECT id, merchant, description FROM transactions WHERE user_id = $1`,
+        const { rows: candidateRows } = await editClient.query(
+          `SELECT id, merchant, description, parent_category, subcategory, needs_want, is_recurring, recurring_type FROM transactions WHERE user_id = $1`,
           [userId],
         );
-        const matchingIds = candidateRows
-          .filter(row => normalizeMerchant(row.merchant || row.description) === merchantKey)
-          .map(row => row.id);
+        const expectedNeedWant = scopedFields.includes("needsWant")
+          ? needsWant
+          : selectedCategory?.needVsWant?.toLowerCase() || "na";
+        const matchingRows = candidateRows.filter((row: any) => {
+          if (row.id === id || normalizeMerchant(row.merchant || row.description) !== merchantKey) return false;
+          return (scopedFields.includes("subcategory") && selectedCategory &&
+              (row.subcategory !== selectedCategory.storedCategory ||
+               row.parent_category !== selectedCategory.storedParentCategory ||
+               row.needs_want !== expectedNeedWant)) ||
+            (scopedFields.includes("needsWant") && row.needs_want !== needsWant) ||
+            (scopedFields.includes("recurring") &&
+              (Boolean(row.is_recurring) !== Boolean(isRecurring) ||
+               (row.recurring_type ?? null) !== (isRecurring ? (recurringType || null) : null)));
+        });
+        const matchingIds = matchingRows.map((row: any) => row.id);
 
         if (matchingIds.length > 0) {
           const merchantUpdates: string[] = [];
@@ -1142,27 +1486,53 @@ export function registerFinanceTrackerRoutes(app: Express) {
             merchantUpdates.push(`${column} = $${merchantParams.length}`);
           };
 
-          if (scopedFields.includes("subcategory")) addMerchantUpdate("subcategory", subcategory);
+          if (scopedFields.includes("subcategory") && selectedCategory) {
+            addMerchantUpdate("subcategory", selectedCategory.storedCategory);
+            addMerchantUpdate("parent_category", selectedCategory.storedParentCategory);
+            if (!scopedFields.includes("needsWant")) addMerchantUpdate("needs_want", selectedCategory.needVsWant?.toLowerCase() || "na");
+          }
           if (scopedFields.includes("needsWant")) addMerchantUpdate("needs_want", needsWant);
           if (scopedFields.includes("recurring")) {
             addMerchantUpdate("is_recurring", Boolean(isRecurring));
             addMerchantUpdate("recurring_type", isRecurring ? (recurringType || null) : null);
           }
 
+          merchantUpdates.push("is_user_modified = TRUE");
           merchantParams.push(userId, matchingIds);
-          const { rowCount } = await pool.query(
+          const { rowCount } = await editClient.query(
             `UPDATE transactions
              SET ${merchantUpdates.join(", ")}, updated_at = NOW()
              WHERE user_id = $${merchantParams.length - 1}
                AND id = ANY($${merchantParams.length}::int[])`,
             merchantParams,
           );
-          updatedCount = rowCount ?? 0;
+          updatedCount = (primaryChanged ? 1 : 0) + (rowCount ?? 0);
+          const fieldsToAudit = scopedFields.includes("subcategory")
+            ? ["parent_category", "subcategory", "needs_want"] : scopedFields.includes("needsWant") ? ["needs_want"] : [];
+          if (scopedFields.includes("recurring")) fieldsToAudit.push("is_recurring", "recurring_type");
+          for (const row of matchingRows) {
+            for (const auditField of fieldsToAudit) {
+              const newValue = auditField === "subcategory" ? selectedCategory?.storedCategory
+                : auditField === "parent_category" ? selectedCategory?.storedParentCategory
+                : auditField === "needs_want" ? (scopedFields.includes("needsWant") ? needsWant : selectedCategory?.needVsWant?.toLowerCase())
+                : auditField === "is_recurring" ? Boolean(isRecurring) : isRecurring ? (recurringType || null) : null;
+              if (String(row[auditField] ?? "") === String(newValue ?? "")) continue;
+              await editClient.query(`INSERT INTO transaction_change_history (user_id, transaction_id, field, old_value, new_value) VALUES ($1,$2,$3,$4,$5)`,
+                [userId, row.id, auditField, row[auditField], newValue == null ? null : String(newValue)]);
+            }
+          }
         }
       }
 
+      await editClient.query("COMMIT");
+      editClient.release();
+      editClient = null;
       res.json({ transaction, updatedCount });
     } catch (e) {
+      if (editClient) {
+        await editClient.query("ROLLBACK").catch(() => undefined);
+        editClient.release();
+      }
       console.error(e);
       res.status(500).json({ message: "Failed to update transaction" });
     }

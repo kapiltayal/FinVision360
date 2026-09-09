@@ -1,4 +1,4 @@
-import { useState, useRef, useMemo } from "react";
+import { useState, useRef, useMemo, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -27,7 +27,7 @@ import {
 // ── Types ─────────────────────────────────────────────────────────────────────
 type Transaction = {
   id: number; user_id: string; date: string; description: string; merchant: string | null;
-  amount: string; type: "income" | "expense"; subcategory: string;
+  amount: string; type: "income" | "expense"; parent_category?: string | null; subcategory: string;
   needs_want: "need" | "want" | "na" | null; is_recurring: boolean;
   recurring_type: "subscription" | "recurring_bill" | null;
   source: "manual" | "plaid" | "upload" | "import"; notes: string | null;
@@ -58,6 +58,12 @@ type ImportResult = {
   inserted: number;
   skipped: number;
   skippedReasons: Record<string, number>;
+};
+type CanonicalCategory = {
+  type: string;
+  parentCategory: string;
+  category: string;
+  needVsWant: string | null;
 };
 type TrendRow = { period: string; income: string; expenses: string };
 type CatRow = { subcategory: string; total: string; count: string };
@@ -150,6 +156,14 @@ function fmtPeriod(s: string, groupBy: string) {
 function catLabel(v: string) {
   return ALL_SUBCATS.find(s => s.value === v)?.label ?? v;
 }
+function normalizeCategoryKey(value: string) {
+  return value.toLowerCase().replace(/&/g, " and ").replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
+}
+const LEGACY_CATEGORY_KEYS: Record<string, string> = {
+  salary: "salary_wages", business: "business_income", bonus: "bonuses_commissions",
+  freelance: "freelance_consulting", dividend: "dividends", rental: "rental_income",
+  refund: "refunds", gift: "gifts", housing: "housing_rent", other_expense: "other_expense",
+};
 
 function getDateRange(period: string, customStart?: string, customEnd?: string) {
   const now = new Date();
@@ -183,72 +197,49 @@ function getDateRange(period: string, customStart?: string, customEnd?: string) 
   return { start: undefined, end: undefined };
 }
 
-// ── CSV Parsing ───────────────────────────────────────────────────────────────
-function detectDelimiter(line: string) {
-  const counts = { "\t": 0, ",": 0, ";": 0, "|": 0 };
-  for (const ch of line) if (ch in counts) (counts as any)[ch]++;
-  return Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0];
-}
-function parseCSVText(text: string): string[][] {
-  const lines = text.trim().split(/\r?\n/);
-  if (!lines.length) return [];
-  const delim = detectDelimiter(lines[0]);
-  return lines.map(line => {
-    const cells: string[] = []; let inQ = false; let cur = "";
-    for (let i = 0; i < line.length; i++) {
-      const ch = line[i];
-      if (ch === '"') { inQ = !inQ; continue; }
-      if (ch === delim && !inQ) { cells.push(cur.trim()); cur = ""; continue; }
-      cur += ch;
-    }
-    cells.push(cur.trim());
-    return cells;
-  });
-}
-function parseDate(s: string): string | null {
-  if (!s) return null;
-  const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
-  if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
-  const us = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
-  if (us) {
-    const yr = us[3].length === 2 ? `20${us[3]}` : us[3];
-    return `${yr}-${us[1].padStart(2, "0")}-${us[2].padStart(2, "0")}`;
-  }
-  const d = new Date(s);
-  if (!isNaN(d.getTime())) return d.toISOString().split("T")[0];
-  return null;
-}
-function guessCol(headers: string[], keywords: string[]) {
-  const h = headers.map(x => x.toLowerCase().trim());
-  for (const kw of keywords) {
-    const i = h.findIndex(x => x.includes(kw));
-    if (i !== -1) return String(i);
-  }
-  return "";
-}
-
 // ── TransactionDialog ─────────────────────────────────────────────────────────
 function TransactionDialog({
-  open, onOpenChange, initial, onSave, saving,
+  open, onOpenChange, initial, onSave, saving, categories, categoriesLoading, categoriesError,
 }: {
   open: boolean; onOpenChange: (v: boolean) => void;
   initial?: Partial<Transaction>; onSave: (data: any) => void; saving: boolean;
+  categories: CanonicalCategory[]; categoriesLoading: boolean; categoriesError: Error | null;
 }) {
   const today = new Date().toISOString().split("T")[0];
   const [date, setDate] = useState(initial?.date ?? today);
   const [desc, setDesc] = useState(initial?.description ?? "");
   const [amount, setAmount] = useState(initial?.amount ? String(parseFloat(initial.amount)) : "");
   const [type, setType] = useState<"income" | "expense">(initial?.type ?? "expense");
-  const [subcat, setSubcat] = useState(initial?.subcategory ?? "unassigned");
+  const [subcat, setSubcat] = useState(initial?.subcategory ?? "");
+  const [parentCategory, setParentCategory] = useState((initial as any)?.parent_category ?? "");
   const [nw, setNw] = useState(initial?.needs_want ?? "");
   const [recurring, setRecurring] = useState(initial?.is_recurring ?? false);
   const [recurringType, setRecurringType] = useState(initial?.recurring_type ?? "");
   const [notes, setNotes] = useState(initial?.notes ?? "");
 
-  const subcats = type === "income" ? INCOME_SUBCATS : EXPENSE_SUBCATS;
+  const matchingCategories = categories.filter(category => category.type.toLowerCase() === type);
+  const groupedCategories = matchingCategories.reduce<Record<string, CanonicalCategory[]>>((groups, category) => {
+    (groups[category.parentCategory] ??= []).push(category);
+    return groups;
+  }, {});
+  const selectedCanonicalCategory = matchingCategories.find(category => category.category === subcat);
+  const hasCurrentCategory = Boolean(selectedCanonicalCategory);
   const isEdit = !!initial?.id;
 
-  const canSave = date && desc && amount && parseFloat(amount) > 0;
+  useEffect(() => {
+    if (!matchingCategories.length || !subcat) return;
+    const normalizedSubcategory = normalizeCategoryKey(subcat);
+    const canonicalKey = LEGACY_CATEGORY_KEYS[normalizedSubcategory] ?? normalizedSubcategory;
+    const category = matchingCategories.find(item =>
+      item.category === subcat || normalizeCategoryKey(item.category) === canonicalKey,
+    );
+    if (!category) return;
+    if (category.category !== subcat) setSubcat(category.category);
+    if (category.parentCategory !== parentCategory) setParentCategory(category.parentCategory);
+  }, [matchingCategories, parentCategory, subcat]);
+
+  const canSave = !!date && !!desc && !!amount && parseFloat(amount) > 0
+    && !!selectedCanonicalCategory && !categoriesLoading && !categoriesError;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -264,7 +255,7 @@ function TransactionDialog({
             </div>
             <div>
               <Label className="text-xs">Type *</Label>
-              <Select value={type} onValueChange={v => { setType(v as any); setSubcat("unassigned"); }}>
+              <Select value={type} onValueChange={v => { setType(v as any); setSubcat(""); setParentCategory(""); }}>
                 <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="income">Income</SelectItem>
@@ -284,12 +275,38 @@ function TransactionDialog({
             </div>
             <div>
               <Label className="text-xs">Category</Label>
-              <Select value={subcat} onValueChange={setSubcat}>
-                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {subcats.map(s => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
-                </SelectContent>
-              </Select>
+               {categoriesLoading ? (
+                 <div className="mt-1 h-10 rounded-md border px-3 flex items-center text-sm text-muted-foreground">Loading categories…</div>
+               ) : categoriesError ? (
+                 <p className="mt-1 text-xs text-destructive">Categories could not be loaded: {categoriesError.message}</p>
+               ) : (
+                 <select
+                   value={subcat}
+                   onChange={event => {
+                     const selectedCategory = matchingCategories.find(category => category.category === event.target.value);
+                     setSubcat(event.target.value);
+                     setParentCategory(selectedCategory?.parentCategory ?? "");
+                     if (selectedCategory?.needVsWant) setNw(selectedCategory.needVsWant.toLowerCase());
+                   }}
+                   className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                   aria-label="Category"
+                 >
+                   <option value="">Choose a category</option>
+                   {!hasCurrentCategory && subcat && <option value={subcat}>{catLabel(subcat)} (current)</option>}
+                   {Object.entries(groupedCategories).map(([parentCategory, childCategories]) => (
+                     <optgroup key={parentCategory} label={parentCategory}>
+                       {childCategories.map(category => (
+                         <option key={`${category.parentCategory}-${category.category}`} value={category.category}>
+                           {category.category}
+                         </option>
+                       ))}
+                     </optgroup>
+                   ))}
+                 </select>
+               )}
+               {!categoriesLoading && !categoriesError && !subcat && (
+                 <p className="mt-1 text-xs text-destructive">Choose a category to save this transaction.</p>
+               )}
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
@@ -332,7 +349,7 @@ function TransactionDialog({
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
           <Button
             disabled={!canSave || saving}
-            onClick={() => onSave({ date, description: desc, amount, type, subcategory: subcat, needsWant: nw || null, isRecurring: recurring, recurringType: recurring ? (recurringType || "subscription") : null, notes })}
+            onClick={() => onSave({ date, description: desc, amount, type, subcategory: subcat, parentCategory: parentCategory || undefined, needsWant: nw || null, isRecurring: recurring, recurringType: recurring ? (recurringType || "subscription") : null, notes })}
           >
             {saving ? "Saving…" : isEdit ? "Save Changes" : "Add Transaction"}
           </Button>
@@ -342,81 +359,38 @@ function TransactionDialog({
   );
 }
 
-// ── CSV Upload Panel ──────────────────────────────────────────────────────────
-function CsvUploadPanel({
+// ── Transaction File Upload Panel ─────────────────────────────────────────────
+function TransactionFileUploadPanel({
   onImport,
   importing,
 }: {
-  onImport: (payload: { transactions: any[]; rejected: Record<string, number> }) => void;
+  onImport: (file: File) => void;
   importing: boolean;
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
-  const [rows, setRows] = useState<string[][]>([]);
-  const [headers, setHeaders] = useState<string[]>([]);
-  const [colDate, setColDate] = useState("");
-  const [colDesc, setColDesc] = useState("");
-  const [colAmt, setColAmt] = useState("");
-  const [colType, setColType] = useState("");
-  const [negIsExpense, setNegIsExpense] = useState(true);
+  const [file, setFile] = useState<File | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const maximumSize = 5 * 1024 * 1024;
+  const allowedExtensions = [".csv", ".tsv", ".txt", ".xls", ".xlsx"];
 
-  function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = ev => {
-      const text = ev.target?.result as string;
-      const parsed = parseCSVText(text);
-      if (parsed.length < 2) return;
-      const hdrs = parsed[0];
-      const data = parsed.slice(1).filter(r => r.some(c => c));
-      setHeaders(hdrs);
-      setRows(data);
-      setColDate(guessCol(hdrs, ["date", "posted", "trans date", "transaction date"]));
-      setColDesc(guessCol(hdrs, ["description", "memo", "name", "payee", "merchant", "details", "narrative"]));
-      setColAmt(guessCol(hdrs, ["amount", "debit", "credit", "value", "sum"]));
-      setColType(guessCol(hdrs, ["type", "category", "transaction type"]));
-    };
-    reader.readAsText(file);
+  function handleFile(event: React.ChangeEvent<HTMLInputElement>) {
+    const selectedFile = event.target.files?.[0];
+    if (!selectedFile) return;
+
+    const extension = `.${selectedFile.name.split(".").pop()?.toLowerCase() ?? ""}`;
+    if (!allowedExtensions.includes(extension)) {
+      setFile(null);
+      setError("Unsupported file type. Upload a CSV, TSV, TXT, XLS, or XLSX transaction file.");
+      return;
+    }
+    if (selectedFile.size > maximumSize) {
+      setFile(null);
+      setError("This transaction file is larger than 5 MiB. Choose a file at or below 5 MiB.");
+      return;
+    }
+    setError(null);
+    setFile(selectedFile);
   }
-
-  function buildImportPayload() {
-    const dIdx = parseInt(colDate); const descIdx = parseInt(colDesc); const aIdx = parseInt(colAmt);
-    const tIdx = colType !== "" ? parseInt(colType) : -1;
-    const transactions: any[] = [];
-    const rejected: Record<string, number> = {};
-    const addRejected = (reason: string) => {
-      rejected[reason] = (rejected[reason] ?? 0) + 1;
-    };
-
-    rows.forEach(r => {
-      const dateStr = parseDate(r[dIdx] ?? "");
-      const desc = r[descIdx]?.trim() ?? "";
-      const rawAmt = parseFloat((r[aIdx] ?? "").replace(/[$,\s]/g, ""));
-      const reasons: string[] = [];
-      if (!dateStr) reasons.push("Missing or invalid date");
-      if (!desc) reasons.push("Missing description");
-      if (isNaN(rawAmt)) reasons.push("Missing or invalid amount");
-
-      if (reasons.length > 0) {
-        addRejected(reasons.join("; "));
-        return;
-      }
-
-      let type: "income" | "expense";
-      if (tIdx !== -1) {
-        const tv = (r[tIdx] ?? "").toLowerCase();
-        type = tv.includes("income") || tv.includes("credit") || tv.includes("deposit") ? "income" : "expense";
-      } else {
-        type = negIsExpense ? (rawAmt < 0 ? "expense" : "income") : (rawAmt > 0 ? "expense" : "income");
-      }
-      transactions.push({ date: dateStr, description: desc, amount: Math.abs(rawAmt), type });
-    });
-
-    return { transactions, rejected };
-  }
-
-  const preview = rows.slice(0, 5);
-  const ready = colDate !== "" && colDesc !== "" && colAmt !== "" && rows.length > 0;
 
   return (
     <div className="space-y-4">
@@ -425,57 +399,15 @@ function CsvUploadPanel({
         onClick={() => fileRef.current?.click()}
       >
         <Upload className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
-        <p className="text-sm font-medium">Click to upload CSV / TSV / TXT</p>
-        <p className="text-xs text-muted-foreground mt-1">Most bank export formats are supported. PDF not yet supported — download as CSV from your bank first.</p>
-        <input ref={fileRef} type="file" accept=".csv,.tsv,.txt" className="hidden" onChange={handleFile} />
+        <p className="text-sm font-medium">Click to upload a transaction file</p>
+        <p className="text-xs text-muted-foreground mt-1">Supported formats: CSV, TSV, TXT, XLS, and XLSX. Maximum size: 5 MiB.</p>
+        <input ref={fileRef} type="file" accept=".csv,.tsv,.txt,.xls,.xlsx" className="hidden" onChange={handleFile} />
       </div>
-
-      {rows.length > 0 && (
-        <div className="space-y-3">
-          <p className="text-sm font-medium text-emerald-600">{rows.length} rows detected — map columns below</p>
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-            {[
-              { label: "Date column", val: colDate, set: setColDate },
-              { label: "Description column", val: colDesc, set: setColDesc },
-              { label: "Amount column", val: colAmt, set: setColAmt },
-              { label: "Type column (optional)", val: colType, set: setColType },
-            ].map(({ label, val, set }) => (
-              <div key={label}>
-                <Label className="text-xs">{label}</Label>
-                <Select value={val} onValueChange={value => set(value === "none" ? "" : value)}>
-                  <SelectTrigger className="mt-1 text-xs"><SelectValue placeholder="Select…" /></SelectTrigger>
-                  <SelectContent>
-                    {colType === "" || label !== "Type column (optional)" ? null : null}
-                    {label === "Type column (optional)" && <SelectItem value="none">— none —</SelectItem>}
-                    {headers.map((h, i) => <SelectItem key={i} value={String(i)}>{h || `Col ${i + 1}`}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-            ))}
-          </div>
-          {colType === "" && (
-            <label className="flex items-center gap-2 text-sm cursor-pointer">
-              <input type="checkbox" checked={negIsExpense} onChange={e => setNegIsExpense(e.target.checked)} className="rounded" />
-              Negative amounts = expenses (standard bank format)
-            </label>
-          )}
-          {preview.length > 0 && (
-            <div className="overflow-x-auto rounded-lg border text-xs">
-              <table className="w-full">
-                <thead className="bg-muted/50">
-                  <tr>{headers.map((h, i) => <th key={i} className="px-3 py-2 text-left font-medium text-muted-foreground">{h || `Col ${i+1}`}</th>)}</tr>
-                </thead>
-                <tbody>
-                  {preview.map((row, ri) => <tr key={ri} className="border-t">{row.map((c, ci) => <td key={ci} className="px-3 py-1.5 truncate max-w-[120px]">{c}</td>)}</tr>)}
-                </tbody>
-              </table>
-            </div>
-          )}
-          <Button disabled={!ready || importing} onClick={() => onImport(buildImportPayload())} className="w-full">
-            {importing ? "Importing…" : `Import ${rows.length} transactions`}
-          </Button>
-        </div>
-      )}
+      {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
+      {file && <p className="text-sm text-emerald-600">Ready to upload: {file.name} ({(file.size / 1024).toFixed(1)} KiB)</p>}
+      <Button disabled={!file || importing} onClick={() => file && onImport(file)} className="w-full">
+        {importing ? "Uploading…" : "Upload transaction file"}
+      </Button>
     </div>
   );
 }
@@ -773,6 +705,17 @@ export default function FinanceTrackerPage() {
     queryKey: insightsQK,
     queryFn: () => apiRequest("GET", `/api/transactions/insights?${insightParams.toString()}`).then(r => r.json()).catch(() => undefined),
   });
+  const {
+    data: canonicalCategoriesRaw,
+    isLoading: categoriesLoading,
+    error: categoriesError,
+  } = useQuery<CanonicalCategory[] | { categories: CanonicalCategory[] }>({
+    queryKey: ["/api/transaction-categories"],
+    queryFn: () => apiRequest("GET", "/api/transaction-categories").then(r => r.json()),
+  });
+  const canonicalCategories = Array.isArray(canonicalCategoriesRaw)
+    ? canonicalCategoriesRaw
+    : canonicalCategoriesRaw?.categories ?? [];
 
   function invalidateAll() {
     queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
@@ -785,7 +728,7 @@ export default function FinanceTrackerPage() {
   const createMut = useMutation({
     mutationFn: (data: any) => apiRequest("POST", "/api/transactions", data),
     onSuccess: () => { invalidateAll(); setAddOpen(false); setDataIntakeOpen(false); toast({ title: "Transaction added" }); },
-    onError: () => toast({ title: "Failed to add", variant: "destructive" }),
+    onError: (error: Error) => toast({ title: "Failed to add", description: error.message, variant: "destructive" }),
   });
   const updateMut = useMutation({
     mutationFn: ({ id, ...data }: any) => apiRequest("PATCH", `/api/transactions/${id}`, data).then(response => response.json()),
@@ -799,7 +742,7 @@ export default function FinanceTrackerPage() {
         description: updatedCount > 1 ? "Category and recurring settings were applied to this merchant." : undefined,
       });
     },
-    onError: () => toast({ title: "Failed to update", variant: "destructive" }),
+    onError: (error: Error) => toast({ title: "Failed to update", description: error.message, variant: "destructive" }),
   });
   const deleteMut = useMutation({
     mutationFn: (id: number) => apiRequest("DELETE", `/api/transactions/${id}`),
@@ -807,8 +750,11 @@ export default function FinanceTrackerPage() {
     onError: () => toast({ title: "Failed to delete", variant: "destructive" }),
   });
   const bulkMut = useMutation({
-    mutationFn: (payload: { transactions: any[]; rejected: Record<string, number> }) =>
-      apiRequest("POST", "/api/transactions/bulk", payload),
+    mutationFn: (file: File) => {
+      const formData = new FormData();
+      formData.append("file", file);
+      return apiRequest("POST", "/api/transactions/ingest", formData);
+    },
     onSuccess: (res: any) => res.json().then((d: any) => {
       const importResult: ImportResult = {
         inserted: Number(d.inserted ?? 0),
@@ -823,7 +769,7 @@ export default function FinanceTrackerPage() {
       setDataIntakeOpen(false);
       setLastImportResult(importResult);
       toast({
-        title: "CSV upload complete",
+        title: "Transaction file upload complete",
         description: [
           `${importResult.inserted} uploaded · ${importResult.skipped} not uploaded.`,
           "Showing All Time so uploaded dates are visible.",
@@ -831,7 +777,7 @@ export default function FinanceTrackerPage() {
         ].filter(Boolean).join(" "),
       });
     }),
-    onError: () => toast({ title: "Import failed", variant: "destructive" }),
+    onError: (error: Error) => toast({ title: "Import failed", description: error.message, variant: "destructive" }),
   });
   const recurringMut = useMutation({
     mutationFn: () => apiRequest("POST", "/api/transactions/detect-recurring"),
@@ -909,7 +855,10 @@ export default function FinanceTrackerPage() {
 
     const changedFields: MerchantUpdateField[] = [];
     const typeOnlyCategoryReset = data.type !== editTxn.type && data.subcategory === "unassigned";
-    if (data.subcategory !== editTxn.subcategory && !typeOnlyCategoryReset) changedFields.push("subcategory");
+    if (
+      (data.subcategory !== editTxn.subcategory || (data.parentCategory ?? "") !== (editTxn.parent_category ?? ""))
+      && !typeOnlyCategoryReset
+    ) changedFields.push("subcategory");
     if ((data.needsWant ?? null) !== (editTxn.needs_want ?? null)) changedFields.push("needsWant");
 
     const recurringChanged = data.isRecurring !== editTxn.is_recurring
@@ -975,7 +924,7 @@ export default function FinanceTrackerPage() {
             <Tabs defaultValue="manual">
               <TabsList className="grid grid-cols-3 w-full max-w-xl">
                 <TabsTrigger value="manual"><Plus className="h-3.5 w-3.5 mr-1.5" />Manual</TabsTrigger>
-                <TabsTrigger value="upload"><Upload className="h-3.5 w-3.5 mr-1.5" />Upload CSV</TabsTrigger>
+                <TabsTrigger value="upload"><Upload className="h-3.5 w-3.5 mr-1.5" />Upload File</TabsTrigger>
                 <TabsTrigger value="import"><Landmark className="h-3.5 w-3.5 mr-1.5" />Connected</TabsTrigger>
               </TabsList>
               <TabsContent value="manual" className="mt-4">
@@ -985,7 +934,7 @@ export default function FinanceTrackerPage() {
                 </Button>
               </TabsContent>
               <TabsContent value="upload" className="mt-4">
-                <CsvUploadPanel onImport={payload => bulkMut.mutate(payload)} importing={bulkMut.isPending} />
+                <TransactionFileUploadPanel onImport={file => bulkMut.mutate(file)} importing={bulkMut.isPending} />
               </TabsContent>
               <TabsContent value="import" className="mt-4">
                 <ConnectedAccountsImportPanel onImported={invalidateAll} />
@@ -999,7 +948,7 @@ export default function FinanceTrackerPage() {
           <div className="flex items-start gap-2.5">
             <Upload className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
             <div className="text-sm">
-              <p className="font-medium text-emerald-800 dark:text-emerald-300">CSV upload complete</p>
+              <p className="font-medium text-emerald-800 dark:text-emerald-300">Transaction file upload complete</p>
               <p className="mt-0.5 text-emerald-700 dark:text-emerald-400">
                 <strong>{lastImportResult.inserted}</strong> uploaded · <strong>{lastImportResult.skipped}</strong> not uploaded
               </p>
@@ -1317,6 +1266,9 @@ export default function FinanceTrackerPage() {
         onOpenChange={setAddOpen}
         onSave={data => createMut.mutate(data)}
         saving={createMut.isPending}
+        categories={canonicalCategories}
+        categoriesLoading={categoriesLoading}
+        categoriesError={categoriesError}
       />
       {editTxn && (
         <TransactionDialog
@@ -1326,6 +1278,9 @@ export default function FinanceTrackerPage() {
           initial={editTxn}
           onSave={handleEditSave}
           saving={updateMut.isPending}
+          categories={canonicalCategories}
+          categoriesLoading={categoriesLoading}
+          categoriesError={categoriesError}
         />
       )}
       <Dialog

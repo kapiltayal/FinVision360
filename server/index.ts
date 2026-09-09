@@ -74,8 +74,10 @@ app.use((req, res, next) => {
       merchant        TEXT,
       amount          NUMERIC(12,2) NOT NULL,
       type            TEXT NOT NULL CHECK(type IN ('income','expense')),
+       parent_category TEXT,
       subcategory     TEXT NOT NULL DEFAULT 'unassigned',
       needs_want      TEXT CHECK(needs_want IN ('need','want','na')),
+       is_user_modified BOOLEAN NOT NULL DEFAULT FALSE,
       is_recurring    BOOLEAN DEFAULT FALSE,
       recurring_type  TEXT CHECK(recurring_type IN ('subscription','recurring_bill')),
       source          TEXT NOT NULL DEFAULT 'manual' CHECK(source IN ('manual','plaid','upload','import')),
@@ -90,6 +92,19 @@ app.use((req, res, next) => {
     ALTER TABLE transactions ADD COLUMN IF NOT EXISTS plaid_account_id TEXT;
     ALTER TABLE transactions ADD COLUMN IF NOT EXISTS plaid_account_name TEXT;
     ALTER TABLE transactions ADD COLUMN IF NOT EXISTS plaid_institution_name TEXT;
+    ALTER TABLE transactions ADD COLUMN IF NOT EXISTS parent_category TEXT;
+    ALTER TABLE transactions ADD COLUMN IF NOT EXISTS is_user_modified BOOLEAN NOT NULL DEFAULT FALSE;
+    CREATE TABLE IF NOT EXISTS transaction_change_history (
+      id SERIAL PRIMARY KEY,
+      user_id VARCHAR NOT NULL,
+      transaction_id INTEGER NOT NULL,
+      field TEXT NOT NULL,
+      old_value TEXT,
+      new_value TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS idx_transaction_change_history_transaction
+      ON transaction_change_history(transaction_id);
     CREATE INDEX IF NOT EXISTS idx_transactions_user_id ON transactions(user_id);
     CREATE INDEX IF NOT EXISTS idx_transactions_date    ON transactions(date);
     CREATE INDEX IF NOT EXISTS idx_transactions_type    ON transactions(type);
