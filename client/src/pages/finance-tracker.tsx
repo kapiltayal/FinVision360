@@ -199,6 +199,12 @@ function getDateRange(period: string, customStart?: string, customEnd?: string) 
 }
 
 // ── TransactionDialog ─────────────────────────────────────────────────────────
+function dateInputValue(value: unknown, fallback: string): string {
+  if (typeof value !== "string") return fallback;
+  const match = value.trim().match(/^(\d{4}-\d{2}-\d{2})/);
+  return match?.[1] ?? fallback;
+}
+
 function TransactionDialog({
   open, onOpenChange, initial, onSave, saving, categories, categoriesLoading, categoriesError,
 }: {
@@ -207,7 +213,7 @@ function TransactionDialog({
   categories: CanonicalCategory[]; categoriesLoading: boolean; categoriesError: Error | null;
 }) {
   const today = new Date().toISOString().split("T")[0];
-  const [date, setDate] = useState(initial?.date ?? today);
+  const [date, setDate] = useState(dateInputValue(initial?.date, today));
   const [desc, setDesc] = useState(initial?.description ?? "");
   const [amount, setAmount] = useState(initial?.amount ? String(parseFloat(initial.amount)) : "");
   const [type, setType] = useState<"income" | "expense">(initial?.type ?? "expense");
