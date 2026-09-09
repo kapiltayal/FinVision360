@@ -82,6 +82,65 @@ function deterministicTransactionCategory(
   const automatic = autoCategorizeFn(description, type);
   return categoryForInput(categories, type, legacyCategoryAliases[automatic.subcategory] || automatic.subcategory);
 }
+type MerchantCategoryPreferences = Map<string, CanonicalTransactionCategory>;
+
+function merchantCategoryKey(type: unknown, merchant: unknown, description: unknown): string {
+  if (type !== "income" && type !== "expense") return "";
+  const normalized = normalizeMerchant(String(merchant || description || ""));
+  return normalized ? `${type}:${normalized}` : "";
+}
+
+async function userMerchantCategoryPreferences(
+  userId: string,
+  categories: CanonicalTransactionCategory[],
+): Promise<MerchantCategoryPreferences> {
+  const { rows } = await pool.query(
+    `SELECT t.merchant, t.description, t.type, t.parent_category, t.subcategory,
+            t.source, t.updated_at,
+            EXISTS (
+              SELECT 1
+              FROM transaction_change_history h
+              WHERE h.user_id = t.user_id
+                AND h.transaction_id = t.id
+                AND h.field IN ('subcategory', 'parent_category')
+            ) AS category_was_edited
+     FROM transactions t
+     WHERE t.user_id = $1
+       AND t.subcategory IS NOT NULL
+       AND t.subcategory <> $2
+       AND (
+         t.source = 'manual'
+         OR EXISTS (
+           SELECT 1
+           FROM transaction_change_history h
+           WHERE h.user_id = t.user_id
+             AND h.transaction_id = t.id
+             AND h.field IN ('subcategory', 'parent_category')
+         )
+       )
+     ORDER BY category_was_edited DESC, (t.source = 'manual') DESC, t.updated_at DESC, t.id DESC`,
+    [userId, UNASSIGNED_TRANSACTION_CATEGORY],
+  );
+  const preferences: MerchantCategoryPreferences = new Map();
+  for (const row of rows) {
+    const type = row.type === "income" || row.type === "expense" ? row.type : undefined;
+    if (!type) continue;
+    const key = merchantCategoryKey(type, row.merchant, row.description);
+    if (!key || preferences.has(key)) continue;
+    const selected = categoryForInput(categories, type, row.subcategory, row.parent_category);
+    if (selected) preferences.set(key, selected);
+  }
+  return preferences;
+}
+
+function categoryFromMerchantPreference(
+  preferences: MerchantCategoryPreferences,
+  row: { type?: unknown; merchant?: unknown; description?: unknown },
+): CanonicalTransactionCategory | undefined {
+  const key = merchantCategoryKey(row.type, row.merchant, row.description);
+  return key ? preferences.get(key) : undefined;
+}
+
 async function aiTransactionCategories(
   rows: RawRow[], categories: CanonicalTransactionCategory[],
 ): Promise<Map<number, CanonicalTransactionCategory> | null> {
@@ -90,7 +149,7 @@ async function aiTransactionCategories(
     .map(({ type, parentCategory, category, needVsWant, description }) => ({ type, parentCategory, category, needVsWant, description }));
   try {
     const content = await completeIngestionClassification(JSON.stringify({
-      task: "Return JSON {entries:[{sourceIndex:number,type:'income'|'expense',category:'exact provided category'}]}. Classify only clear transactions. Categories must be copied exactly from categories; never invent values.",
+      task: "Use all provided fields in each transaction row to classify it. Return JSON {entries:[{sourceIndex:number,type:'income'|'expense',category:'exact provided category'}]}. Classify only clear transactions. Categories must be copied exactly from categories; never invent values.",
       categories: allowed, rows: rows.map((row, sourceIndex) => ({ sourceIndex, row })),
     }));
     const entries = JSON.parse(content)?.entries;
@@ -939,17 +998,28 @@ export function registerFinanceTrackerRoutes(app: Express) {
       }
 
       const categories = await canonicalTransactionCategories();
-      const unmapped = transactions.map((t, index) => ({ t, index })).filter(({ t }) =>
-        (t?.type === "income" || t?.type === "expense") &&
-        t.subcategory === undefined && t.category === undefined &&
-        !deterministicTransactionCategory(categories, t.description || "", t.type),
-      );
+      const preferences = await userMerchantCategoryPreferences(userId, categories);
+      const assignments = new Map<number, CanonicalTransactionCategory>();
+      const unmapped: Array<{ t: any; index: number }> = [];
+      transactions.forEach((t, index) => {
+        if (t?.type !== "income" && t?.type !== "expense") return;
+        // Classification order: user's merchant preference, supplied canonical
+        // category fields, AI, then unassigned during persistence.
+        const merchantMatch = categoryFromMerchantPreference(preferences, t);
+        const supplied = t.subcategory ?? t.category;
+        const suppliedMatch = supplied !== undefined
+          ? categoryForInput(categories, t.type, supplied, t.parentCategory)
+          : undefined;
+        const selected = merchantMatch || suppliedMatch;
+        if (selected) assignments.set(index, selected);
+        else unmapped.push({ t, index });
+      });
       const aiMatches = await aiTransactionCategories(unmapped.map(({ t }) => t), categories);
       for (const [sourceIndex, selected] of Array.from((aiMatches || new Map()).entries())) {
-        const target = unmapped[sourceIndex]?.t;
+        const target = unmapped[sourceIndex];
         if (target) {
-          target.subcategory = selected.storedCategory;
-          target.parentCategory = selected.storedParentCategory;
+          assignments.set(target.index, selected);
+          target.t.type = selected.type.toLowerCase();
         }
       }
       importClient = await pool.connect();
@@ -968,7 +1038,7 @@ export function registerFinanceTrackerRoutes(app: Express) {
         }
       }
 
-      for (const t of transactions) {
+      for (const [index, t] of transactions.entries()) {
         if (!t.date || !isValidIsoDate(t.date)) { addSkipped("Missing or invalid date"); continue; }
         if (!t.description) { addSkipped("Missing description"); continue; }
         if (t.amount === undefined || t.amount === null || !Number.isFinite(Number(t.amount)) || Number(t.amount) === 0) {
@@ -981,10 +1051,7 @@ export function registerFinanceTrackerRoutes(app: Express) {
         }
 
         try {
-          const supplied = t.subcategory ?? t.category;
-          const selected = supplied !== undefined
-            ? categoryForInput(categories, t.type, supplied, t.parentCategory)
-            : deterministicTransactionCategory(categories, t.description, t.type);
+          const selected = assignments.get(index);
           const finalCategory = selected?.storedCategory ?? UNASSIGNED_TRANSACTION_CATEGORY;
           const finalParentCategory = selected?.storedParentCategory ?? null;
           const finalNW = selected?.needVsWant?.toLowerCase() ?? "na";
@@ -1043,7 +1110,9 @@ export function registerFinanceTrackerRoutes(app: Express) {
         return res.status(400).json({ message: CORRUPT_TRANSACTION_FILE });
       }
       if (rows.length > 500) return res.status(400).json({ message: "Imports are limited to 500 entries at a time" });
+      const userId = (req.user as any).id;
       const categories = await canonicalTransactionCategories();
+      const preferences = await userMerchantCategoryPreferences(userId, categories);
       const normalized = rows.map((row) => {
         const parseMoney = (value: string) => Number(value.replace(/[$,\s]/g, "").replace(/^\((.*)\)$/, "-$1"));
         const rawAmount = field(row, "amount", "value");
@@ -1063,17 +1132,25 @@ export function registerFinanceTrackerRoutes(app: Express) {
           notes: field(row, "notes", "memo"),
         };
       });
+      const assignments = new Map<number, CanonicalTransactionCategory>();
       const unknownIndexes: number[] = [];
       normalized.forEach((row, index) => {
-        if (!row.subcategory && !row.parentCategory && !deterministicTransactionCategory(categories, row.description, row.type)) unknownIndexes.push(index);
+        // Classification order: user's merchant preference, supplied canonical
+        // category fields, AI, then unassigned during persistence.
+        const merchantMatch = categoryFromMerchantPreference(preferences, row);
+        const suppliedMatch = row.subcategory
+          ? categoryForInput(categories, row.type, row.subcategory, row.parentCategory)
+          : undefined;
+        const selected = merchantMatch || suppliedMatch;
+        if (selected) assignments.set(index, selected);
+        else unknownIndexes.push(index);
       });
       const ai = await aiTransactionCategories(unknownIndexes.map((index) => rows[index]), categories);
       unknownIndexes.forEach((index, sourceIndex) => {
         const category = ai?.get(sourceIndex);
         if (category) {
+          assignments.set(index, category);
           normalized[index].type = category.type.toLowerCase() as "income" | "expense";
-          normalized[index].subcategory = category.storedCategory;
-          normalized[index].parentCategory = category.storedParentCategory;
         }
       });
       req.body = { transactions: normalized };
@@ -1082,16 +1159,16 @@ export function registerFinanceTrackerRoutes(app: Express) {
       ingestionClient = await pool.connect();
       await ingestionClient.query("BEGIN");
       let inserted = 0; let uncategorized = 0; const skippedReasons: Record<string, number> = {};
-      for (const t of normalized) {
+      for (const [index, t] of normalized.entries()) {
         if (!isValidIsoDate(t.date) || !t.description || !Number.isFinite(t.amount) || t.amount === 0) { skippedReasons["Invalid transaction"] = (skippedReasons["Invalid transaction"] || 0) + 1; continue; }
-        const selected = categoryForInput(categories, t.type, t.subcategory, t.parentCategory) || deterministicTransactionCategory(categories, t.description, t.type);
+        const selected = assignments.get(index);
         const finalCategory = selected?.storedCategory ?? UNASSIGNED_TRANSACTION_CATEGORY;
         const finalParentCategory = selected?.storedParentCategory ?? null;
         const finalNeedWant = selected?.needVsWant?.toLowerCase() || "na";
         if (!selected) uncategorized++;
         await ingestionClient.query(`INSERT INTO transactions (user_id,date,description,merchant,amount,type,parent_category,subcategory,needs_want,source,notes)
           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'upload',$10)`,
-          [(req.user as any).id, t.date, t.description, t.merchant || t.description, Math.abs(t.amount), t.type, finalParentCategory, finalCategory, finalNeedWant, t.notes || null]);
+          [userId, t.date, t.description, t.merchant || t.description, Math.abs(t.amount), t.type, finalParentCategory, finalCategory, finalNeedWant, t.notes || null]);
         inserted++;
       }
       if (!inserted) {
@@ -1103,7 +1180,7 @@ export function registerFinanceTrackerRoutes(app: Express) {
       await ingestionClient.query("COMMIT");
       ingestionClient.release();
       ingestionClient = null;
-      res.json({ inserted, uncategorized, skipped: Object.values(skippedReasons).reduce((a, b) => a + b, 0), skippedReasons, recurringMarked: await detectAndMarkRecurring((req.user as any).id) });
+      res.json({ inserted, uncategorized, skipped: Object.values(skippedReasons).reduce((a, b) => a + b, 0), skippedReasons, recurringMarked: await detectAndMarkRecurring(userId) });
     } catch (error) {
       if (ingestionClient) {
         await ingestionClient.query("ROLLBACK").catch(() => undefined);
