@@ -422,7 +422,7 @@ export default function AIAdvisorPage() {
               ) : (
                 <div className="divide-y">
                   {history.map((entry, index) => (
-                    <details key={entry.id} className="group p-4" defaultOpen={index === 0}>
+                    <details key={entry.id} className="group p-3" defaultOpen={index === 0}>
                       <summary className="cursor-pointer list-none">
                         <div className="flex items-start justify-between gap-4">
                           <div className="min-w-0">
