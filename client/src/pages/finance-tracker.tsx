@@ -1127,7 +1127,7 @@ export default function FinanceTrackerPage() {
             {trendChart.length === 0
               ? <div className="h-44 flex items-center justify-center text-muted-foreground text-sm">No trend data for this period</div>
               : (
-                <ResponsiveContainer width="100%" height={220}>
+                <ResponsiveContainer width="100%" height={300}>
                   <ComposedChart data={trendChart} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
                     <XAxis dataKey="period" tick={{ fontSize: 11 }} />
