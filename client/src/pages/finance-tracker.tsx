@@ -167,6 +167,22 @@ function fmtPeriod(s: string, groupBy: string) {
   if (groupBy === "year") return String(d.getFullYear());
   return d.toLocaleDateString("en-US", { month: "short", year: "2-digit" });
 }
+function TrendChartLegend({ payload }: { payload?: Array<{ value?: string; color?: string }> }) {
+  return (
+    <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
+      {payload?.map((entry) => (
+        <span
+          key={entry.value}
+          className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold text-white shadow-sm"
+          style={{ backgroundColor: entry.color ?? "hsl(var(--primary))" }}
+        >
+          <span className="h-2.5 w-2.5 rounded-sm bg-white/80" />
+          {entry.value}
+        </span>
+      ))}
+    </div>
+  );
+}
 function catLabel(v: string) {
   return ALL_SUBCATS.find(s => s.value === v)?.label ?? v;
 }
@@ -1133,7 +1149,7 @@ export default function FinanceTrackerPage() {
                     <XAxis dataKey="period" tick={{ fontSize: 11 }} />
                     <YAxis tick={{ fontSize: 11 }} tickFormatter={v => `$${(v/1000).toFixed(0)}k`} />
                     <Tooltip content={<FinancialChartTooltip />} />
-                    <Legend />
+                    <Legend content={<TrendChartLegend />} />
                     {trendChartType === "bar" ? (
                       <>
                         <Bar dataKey="Income" fill="#22c55e" radius={[3,3,0,0]} maxBarSize={40} />
