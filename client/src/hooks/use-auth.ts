@@ -4,6 +4,7 @@ import { queryClient, apiRequest, getQueryFn } from "@/lib/queryClient";
 import { getSupabase, getAccessToken, clearCachedToken } from "@/lib/supabase";
 import { useLocation } from "wouter";
 import type { SupabaseClient, Session } from "@supabase/supabase-js";
+import { isHoneypotFilled } from "@/components/honeypot-field";
 
 export function useAuth() {
   const { data: user, isLoading } = useQuery({
@@ -47,7 +48,8 @@ export function useSupabaseSession() {
 export function useLogin() {
   const [, setLocation] = useLocation();
   return useMutation({
-    mutationFn: async ({ email, password }: { email: string; password: string }) => {
+    mutationFn: async ({ email, password, honeypot }: { email: string; password: string; honeypot?: string }) => {
+      if (isHoneypotFilled(honeypot)) throw new Error("Unable to process this request.");
       const sb = await getSupabase();
       const { error, data } = await sb.auth.signInWithPassword({ email, password });
       if (error) throw new Error(error.message);
@@ -63,7 +65,8 @@ export function useLogin() {
 export function useRegister() {
   const [, setLocation] = useLocation();
   return useMutation({
-    mutationFn: async ({ email, password, fullName }: { email: string; password: string; fullName?: string }) => {
+    mutationFn: async ({ email, password, fullName, honeypot }: { email: string; password: string; fullName?: string; honeypot?: string }) => {
+      if (isHoneypotFilled(honeypot)) throw new Error("Unable to process this request.");
       const sb = await getSupabase();
       const { error, data } = await sb.auth.signUp({
         email,

@@ -33,6 +33,7 @@ import {
 import logoPath from "@assets/FinVision360_Logo_H_(transparent)_1776714495394.png";
 import { useTheme } from "@/components/theme-provider";
 import { useLogout } from "@/hooks/use-auth";
+import { HoneypotField, isHoneypotFilled } from "@/components/honeypot-field";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -118,6 +119,9 @@ function AuthModal({
   const [showPassword, setShowPassword] = useState(false);
   const [resetMode, setResetMode] = useState(false);
   const [resetEmail, setResetEmail] = useState("");
+  const [loginHoneypot, setLoginHoneypot] = useState("");
+  const [registerHoneypot, setRegisterHoneypot] = useState("");
+  const [resetHoneypot, setResetHoneypot] = useState("");
 
   // Clear all form fields whenever the modal is closed
   useEffect(() => {
@@ -137,18 +141,19 @@ function AuthModal({
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    login.mutate(loginData, {
+    login.mutate({ ...loginData, honeypot: loginHoneypot }, {
       onError: (error: any) => toast({ title: "Sign in failed", description: error.message, variant: "destructive" }),
     });
   };
 
   const handleRegister = (e: React.FormEvent) => {
     e.preventDefault();
+    if (isHoneypotFilled(registerHoneypot)) return;
     if (registerData.password.length < 6) {
       toast({ title: "Password too short", description: "Minimum 6 characters", variant: "destructive" });
       return;
     }
-    register.mutate(registerData, {
+    register.mutate({ ...registerData, honeypot: registerHoneypot }, {
       onError: (error: any) => toast({ title: "Registration failed", description: error.message, variant: "destructive" }),
       onSuccess: (data: any) => {
         if (!data.session) {
@@ -161,6 +166,7 @@ function AuthModal({
 
   const handleReset = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isHoneypotFilled(resetHoneypot)) return;
     setResetLoading(true);
     try {
       const { getSupabase } = await import("@/lib/supabase");
@@ -211,6 +217,7 @@ function AuthModal({
                     required
                   />
                 </div>
+                <HoneypotField id="landing-reset-website" value={resetHoneypot} onChange={setResetHoneypot} />
                 <Button type="submit" className="w-full" disabled={resetLoading} data-testid="button-reset">
                   {resetLoading ? "Sending..." : "Send Reset Link"}
                 </Button>
@@ -266,6 +273,7 @@ function AuthModal({
                     </Button>
                   </div>
                 </div>
+                <HoneypotField id="landing-login-website" value={loginHoneypot} onChange={setLoginHoneypot} />
                 <Button type="submit" className="w-full" disabled={login.isPending} data-testid="button-login">
                   {login.isPending ? "Signing in…" : "Sign In"}
                 </Button>
@@ -306,6 +314,7 @@ function AuthModal({
                     required
                   />
                 </div>
+                <HoneypotField id="landing-register-website" value={registerHoneypot} onChange={setRegisterHoneypot} />
                 <Button type="submit" className="w-full" disabled={register.isPending} data-testid="button-register">
                   {register.isPending ? "Creating account…" : "Create Free Account"}
                 </Button>

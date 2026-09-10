@@ -8,10 +8,12 @@ import { useToast } from "@/hooks/use-toast";
 import { supabaseClient } from "@/lib/supabase";
 import { useLocation } from "wouter";
 import logoPath from "@assets/FinVision360_Logo_H_(transparent)_1776714495394.png";
+import { HoneypotField, isHoneypotFilled } from "@/components/honeypot-field";
 
 export default function ResetPasswordPage() {
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
+  const [honeypot, setHoneypot] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
@@ -34,6 +36,7 @@ export default function ResetPasswordPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isHoneypotFilled(honeypot)) return;
     if (password.length < 8) {
       toast({ title: "Password too short", description: "Minimum 8 characters.", variant: "destructive" });
       return;
@@ -140,6 +143,7 @@ export default function ResetPasswordPage() {
                       />
                     </div>
                   </div>
+                  <HoneypotField id="reset-password-website" value={honeypot} onChange={setHoneypot} />
                   <Button type="submit" className="w-full" disabled={loading} data-testid="button-set-password">
                     {loading ? (
                       <><Loader2 className="h-4 w-4 animate-spin mr-2" />Updating…</>

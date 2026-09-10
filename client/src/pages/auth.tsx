@@ -8,6 +8,7 @@ import { useLogin, useRegister } from "@/hooks/use-auth";
 import { Eye, EyeOff, Mail, Lock, User } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { getSupabase } from "@/lib/supabase";
+import { HoneypotField, isHoneypotFilled } from "@/components/honeypot-field";
 import logoPath from "@assets/FinVision360_Logo_H_(transparent)_1776714495394.png";
 
 export default function AuthPage() {
@@ -15,6 +16,9 @@ export default function AuthPage() {
   const [loginData, setLoginData] = useState({ email: "", password: "" });
   const [registerData, setRegisterData] = useState({ email: "", password: "", fullName: "" });
   const [resetEmail, setResetEmail] = useState("");
+  const [loginHoneypot, setLoginHoneypot] = useState("");
+  const [registerHoneypot, setRegisterHoneypot] = useState("");
+  const [resetHoneypot, setResetHoneypot] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showRegPassword, setShowRegPassword] = useState(false);
   const [resetSent, setResetSent] = useState(false);
@@ -25,7 +29,7 @@ export default function AuthPage() {
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    login.mutate(loginData, {
+    login.mutate({ ...loginData, honeypot: loginHoneypot }, {
       onError: (error: any) => {
         toast({ title: "Sign in failed", description: error.message, variant: "destructive" });
       },
@@ -34,11 +38,12 @@ export default function AuthPage() {
 
   const handleRegister = (e: React.FormEvent) => {
     e.preventDefault();
+    if (isHoneypotFilled(registerHoneypot)) return;
     if (registerData.password.length < 6) {
       toast({ title: "Password too short", description: "Password must be at least 6 characters.", variant: "destructive" });
       return;
     }
-    register.mutate(registerData, {
+    register.mutate({ ...registerData, honeypot: registerHoneypot }, {
       onError: (error: any) => {
         toast({ title: "Registration failed", description: error.message, variant: "destructive" });
       },
@@ -53,6 +58,7 @@ export default function AuthPage() {
 
   const handleReset = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isHoneypotFilled(resetHoneypot)) return;
     setResetLoading(true);
     try {
       const sb = await getSupabase();
@@ -112,6 +118,7 @@ export default function AuthPage() {
                         />
                       </div>
                     </div>
+                    <HoneypotField id="auth-reset-website" value={resetHoneypot} onChange={setResetHoneypot} />
                     <Button type="submit" className="w-full" disabled={resetLoading} data-testid="button-reset">
                       {resetLoading ? "Sending..." : "Send reset link"}
                     </Button>
@@ -180,6 +187,7 @@ export default function AuthPage() {
                         </Button>
                       </div>
                     </div>
+                    <HoneypotField id="auth-login-website" value={loginHoneypot} onChange={setLoginHoneypot} />
                     <Button type="submit" className="w-full" disabled={login.isPending} data-testid="button-login">
                       {login.isPending ? "Signing in..." : "Sign In"}
                     </Button>
@@ -243,6 +251,7 @@ export default function AuthPage() {
                         </Button>
                       </div>
                     </div>
+                    <HoneypotField id="auth-register-website" value={registerHoneypot} onChange={setRegisterHoneypot} />
                     <Button type="submit" className="w-full" disabled={register.isPending} data-testid="button-register">
                       {register.isPending ? "Creating account..." : "Create Account"}
                     </Button>
