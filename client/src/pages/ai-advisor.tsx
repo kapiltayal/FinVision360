@@ -227,14 +227,26 @@ export default function AIAdvisorPage() {
       </div>
 
       <Tabs defaultValue="scenario">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="scenario" data-testid="tab-scenario">
+        <TabsList className="grid h-auto w-full grid-cols-1 gap-2 bg-transparent p-0 sm:grid-cols-3">
+          <TabsTrigger
+            value="scenario"
+            data-testid="tab-scenario"
+            className="h-12 rounded-xl border border-border/70 bg-card px-4 text-muted-foreground shadow-sm hover:border-primary/40 hover:bg-accent/50 data-[state=active]:border-primary data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md"
+          >
             <Brain className="h-4 w-4 mr-2" /> Ask Whizzy
           </TabsTrigger>
-          <TabsTrigger value="debt" data-testid="tab-debt">
+          <TabsTrigger
+            value="debt"
+            data-testid="tab-debt"
+            className="h-12 rounded-xl border border-border/70 bg-card px-4 text-muted-foreground shadow-sm hover:border-primary/40 hover:bg-accent/50 data-[state=active]:border-primary data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md"
+          >
             <CreditCard className="h-4 w-4 mr-2" /> Debt Strategy
           </TabsTrigger>
-          <TabsTrigger value="history" data-testid="tab-history">
+          <TabsTrigger
+            value="history"
+            data-testid="tab-history"
+            className="h-12 rounded-xl border border-border/70 bg-card px-4 text-muted-foreground shadow-sm hover:border-primary/40 hover:bg-accent/50 data-[state=active]:border-primary data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md"
+          >
             <History className="h-4 w-4 mr-2" /> Whizzy Archives
           </TabsTrigger>
         </TabsList>
