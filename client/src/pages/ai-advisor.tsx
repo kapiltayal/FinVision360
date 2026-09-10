@@ -252,7 +252,7 @@ export default function AIAdvisorPage() {
         </TabsList>
 
         <TabsContent value="scenario" forceMount className="space-y-4 mt-4 data-[state=inactive]:hidden">
-          <Card>
+          <Card className="border-border/60">
             <CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center gap-2">
                 <Sparkles className="h-4 w-4 text-primary" /> Ask About Your Finances
