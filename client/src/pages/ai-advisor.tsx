@@ -385,10 +385,16 @@ export default function AIAdvisorPage() {
 
         <TabsContent value="history" forceMount className="space-y-4 mt-4 data-[state=inactive]:hidden">
           <Card>
-            <CardHeader className="flex-row items-center justify-between gap-4 border-b pb-3">
-              <CardTitle className="text-base flex items-center gap-2">
-                <History className="h-4 w-4 text-primary" /> Whizzy Archives
-              </CardTitle>
+            <CardHeader className="flex-row items-center justify-between gap-3 border-b border-primary/20 bg-muted/50 px-4 py-3">
+              <div className="flex min-w-0 items-center gap-3">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-primary/10">
+                  <History className="h-4 w-4 text-primary" />
+                </div>
+                <div className="min-w-0">
+                  <CardTitle className="text-sm font-semibold uppercase tracking-wide">Whizzy Archives</CardTitle>
+                  <p className="mt-0.5 text-xs text-muted-foreground">Saved AI questions and responses</p>
+                </div>
+              </div>
               {history.length > 0 && (
                 <Button
                   variant="outline"
