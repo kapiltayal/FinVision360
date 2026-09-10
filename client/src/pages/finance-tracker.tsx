@@ -128,7 +128,19 @@ const CAT_COLORS: Record<string, string> = {
   freelance: "#4ade80", dividend: "#86efac", interest: "#166534", rental: "#6ee7b7",
   capital_gains: "#052e16", business: "#22c55e", gift: "#a7f3d0", refund: "#d1fae5",
   other_income: "#bbf7d0", unassigned: "#cbd5e1",
+  salary_wages: "#16a34a", business_income: "#22c55e", bonuses_commissions: "#15803d",
+  freelance_consulting: "#4ade80", dividends: "#86efac", rental_income: "#6ee7b7",
+  royalties: "#0f766e", crypto: "#0e7490", tax_refunds: "#84cc16", gifts: "#a7f3d0",
+  grants_scholarships: "#65a30d", reimbursements_cashbacks: "#bef264", government_benefits: "#4d7c0f",
+  housing_rent: "#3b82f6", home_maintenance_repairs: "#2563eb", pets: "#f97316",
+  professional_services: "#7c3aed", fees_interest_charges: "#c026d3", childcare: "#db2777",
+  gifts_given: "#be185d", donations: "#9f1239", alimony_support: "#e11d48",
+  savings: "#0284c7", credit_card_payments: "#0369a1",
 };
+const CATEGORY_COLOR_PALETTE = [
+  "#2563eb", "#7c3aed", "#059669", "#ea580c", "#dc2626", "#db2777",
+  "#0891b2", "#65a30d", "#d97706", "#4f46e5", "#0f766e", "#c026d3",
+];
 
 const PERIOD_OPTIONS = [
   { value: "today", label: "Today" }, { value: "week", label: "This Week" },
@@ -165,6 +177,18 @@ const LEGACY_CATEGORY_KEYS: Record<string, string> = {
   freelance: "freelance_consulting", dividend: "dividends", rental: "rental_income",
   refund: "refunds", gift: "gifts", housing: "housing_rent", other_expense: "other_expense",
 };
+function getCategoryColor(value: string) {
+  const normalized = normalizeCategoryKey(value);
+  const mappedKey = LEGACY_CATEGORY_KEYS[normalized] ?? normalized;
+  if (CAT_COLORS[mappedKey]) return CAT_COLORS[mappedKey];
+  if (CAT_COLORS[normalized]) return CAT_COLORS[normalized];
+
+  let hash = 0;
+  for (let index = 0; index < normalized.length; index += 1) {
+    hash = (hash * 31 + normalized.charCodeAt(index)) | 0;
+  }
+  return CATEGORY_COLOR_PALETTE[Math.abs(hash) % CATEGORY_COLOR_PALETTE.length];
+}
 
 function getDateRange(period: string, customStart?: string, customEnd?: string) {
   const now = new Date();
