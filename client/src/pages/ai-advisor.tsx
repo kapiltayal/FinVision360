@@ -220,7 +220,7 @@ export default function AIAdvisorPage() {
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="scenario" className="space-y-4 mt-4">
+        <TabsContent value="scenario" forceMount className="space-y-4 mt-4 data-[state=inactive]:hidden">
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center gap-2">
@@ -265,7 +265,7 @@ export default function AIAdvisorPage() {
           )}
         </TabsContent>
 
-        <TabsContent value="debt" className="space-y-4 mt-4">
+        <TabsContent value="debt" forceMount className="space-y-4 mt-4 data-[state=inactive]:hidden">
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center gap-2">
@@ -315,7 +315,7 @@ export default function AIAdvisorPage() {
           )}
         </TabsContent>
 
-        <TabsContent value="forecast" className="space-y-4 mt-4">
+        <TabsContent value="forecast" forceMount className="space-y-4 mt-4 data-[state=inactive]:hidden">
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center gap-2">
