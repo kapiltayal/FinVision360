@@ -105,6 +105,16 @@ app.use((req, res, next) => {
     );
     CREATE INDEX IF NOT EXISTS idx_transaction_change_history_transaction
       ON transaction_change_history(transaction_id);
+    CREATE TABLE IF NOT EXISTS ai_advisor_history (
+      id            SERIAL PRIMARY KEY,
+      user_id       VARCHAR NOT NULL,
+      query_type    TEXT NOT NULL CHECK(query_type IN ('scenario','debt_strategy','forecast')),
+      query_text    TEXT NOT NULL,
+      response_text TEXT NOT NULL,
+      created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS idx_ai_advisor_history_user_date
+      ON ai_advisor_history(user_id, created_at DESC);
     CREATE INDEX IF NOT EXISTS idx_transactions_user_id ON transactions(user_id);
     CREATE INDEX IF NOT EXISTS idx_transactions_date    ON transactions(date);
     CREATE INDEX IF NOT EXISTS idx_transactions_type    ON transactions(type);

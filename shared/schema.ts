@@ -169,6 +169,18 @@ export const transactionChangeHistory = pgTable("transaction_change_history", {
   transactionIndex: index("idx_transaction_change_history_transaction").on(table.transactionId),
 }));
 
+export const aiAdvisorHistory = pgTable("ai_advisor_history", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull(),
+  queryType: text("query_type").notNull(),
+  queryText: text("query_text").notNull(),
+  responseText: text("response_text").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  userDateIndex: index("idx_ai_advisor_history_user_date").on(table.userId, table.createdAt),
+  queryTypeCheck: check("ai_advisor_history_query_type_check", sql`${table.queryType} IN ('scenario', 'debt_strategy', 'forecast')`),
+}));
+
 export const insurancePolicies = pgTable("insurance_policies", {
   id: serial("id").primaryKey(),
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),

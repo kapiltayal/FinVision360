@@ -124,6 +124,7 @@ async function streamAdvisorResponse(
   res: Response,
   messages: readonly AdvisorMessage[],
   operation: string,
+  onComplete?: (response: string) => Promise<void>,
 ) {
   setAdvisorStreamHeaders(res);
   const abortController = new AbortController();
@@ -131,13 +132,24 @@ async function streamAdvisorResponse(
   res.once("close", abortRequest);
 
   try {
+    let completedResponse = "";
     const stream = await streamAdvisorCompletion(messages, abortController.signal);
     for await (const chunk of stream) {
       if (abortController.signal.aborted || res.destroyed) break;
       const content = chunk.choices[0]?.delta?.content || "";
-      if (content) res.write(`data: ${JSON.stringify({ content })}\n\n`);
+      if (content) {
+        completedResponse += content;
+        res.write(`data: ${JSON.stringify({ content })}\n\n`);
+      }
     }
     if (!res.destroyed && !res.writableEnded) {
+      if (onComplete && completedResponse.trim()) {
+        try {
+          await onComplete(completedResponse);
+        } catch (historyError) {
+          console.error(`AI ${operation} history save error:`, historyError);
+        }
+      }
       res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
       res.end();
     }
@@ -154,6 +166,19 @@ async function streamAdvisorResponse(
   } finally {
     res.removeListener("close", abortRequest);
   }
+}
+
+async function saveAdvisorHistory(
+  userId: string,
+  queryType: "scenario" | "debt_strategy" | "forecast",
+  queryText: string,
+  responseText: string,
+) {
+  await pool.query(
+    `INSERT INTO ai_advisor_history (user_id, query_type, query_text, response_text)
+     VALUES ($1, $2, $3, $4)`,
+    [userId, queryType, queryText, responseText],
+  );
 }
 
 export async function registerRoutes(
@@ -503,7 +528,7 @@ Question: ${scenario}
 
 Use markdown sections for key observations, recommendations, projected impact, and risks. Be concise and use numbers only when the supplied data supports them.`,
       },
-    ], "scenario");
+    ], "scenario", response => saveAdvisorHistory(userId, "scenario", scenario, response));
   });
 
   app.post("/api/ai/debt-strategy", requireAuth, async (req, res) => {
@@ -512,7 +537,8 @@ Use markdown sections for key observations, recommendations, projected impact, a
       return res.status(400).json({ message: "Enter a monthly payment budget between $0 and $1,000,000." });
     }
 
-    const liabilitiesForUser = await storage.getLiabilities((req.user as any).id);
+    const userId = (req.user as any).id;
+    const liabilitiesForUser = await storage.getLiabilities(userId);
     const liabilitiesContext = toAdvisorLiabilityContext(liabilitiesForUser);
     if (!liabilitiesContext.length) return res.status(400).json({ message: "Add a liability before requesting a debt strategy." });
 
@@ -533,7 +559,12 @@ Monthly budget available for extra debt payments: $${budget.toFixed(2)}
 
 Compare avalanche, snowball, and a suitable custom approach. Include debt priority order, approximate payoff considerations, and first six months of payment guidance. Use markdown headings and bold key numbers where appropriate.`,
       },
-    ], "debt strategy");
+    ], "debt strategy", response => saveAdvisorHistory(
+      userId,
+      "debt_strategy",
+      `Debt strategy with a $${budget.toFixed(2)} monthly extra-payment budget`,
+      response,
+    ));
   });
 
   app.post("/api/ai/forecast", requireAuth, async (req, res) => {
@@ -577,7 +608,33 @@ ${JSON.stringify({
 
 Include a year-by-year overview, useful milestones, a conservative/base/optimistic discussion, and actions that could improve the outlook. Use markdown headings and make uncertainty clear.`,
       },
-    ], "forecast");
+    ], "forecast", response => saveAdvisorHistory(
+      userId,
+      "forecast",
+      `${years}-year net worth forecast`,
+      response,
+    ));
+  });
+
+  app.get("/api/ai/history", requireAuth, async (req, res) => {
+    try {
+      const { rows } = await pool.query(
+        `SELECT id,
+                query_type AS "queryType",
+                query_text AS "queryText",
+                response_text AS "responseText",
+                created_at AS "createdAt"
+         FROM ai_advisor_history
+         WHERE user_id = $1
+         ORDER BY created_at DESC, id DESC
+         LIMIT 100`,
+        [(req.user as any).id],
+      );
+      res.json(rows);
+    } catch (error) {
+      console.error("AI history load error:", error);
+      res.status(500).json({ message: "Failed to load AI query history" });
+    }
   });
 
   app.get("/api/insurance", requireAuth, async (req, res) => {

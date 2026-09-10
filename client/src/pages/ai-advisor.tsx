@@ -7,9 +7,18 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Brain, Lightbulb, TrendingUp, CreditCard, Loader2, Sparkles, Send } from "lucide-react";
+import { Brain, History, CreditCard, Loader2, Sparkles, Send } from "lucide-react";
 import { type Asset, type Liability } from "@shared/schema";
 import { getAccessToken } from "@/lib/supabase";
+import { queryClient } from "@/lib/queryClient";
+
+type AdvisorHistoryEntry = {
+  id: number;
+  queryType: "scenario" | "debt_strategy" | "forecast";
+  queryText: string;
+  responseText: string;
+  createdAt: string;
+};
 
 function escapeHtml(text: string): string {
   return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -41,10 +50,12 @@ function StreamingResponse({
   endpoint,
   body,
   onStart,
+  onComplete,
 }: {
   endpoint: string;
   body: any;
   onStart?: () => void;
+  onComplete?: () => void;
 }) {
   const [response, setResponse] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
@@ -103,6 +114,7 @@ function StreamingResponse({
               }
               if (data.done) {
                 setIsStreaming(false);
+                 onComplete?.();
               }
               if (data.error) {
                 setError(data.error);
@@ -172,24 +184,31 @@ export default function AIAdvisorPage() {
   const { data: liabilities = [] } = useQuery<Liability[]>({ queryKey: ["/api/liabilities"] });
   const [scenarioQuery, setScenarioQuery] = useState("");
   const [scenarioSubmitted, setScenarioSubmitted] = useState<any>(null);
+  const scenarioRequestId = useRef(0);
 
   const [debtBudget, setDebtBudget] = useState("500");
   const [debtSubmitted, setDebtSubmitted] = useState<any>(null);
-
-  const [forecastYears, setForecastYears] = useState("10");
-  const [forecastSubmitted, setForecastSubmitted] = useState<any>(null);
+  const debtRequestId = useRef(0);
+  const {
+    data: historyRaw,
+    isLoading: historyLoading,
+    isError: historyError,
+  } = useQuery<AdvisorHistoryEntry[]>({ queryKey: ["/api/ai/history"] });
+  const history = Array.isArray(historyRaw) ? historyRaw : [];
 
   const handleScenarioSubmit = () => {
     if (!scenarioQuery.trim()) return;
-    setScenarioSubmitted({ scenario: scenarioQuery.trim() });
+    scenarioRequestId.current += 1;
+    setScenarioSubmitted({ scenario: scenarioQuery.trim(), requestId: scenarioRequestId.current });
   };
 
   const handleDebtSubmit = () => {
-    setDebtSubmitted({ monthlyBudget: debtBudget });
+    debtRequestId.current += 1;
+    setDebtSubmitted({ monthlyBudget: debtBudget, requestId: debtRequestId.current });
   };
 
-  const handleForecastSubmit = () => {
-    setForecastSubmitted({ yearsToForecast: forecastYears });
+  const refreshHistory = () => {
+    queryClient.invalidateQueries({ queryKey: ["/api/ai/history"] });
   };
 
   const scenarioSuggestions = [
@@ -210,13 +229,13 @@ export default function AIAdvisorPage() {
       <Tabs defaultValue="scenario">
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="scenario" data-testid="tab-scenario">
-            <Lightbulb className="h-4 w-4 mr-2" /> Scenario Planner
+            <Brain className="h-4 w-4 mr-2" /> Ask Whizzy
           </TabsTrigger>
           <TabsTrigger value="debt" data-testid="tab-debt">
             <CreditCard className="h-4 w-4 mr-2" /> Debt Strategy
           </TabsTrigger>
-          <TabsTrigger value="forecast" data-testid="tab-forecast">
-            <TrendingUp className="h-4 w-4 mr-2" /> Net Worth Forecast
+          <TabsTrigger value="history" data-testid="tab-history">
+            <History className="h-4 w-4 mr-2" /> AI History
           </TabsTrigger>
         </TabsList>
 
@@ -261,6 +280,7 @@ export default function AIAdvisorPage() {
               key={JSON.stringify(scenarioSubmitted)}
               endpoint="/api/ai/scenario"
               body={scenarioSubmitted}
+              onComplete={refreshHistory}
             />
           )}
         </TabsContent>
@@ -311,44 +331,65 @@ export default function AIAdvisorPage() {
               key={JSON.stringify(debtSubmitted)}
               endpoint="/api/ai/debt-strategy"
               body={debtSubmitted}
+              onComplete={refreshHistory}
             />
           )}
         </TabsContent>
 
-        <TabsContent value="forecast" forceMount className="space-y-4 mt-4 data-[state=inactive]:hidden">
+        <TabsContent value="history" forceMount className="space-y-4 mt-4 data-[state=inactive]:hidden">
           <Card>
-            <CardHeader className="pb-3">
+            <CardHeader className="pb-3 border-b">
               <CardTitle className="text-base flex items-center gap-2">
-                <TrendingUp className="h-4 w-4 text-primary" /> Net Worth Forecast
+                <History className="h-4 w-4 text-primary" /> Past AI Queries
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label>Years to Forecast</Label>
-                <div className="flex gap-2">
-                  <Input
-                    type="number"
-                    value={forecastYears}
-                    onChange={(e) => setForecastYears(e.target.value)}
-                    min={1}
-                    max={50}
-                    className="max-w-xs"
-                    data-testid="input-forecast-years"
-                  />
-                  <Button onClick={handleForecastSubmit} data-testid="button-forecast">
-                    <TrendingUp className="h-4 w-4 mr-2" /> Forecast
-                  </Button>
+            <CardContent className="p-0">
+              {historyLoading ? (
+                <div className="space-y-3 p-5">
+                  <Skeleton className="h-16 w-full" />
+                  <Skeleton className="h-16 w-full" />
                 </div>
-              </div>
+              ) : historyError ? (
+                <p className="p-5 text-sm text-destructive">AI query history could not be loaded.</p>
+              ) : history.length === 0 ? (
+                <div className="p-8 text-center">
+                  <History className="mx-auto h-8 w-8 text-muted-foreground/60" />
+                  <p className="mt-3 text-sm font-medium">No saved AI queries yet</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Completed Ask Whizzy and Debt Strategy responses will appear here.
+                  </p>
+                </div>
+              ) : (
+                <div className="divide-y">
+                  {history.map((entry, index) => (
+                    <details key={entry.id} className="group p-4" defaultOpen={index === 0}>
+                      <summary className="cursor-pointer list-none">
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="min-w-0">
+                            <p className="text-xs font-medium text-primary">
+                              {entry.queryType === "scenario"
+                                ? "Ask Whizzy"
+                                : entry.queryType === "debt_strategy"
+                                  ? "Debt Strategy"
+                                  : "Net Worth Forecast"}
+                            </p>
+                            <p className="mt-1 text-sm font-medium text-foreground">{entry.queryText}</p>
+                          </div>
+                          <time className="shrink-0 text-xs text-muted-foreground" dateTime={entry.createdAt}>
+                            {new Date(entry.createdAt).toLocaleString()}
+                          </time>
+                        </div>
+                        <p className="mt-2 text-xs text-muted-foreground group-open:hidden">Select to view response</p>
+                      </summary>
+                      <div className="mt-4 rounded-lg border bg-muted/20 p-4">
+                        <MarkdownRenderer content={entry.responseText} />
+                      </div>
+                    </details>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
-          {forecastSubmitted && (
-            <StreamingResponse
-              key={JSON.stringify(forecastSubmitted)}
-              endpoint="/api/ai/forecast"
-              body={forecastSubmitted}
-            />
-          )}
         </TabsContent>
       </Tabs>
     </div>
