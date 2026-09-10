@@ -536,7 +536,7 @@ function SpendingInsightCarousel({
                   <ResponsiveContainer width="100%" height={160}>
                     <PieChart>
                       <Pie data={categoryData} dataKey="value" cx="50%" cy="50%" innerRadius={40} outerRadius={72} paddingAngle={2}>
-                        {categoryData.map(d => <Cell key={d.key} fill={CAT_COLORS[d.key] ?? "#94a3b8"} />)}
+                        {categoryData.map(d => <Cell key={d.key} fill={getCategoryColor(d.key)} />)}
                       </Pie>
                       <Tooltip formatter={(value: any) => fmtFull(Number(value))} />
                     </PieChart>
@@ -545,7 +545,7 @@ function SpendingInsightCarousel({
                     {categoryData.map(d => (
                       <div key={d.key} className="flex items-center justify-between text-xs">
                         <div className="flex items-center gap-1.5 min-w-0">
-                          <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: CAT_COLORS[d.key] ?? "#94a3b8" }} />
+                          <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: getCategoryColor(d.key) }} />
                           <span className="text-muted-foreground truncate">{d.name}</span>
                         </div>
                         <span className="font-medium tabular-nums ml-3">{fmt(d.value)}</span>
@@ -1261,7 +1261,7 @@ export default function FinanceTrackerPage() {
                           </td>
                           <td className="px-3 py-2.5">
                             <div className="flex items-center gap-1.5">
-                              <div className="w-2 h-2 rounded-full shrink-0" style={{ background: CAT_COLORS[t.subcategory] ?? "#94a3b8" }} />
+                              <div className="w-2 h-2 rounded-full shrink-0" style={{ background: getCategoryColor(t.subcategory) }} />
                               <span className={`text-xs ${t.subcategory === "unassigned" ? "text-amber-600 dark:text-amber-400 font-medium" : ""}`}>{catLabel(t.subcategory)}</span>
                             </div>
                           </td>
