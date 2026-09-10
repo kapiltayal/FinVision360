@@ -26,6 +26,7 @@ import {
   YAxis,
 } from "recharts";
 import { formatCurrency } from "@/lib/format";
+import { FinancialChartTooltip } from "@/components/financial-chart-tooltip";
 
 type CashFlowCategory = {
   type: "income" | "expense";
@@ -338,8 +339,7 @@ export default function IncomeExpensesPage() {
                       <XAxis dataKey="name" tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} tickLine={false} />
                       <YAxis tickFormatter={(value) => `$${Math.round(value / 1000)}k`} tick={{ fontSize: 11 }} width={48} tickLine={false} axisLine={false} />
                       <Tooltip
-                        formatter={(value: number) => [`${formatCurrency(Number(value))}/mo`, "Average"]}
-                        contentStyle={{ borderRadius: "0.5rem" }}
+                        content={<FinancialChartTooltip valueSuffix="/mo" />}
                       />
                       <Bar dataKey="amount" radius={[5, 5, 0, 0]}>
                         {totalsChartData.map((entry) => <Cell key={entry.name} fill={entry.color} />)}
@@ -351,8 +351,7 @@ export default function IncomeExpensesPage() {
                       <XAxis dataKey="name" tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} tickLine={false} />
                       <YAxis tickFormatter={(value) => `$${Math.round(value / 1000)}k`} tick={{ fontSize: 11 }} width={48} tickLine={false} axisLine={false} />
                       <Tooltip
-                        formatter={(value: number, name: string) => [`${formatCurrency(Number(value))}/mo`, name]}
-                        contentStyle={{ borderRadius: "0.5rem" }}
+                        content={<FinancialChartTooltip valueSuffix="/mo" />}
                       />
                       <Legend wrapperStyle={{ fontSize: "12px" }} />
                       {categorySeries.map((series) => (

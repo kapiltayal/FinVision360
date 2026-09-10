@@ -29,6 +29,7 @@ import {
 } from "recharts";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { formatCurrency } from "@/lib/format";
+import { FinancialChartTooltip } from "@/components/financial-chart-tooltip";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -189,16 +190,7 @@ function TrendSparkline({
           <RechartsTooltip
             position={{ y: -44 }}
             cursor={{ stroke: "hsl(var(--border))", strokeDasharray: "2 2" }}
-            formatter={(value: number) => [formatCurrency(Number(value)), "Amount"]}
-            labelFormatter={(label) => formatMonth(String(label))}
-            contentStyle={{
-              borderRadius: "0.5rem",
-              border: "1px solid hsl(var(--border))",
-              background: "hsl(var(--popover))",
-              color: "hsl(var(--popover-foreground))",
-              fontSize: "12px",
-              padding: "6px 8px",
-            }}
+            content={<FinancialChartTooltip labelFormatter={(label) => formatMonth(String(label))} />}
           />
           <Line
             type="monotone"

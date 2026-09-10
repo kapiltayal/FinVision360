@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { ConnectedAccountsImportPanel } from "@/components/finance-tracker/connected-accounts-import";
+import { FinancialChartTooltip } from "@/components/financial-chart-tooltip";
 import {
   TrendingUp, TrendingDown, Wallet, Plus, Upload, RefreshCw, Pencil, Trash2,
   AlertCircle, ArrowDownCircle, ArrowUpCircle, Repeat2, Tag, Search, X,
@@ -538,7 +539,7 @@ function SpendingInsightCarousel({
                       <Pie data={categoryData} dataKey="value" cx="50%" cy="50%" innerRadius={40} outerRadius={72} paddingAngle={2}>
                         {categoryData.map(d => <Cell key={d.key} fill={getCategoryColor(d.key)} />)}
                       </Pie>
-                      <Tooltip formatter={(value: any) => fmtFull(Number(value))} />
+                      <Tooltip content={<FinancialChartTooltip />} />
                     </PieChart>
                   </ResponsiveContainer>
                   <div className="space-y-1 mt-2 max-h-36 overflow-y-auto pr-1">
@@ -1131,7 +1132,7 @@ export default function FinanceTrackerPage() {
                     <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
                     <XAxis dataKey="period" tick={{ fontSize: 11 }} />
                     <YAxis tick={{ fontSize: 11 }} tickFormatter={v => `$${(v/1000).toFixed(0)}k`} />
-                    <Tooltip formatter={(v: any) => fmtFull(v)} />
+                    <Tooltip content={<FinancialChartTooltip />} />
                     <Legend />
                     {trendChartType === "bar" ? (
                       <>
