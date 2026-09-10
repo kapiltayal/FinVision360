@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -7,10 +7,18 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Brain, History, CreditCard, Loader2, Sparkles, Send } from "lucide-react";
+import {
+  Brain, History, CreditCard, Loader2, Sparkles, Send, Trash2,
+} from "lucide-react";
 import { type Asset, type Liability } from "@shared/schema";
 import { getAccessToken } from "@/lib/supabase";
 import { queryClient } from "@/lib/queryClient";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 type AdvisorHistoryEntry = {
   id: number;
@@ -195,6 +203,9 @@ export default function AIAdvisorPage() {
     isError: historyError,
   } = useQuery<AdvisorHistoryEntry[]>({ queryKey: ["/api/ai/history"] });
   const history = Array.isArray(historyRaw) ? historyRaw : [];
+  const [deleteTarget, setDeleteTarget] = useState<AdvisorHistoryEntry | null>(null);
+  const [clearArchiveOpen, setClearArchiveOpen] = useState(false);
+  const { toast } = useToast();
 
   const handleScenarioSubmit = () => {
     if (!scenarioQuery.trim()) return;
@@ -210,6 +221,30 @@ export default function AIAdvisorPage() {
   const refreshHistory = () => {
     queryClient.invalidateQueries({ queryKey: ["/api/ai/history"] });
   };
+  const deleteHistoryMutation = useMutation({
+    mutationFn: async (id: number) => {
+      await apiRequest("DELETE", `/api/ai/history/${id}`);
+    },
+    onSuccess: () => {
+      setDeleteTarget(null);
+      refreshHistory();
+    },
+    onError: (error: Error) => {
+      toast({ title: "Could not delete archive entry", description: error.message, variant: "destructive" });
+    },
+  });
+  const clearHistoryMutation = useMutation({
+    mutationFn: async () => {
+      await apiRequest("DELETE", "/api/ai/history");
+    },
+    onSuccess: () => {
+      setClearArchiveOpen(false);
+      refreshHistory();
+    },
+    onError: (error: Error) => {
+      toast({ title: "Could not clear Whizzy Archives", description: error.message, variant: "destructive" });
+    },
+  });
 
   const scenarioSuggestions = [
     "What if I increase my monthly savings by $500?",
@@ -350,10 +385,23 @@ export default function AIAdvisorPage() {
 
         <TabsContent value="history" forceMount className="space-y-4 mt-4 data-[state=inactive]:hidden">
           <Card>
-            <CardHeader className="pb-3 border-b">
+            <CardHeader className="flex-row items-center justify-between gap-4 border-b pb-3">
               <CardTitle className="text-base flex items-center gap-2">
                 <History className="h-4 w-4 text-primary" /> Whizzy Archives
               </CardTitle>
+              {history.length > 0 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="shrink-0 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                  onClick={() => setClearArchiveOpen(true)}
+                  disabled={clearHistoryMutation.isPending}
+                  data-testid="button-clear-whizzy-archives"
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Clear archive
+                </Button>
+              )}
             </CardHeader>
             <CardContent className="p-0">
               {historyLoading ? (
@@ -387,9 +435,26 @@ export default function AIAdvisorPage() {
                             </p>
                             <p className="mt-1 text-sm font-medium text-foreground">{entry.queryText}</p>
                           </div>
-                          <time className="shrink-0 text-xs text-muted-foreground" dateTime={entry.createdAt}>
-                            {new Date(entry.createdAt).toLocaleString()}
-                          </time>
+                          <div className="flex shrink-0 items-start gap-2">
+                            <time className="pt-1 text-xs text-muted-foreground" dateTime={entry.createdAt}>
+                              {new Date(entry.createdAt).toLocaleString()}
+                            </time>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                              aria-label={`Delete ${entry.queryText}`}
+                              onClick={(event) => {
+                                event.preventDefault();
+                                event.stopPropagation();
+                                setDeleteTarget(entry);
+                              }}
+                              data-testid={`button-delete-archive-${entry.id}`}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
                         </div>
                         <p className="mt-2 text-xs text-muted-foreground group-open:hidden">Select to view response</p>
                       </summary>
@@ -402,6 +467,46 @@ export default function AIAdvisorPage() {
               )}
             </CardContent>
           </Card>
+          <AlertDialog open={deleteTarget !== null} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete this archived response?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This will permanently remove this saved question and response from Whizzy Archives.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel disabled={deleteHistoryMutation.isPending}>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  disabled={deleteHistoryMutation.isPending}
+                  onClick={() => deleteTarget && deleteHistoryMutation.mutate(deleteTarget.id)}
+                >
+                  {deleteHistoryMutation.isPending ? "Deleting..." : "Delete"}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+          <AlertDialog open={clearArchiveOpen} onOpenChange={setClearArchiveOpen}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Clear Whizzy Archives?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This will permanently delete all saved AI questions and responses. This cannot be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel disabled={clearHistoryMutation.isPending}>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  disabled={clearHistoryMutation.isPending}
+                  onClick={() => clearHistoryMutation.mutate()}
+                >
+                  {clearHistoryMutation.isPending ? "Clearing..." : "Clear archive"}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </TabsContent>
       </Tabs>
     </div>

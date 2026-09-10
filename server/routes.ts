@@ -637,6 +637,39 @@ Include a year-by-year overview, useful milestones, a conservative/base/optimist
     }
   });
 
+  app.delete("/api/ai/history/:id", requireAuth, async (req, res) => {
+    const historyId = Number(req.params.id);
+    if (!Number.isInteger(historyId) || historyId < 1) {
+      return res.status(400).json({ message: "Invalid archive entry" });
+    }
+
+    try {
+      const { rowCount } = await pool.query(
+        `DELETE FROM ai_advisor_history
+         WHERE id = $1 AND user_id = $2`,
+        [historyId, (req.user as any).id],
+      );
+      if (!rowCount) return res.status(404).json({ message: "Archive entry not found" });
+      res.status(204).end();
+    } catch (error) {
+      console.error("AI history delete error:", error);
+      res.status(500).json({ message: "Failed to delete archive entry" });
+    }
+  });
+
+  app.delete("/api/ai/history", requireAuth, async (req, res) => {
+    try {
+      const { rowCount } = await pool.query(
+        `DELETE FROM ai_advisor_history WHERE user_id = $1`,
+        [(req.user as any).id],
+      );
+      res.json({ deleted: rowCount ?? 0 });
+    } catch (error) {
+      console.error("AI history clear error:", error);
+      res.status(500).json({ message: "Failed to clear Whizzy Archives" });
+    }
+  });
+
   app.get("/api/insurance", requireAuth, async (req, res) => {
     const userId = (req.user as any).id;
     const policies = await storage.getInsurancePolicies(userId);
