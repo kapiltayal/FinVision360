@@ -235,7 +235,7 @@ export default function AIAdvisorPage() {
             <CreditCard className="h-4 w-4 mr-2" /> Debt Strategy
           </TabsTrigger>
           <TabsTrigger value="history" data-testid="tab-history">
-            <History className="h-4 w-4 mr-2" /> AI History
+            <History className="h-4 w-4 mr-2" /> Whizzy Archives
           </TabsTrigger>
         </TabsList>
 
@@ -340,7 +340,7 @@ export default function AIAdvisorPage() {
           <Card>
             <CardHeader className="pb-3 border-b">
               <CardTitle className="text-base flex items-center gap-2">
-                <History className="h-4 w-4 text-primary" /> Past AI Queries
+                <History className="h-4 w-4 text-primary" /> Whizzy Archives
               </CardTitle>
             </CardHeader>
             <CardContent className="p-0">
@@ -350,11 +350,11 @@ export default function AIAdvisorPage() {
                   <Skeleton className="h-16 w-full" />
                 </div>
               ) : historyError ? (
-                <p className="p-5 text-sm text-destructive">AI query history could not be loaded.</p>
+                <p className="p-5 text-sm text-destructive">Whizzy archives could not be loaded.</p>
               ) : history.length === 0 ? (
                 <div className="p-8 text-center">
                   <History className="mx-auto h-8 w-8 text-muted-foreground/60" />
-                  <p className="mt-3 text-sm font-medium">No saved AI queries yet</p>
+                  <p className="mt-3 text-sm font-medium">No saved queries yet</p>
                   <p className="mt-1 text-xs text-muted-foreground">
                     Completed Ask Whizzy and Debt Strategy responses will appear here.
                   </p>
