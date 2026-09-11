@@ -388,7 +388,7 @@ export default function AIAdvisorPage() {
 
         <TabsContent value="history" forceMount className="space-y-4 mt-4 data-[state=inactive]:hidden">
           <Card>
-            <CardHeader className="flex-row items-center justify-between gap-3 border-b border-primary/20 bg-muted/50 px-4 py-3">
+            <CardHeader className="flex-row items-center justify-between gap-3 border-b-2 border-primary/20 bg-muted/50 px-4 py-3">
               <div className="flex min-w-0 items-center gap-3">
                 <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-primary/10">
                   <History className="h-4 w-4 text-primary" />
