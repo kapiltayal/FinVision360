@@ -681,8 +681,8 @@ export default function DashboardPage() {
     <div className="p-6 space-y-4 max-w-7xl mx-auto">
       <div className="flex items-start justify-between gap-4 flex-wrap page-header-gradient">
         <div>
-          <h1 className="text-2xl font-bold" data-testid="text-dashboard-title">Your Personal CFO</h1>
-          <p className="text-muted-foreground">Actively Growing Your Wealth</p>
+          <h1 className="text-2xl font-bold" data-testid="text-dashboard-title">Net Worth</h1>
+          <p className="text-muted-foreground">Your complete net worth picture</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <ExportMenu data={exportData} />
