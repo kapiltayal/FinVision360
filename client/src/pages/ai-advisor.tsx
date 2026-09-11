@@ -260,8 +260,8 @@ export default function AIAdvisorPage() {
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
       <div className="page-header-gradient">
-        <h1 className="text-2xl font-bold" data-testid="text-ai-title">AI Finance Intelligence</h1>
-        <p className="text-muted-foreground">Get personalized insights powered by AI</p>
+        <h1 className="text-2xl font-bold" data-testid="text-ai-title">Your Intelligence Lab</h1>
+        <p className="text-muted-foreground">Clear, personalized guidance for your financial future</p>
       </div>
 
       <Tabs defaultValue="scenario">
