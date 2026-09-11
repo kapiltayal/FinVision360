@@ -285,7 +285,7 @@ export default function AIAdvisorPage() {
             data-testid="tab-history"
             className="h-10 rounded-xl border border-border/70 bg-muted/70 px-4 text-muted-foreground shadow-sm hover:border-primary/40 hover:bg-muted data-[state=active]:border-primary data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md"
           >
-            <History className="h-4 w-4 mr-2" /> Whizzy Archives
+            <History className="h-4 w-4 mr-2" /> Whizzy Archives ({history.length})
           </TabsTrigger>
         </TabsList>
 
