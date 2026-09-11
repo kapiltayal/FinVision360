@@ -166,7 +166,10 @@ function StreamingResponse({
   return (
     <Card>
       <CardContent className="p-6">
-        <div ref={containerRef} className="max-h-[500px] overflow-y-auto">
+        <div
+          ref={containerRef}
+          className={response && !isStreaming ? "max-h-[500px] overflow-y-auto" : "max-h-[500px] overflow-hidden"}
+        >
           {response ? (
             <MarkdownRenderer content={response} />
           ) : (
