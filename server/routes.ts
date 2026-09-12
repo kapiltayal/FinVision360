@@ -932,7 +932,13 @@ Include a year-by-year overview, useful milestones, a conservative/base/optimist
 
   app.put("/api/recommendation-settings", requireAuth, async (req, res) => {
     const userId = (req.user as any).id;
-    const settings = await storage.upsertRecommendationSettings({ userId, ...req.body });
+    const aiAdvisorName = typeof req.body?.aiAdvisorName === "string"
+      ? req.body.aiAdvisorName.trim()
+      : "Whizzy";
+    if (!aiAdvisorName || aiAdvisorName.length > 50) {
+      return res.status(400).json({ message: "AI Advisor name must be between 1 and 50 characters." });
+    }
+    const settings = await storage.upsertRecommendationSettings({ userId, ...req.body, aiAdvisorName });
     res.json(settings);
   });
 

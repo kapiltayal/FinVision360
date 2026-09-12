@@ -228,6 +228,7 @@ export const recommendationSettings = pgTable("recommendation_settings", {
   interestEarningThreshold: numeric("interest_earning_threshold", { precision: 15, scale: 2 }),
   debtInterestPaymentReductionThreshold: numeric("debt_interest_payment_reduction_threshold", { precision: 15, scale: 2 }),
   insurancePremiumSavingsThreshold: numeric("insurance_premium_savings_threshold", { precision: 15, scale: 2 }),
+  aiAdvisorName: text("ai_advisor_name").notNull().default("Whizzy"),
   updatedAt: timestamp("updated_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
 });
 

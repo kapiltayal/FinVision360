@@ -53,6 +53,7 @@ export function setupAuth(app: Express) {
           interestEarningThreshold: "200",
           debtInterestPaymentReductionThreshold: "200",
           insurancePremiumSavingsThreshold: "100",
+          aiAdvisorName: "Whizzy",
         });
       }
       res.json({ ok: true });
@@ -120,6 +121,7 @@ export async function authenticateSupabase(req: any, res: Response, next: NextFu
         interestEarningThreshold: "200",
         debtInterestPaymentReductionThreshold: "200",
         insurancePremiumSavingsThreshold: "100",
+        aiAdvisorName: "Whizzy",
       });
     }
     req.user = localUser;

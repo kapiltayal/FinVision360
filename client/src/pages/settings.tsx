@@ -62,12 +62,14 @@ type RecommendationFields = {
   interestEarningThreshold: string;
   debtInterestPaymentReductionThreshold: string;
   insurancePremiumSavingsThreshold: string;
+  aiAdvisorName: string;
 };
 
 const DEFAULT_REC: RecommendationFields = {
   interestEarningThreshold: "200",
   debtInterestPaymentReductionThreshold: "200",
   insurancePremiumSavingsThreshold: "100",
+  aiAdvisorName: "Whizzy",
 };
 
 function numericToStr(v: string | null | undefined, fallback = ""): string {
@@ -219,6 +221,9 @@ export default function SettingsPage() {
           recData.insurancePremiumSavingsThreshold,
           DEFAULT_REC.insurancePremiumSavingsThreshold,
         ),
+        aiAdvisorName: typeof recData.aiAdvisorName === "string" && recData.aiAdvisorName.trim()
+          ? recData.aiAdvisorName.trim()
+          : DEFAULT_REC.aiAdvisorName,
       });
     }
   }, [recData]);
@@ -228,7 +233,7 @@ export default function SettingsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/recommendation-settings"] });
       markUpdated();
-      toast({ title: "Recommendation settings saved" });
+      toast({ title: "Account settings saved" });
     },
     onError: (e: any) => toast({ title: "Failed to save", description: e.message, variant: "destructive" }),
   });
@@ -650,6 +655,32 @@ export default function SettingsPage() {
                   value={rec.insurancePremiumSavingsThreshold}
                   onChange={setRecField("insurancePremiumSavingsThreshold")}
                 />
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-4">
+                <CardTitle className="text-base">AI Advisor Settings</CardTitle>
+                <CardDescription>Customize the name shown throughout your AI Advisor experience</CardDescription>
+              </CardHeader>
+              <Separator />
+              <CardContent className="pt-5">
+                <div className="max-w-md space-y-1.5">
+                  <Label htmlFor="aiAdvisorName" className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                    AI Advisor Name
+                  </Label>
+                  <Input
+                    id="aiAdvisorName"
+                    value={rec.aiAdvisorName}
+                    maxLength={50}
+                    required
+                    onChange={(e) => setRecField("aiAdvisorName")(e.target.value)}
+                    placeholder="Whizzy"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    This name appears in labels such as “Ask {rec.aiAdvisorName || "Whizzy"}” and “{rec.aiAdvisorName || "Whizzy"} Archives”.
+                  </p>
+                </div>
               </CardContent>
             </Card>
 
