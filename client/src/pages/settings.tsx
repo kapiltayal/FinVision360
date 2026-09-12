@@ -40,7 +40,12 @@ function DollarInput({
 }) {
   return (
     <div className="space-y-1.5">
-      <Label htmlFor={id} className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{label}</Label>
+      <Label
+        htmlFor={id}
+        className="block min-h-10 text-xs font-medium leading-5 text-muted-foreground uppercase tracking-wide"
+      >
+        {label}
+      </Label>
       <div className="relative">
         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm font-medium">$</span>
         <Input
