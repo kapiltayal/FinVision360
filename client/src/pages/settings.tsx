@@ -385,7 +385,7 @@ export default function SettingsPage() {
           </TabsTrigger>
           <TabsTrigger value="recommendations" className="flex items-center gap-2 text-sm">
             <SlidersHorizontal className="h-4 w-4" />
-            Recommendations
+            Account Settings
           </TabsTrigger>
         </TabsList>
 
@@ -611,7 +611,7 @@ export default function SettingsPage() {
           </Card>
         </TabsContent>
 
-        {/* Recommendation Settings Tab */}
+        {/* Account Settings Tab */}
         <TabsContent value="recommendations">
           <form onSubmit={handleRecSubmit} className="space-y-5">
             <Card className="border-[#1C91D4]/30 dark:border-[#1C91D4]/30 bg-[#1C91D4]/5 dark:bg-[#1C91D4]/5">
@@ -656,7 +656,7 @@ export default function SettingsPage() {
             <div className="flex justify-end">
               <Button type="submit" disabled={saveRecMutation.isPending} className="gap-2">
                 <Save className="h-4 w-4" />
-                {saveRecMutation.isPending ? "Saving..." : "Save Recommendation Settings"}
+                {saveRecMutation.isPending ? "Saving..." : "Save Account Settings"}
               </Button>
             </div>
           </form>
