@@ -677,13 +677,13 @@ export default function SettingsPage() {
                   <Input
                     id="aiAdvisorName"
                     value={rec.aiAdvisorName}
-                    maxLength={50}
+                    maxLength={20}
                     required
                     onChange={(e) => setRecField("aiAdvisorName")(e.target.value)}
                     placeholder="Whizzy"
                   />
                   <p className="text-xs text-muted-foreground">
-                    This name appears in labels such as “Ask {rec.aiAdvisorName || "Whizzy"}” and “{rec.aiAdvisorName || "Whizzy"} Archives”.
+                    Use up to 20 characters. This name appears in labels such as “Ask {rec.aiAdvisorName || "Whizzy"}” and “{rec.aiAdvisorName || "Whizzy"} Archives”.
                   </p>
                 </div>
               </CardContent>

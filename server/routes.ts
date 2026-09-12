@@ -935,8 +935,8 @@ Include a year-by-year overview, useful milestones, a conservative/base/optimist
     const aiAdvisorName = typeof req.body?.aiAdvisorName === "string"
       ? req.body.aiAdvisorName.trim()
       : "Whizzy";
-    if (!aiAdvisorName || aiAdvisorName.length > 50) {
-      return res.status(400).json({ message: "AI Advisor name must be between 1 and 50 characters." });
+    if (!aiAdvisorName || aiAdvisorName.length > 20) {
+      return res.status(400).json({ message: "AI Advisor name must be between 1 and 20 characters." });
     }
     const settings = await storage.upsertRecommendationSettings({ userId, ...req.body, aiAdvisorName });
     res.json(settings);
