@@ -193,6 +193,12 @@ function StreamingResponse({
 export default function AIAdvisorPage() {
   const { data: assets = [] } = useQuery<Asset[]>({ queryKey: ["/api/assets"] });
   const { data: liabilities = [] } = useQuery<Liability[]>({ queryKey: ["/api/liabilities"] });
+  const { data: advisorSettings } = useQuery<{ aiAdvisorName?: string }>({
+    queryKey: ["/api/recommendation-settings"],
+    queryFn: () => apiRequest("GET", "/api/recommendation-settings").then((r) => r.json()),
+  });
+  const savedAdvisorName = advisorSettings?.aiAdvisorName?.trim();
+  const advisorName = savedAdvisorName || "Whizzy";
   const [scenarioQuery, setScenarioQuery] = useState("");
   const [scenarioSubmitted, setScenarioSubmitted] = useState<any>(null);
   const scenarioRequestId = useRef(0);
@@ -208,7 +214,14 @@ export default function AIAdvisorPage() {
   const history = Array.isArray(historyRaw) ? historyRaw : [];
   const [deleteTarget, setDeleteTarget] = useState<AdvisorHistoryEntry | null>(null);
   const [clearArchiveOpen, setClearArchiveOpen] = useState(false);
+  const firstArchiveRef = useRef<HTMLDetailsElement | null>(null);
   const { toast } = useToast();
+
+  useEffect(() => {
+    if (firstArchiveRef.current) {
+      firstArchiveRef.current.open = true;
+    }
+  }, [history]);
 
   const handleScenarioSubmit = () => {
     if (!scenarioQuery.trim()) return;
@@ -245,7 +258,7 @@ export default function AIAdvisorPage() {
       refreshHistory();
     },
     onError: (error: Error) => {
-      toast({ title: "Could not clear Whizzy Archives", description: error.message, variant: "destructive" });
+      toast({ title: `Could not clear ${advisorName} Archives`, description: error.message, variant: "destructive" });
     },
   });
 
@@ -271,7 +284,7 @@ export default function AIAdvisorPage() {
             data-testid="tab-scenario"
             className="h-10 rounded-xl border border-border/70 bg-muted/70 px-4 text-muted-foreground shadow-sm hover:border-primary/40 hover:bg-muted data-[state=active]:border-primary data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md"
           >
-            <Brain className="h-4 w-4 mr-2" /> Ask Whizzy
+            <Brain className="h-4 w-4 mr-2" /> Ask {advisorName}
           </TabsTrigger>
           <TabsTrigger
             value="debt"
@@ -285,7 +298,7 @@ export default function AIAdvisorPage() {
             data-testid="tab-history"
             className="h-10 rounded-xl border border-border/70 bg-muted/70 px-4 text-muted-foreground shadow-sm hover:border-primary/40 hover:bg-muted data-[state=active]:border-primary data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md"
           >
-            <History className="h-4 w-4 mr-2" /> Whizzy Archives ({history.length})
+            <History className="h-4 w-4 mr-2" /> {advisorName} Archives ({history.length})
           </TabsTrigger>
         </TabsList>
 
@@ -394,7 +407,7 @@ export default function AIAdvisorPage() {
                   <History className="h-4 w-4 text-primary" />
                 </div>
                 <div className="min-w-0">
-                  <CardTitle className="text-sm font-semibold uppercase tracking-wide">Whizzy Archives</CardTitle>
+                  <CardTitle className="text-sm font-semibold uppercase tracking-wide">{advisorName} Archives</CardTitle>
                   <p className="mt-0.5 text-xs text-muted-foreground">Saved AI questions and responses</p>
                 </div>
               </div>
@@ -419,25 +432,29 @@ export default function AIAdvisorPage() {
                   <Skeleton className="h-16 w-full" />
                 </div>
               ) : historyError ? (
-                <p className="p-5 text-sm text-destructive">Whizzy archives could not be loaded.</p>
+                <p className="p-5 text-sm text-destructive">{advisorName} archives could not be loaded.</p>
               ) : history.length === 0 ? (
                 <div className="p-8 text-center">
                   <History className="mx-auto h-8 w-8 text-muted-foreground/60" />
                   <p className="mt-3 text-sm font-medium">No saved queries yet</p>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    Completed Ask Whizzy and Debt Strategy responses will appear here.
+                    Completed Ask {advisorName} and Debt Strategy responses will appear here.
                   </p>
                 </div>
               ) : (
                 <div className="divide-y">
-                  {history.map((entry, index) => (
-                    <details key={entry.id} className="group p-3" defaultOpen={index === 0}>
+                    {history.map((entry, index) => (
+                    <details
+                      key={entry.id}
+                      ref={index === 0 ? firstArchiveRef : undefined}
+                      className="group p-3"
+                    >
                       <summary className="cursor-pointer list-none">
                         <div className="flex items-start justify-between gap-4">
                           <div className="min-w-0">
                             <p className="text-xs font-medium text-primary">
                               {entry.queryType === "scenario"
-                                ? "Ask Whizzy"
+                                ? `Ask ${advisorName}`
                                 : entry.queryType === "debt_strategy"
                                   ? "Debt Strategy"
                                   : "Net Worth Forecast"}
@@ -481,7 +498,7 @@ export default function AIAdvisorPage() {
               <AlertDialogHeader>
                 <AlertDialogTitle>Delete this archived response?</AlertDialogTitle>
                 <AlertDialogDescription>
-                  This will permanently remove this saved question and response from Whizzy Archives.
+                  This will permanently remove this saved question and response from {advisorName} Archives.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
@@ -499,7 +516,7 @@ export default function AIAdvisorPage() {
           <AlertDialog open={clearArchiveOpen} onOpenChange={setClearArchiveOpen}>
             <AlertDialogContent>
               <AlertDialogHeader>
-                <AlertDialogTitle>Clear Whizzy Archives?</AlertDialogTitle>
+                <AlertDialogTitle>Clear {advisorName} Archives?</AlertDialogTitle>
                 <AlertDialogDescription>
                   This will permanently delete all saved AI questions and responses. This cannot be undone.
                 </AlertDialogDescription>

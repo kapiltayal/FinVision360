@@ -666,7 +666,7 @@ Include a year-by-year overview, useful milestones, a conservative/base/optimist
       res.json({ deleted: rowCount ?? 0 });
     } catch (error) {
       console.error("AI history clear error:", error);
-      res.status(500).json({ message: "Failed to clear Whizzy Archives" });
+      res.status(500).json({ message: "Failed to clear AI advisor archives" });
     }
   });
 
