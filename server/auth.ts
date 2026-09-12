@@ -50,18 +50,9 @@ export function setupAuth(app: Express) {
         localUser = await storage.createUserFromSupabase(supabaseUser.id, email, fullName);
         await storage.upsertRecommendationSettings({
           userId: localUser.id,
-          checkingThreshold: "200",
-          savingsThreshold: "200",
-          cdsThreshold: "200",
-          studentLoanThreshold: "200",
-          creditCardThreshold: "200",
-          autoLoanThreshold: "200",
-          personalLoanThreshold: "200",
-          mortgageThreshold: "200",
-          autoInsuranceThreshold: "100",
-          homeInsuranceThreshold: "100",
-          lifeInsuranceThreshold: "100",
-          otherInsuranceThreshold: "100",
+          interestEarningThreshold: "200",
+          debtInterestPaymentReductionThreshold: "200",
+          insurancePremiumSavingsThreshold: "100",
         });
       }
       res.json({ ok: true });
@@ -126,18 +117,9 @@ export async function authenticateSupabase(req: any, res: Response, next: NextFu
       localUser = await storage.createUserFromSupabase(supabaseUser.id, email, fullName);
       await storage.upsertRecommendationSettings({
         userId: localUser.id,
-        checkingThreshold: "200",
-        savingsThreshold: "200",
-        cdsThreshold: "200",
-        studentLoanThreshold: "200",
-        creditCardThreshold: "200",
-        autoLoanThreshold: "200",
-        personalLoanThreshold: "200",
-        mortgageThreshold: "200",
-        autoInsuranceThreshold: "100",
-        homeInsuranceThreshold: "100",
-        lifeInsuranceThreshold: "100",
-        otherInsuranceThreshold: "100",
+        interestEarningThreshold: "200",
+        debtInterestPaymentReductionThreshold: "200",
+        insurancePremiumSavingsThreshold: "100",
       });
     }
     req.user = localUser;

@@ -15,7 +15,7 @@ import { useAuth, useChangePassword } from "@/hooks/use-auth";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { COUNTRY_OPTIONS, US_STATE_OPTIONS } from "@shared/profile-options";
 import {
-  User, Lock, Save, PiggyBank, CreditCard, Shield,
+  User, Lock, Save,
   KeyRound, BadgeCheck, SlidersHorizontal, Clock, Camera, Upload, X,
 } from "lucide-react";
 
@@ -59,33 +59,15 @@ function DollarInput({
 }
 
 type RecommendationFields = {
-  checkingThreshold: string;
-  savingsThreshold: string;
-  cdsThreshold: string;
-  studentLoanThreshold: string;
-  creditCardThreshold: string;
-  autoLoanThreshold: string;
-  personalLoanThreshold: string;
-  mortgageThreshold: string;
-  autoInsuranceThreshold: string;
-  homeInsuranceThreshold: string;
-  lifeInsuranceThreshold: string;
-  otherInsuranceThreshold: string;
+  interestEarningThreshold: string;
+  debtInterestPaymentReductionThreshold: string;
+  insurancePremiumSavingsThreshold: string;
 };
 
 const DEFAULT_REC: RecommendationFields = {
-  checkingThreshold: "200",
-  savingsThreshold: "200",
-  cdsThreshold: "200",
-  studentLoanThreshold: "200",
-  creditCardThreshold: "200",
-  autoLoanThreshold: "200",
-  personalLoanThreshold: "200",
-  mortgageThreshold: "200",
-  autoInsuranceThreshold: "100",
-  homeInsuranceThreshold: "100",
-  lifeInsuranceThreshold: "100",
-  otherInsuranceThreshold: "100",
+  interestEarningThreshold: "200",
+  debtInterestPaymentReductionThreshold: "200",
+  insurancePremiumSavingsThreshold: "100",
 };
 
 function numericToStr(v: string | null | undefined, fallback = ""): string {
@@ -228,18 +210,15 @@ export default function SettingsPage() {
   useEffect(() => {
     if (recData) {
       setRec({
-        checkingThreshold: numericToStr(recData.checkingThreshold, DEFAULT_REC.checkingThreshold),
-        savingsThreshold: numericToStr(recData.savingsThreshold, DEFAULT_REC.savingsThreshold),
-        cdsThreshold: numericToStr(recData.cdsThreshold, DEFAULT_REC.cdsThreshold),
-        studentLoanThreshold: numericToStr(recData.studentLoanThreshold, DEFAULT_REC.studentLoanThreshold),
-        creditCardThreshold: numericToStr(recData.creditCardThreshold, DEFAULT_REC.creditCardThreshold),
-        autoLoanThreshold: numericToStr(recData.autoLoanThreshold, DEFAULT_REC.autoLoanThreshold),
-        personalLoanThreshold: numericToStr(recData.personalLoanThreshold, DEFAULT_REC.personalLoanThreshold),
-        mortgageThreshold: numericToStr(recData.mortgageThreshold, DEFAULT_REC.mortgageThreshold),
-        autoInsuranceThreshold: numericToStr(recData.autoInsuranceThreshold, DEFAULT_REC.autoInsuranceThreshold),
-        homeInsuranceThreshold: numericToStr(recData.homeInsuranceThreshold, DEFAULT_REC.homeInsuranceThreshold),
-        lifeInsuranceThreshold: numericToStr(recData.lifeInsuranceThreshold, DEFAULT_REC.lifeInsuranceThreshold),
-        otherInsuranceThreshold: numericToStr(recData.otherInsuranceThreshold, DEFAULT_REC.otherInsuranceThreshold),
+        interestEarningThreshold: numericToStr(recData.interestEarningThreshold, DEFAULT_REC.interestEarningThreshold),
+        debtInterestPaymentReductionThreshold: numericToStr(
+          recData.debtInterestPaymentReductionThreshold,
+          DEFAULT_REC.debtInterestPaymentReductionThreshold,
+        ),
+        insurancePremiumSavingsThreshold: numericToStr(
+          recData.insurancePremiumSavingsThreshold,
+          DEFAULT_REC.insurancePremiumSavingsThreshold,
+        ),
       });
     }
   }, [recData]);
@@ -639,74 +618,38 @@ export default function SettingsPage() {
               <CardContent className="p-4 flex items-start gap-3">
                 <SlidersHorizontal className="h-4 w-4 text-[#1475A8] dark:text-[#49AEE3] mt-0.5 shrink-0" />
                 <p className="text-sm text-[#1475A8] dark:text-[#7EC8ED]">
-                  Set dollar thresholds for each category. When <strong>FinVision360</strong> finds potential savings above your threshold, it will surface a personalized recommendation.
+              Set aggregate dollar thresholds for interest earnings, debt interest payment reductions, and insurance premium savings. When <strong>FinVision360</strong> finds potential savings above a threshold, it will surface a personalized recommendation.
                 </p>
               </CardContent>
             </Card>
 
-            {/* Savings */}
             <Card>
               <CardHeader className="pb-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-md bg-emerald-500/10">
-                    <PiggyBank className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-                  </div>
-                  <div>
-                    <CardTitle className="text-base">Savings Accounts</CardTitle>
-                    <CardDescription>Trigger thresholds for savings-related accounts</CardDescription>
-                  </div>
+                <div>
+                  <CardTitle className="text-base">Recommendation Thresholds</CardTitle>
+                  <CardDescription>Trigger thresholds for the three recommendation categories</CardDescription>
                 </div>
               </CardHeader>
               <Separator />
               <CardContent className="pt-5 grid gap-4 sm:grid-cols-3">
-                <DollarInput id="checkingThreshold" label="Checking" value={rec.checkingThreshold} onChange={setRecField("checkingThreshold")} />
-                <DollarInput id="savingsThreshold" label="Savings" value={rec.savingsThreshold} onChange={setRecField("savingsThreshold")} />
-                <DollarInput id="cdsThreshold" label="CDs" value={rec.cdsThreshold} onChange={setRecField("cdsThreshold")} />
-              </CardContent>
-            </Card>
-
-            {/* Borrowing */}
-            <Card>
-              <CardHeader className="pb-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-md bg-red-500/10">
-                    <CreditCard className="h-4 w-4 text-red-600 dark:text-red-400" />
-                  </div>
-                  <div>
-                    <CardTitle className="text-base">Borrowing & Debt</CardTitle>
-                    <CardDescription>Trigger thresholds for debt and loan balances</CardDescription>
-                  </div>
-                </div>
-              </CardHeader>
-              <Separator />
-              <CardContent className="pt-5 grid gap-4 sm:grid-cols-2">
-                <DollarInput id="studentLoanThreshold" label="Student Loan" value={rec.studentLoanThreshold} onChange={setRecField("studentLoanThreshold")} />
-                <DollarInput id="creditCardThreshold" label="Credit Card" value={rec.creditCardThreshold} onChange={setRecField("creditCardThreshold")} />
-                <DollarInput id="autoLoanThreshold" label="Auto Loan" value={rec.autoLoanThreshold} onChange={setRecField("autoLoanThreshold")} />
-                <DollarInput id="personalLoanThreshold" label="Personal Loan" value={rec.personalLoanThreshold} onChange={setRecField("personalLoanThreshold")} />
-                <DollarInput id="mortgageThreshold" label="Mortgage" value={rec.mortgageThreshold} onChange={setRecField("mortgageThreshold")} />
-              </CardContent>
-            </Card>
-
-            {/* Insurance */}
-            <Card>
-              <CardHeader className="pb-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-md bg-purple-500/10">
-                    <Shield className="h-4 w-4 text-purple-600 dark:text-purple-400" />
-                  </div>
-                  <div>
-                    <CardTitle className="text-base">Insurance Coverage</CardTitle>
-                    <CardDescription>Trigger thresholds for insurance coverage amounts</CardDescription>
-                  </div>
-                </div>
-              </CardHeader>
-              <Separator />
-              <CardContent className="pt-5 grid gap-4 sm:grid-cols-2">
-                <DollarInput id="autoInsuranceThreshold" label="Auto Insurance" value={rec.autoInsuranceThreshold} onChange={setRecField("autoInsuranceThreshold")} />
-                <DollarInput id="homeInsuranceThreshold" label="Home Insurance" value={rec.homeInsuranceThreshold} onChange={setRecField("homeInsuranceThreshold")} />
-                <DollarInput id="lifeInsuranceThreshold" label="Life Insurance" value={rec.lifeInsuranceThreshold} onChange={setRecField("lifeInsuranceThreshold")} />
-                <DollarInput id="otherInsuranceThreshold" label="Other Insurance" value={rec.otherInsuranceThreshold} onChange={setRecField("otherInsuranceThreshold")} />
+                <DollarInput
+                  id="interestEarningThreshold"
+                  label="Interest Earning"
+                  value={rec.interestEarningThreshold}
+                  onChange={setRecField("interestEarningThreshold")}
+                />
+                <DollarInput
+                  id="debtInterestPaymentReductionThreshold"
+                  label="Debt Interest Payment Reduction"
+                  value={rec.debtInterestPaymentReductionThreshold}
+                  onChange={setRecField("debtInterestPaymentReductionThreshold")}
+                />
+                <DollarInput
+                  id="insurancePremiumSavingsThreshold"
+                  label="Insurance Premium Savings"
+                  value={rec.insurancePremiumSavingsThreshold}
+                  onChange={setRecField("insurancePremiumSavingsThreshold")}
+                />
               </CardContent>
             </Card>
 

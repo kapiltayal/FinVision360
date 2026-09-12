@@ -225,21 +225,9 @@ export type InsurancePolicy = typeof insurancePolicies.$inferSelect;
 export const recommendationSettings = pgTable("recommendation_settings", {
   id: serial("id").primaryKey(),
   userId: varchar("user_id").notNull().unique().references(() => users.id, { onDelete: "cascade" }),
-  // Savings thresholds
-  checkingThreshold: numeric("checking_threshold", { precision: 15, scale: 2 }),
-  savingsThreshold: numeric("savings_threshold", { precision: 15, scale: 2 }),
-  cdsThreshold: numeric("cds_threshold", { precision: 15, scale: 2 }),
-  // Borrowing thresholds
-  studentLoanThreshold: numeric("student_loan_threshold", { precision: 15, scale: 2 }),
-  creditCardThreshold: numeric("credit_card_threshold", { precision: 15, scale: 2 }),
-  autoLoanThreshold: numeric("auto_loan_threshold", { precision: 15, scale: 2 }),
-  personalLoanThreshold: numeric("personal_loan_threshold", { precision: 15, scale: 2 }),
-  mortgageThreshold: numeric("mortgage_threshold", { precision: 15, scale: 2 }),
-  // Insurance thresholds
-  autoInsuranceThreshold: numeric("auto_insurance_threshold", { precision: 15, scale: 2 }),
-  homeInsuranceThreshold: numeric("home_insurance_threshold", { precision: 15, scale: 2 }),
-  lifeInsuranceThreshold: numeric("life_insurance_threshold", { precision: 15, scale: 2 }),
-  otherInsuranceThreshold: numeric("other_insurance_threshold", { precision: 15, scale: 2 }),
+  interestEarningThreshold: numeric("interest_earning_threshold", { precision: 15, scale: 2 }),
+  debtInterestPaymentReductionThreshold: numeric("debt_interest_payment_reduction_threshold", { precision: 15, scale: 2 }),
+  insurancePremiumSavingsThreshold: numeric("insurance_premium_savings_threshold", { precision: 15, scale: 2 }),
   updatedAt: timestamp("updated_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
 });
 
