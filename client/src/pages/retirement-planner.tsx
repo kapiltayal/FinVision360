@@ -94,20 +94,22 @@ export default function RetirementPlannerPage() {
             </div>
           ) : (
             <div className="grid gap-5 md:grid-cols-3">
-              <div className="space-y-2">
-                <div className="flex items-center justify-between gap-2">
+              <div className="space-y-3">
+                <div className="flex min-h-5 items-center gap-2">
                   <Label>Current Age</Label>
+                </div>
+                <div className="flex items-baseline gap-2">
+                  <p className="text-3xl font-semibold leading-none" data-testid="text-retirement-current-age">
+                    {currentAge}
+                  </p>
                   <Link href="/settings" className="text-xs font-medium text-primary hover:underline">
                     Update
                   </Link>
                 </div>
-                <p className="text-3xl font-semibold leading-none" data-testid="text-retirement-current-age">
-                  {currentAge}
-                </p>
               </div>
 
               <div className="space-y-3">
-                <div className="flex items-center justify-between gap-2">
+                <div className="flex min-h-5 items-center justify-between gap-2">
                   <Label htmlFor="retirement-age">Retirement Age</Label>
                   <span className="text-lg font-semibold tabular-nums">{retirementAge}</span>
                 </div>
@@ -125,7 +127,7 @@ export default function RetirementPlannerPage() {
               </div>
 
               <div className="space-y-3">
-                <div className="flex items-center justify-between gap-2">
+                <div className="flex min-h-5 items-center justify-between gap-2">
                   <Label htmlFor="life-expectancy">Life Expectancy</Label>
                   <span className="text-lg font-semibold tabular-nums">{lifeExpectancy}</span>
                 </div>
