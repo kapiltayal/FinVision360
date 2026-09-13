@@ -2,7 +2,6 @@ import { useState, useMemo, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CurrencyInput } from "@/components/ui/currency-input";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -16,6 +15,8 @@ import {
 import { formatCurrency } from "@/lib/format";
 import { useAuth } from "@/hooks/use-auth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { type RetirementPlannerSettings } from "@shared/schema";
+import { RetirementTimelineSummary } from "@/components/retirement-timeline-summary";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, ReferenceLine, Legend,
@@ -142,6 +143,9 @@ export default function SocialSecurityPage() {
     queryKey: ["/api/social-security"],
     staleTime: 0,
   });
+  const { data: plannerSettings } = useQuery<RetirementPlannerSettings>({
+    queryKey: ["/api/retirement/planner-settings"],
+  });
 
   // Populate form when settings load — skip empty {} fallback, wait for real data
   const initialised = useRef(false);
@@ -151,8 +155,13 @@ export default function SocialSecurityPage() {
     if (!hasSavedData) return;
     initialised.current = true;
     if (savedSettings.fraMonthlyBenefit) setFraMonthlyBenefit(String(savedSettings.fraMonthlyBenefit));
-    if (savedSettings.expectedLifeAge)  setExpectedLifeAge(String(savedSettings.expectedLifeAge));
   }, [savedSettings]);
+
+  useEffect(() => {
+    if (plannerSettings?.lifeExpectancy != null) {
+      setExpectedLifeAge(String(plannerSettings.lifeExpectancy));
+    }
+  }, [plannerSettings?.lifeExpectancy]);
 
   const saveMutation = useMutation({
     mutationFn: (data: any) => apiRequest("PUT", "/api/social-security", data),
@@ -166,7 +175,6 @@ export default function SocialSecurityPage() {
   const handleSave = () => {
     saveMutation.mutate({
       fraMonthlyBenefit: fraMonthlyBenefit,
-      expectedLifeAge: parseInt(expectedLifeAge) || 85,
     });
   };
 
@@ -255,6 +263,8 @@ export default function SocialSecurityPage() {
         <h1 className="text-2xl font-bold">Social Security Planning</h1>
         <p className="text-muted-foreground">Understand your benefits and find the optimal time to claim</p>
       </div>
+
+      <RetirementTimelineSummary settings={plannerSettings} />
 
       {/* Key Factors — 3D card */}
       <Card className="stat-card-3d">
@@ -359,21 +369,6 @@ export default function SocialSecurityPage() {
                   placeholder="2000"
                 />
                 <p className="text-xs text-muted-foreground">Find this at ssa.gov/myaccount</p>
-              </div>
-
-              {/* Expected Life Age */}
-              <div className="space-y-2">
-                <Label>Expected Life Age</Label>
-                <Input
-                  data-testid="input-ss-life-age"
-                  type="number"
-                  value={expectedLifeAge}
-                  min={63}
-                  max={110}
-                  onChange={(e) => setExpectedLifeAge(e.target.value)}
-                  placeholder="85"
-                />
-                <p className="text-xs text-muted-foreground">Used to personalize the recommendation below</p>
               </div>
 
               <div className="pt-2 space-y-3 border-t">

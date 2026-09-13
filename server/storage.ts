@@ -5,6 +5,7 @@ import {
   type Asset, type InsertAsset,
   type Liability, type InsertLiability,
   type Retirement401kGoal, type InsertRetirement401kGoal,
+  type RetirementPlannerSettings, type InsertRetirementPlannerSettings,
   type RetirementPension, type InsertRetirementPension,
   type InsurancePolicy, type InsertInsurancePolicy,
   type RecommendationSettings, type InsertRecommendationSettings,
@@ -16,7 +17,7 @@ import {
   type EstateDocument, type InsertEstateDocument,
   type EstateContact, type InsertEstateContact,
   type Feedback, type InsertFeedback,
-  users, assets, liabilities, assetTypeList, liabilitiesTypeList, retirement401kGoals, retirementPensions, insurancePolicies, recommendationSettings,
+  users, assets, liabilities, assetTypeList, liabilitiesTypeList, retirement401kGoals, retirementPlannerSettings, retirementPensions, insurancePolicies, recommendationSettings,
   bankConfigs, bankRates, plaidItems, plaidAccounts,
   estateBeneficiaries, estateDocuments, estateContacts, feedback, contactus, socialSecuritySettings,
   userGoals,
@@ -48,6 +49,8 @@ export interface IStorage {
 
   getRetirement401kGoal(userId: string): Promise<Retirement401kGoal | undefined>;
   upsertRetirement401kGoal(goal: InsertRetirement401kGoal): Promise<Retirement401kGoal>;
+  getRetirementPlannerSettings(userId: string): Promise<RetirementPlannerSettings | undefined>;
+  upsertRetirementPlannerSettings(settings: InsertRetirementPlannerSettings): Promise<RetirementPlannerSettings>;
   getRetirementPensions(userId: string): Promise<RetirementPension[]>;
   createRetirementPension(pension: InsertRetirementPension): Promise<RetirementPension>;
   updateRetirementPension(id: number, userId: string, data: Partial<InsertRetirementPension>): Promise<RetirementPension | undefined>;
@@ -220,6 +223,30 @@ export class DatabaseStorage implements IStorage {
     }
     const [created] = await db.insert(retirement401kGoals).values(goal).returning();
     return created;
+  }
+
+  async getRetirementPlannerSettings(userId: string): Promise<RetirementPlannerSettings | undefined> {
+    const [settings] = await db
+      .select()
+      .from(retirementPlannerSettings)
+      .where(eq(retirementPlannerSettings.userId, userId));
+    return settings;
+  }
+
+  async upsertRetirementPlannerSettings(settings: InsertRetirementPlannerSettings): Promise<RetirementPlannerSettings> {
+    const [updated] = await db
+      .insert(retirementPlannerSettings)
+      .values({ ...settings, updatedAt: new Date() })
+      .onConflictDoUpdate({
+        target: retirementPlannerSettings.userId,
+        set: {
+          retirementAge: settings.retirementAge,
+          lifeExpectancy: settings.lifeExpectancy,
+          updatedAt: new Date(),
+        },
+      })
+      .returning();
+    return updated;
   }
 
   async getRetirementPensions(userId: string): Promise<RetirementPension[]> {

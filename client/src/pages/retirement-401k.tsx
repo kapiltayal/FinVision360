@@ -15,7 +15,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useLastUpdated } from "@/hooks/use-last-updated";
 import { ExportMenu } from "@/components/export-menu";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { type Retirement401kGoal } from "@shared/schema";
+import { type Retirement401kGoal, type RetirementPlannerSettings } from "@shared/schema";
+import { RetirementTimelineSummary } from "@/components/retirement-timeline-summary";
 import { useAuth } from "@/hooks/use-auth";
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid,
@@ -29,6 +30,9 @@ export default function Retirement401kPage() {
   const { toast } = useToast();
   const { user } = useAuth();
   const { data: goal } = useQuery<Retirement401kGoal | null>({ queryKey: ["/api/retirement/401k"] });
+  const { data: plannerSettings } = useQuery<RetirementPlannerSettings>({
+    queryKey: ["/api/retirement/planner-settings"],
+  });
 
   // Derive current age from profile DOB (birthday-aware), same pattern as snapshot page
   const dobStr: string | undefined = (user as any)?.dateOfBirth;
@@ -61,7 +65,7 @@ export default function Retirement401kPage() {
     if (goal) {
       setForm({
         currentAge: ageFromProfile ?? goal.currentAge ?? 35,
-        retirementAge: goal.retirementAge ?? 65,
+        retirementAge: plannerSettings?.retirementAge ?? goal.retirementAge ?? 65,
         currentBalance: goal.currentBalance ?? "25000",
         annualSalary: goal.annualSalary ?? "80000",
         contributionPct: parseFloat(goal.contributionPct ?? "10"),
@@ -72,7 +76,13 @@ export default function Retirement401kPage() {
         rothTaxRate: parseFloat(goal.rothTaxRate ?? "20"),
       });
     }
-  }, [goal]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [goal, plannerSettings?.retirementAge]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (plannerSettings?.retirementAge != null) {
+      setForm((current) => ({ ...current, retirementAge: plannerSettings.retirementAge }));
+    }
+  }, [plannerSettings?.retirementAge]);
 
   // Keep currentAge in sync whenever the profile DOB resolves
   useEffect(() => {
@@ -214,6 +224,8 @@ export default function Retirement401kPage() {
         </div>
       </div>
 
+      <RetirementTimelineSummary settings={plannerSettings} />
+
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card className="stat-card-3d">
           <CardContent className="p-5">
@@ -300,13 +312,6 @@ export default function Retirement401kPage() {
                 </p>
               </div>
             )}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label>Retirement Age</Label>
-                <span className="text-sm font-medium">{form.retirementAge}</span>
-              </div>
-              <Slider value={[form.retirementAge]} onValueChange={([v]) => set("retirementAge", v)} min={form.currentAge + 1} max={80} step={1} data-testid="slider-401k-retirement-age" />
-            </div>
             <div className="space-y-2">
               <Label>Current 401k Balance ($)</Label>
               <CurrencyInput data-testid="input-401k-balance" value={form.currentBalance} onChange={(v) => set("currentBalance", v)} />

@@ -1,10 +1,13 @@
 import { useEffect, useState } from "react";
 import { Link } from "wouter";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { CalendarDays, Landmark } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { type RetirementPlannerSettings } from "@shared/schema";
 
 const MAX_AGE = 125;
 
@@ -42,6 +45,16 @@ export default function RetirementPlannerPage() {
   const currentAge = getCurrentAge((user as any)?.dateOfBirth);
   const [retirementAge, setRetirementAge] = useState("");
   const [lifeExpectancy, setLifeExpectancy] = useState("");
+  const { data: savedSettings } = useQuery<RetirementPlannerSettings>({
+    queryKey: ["/api/retirement/planner-settings"],
+  });
+  const saveMutation = useMutation({
+    mutationFn: (settings: { retirementAge: number; lifeExpectancy: number }) =>
+      apiRequest("PUT", "/api/retirement/planner-settings", settings).then((response) => response.json()),
+    onSuccess: (settings: RetirementPlannerSettings) => {
+      queryClient.setQueryData(["/api/retirement/planner-settings"], settings);
+    },
+  });
 
   useEffect(() => {
     if (currentAge === null) {
@@ -50,13 +63,30 @@ export default function RetirementPlannerPage() {
       return;
     }
 
+    const savedRetirementAge = Number(savedSettings?.retirementAge);
+    const savedLifeExpectancy = Number(savedSettings?.lifeExpectancy);
     setRetirementAge((value) =>
-      isValidAge(value, currentAge) ? value : getDefaultRetirementAge(currentAge),
+      isValidAge(value, currentAge)
+        ? value
+        : isValidAge(String(savedRetirementAge), currentAge)
+          ? String(savedRetirementAge)
+          : getDefaultRetirementAge(currentAge),
     );
     setLifeExpectancy((value) =>
-      isValidAge(value, currentAge) ? value : getDefaultLifeExpectancy(currentAge),
+      isValidAge(value, currentAge)
+        ? value
+        : isValidAge(String(savedLifeExpectancy), currentAge)
+          ? String(savedLifeExpectancy)
+          : getDefaultLifeExpectancy(currentAge),
     );
-  }, [currentAge]);
+  }, [currentAge, savedSettings?.retirementAge, savedSettings?.lifeExpectancy]);
+
+  const saveTimeline = (nextRetirementAge: number, nextLifeExpectancy: number) => {
+    saveMutation.mutate({
+      retirementAge: nextRetirementAge,
+      lifeExpectancy: nextLifeExpectancy,
+    });
+  };
 
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
@@ -120,6 +150,9 @@ export default function RetirementPlannerPage() {
                   step={1}
                   value={[Number(retirementAge) || currentAge + 1]}
                   onValueChange={([value]) => setRetirementAge(String(value))}
+                  onValueCommit={([value]) =>
+                    saveTimeline(Number(value), Number(lifeExpectancy) || Number(getDefaultLifeExpectancy(currentAge)))
+                  }
                   aria-label="Retirement Age"
                   data-testid="slider-retirement-age"
                 />
@@ -138,6 +171,9 @@ export default function RetirementPlannerPage() {
                   step={1}
                   value={[Number(lifeExpectancy) || currentAge + 1]}
                   onValueChange={([value]) => setLifeExpectancy(String(value))}
+                  onValueCommit={([value]) =>
+                    saveTimeline(Number(retirementAge) || Number(getDefaultRetirementAge(currentAge)), Number(value))
+                  }
                   aria-label="Life Expectancy"
                   data-testid="slider-life-expectancy"
                 />

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -32,7 +32,8 @@ import {
 import { formatCurrency } from "@/lib/format";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { type RetirementPension } from "@shared/schema";
+import { type RetirementPension, type RetirementPlannerSettings } from "@shared/schema";
+import { RetirementTimelineSummary } from "@/components/retirement-timeline-summary";
 
 type PensionForm = {
   name: string;
@@ -70,6 +71,19 @@ export default function RetirementPensionPage() {
     queryKey: ["/api/retirement/pensions"],
     staleTime: 0,
   });
+  const { data: plannerSettings } = useQuery<RetirementPlannerSettings>({
+    queryKey: ["/api/retirement/planner-settings"],
+  });
+
+  useEffect(() => {
+    if (editingId === null && !form.name && !form.amount && plannerSettings?.retirementAge != null) {
+      setForm((current) =>
+        current.startAge === EMPTY_FORM.startAge
+          ? { ...current, startAge: String(plannerSettings.retirementAge) }
+          : current,
+      );
+    }
+  }, [editingId, plannerSettings?.retirementAge]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const monthlyTotal = useMemo(
     () => pensions.reduce((total, pension) => total + monthlyAmount(pension), 0),
@@ -163,6 +177,8 @@ export default function RetirementPensionPage() {
           Track every pension source you expect to receive in retirement
         </p>
       </div>
+
+      <RetirementTimelineSummary settings={plannerSettings} />
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
         <Card className="stat-card-3d">
@@ -260,7 +276,7 @@ export default function RetirementPensionPage() {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="pension-start-age">Starts at age</Label>
+                  <Label htmlFor="pension-start-age">Source starts at age</Label>
                   <Input
                     id="pension-start-age"
                     data-testid="input-pension-start-age"

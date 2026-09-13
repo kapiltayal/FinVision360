@@ -55,6 +55,11 @@ export function setupAuth(app: Express) {
           insurancePremiumSavingsThreshold: "100",
           aiAdvisorName: "Whizzy",
         });
+        await storage.upsertRetirementPlannerSettings({
+          userId: localUser.id,
+          retirementAge: 65,
+          lifeExpectancy: 85,
+        });
       }
       res.json({ ok: true });
     } catch (err) {
@@ -122,6 +127,11 @@ export async function authenticateSupabase(req: any, res: Response, next: NextFu
         debtInterestPaymentReductionThreshold: "200",
         insurancePremiumSavingsThreshold: "100",
         aiAdvisorName: "Whizzy",
+      });
+      await storage.upsertRetirementPlannerSettings({
+        userId: localUser.id,
+        retirementAge: 65,
+        lifeExpectancy: 85,
       });
     }
     req.user = localUser;

@@ -271,6 +271,22 @@ export const insertRetirement401kGoalSchema = createInsertSchema(retirement401kG
 export type InsertRetirement401kGoal = z.infer<typeof insertRetirement401kGoalSchema>;
 export type Retirement401kGoal = typeof retirement401kGoals.$inferSelect;
 
+export const retirementPlannerSettings = pgTable("retirement_planner_settings", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().unique().references(() => users.id, { onDelete: "cascade" }),
+  retirementAge: integer("retirement_age").notNull().default(65),
+  lifeExpectancy: integer("life_expectancy").notNull().default(85),
+  updatedAt: timestamp("updated_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
+});
+
+export const insertRetirementPlannerSettingsSchema = createInsertSchema(retirementPlannerSettings).omit({
+  id: true,
+  updatedAt: true,
+});
+
+export type InsertRetirementPlannerSettings = z.infer<typeof insertRetirementPlannerSettingsSchema>;
+export type RetirementPlannerSettings = typeof retirementPlannerSettings.$inferSelect;
+
 export const retirementPensions = pgTable("retirement_pensions", {
   id: serial("id").primaryKey(),
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),

@@ -84,6 +84,20 @@ function finiteNumber(value: unknown, fallback = 0): number {
   return Number.isFinite(number) ? number : fallback;
 }
 
+function ageFromDateOfBirth(dateOfBirth: unknown): number | null {
+  if (typeof dateOfBirth !== "string" || !dateOfBirth) return null;
+  const birthDate = new Date(`${dateOfBirth}T00:00:00Z`);
+  if (Number.isNaN(birthDate.getTime())) return null;
+
+  const today = new Date();
+  let age = today.getUTCFullYear() - birthDate.getUTCFullYear();
+  const hadBirthday =
+    today.getUTCMonth() > birthDate.getUTCMonth() ||
+    (today.getUTCMonth() === birthDate.getUTCMonth() && today.getUTCDate() >= birthDate.getUTCDate());
+  if (!hadBirthday) age -= 1;
+  return age >= 0 ? age : null;
+}
+
 function advisorItemText(value: unknown): string {
   return boundedText(value, AI_ADVISOR_LIMITS.maxContextFieldCharacters) || "Unnamed";
 }
@@ -442,6 +456,38 @@ export async function registerRoutes(
       userId, currentAge, retirementAge, currentBalance, annualSalary, contributionPct, employerMatchPct, employerMatchLimit, expectedReturn, taxBracket, rothTaxRate,
     });
     res.json(goal);
+  });
+
+  app.get("/api/retirement/planner-settings", requireAuth, async (req, res) => {
+    const settings = await storage.getRetirementPlannerSettings((req.user as any).id);
+    res.json(settings || { retirementAge: 65, lifeExpectancy: 85 });
+  });
+
+  app.put("/api/retirement/planner-settings", requireAuth, async (req, res) => {
+    const retirementAge = Number(req.body?.retirementAge);
+    const lifeExpectancy = Number(req.body?.lifeExpectancy);
+    const currentAge = ageFromDateOfBirth((req.user as any).dateOfBirth);
+    const minimumAge = currentAge === null ? 1 : currentAge + 1;
+
+    if (
+      !Number.isInteger(retirementAge) ||
+      !Number.isInteger(lifeExpectancy) ||
+      retirementAge < minimumAge ||
+      lifeExpectancy < minimumAge ||
+      retirementAge > 125 ||
+      lifeExpectancy > 125
+    ) {
+      return res.status(400).json({
+        message: `Retirement age and life expectancy must be whole numbers from ${minimumAge} to 125.`,
+      });
+    }
+
+    const settings = await storage.upsertRetirementPlannerSettings({
+      userId: (req.user as any).id,
+      retirementAge,
+      lifeExpectancy,
+    });
+    res.json(settings);
   });
 
   app.get("/api/retirement/pensions", requireAuth, async (req, res) => {
@@ -952,8 +998,13 @@ Include a year-by-year overview, useful milestones, a conservative/base/optimist
 
   app.put("/api/social-security", requireAuth, async (req, res) => {
     const userId = (req.user as any).id;
-    const { fraMonthlyBenefit, expectedLifeAge } = req.body;
-    const settings = await storage.upsertSocialSecuritySettings({ userId, fraMonthlyBenefit, expectedLifeAge });
+    const { fraMonthlyBenefit } = req.body;
+    const existing = await storage.getSocialSecuritySettings(userId);
+    const settings = await storage.upsertSocialSecuritySettings({
+      userId,
+      fraMonthlyBenefit,
+      expectedLifeAge: existing?.expectedLifeAge ?? null,
+    });
     res.json(settings);
   });
 
