@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 import { Link } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { CalendarDays, Info, Landmark } from "lucide-react";
+import { Slider } from "@/components/ui/slider";
+import { CalendarDays, Landmark } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 
 const MAX_AGE = 125;
@@ -58,13 +58,6 @@ export default function RetirementPlannerPage() {
     );
   }, [currentAge]);
 
-  const clampAge = (value: string): string => {
-    if (currentAge === null || currentAge >= MAX_AGE) return "";
-    const parsedAge = Number(value);
-    if (!Number.isFinite(parsedAge)) return getDefaultRetirementAge(currentAge);
-    return String(Math.min(MAX_AGE, Math.max(currentAge + 1, Math.trunc(parsedAge))));
-  };
-
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
       <div className="page-header-gradient">
@@ -80,107 +73,75 @@ export default function RetirementPlannerPage() {
       </div>
 
       <Card className="overflow-hidden border-violet-500/20 shadow-sm">
-        <CardHeader className="border-b bg-violet-500/5 pb-4">
+        <CardHeader className="border-b bg-violet-500/5 px-5 py-3">
           <div className="flex items-start gap-3">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-violet-500/10">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-violet-500/10">
               <CalendarDays className="h-4 w-4 text-violet-500" />
             </div>
             <div>
               <CardTitle className="text-base">Retirement Timeline</CardTitle>
-              <CardDescription className="mt-1">
-                Set the ages used to build your retirement projection.
-              </CardDescription>
+              <CardDescription className="mt-0.5 text-xs">Set the ages used for your retirement projection.</CardDescription>
             </div>
           </div>
         </CardHeader>
-        <CardContent className="p-5">
+        <CardContent className="p-4">
           {currentAge === null ? (
-            <div className="flex items-start gap-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-4">
-              <Info className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
-              <div className="space-y-1 text-sm">
-                <p className="font-medium">Add your date of birth to calculate your current age.</p>
-                <p className="text-muted-foreground">
-                  Your current age is read from your profile and cannot be entered manually.
-                </p>
-                <Link href="/settings" className="inline-block font-medium text-primary hover:underline">
-                  Open Account Settings
-                </Link>
-              </div>
+            <div className="flex items-center justify-between gap-3 rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-sm">
+              <span className="text-muted-foreground">Add your date of birth to calculate your current age.</span>
+              <Link href="/settings" className="shrink-0 font-medium text-primary hover:underline">
+                Update profile
+              </Link>
             </div>
           ) : (
-            <>
-              <div className="grid gap-5 md:grid-cols-3">
-                <div className="space-y-2">
-                  <Label htmlFor="retirement-current-age">Current Age</Label>
-                  <Input
-                    id="retirement-current-age"
-                    type="number"
-                    value={currentAge}
-                    readOnly
-                    aria-describedby="retirement-current-age-help"
-                    className="bg-muted/50 font-semibold"
-                    data-testid="input-retirement-current-age"
-                  />
-                  <p id="retirement-current-age-help" className="text-xs text-muted-foreground">
-                    Calculated from your date of birth.
-                  </p>
+            <div className="grid gap-5 md:grid-cols-3">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <Label>Current Age</Label>
+                  <Link href="/settings" className="text-xs font-medium text-primary hover:underline">
+                    Update
+                  </Link>
                 </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="retirement-age">Retirement Age</Label>
-                  <Input
-                    id="retirement-age"
-                    type="number"
-                    min={currentAge + 1}
-                    max={MAX_AGE}
-                    step="1"
-                    value={retirementAge}
-                    onChange={(event) => setRetirementAge(event.target.value)}
-                    onBlur={() => setRetirementAge(clampAge(retirementAge))}
-                    aria-describedby="retirement-age-help"
-                    data-testid="input-retirement-age"
-                  />
-                  <p id="retirement-age-help" className="text-xs text-muted-foreground">
-                    Choose an age from {currentAge + 1} to {MAX_AGE}.
-                  </p>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="life-expectancy">Life Expectancy</Label>
-                  <Input
-                    id="life-expectancy"
-                    type="number"
-                    min={currentAge + 1}
-                    max={MAX_AGE}
-                    step="1"
-                    value={lifeExpectancy}
-                    onChange={(event) => setLifeExpectancy(event.target.value)}
-                    onBlur={() => {
-                      const parsedAge = Number(lifeExpectancy);
-                      if (!Number.isFinite(parsedAge)) {
-                        setLifeExpectancy(getDefaultLifeExpectancy(currentAge));
-                      } else {
-                        setLifeExpectancy(
-                          String(Math.min(MAX_AGE, Math.max(currentAge + 1, Math.trunc(parsedAge)))),
-                        );
-                      }
-                    }}
-                    aria-describedby="life-expectancy-help"
-                    data-testid="input-life-expectancy"
-                  />
-                  <p id="life-expectancy-help" className="text-xs text-muted-foreground">
-                    Choose an age from {currentAge + 1} to {MAX_AGE}.
-                  </p>
-                </div>
-              </div>
-              <div className="mt-5 flex items-start gap-2 rounded-lg bg-muted/50 p-3 text-xs text-muted-foreground">
-                <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                <p>
-                  Current age is calculated from your profile. Retirement age and life expectancy must be
-                  greater than your current age and cannot exceed {MAX_AGE}.
+                <p className="text-3xl font-semibold leading-none" data-testid="text-retirement-current-age">
+                  {currentAge}
                 </p>
               </div>
-            </>
+
+              <div className="space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <Label htmlFor="retirement-age">Retirement Age</Label>
+                  <span className="text-lg font-semibold tabular-nums">{retirementAge}</span>
+                </div>
+                <Slider
+                  id="retirement-age"
+                  min={currentAge + 1}
+                  max={MAX_AGE}
+                  step={1}
+                  value={[Number(retirementAge) || currentAge + 1]}
+                  onValueChange={([value]) => setRetirementAge(String(value))}
+                  aria-label="Retirement Age"
+                  data-testid="slider-retirement-age"
+                />
+                <p className="text-xs text-muted-foreground">{currentAge + 1}–{MAX_AGE}</p>
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <Label htmlFor="life-expectancy">Life Expectancy</Label>
+                  <span className="text-lg font-semibold tabular-nums">{lifeExpectancy}</span>
+                </div>
+                <Slider
+                  id="life-expectancy"
+                  min={currentAge + 1}
+                  max={MAX_AGE}
+                  step={1}
+                  value={[Number(lifeExpectancy) || currentAge + 1]}
+                  onValueChange={([value]) => setLifeExpectancy(String(value))}
+                  aria-label="Life Expectancy"
+                  data-testid="slider-life-expectancy"
+                />
+                <p className="text-xs text-muted-foreground">{currentAge + 1}–{MAX_AGE}</p>
+              </div>
+            </div>
           )}
         </CardContent>
       </Card>
