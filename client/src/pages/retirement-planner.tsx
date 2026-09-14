@@ -94,6 +94,7 @@ export default function RetirementPlannerPage() {
   ];
   const activeThumbRef = useRef<number | null>(null);
   const timelineValuesRef = useRef(timelineValues);
+  const timelineSliderRef = useRef<HTMLSpanElement>(null);
   useEffect(() => {
     timelineValuesRef.current = timelineValues;
   }, [timelineValues[0], timelineValues[1]]);
@@ -104,14 +105,17 @@ export default function RetirementPlannerPage() {
     const previousValues = timelineValuesRef.current;
     const activeThumb = activeThumbRef.current;
     let nextValues: [number, number];
+    let shouldRestoreFocus = false;
 
     if (activeThumb === 0) {
       const attemptedValue =
         values[0] === previousValues[1] && values[1] > previousValues[1] ? values[1] : values[0];
+      shouldRestoreFocus = values[0] === previousValues[1] && values[1] > previousValues[1];
       nextValues = [Math.min(attemptedValue, previousValues[1]), previousValues[1]];
     } else if (activeThumb === 1) {
       const attemptedValue =
         values[1] === previousValues[0] && values[0] < previousValues[0] ? values[0] : values[1];
+      shouldRestoreFocus = values[1] === previousValues[0] && values[0] < previousValues[0];
       nextValues = [previousValues[0], Math.max(attemptedValue, previousValues[0])];
     } else {
       nextValues = [Math.min(values[0], values[1]), Math.max(values[0], values[1])];
@@ -120,6 +124,13 @@ export default function RetirementPlannerPage() {
     timelineValuesRef.current = nextValues;
     setRetirementAge(String(nextValues[0]));
     setLifeExpectancy(String(nextValues[1]));
+
+    if (shouldRestoreFocus && activeThumb !== null) {
+      window.requestAnimationFrame(() => {
+        const thumbs = timelineSliderRef.current?.querySelectorAll<HTMLElement>('[role="slider"]');
+        thumbs?.[activeThumb]?.focus();
+      });
+    }
   };
   const lifeExpectancyPercent =
     ((lifeExpectancyValue - currentAgeFloor + 1) / (MAX_AGE - currentAgeFloor + 1)) * 100;
@@ -203,6 +214,7 @@ export default function RetirementPlannerPage() {
                   max={MAX_AGE}
                   step={1}
                   minStepsBetweenThumbs={0}
+                  ref={timelineSliderRef}
                   value={timelineValues}
                   onValueChange={handleTimelineChange}
                   onValueCommit={() => {
