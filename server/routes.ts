@@ -474,6 +474,7 @@ export async function registerRoutes(
       !Number.isInteger(lifeExpectancy) ||
       retirementAge < minimumAge ||
       lifeExpectancy < minimumAge ||
+      retirementAge > lifeExpectancy ||
       retirementAge > 125 ||
       lifeExpectancy > 125
     ) {

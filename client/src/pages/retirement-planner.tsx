@@ -65,28 +65,31 @@ export default function RetirementPlannerPage() {
 
     const savedRetirementAge = Number(savedSettings?.retirementAge);
     const savedLifeExpectancy = Number(savedSettings?.lifeExpectancy);
-    setRetirementAge((value) =>
-      isValidAge(value, currentAge)
-        ? value
-        : isValidAge(String(savedRetirementAge), currentAge)
-          ? String(savedRetirementAge)
-          : getDefaultRetirementAge(currentAge),
+    const nextLifeExpectancy = isValidAge(String(savedLifeExpectancy), currentAge)
+      ? savedLifeExpectancy
+      : Number(getDefaultLifeExpectancy(currentAge));
+    const nextRetirementAge = Math.min(
+      isValidAge(String(savedRetirementAge), currentAge)
+        ? savedRetirementAge
+        : Number(getDefaultRetirementAge(currentAge)),
+      nextLifeExpectancy,
     );
-    setLifeExpectancy((value) =>
-      isValidAge(value, currentAge)
-        ? value
-        : isValidAge(String(savedLifeExpectancy), currentAge)
-          ? String(savedLifeExpectancy)
-          : getDefaultLifeExpectancy(currentAge),
-    );
+    setRetirementAge(String(nextRetirementAge));
+    setLifeExpectancy(String(nextLifeExpectancy));
   }, [currentAge, savedSettings?.retirementAge, savedSettings?.lifeExpectancy]);
 
   const saveTimeline = (nextRetirementAge: number, nextLifeExpectancy: number) => {
     saveMutation.mutate({
-      retirementAge: nextRetirementAge,
-      lifeExpectancy: nextLifeExpectancy,
+      retirementAge: Math.min(nextRetirementAge, nextLifeExpectancy),
+      lifeExpectancy: Math.max(nextLifeExpectancy, nextRetirementAge),
     });
   };
+
+  const currentAgeFloor = currentAge === null ? 1 : currentAge + 1;
+  const retirementAgeValue = Number(retirementAge) || currentAgeFloor;
+  const lifeExpectancyValue = Number(lifeExpectancy) || currentAgeFloor;
+  const retirementAgeMax = Math.min(MAX_AGE, Math.max(currentAgeFloor, lifeExpectancyValue));
+  const lifeExpectancyMin = Math.min(MAX_AGE, Math.max(currentAgeFloor, retirementAgeValue));
 
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
@@ -146,17 +149,19 @@ export default function RetirementPlannerPage() {
                 <Slider
                   id="retirement-age"
                   min={currentAge + 1}
-                  max={MAX_AGE}
+                  max={retirementAgeMax}
                   step={1}
-                  value={[Number(retirementAge) || currentAge + 1]}
-                  onValueChange={([value]) => setRetirementAge(String(value))}
+                  value={[Math.min(retirementAgeValue, retirementAgeMax)]}
+                  onValueChange={([value]) =>
+                    setRetirementAge(String(Math.min(Number(value), lifeExpectancyValue)))
+                  }
                   onValueCommit={([value]) =>
-                    saveTimeline(Number(value), Number(lifeExpectancy) || Number(getDefaultLifeExpectancy(currentAge)))
+                    saveTimeline(Number(value), lifeExpectancyValue)
                   }
                   aria-label="Retirement Age"
                   data-testid="slider-retirement-age"
                 />
-                <p className="text-xs text-muted-foreground">{currentAge + 1}–{MAX_AGE}</p>
+                <p className="text-xs text-muted-foreground">{currentAge + 1}–{retirementAgeMax}</p>
               </div>
 
               <div className="space-y-3">
@@ -166,18 +171,20 @@ export default function RetirementPlannerPage() {
                 </div>
                 <Slider
                   id="life-expectancy"
-                  min={currentAge + 1}
+                  min={lifeExpectancyMin}
                   max={MAX_AGE}
                   step={1}
-                  value={[Number(lifeExpectancy) || currentAge + 1]}
-                  onValueChange={([value]) => setLifeExpectancy(String(value))}
+                  value={[Math.max(lifeExpectancyValue, lifeExpectancyMin)]}
+                  onValueChange={([value]) =>
+                    setLifeExpectancy(String(Math.max(Number(value), retirementAgeValue)))
+                  }
                   onValueCommit={([value]) =>
-                    saveTimeline(Number(retirementAge) || Number(getDefaultRetirementAge(currentAge)), Number(value))
+                    saveTimeline(retirementAgeValue, Number(value))
                   }
                   aria-label="Life Expectancy"
                   data-testid="slider-life-expectancy"
                 />
-                <p className="text-xs text-muted-foreground">{currentAge + 1}–{MAX_AGE}</p>
+                <p className="text-xs text-muted-foreground">{lifeExpectancyMin}–{MAX_AGE}</p>
               </div>
             </div>
           )}
