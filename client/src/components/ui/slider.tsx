@@ -6,6 +6,8 @@ import { cn } from "@/lib/utils"
 type SliderProps = React.ComponentPropsWithoutRef<typeof SliderPrimitive.Root> & {
   thumbLabels?: string[];
   thumbClassNames?: string[];
+  onThumbPointerDown?: (index: number) => void;
+  onThumbKeyDown?: (index: number) => void;
   trackFill?: {
     startPercent: number;
     endPercent: number;
@@ -16,7 +18,7 @@ type SliderProps = React.ComponentPropsWithoutRef<typeof SliderPrimitive.Root> &
 const Slider = React.forwardRef<
   React.ElementRef<typeof SliderPrimitive.Root>,
   SliderProps
->(({ className, thumbLabels, thumbClassNames, trackFill, ...props }, ref) => {
+>(({ className, thumbLabels, thumbClassNames, onThumbPointerDown, onThumbKeyDown, trackFill, ...props }, ref) => {
   const values = props.value ?? props.defaultValue;
   const thumbCount = Array.isArray(values) ? Math.max(values.length, 1) : 1;
 
@@ -46,6 +48,8 @@ const Slider = React.forwardRef<
         <SliderPrimitive.Thumb
           key={index}
           aria-label={thumbLabels?.[index]}
+          onPointerDown={() => onThumbPointerDown?.(index)}
+          onKeyDown={() => onThumbKeyDown?.(index)}
           className={cn(
             "block h-5 w-5 rounded-full border-2 border-primary bg-background ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
             thumbClassNames?.[index],

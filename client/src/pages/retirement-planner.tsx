@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "wouter";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -92,6 +92,35 @@ export default function RetirementPlannerPage() {
     Math.min(retirementAgeValue, lifeExpectancyValue),
     Math.max(retirementAgeValue, lifeExpectancyValue),
   ];
+  const activeThumbRef = useRef<number | null>(null);
+  const timelineValuesRef = useRef(timelineValues);
+  useEffect(() => {
+    timelineValuesRef.current = timelineValues;
+  }, [timelineValues[0], timelineValues[1]]);
+
+  const handleTimelineChange = (values: number[]) => {
+    if (values.length < 2) return;
+
+    const previousValues = timelineValuesRef.current;
+    const activeThumb = activeThumbRef.current;
+    let nextValues: [number, number];
+
+    if (activeThumb === 0) {
+      const attemptedValue =
+        values[0] === previousValues[1] && values[1] > previousValues[1] ? values[1] : values[0];
+      nextValues = [Math.min(attemptedValue, previousValues[1]), previousValues[1]];
+    } else if (activeThumb === 1) {
+      const attemptedValue =
+        values[1] === previousValues[0] && values[0] < previousValues[0] ? values[0] : values[1];
+      nextValues = [previousValues[0], Math.max(attemptedValue, previousValues[0])];
+    } else {
+      nextValues = [Math.min(values[0], values[1]), Math.max(values[0], values[1])];
+    }
+
+    timelineValuesRef.current = nextValues;
+    setRetirementAge(String(nextValues[0]));
+    setLifeExpectancy(String(nextValues[1]));
+  };
   const lifeExpectancyPercent =
     ((lifeExpectancyValue - currentAgeFloor + 1) / (MAX_AGE - currentAgeFloor + 1)) * 100;
   const decadeMarkers = Array.from(
@@ -175,18 +204,22 @@ export default function RetirementPlannerPage() {
                   step={1}
                   minStepsBetweenThumbs={0}
                   value={timelineValues}
-                  onValueChange={([nextRetirementAge, nextLifeExpectancy]) => {
-                    setRetirementAge(String(nextRetirementAge));
-                    setLifeExpectancy(String(nextLifeExpectancy));
+                  onValueChange={handleTimelineChange}
+                  onValueCommit={() => {
+                    const [nextRetirementAge, nextLifeExpectancy] = timelineValuesRef.current;
+                    saveTimeline(nextRetirementAge, nextLifeExpectancy);
                   }}
-                  onValueCommit={([nextRetirementAge, nextLifeExpectancy]) =>
-                    saveTimeline(Number(nextRetirementAge), Number(nextLifeExpectancy))
-                  }
                   thumbLabels={["Retirement Age", "Life Expectancy"]}
                   thumbClassNames={[
                     "border-violet-600 bg-violet-100 dark:border-violet-400 dark:bg-violet-950",
                     "border-emerald-600 bg-emerald-100 dark:border-emerald-400 dark:bg-emerald-950",
                   ]}
+                  onThumbPointerDown={(index) => {
+                    activeThumbRef.current = index;
+                  }}
+                  onThumbKeyDown={(index) => {
+                    activeThumbRef.current = index;
+                  }}
                   trackFill={{
                     startPercent: 0,
                     endPercent: Math.min(100, Math.max(0, lifeExpectancyPercent)),
