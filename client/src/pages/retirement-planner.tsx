@@ -146,12 +146,20 @@ export default function RetirementPlannerPage() {
               <div className="space-y-4 md:col-span-2">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex items-center justify-between gap-3">
-                    <Label htmlFor="retirement-timeline">Retirement Age</Label>
-                    <span className="text-lg font-semibold tabular-nums">{retirementAge}</span>
+                    <Label htmlFor="retirement-timeline" className="text-violet-700 dark:text-violet-300">
+                      Retirement Age
+                    </Label>
+                    <span className="text-lg font-semibold tabular-nums text-violet-700 dark:text-violet-300">
+                      {retirementAge}
+                    </span>
                   </div>
                   <div className="flex items-center justify-between gap-3">
-                    <Label htmlFor="retirement-timeline">Life Expectancy</Label>
-                    <span className="text-lg font-semibold tabular-nums">{lifeExpectancy}</span>
+                    <Label htmlFor="retirement-timeline" className="text-emerald-700 dark:text-emerald-300">
+                      Life Expectancy
+                    </Label>
+                    <span className="text-lg font-semibold tabular-nums text-emerald-700 dark:text-emerald-300">
+                      {lifeExpectancy}
+                    </span>
                   </div>
                 </div>
                 <Slider
@@ -169,6 +177,10 @@ export default function RetirementPlannerPage() {
                     saveTimeline(Number(nextRetirementAge), Number(nextLifeExpectancy))
                   }
                   thumbLabels={["Retirement Age", "Life Expectancy"]}
+                  thumbClassNames={[
+                    "border-violet-600 bg-violet-100 dark:border-violet-400 dark:bg-violet-950",
+                    "border-emerald-600 bg-emerald-100 dark:border-emerald-400 dark:bg-emerald-950",
+                  ]}
                   aria-label="Retirement timeline"
                   data-testid="slider-retirement-timeline"
                 />
