@@ -1,15 +1,33 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "wouter";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
-import { CalendarDays, Landmark } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { formatCurrency } from "@/lib/format";
+import {
+  ArrowRight,
+  CalendarDays,
+  CircleDollarSign,
+  Landmark,
+  PiggyBank,
+  ReceiptText,
+  ShieldCheck,
+  TrendingDown,
+  TrendingUp,
+  WalletCards,
+} from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { type RetirementPlannerSettings } from "@shared/schema";
+import { type Asset, type Liability, type RetirementPlannerSettings } from "@shared/schema";
 
 const MAX_AGE = 125;
+
+type CashFlowSummary = {
+  period: { startMonth: string | null; endMonth: string | null; months: number };
+  averages: { income: number; expenses: number; net: number; savingsRate: number };
+};
 
 function getCurrentAge(dateOfBirth: string | null | undefined): number | null {
   if (!dateOfBirth) return null;
@@ -47,6 +65,15 @@ export default function RetirementPlannerPage() {
   const [lifeExpectancy, setLifeExpectancy] = useState("");
   const { data: savedSettings } = useQuery<RetirementPlannerSettings>({
     queryKey: ["/api/retirement/planner-settings"],
+  });
+  const { data: assets = [] } = useQuery<Asset[]>({
+    queryKey: ["/api/assets"],
+  });
+  const { data: liabilities = [] } = useQuery<Liability[]>({
+    queryKey: ["/api/liabilities"],
+  });
+  const { data: cashFlowSummary } = useQuery<CashFlowSummary>({
+    queryKey: ["/api/transactions/monthly-averages"],
   });
   const saveMutation = useMutation({
     mutationFn: (settings: { retirementAge: number; lifeExpectancy: number }) =>
@@ -138,6 +165,30 @@ export default function RetirementPlannerPage() {
     { length: Math.floor(MAX_AGE / 10) - Math.ceil(currentAgeFloor / 10) + 1 },
     (_, index) => Math.ceil(currentAgeFloor / 10) * 10 + index * 10,
   ).filter((age) => age <= MAX_AGE);
+  const totalAssets = useMemo(
+    () => assets.reduce((sum, asset) => sum + parseFloat(asset.value || "0"), 0),
+    [assets],
+  );
+  const totalLiabilities = useMemo(
+    () => liabilities.reduce((sum, liability) => sum + parseFloat(liability.balance || "0"), 0),
+    [liabilities],
+  );
+  const retirementAssets = useMemo(
+    () =>
+      assets
+        .filter((asset) => asset.category === "retirement_fund")
+        .reduce((sum, asset) => sum + parseFloat(asset.value || "0"), 0),
+    [assets],
+  );
+  const currentNetWorth = totalAssets - totalLiabilities;
+  const yearsToRetirement =
+    currentAge === null ? null : Math.max(retirementAgeValue - currentAge, 0);
+  const cashFlow = cashFlowSummary?.averages ?? {
+    income: 0,
+    expenses: 0,
+    net: 0,
+    savingsRate: 0,
+  };
 
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
@@ -267,6 +318,200 @@ export default function RetirementPlannerPage() {
             </div>
           )}
         </CardContent>
+      </Card>
+
+      <Card className="overflow-hidden border-slate-200/70 shadow-sm dark:border-slate-800">
+        <Tabs defaultValue="net-worth" className="w-full">
+          <div className="border-b bg-slate-50/80 px-4 pt-4 dark:bg-slate-900/40">
+            <TabsList className="grid h-auto w-full max-w-xl grid-cols-2 rounded-xl bg-slate-200/70 p-1 dark:bg-slate-800">
+              <TabsTrigger
+                value="net-worth"
+                data-testid="tab-retirement-net-worth"
+                className="gap-2 rounded-lg px-3 py-2.5 text-xs font-semibold sm:text-sm data-[state=active]:bg-white data-[state=active]:text-violet-700 data-[state=active]:shadow-sm dark:data-[state=active]:bg-slate-950 dark:data-[state=active]:text-violet-300"
+              >
+                <WalletCards className="h-4 w-4" />
+                Net worth at Retirement
+              </TabsTrigger>
+              <TabsTrigger
+                value="income-expenses"
+                data-testid="tab-retirement-income-expenses"
+                className="gap-2 rounded-lg px-3 py-2.5 text-xs font-semibold sm:text-sm data-[state=active]:bg-white data-[state=active]:text-emerald-700 data-[state=active]:shadow-sm dark:data-[state=active]:bg-slate-950 dark:data-[state=active]:text-emerald-300"
+              >
+                <ReceiptText className="h-4 w-4" />
+                Income &amp; Expenses at Retirement
+              </TabsTrigger>
+            </TabsList>
+          </div>
+
+          <CardContent className="p-4 sm:p-5">
+            <TabsContent value="net-worth" className="mt-0 space-y-5">
+              <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-violet-600 via-violet-600 to-blue-700 p-5 text-white shadow-sm">
+                <div className="absolute -right-8 -top-10 h-32 w-32 rounded-full bg-white/10" />
+                <div className="absolute -bottom-16 right-20 h-36 w-36 rounded-full bg-blue-400/20" />
+                <div className="relative flex items-start justify-between gap-4">
+                  <div>
+                    <div className="mb-2 flex items-center gap-2 text-violet-100">
+                      <WalletCards className="h-4 w-4" />
+                      <span className="text-xs font-semibold uppercase tracking-[0.16em]">Your wealth picture</span>
+                    </div>
+                    <h2 className="text-xl font-bold">Net worth at Retirement</h2>
+                    <p className="mt-1 max-w-xl text-sm text-violet-100">
+                      Your current balance sheet is the starting point for building a confident retirement projection.
+                    </p>
+                  </div>
+                  <div className="hidden rounded-xl bg-white/10 px-4 py-3 text-right sm:block">
+                    <p className="text-xs text-violet-100">Target age</p>
+                    <p className="text-2xl font-bold">{retirementAgeValue}</p>
+                  </div>
+                </div>
+                <div className="relative mt-5 flex flex-wrap gap-2 text-xs font-medium">
+                  <span className="rounded-full bg-white/15 px-3 py-1.5">
+                    {yearsToRetirement === null ? "Add your birth date" : `${yearsToRetirement} years to go`}
+                  </span>
+                  <span className="rounded-full bg-white/15 px-3 py-1.5">
+                    {retirementAssets > 0 ? `${formatCurrency(retirementAssets)} in retirement assets` : "Add retirement assets"}
+                  </span>
+                </div>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-3">
+                <div className="rounded-xl border bg-card p-4">
+                  <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-lg bg-violet-500/10 text-violet-600 dark:text-violet-300">
+                    <CircleDollarSign className="h-5 w-5" />
+                  </div>
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Current net worth</p>
+                  <p className="mt-1 text-2xl font-bold tabular-nums">{formatCurrency(currentNetWorth)}</p>
+                </div>
+                <div className="rounded-xl border bg-card p-4">
+                  <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-300">
+                    <TrendingUp className="h-5 w-5" />
+                  </div>
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Total assets</p>
+                  <p className="mt-1 text-2xl font-bold tabular-nums text-emerald-700 dark:text-emerald-300">{formatCurrency(totalAssets)}</p>
+                </div>
+                <div className="rounded-xl border bg-card p-4">
+                  <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-lg bg-red-500/10 text-red-600 dark:text-red-300">
+                    <TrendingDown className="h-5 w-5" />
+                  </div>
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Total liabilities</p>
+                  <p className="mt-1 text-2xl font-bold tabular-nums text-red-700 dark:text-red-300">{formatCurrency(totalLiabilities)}</p>
+                </div>
+              </div>
+
+              <div className="rounded-xl border bg-muted/20 p-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="font-semibold">Keep your projection inputs current</p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Update your accounts and retirement savings assumptions to refine the picture at age {retirementAgeValue}.
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 flex-wrap gap-2">
+                    <Link href="/retirement/401k" className="inline-flex items-center gap-1.5 rounded-lg bg-violet-600 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-violet-700">
+                      401(k) Calculator <ArrowRight className="h-3.5 w-3.5" />
+                    </Link>
+                    <Link href="/assets" className="inline-flex items-center gap-1.5 rounded-lg border bg-background px-3 py-2 text-xs font-semibold transition-colors hover:bg-muted">
+                      Review accounts
+                    </Link>
+                  </div>
+                </div>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="income-expenses" className="mt-0 space-y-5">
+              <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-600 via-teal-600 to-cyan-700 p-5 text-white shadow-sm">
+                <div className="absolute -right-8 -top-10 h-32 w-32 rounded-full bg-white/10" />
+                <div className="absolute -bottom-16 right-20 h-36 w-36 rounded-full bg-cyan-300/20" />
+                <div className="relative flex items-start justify-between gap-4">
+                  <div>
+                    <div className="mb-2 flex items-center gap-2 text-emerald-100">
+                      <ReceiptText className="h-4 w-4" />
+                      <span className="text-xs font-semibold uppercase tracking-[0.16em]">Your retirement cash flow</span>
+                    </div>
+                    <h2 className="text-xl font-bold">Income &amp; Expenses at Retirement</h2>
+                    <p className="mt-1 max-w-xl text-sm text-emerald-100">
+                      See the monthly spending baseline you will need to replace and the retirement income sources you can build.
+                    </p>
+                  </div>
+                  <div className="hidden rounded-xl bg-white/10 px-4 py-3 text-right sm:block">
+                    <p className="text-xs text-emerald-100">Starting at age</p>
+                    <p className="text-2xl font-bold">{retirementAgeValue}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-3">
+                <div className="rounded-xl border bg-card p-4">
+                  <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-300">
+                    <TrendingUp className="h-5 w-5" />
+                  </div>
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Monthly income</p>
+                  <p className="mt-1 text-2xl font-bold tabular-nums text-emerald-700 dark:text-emerald-300">{formatCurrency(cashFlow.income)}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">Current recorded average</p>
+                </div>
+                <div className="rounded-xl border bg-card p-4">
+                  <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-lg bg-orange-500/10 text-orange-600 dark:text-orange-300">
+                    <TrendingDown className="h-5 w-5" />
+                  </div>
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Monthly expenses</p>
+                  <p className="mt-1 text-2xl font-bold tabular-nums text-orange-700 dark:text-orange-300">{formatCurrency(cashFlow.expenses)}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">Current spending baseline</p>
+                </div>
+                <div className="rounded-xl border bg-card p-4">
+                  <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-300">
+                    <PiggyBank className="h-5 w-5" />
+                  </div>
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Monthly surplus</p>
+                  <p className={`mt-1 text-2xl font-bold tabular-nums ${cashFlow.net >= 0 ? "text-blue-700 dark:text-blue-300" : "text-red-700 dark:text-red-300"}`}>
+                    {formatCurrency(cashFlow.net)}
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">Available to save or invest</p>
+                </div>
+              </div>
+
+              <div>
+                <div className="mb-3">
+                  <p className="font-semibold">Build your retirement income plan</p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Connect each income source to see how it can help cover your spending baseline.
+                  </p>
+                </div>
+                <div className="grid gap-3 md:grid-cols-3">
+                  <Link href="/retirement/social-security" className="group rounded-xl border bg-card p-4 transition-colors hover:border-emerald-500/50 hover:bg-emerald-500/5">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-300">
+                        <ShieldCheck className="h-5 w-5" />
+                      </div>
+                      <ArrowRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-1" />
+                    </div>
+                    <p className="mt-3 font-semibold">Social Security</p>
+                    <p className="mt-1 text-xs leading-relaxed text-muted-foreground">Estimate benefits and choose a claiming age.</p>
+                  </Link>
+                  <Link href="/retirement/pension" className="group rounded-xl border bg-card p-4 transition-colors hover:border-emerald-500/50 hover:bg-emerald-500/5">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-300">
+                        <Landmark className="h-5 w-5" />
+                      </div>
+                      <ArrowRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-1" />
+                    </div>
+                    <p className="mt-3 font-semibold">Pension income</p>
+                    <p className="mt-1 text-xs leading-relaxed text-muted-foreground">Add employer pensions and recurring payments.</p>
+                  </Link>
+                  <Link href="/retirement/401k" className="group rounded-xl border bg-card p-4 transition-colors hover:border-emerald-500/50 hover:bg-emerald-500/5">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-violet-500/10 text-violet-600 dark:text-violet-300">
+                        <WalletCards className="h-5 w-5" />
+                      </div>
+                      <ArrowRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-1" />
+                    </div>
+                    <p className="mt-3 font-semibold">401(k) withdrawals</p>
+                    <p className="mt-1 text-xs leading-relaxed text-muted-foreground">Model contributions and future account value.</p>
+                  </Link>
+                </div>
+              </div>
+            </TabsContent>
+          </CardContent>
+        </Tabs>
       </Card>
     </div>
   );
