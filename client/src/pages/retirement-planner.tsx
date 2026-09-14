@@ -88,8 +88,10 @@ export default function RetirementPlannerPage() {
   const currentAgeFloor = currentAge === null ? 1 : currentAge + 1;
   const retirementAgeValue = Number(retirementAge) || currentAgeFloor;
   const lifeExpectancyValue = Number(lifeExpectancy) || currentAgeFloor;
-  const retirementAgeMax = Math.min(MAX_AGE, Math.max(currentAgeFloor, lifeExpectancyValue));
-  const lifeExpectancyMin = Math.min(MAX_AGE, Math.max(currentAgeFloor, retirementAgeValue));
+  const timelineValues = [
+    Math.min(retirementAgeValue, lifeExpectancyValue),
+    Math.max(retirementAgeValue, lifeExpectancyValue),
+  ];
 
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
@@ -141,50 +143,40 @@ export default function RetirementPlannerPage() {
                 </div>
               </div>
 
-              <div className="space-y-3">
-                <div className="flex min-h-5 items-center justify-between gap-2">
-                  <Label htmlFor="retirement-age">Retirement Age</Label>
-                  <span className="text-lg font-semibold tabular-nums">{retirementAge}</span>
+              <div className="space-y-4 md:col-span-2">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex items-center justify-between gap-3">
+                    <Label htmlFor="retirement-timeline">Retirement Age</Label>
+                    <span className="text-lg font-semibold tabular-nums">{retirementAge}</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <Label htmlFor="retirement-timeline">Life Expectancy</Label>
+                    <span className="text-lg font-semibold tabular-nums">{lifeExpectancy}</span>
+                  </div>
                 </div>
                 <Slider
-                  id="retirement-age"
+                  id="retirement-timeline"
                   min={currentAge + 1}
-                  max={retirementAgeMax}
-                  step={1}
-                  value={[Math.min(retirementAgeValue, retirementAgeMax)]}
-                  onValueChange={([value]) =>
-                    setRetirementAge(String(Math.min(Number(value), lifeExpectancyValue)))
-                  }
-                  onValueCommit={([value]) =>
-                    saveTimeline(Number(value), lifeExpectancyValue)
-                  }
-                  aria-label="Retirement Age"
-                  data-testid="slider-retirement-age"
-                />
-                <p className="text-xs text-muted-foreground">{currentAge + 1}–{retirementAgeMax}</p>
-              </div>
-
-              <div className="space-y-3">
-                <div className="flex min-h-5 items-center justify-between gap-2">
-                  <Label htmlFor="life-expectancy">Life Expectancy</Label>
-                  <span className="text-lg font-semibold tabular-nums">{lifeExpectancy}</span>
-                </div>
-                <Slider
-                  id="life-expectancy"
-                  min={lifeExpectancyMin}
                   max={MAX_AGE}
                   step={1}
-                  value={[Math.max(lifeExpectancyValue, lifeExpectancyMin)]}
-                  onValueChange={([value]) =>
-                    setLifeExpectancy(String(Math.max(Number(value), retirementAgeValue)))
+                  minStepsBetweenThumbs={0}
+                  value={timelineValues}
+                  onValueChange={([nextRetirementAge, nextLifeExpectancy]) => {
+                    setRetirementAge(String(nextRetirementAge));
+                    setLifeExpectancy(String(nextLifeExpectancy));
+                  }}
+                  onValueCommit={([nextRetirementAge, nextLifeExpectancy]) =>
+                    saveTimeline(Number(nextRetirementAge), Number(nextLifeExpectancy))
                   }
-                  onValueCommit={([value]) =>
-                    saveTimeline(retirementAgeValue, Number(value))
-                  }
-                  aria-label="Life Expectancy"
-                  data-testid="slider-life-expectancy"
+                  thumbLabels={["Retirement Age", "Life Expectancy"]}
+                  aria-label="Retirement timeline"
+                  data-testid="slider-retirement-timeline"
                 />
-                <p className="text-xs text-muted-foreground">{lifeExpectancyMin}–{MAX_AGE}</p>
+                <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
+                  <span>{currentAge + 1}</span>
+                  <span>Left handle: Retirement Age · Right handle: Life Expectancy</span>
+                  <span>{MAX_AGE}</span>
+                </div>
               </div>
             </div>
           )}
