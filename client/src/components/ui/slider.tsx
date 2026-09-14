@@ -6,12 +6,17 @@ import { cn } from "@/lib/utils"
 type SliderProps = React.ComponentPropsWithoutRef<typeof SliderPrimitive.Root> & {
   thumbLabels?: string[];
   thumbClassNames?: string[];
+  trackFill?: {
+    startPercent: number;
+    endPercent: number;
+    className?: string;
+  };
 };
 
 const Slider = React.forwardRef<
   React.ElementRef<typeof SliderPrimitive.Root>,
   SliderProps
->(({ className, thumbLabels, thumbClassNames, ...props }, ref) => {
+>(({ className, thumbLabels, thumbClassNames, trackFill, ...props }, ref) => {
   const values = props.value ?? props.defaultValue;
   const thumbCount = Array.isArray(values) ? Math.max(values.length, 1) : 1;
 
@@ -25,7 +30,17 @@ const Slider = React.forwardRef<
       {...props}
     >
       <SliderPrimitive.Track className="relative h-2 w-full grow overflow-hidden rounded-full bg-secondary">
-        <SliderPrimitive.Range className="absolute h-full bg-primary" />
+        {trackFill && (
+          <span
+            aria-hidden="true"
+            className={cn("pointer-events-none absolute h-full bg-primary", trackFill.className)}
+            style={{
+              left: `${trackFill.startPercent}%`,
+              width: `${trackFill.endPercent - trackFill.startPercent}%`,
+            }}
+          />
+        )}
+        <SliderPrimitive.Range className={cn("absolute h-full bg-primary", trackFill && "hidden")} />
       </SliderPrimitive.Track>
       {Array.from({ length: thumbCount }, (_, index) => (
         <SliderPrimitive.Thumb
