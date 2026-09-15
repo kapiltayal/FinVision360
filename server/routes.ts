@@ -1,10 +1,20 @@
 import type { Express, Response } from "express";
 import { createServer, type Server } from "http";
+import { and, eq } from "drizzle-orm";
 import { storage } from "./storage";
 import { setupAuth, requireAuth, requireAdmin, authenticateSupabase } from "./auth";
 import { db, pool } from "./db";
 import { registerFinanceTrackerRoutes } from "./finance-tracker-routes";
-import { assets, liabilities, assetHistory, liabilityHistory } from "@shared/schema";
+import {
+  assets,
+  liabilities,
+  assetHistory,
+  liabilityHistory,
+  assetTypeList,
+  liabilitiesTypeList,
+  retirementAssetProjectionOverrides,
+  retirementProjectionEntries,
+} from "@shared/schema";
 import { AI_ADVISOR_LIMITS, AIProviderError, type AdvisorMessage, streamAdvisorCompletion } from "./ai/provider";
 import { scrapeBank, DEFAULT_BANK_CONFIGS, type BankSelectorConfig } from "./scraper";
 import { Products, CountryCode } from "plaid";
@@ -14,6 +24,7 @@ import {
   aiClassify, deterministicClassify, extractJsonRows, isEmptySample, parseUpload,
   hasRecognizableStructure, type Category, type IngestionKind, type RawRow,
 } from "./asset-liability-ingestion";
+import { buildRetirementNetWorthProjection } from "./retirement-projection";
 
 const MAX_PENSION_AMOUNT = 9_999_999_999_999.99;
 const ingestionUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024, files: 1 } });
@@ -95,6 +106,33 @@ function optionalIsoDate(value: unknown): { value?: string | null; error?: strin
     return { error: "Maturity date must be a valid date" };
   }
   return { value };
+}
+
+function projectionEntryInput(body: any) {
+  const kind = body?.kind;
+  const name = boundedText(body?.name, 120);
+  const parentCategory = boundedText(body?.parentCategory, 120);
+  const category = boundedText(body?.category, 120);
+  const amount = Number(body?.amount);
+  const notes = boundedText(body?.notes, 1000);
+
+  if (kind !== "asset" && kind !== "liability") return { error: "Entry type must be asset or liability" } as const;
+  if (!name) return { error: "Name is required" } as const;
+  if (!parentCategory || !category) return { error: "Category is required" } as const;
+  if (!Number.isFinite(amount) || amount < 0 || amount > MAX_PENSION_AMOUNT) {
+    return { error: "Amount must be a valid non-negative number" } as const;
+  }
+
+  return {
+    value: {
+      kind,
+      name,
+      parentCategory,
+      category,
+      amount: amount.toFixed(2),
+      notes: notes || null,
+    },
+  } as const;
 }
 
 function ageFromDateOfBirth(dateOfBirth: unknown): number | null {
@@ -518,6 +556,111 @@ export async function registerRoutes(
       lifeExpectancy,
     });
     res.json(settings);
+  });
+
+  app.get("/api/retirement/net-worth-projection", requireAuth, async (req: any, res) => {
+    const userId = req.user.id;
+    const [settings, userAssets, userLiabilities, assetTypes, liabilityTypes, overrides, entries] = await Promise.all([
+      storage.getRetirementPlannerSettings(userId),
+      storage.getAssets(userId),
+      storage.getLiabilities(userId),
+      db.select().from(assetTypeList),
+      db.select().from(liabilitiesTypeList),
+      db.select().from(retirementAssetProjectionOverrides).where(eq(retirementAssetProjectionOverrides.userId, userId)),
+      db.select().from(retirementProjectionEntries).where(eq(retirementProjectionEntries.userId, userId)),
+    ]);
+
+    res.json(buildRetirementNetWorthProjection({
+      retirementAge: settings?.retirementAge ?? 65,
+      currentAge: ageFromDateOfBirth(req.user.dateOfBirth),
+      assets: userAssets,
+      liabilities: userLiabilities,
+      assetTypes,
+      liabilityTypes,
+      assetOverrides: overrides,
+      projectionEntries: entries,
+    }));
+  });
+
+  app.put("/api/retirement/asset-rate/:assetId", requireAuth, async (req: any, res) => {
+    const userId = req.user.id;
+    const assetId = Number(req.params.assetId);
+    const rateOfReturn = Number(req.body?.rateOfReturn);
+    if (!Number.isInteger(assetId)) return res.status(400).json({ message: "Invalid asset id" });
+    if (!Number.isFinite(rateOfReturn) || rateOfReturn < -20 || rateOfReturn > 30) {
+      return res.status(400).json({ message: "Rate of return must be between -20% and 30%" });
+    }
+    if (!await storage.getAsset(assetId, userId)) return res.status(404).json({ message: "Asset not found" });
+
+    const [override] = await db.insert(retirementAssetProjectionOverrides)
+      .values({ userId, assetId, rateOfReturn: rateOfReturn.toFixed(3) })
+      .onConflictDoUpdate({
+        target: [
+          retirementAssetProjectionOverrides.userId,
+          retirementAssetProjectionOverrides.assetId,
+        ],
+        set: { rateOfReturn: rateOfReturn.toFixed(3), updatedAt: new Date() },
+      })
+      .returning();
+    res.json(override);
+  });
+
+  app.delete("/api/retirement/asset-rate/:assetId", requireAuth, async (req: any, res) => {
+    const assetId = Number(req.params.assetId);
+    if (!Number.isInteger(assetId)) return res.status(400).json({ message: "Invalid asset id" });
+    await db.delete(retirementAssetProjectionOverrides).where(and(
+      eq(retirementAssetProjectionOverrides.userId, req.user.id),
+      eq(retirementAssetProjectionOverrides.assetId, assetId),
+    ));
+    res.status(204).send();
+  });
+
+  app.post("/api/retirement/projection-entries", requireAuth, async (req: any, res) => {
+    const parsed = projectionEntryInput(req.body);
+    if ("error" in parsed) return res.status(400).json({ message: parsed.error });
+    const categories = await categoriesFor(parsed.value.kind);
+    if (!categories.some((item) =>
+      item.parentCategory === parsed.value.parentCategory && item.category === parsed.value.category
+    )) {
+      return res.status(400).json({ message: "Invalid category" });
+    }
+    const [entry] = await db.insert(retirementProjectionEntries)
+      .values({ userId: req.user.id, ...parsed.value })
+      .returning();
+    res.status(201).json(entry);
+  });
+
+  app.patch("/api/retirement/projection-entries/:id", requireAuth, async (req: any, res) => {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id)) return res.status(400).json({ message: "Invalid entry id" });
+    const parsed = projectionEntryInput(req.body);
+    if ("error" in parsed) return res.status(400).json({ message: parsed.error });
+    const categories = await categoriesFor(parsed.value.kind);
+    if (!categories.some((item) =>
+      item.parentCategory === parsed.value.parentCategory && item.category === parsed.value.category
+    )) {
+      return res.status(400).json({ message: "Invalid category" });
+    }
+    const [entry] = await db.update(retirementProjectionEntries)
+      .set({ ...parsed.value, updatedAt: new Date() })
+      .where(and(
+        eq(retirementProjectionEntries.id, id),
+        eq(retirementProjectionEntries.userId, req.user.id),
+      ))
+      .returning();
+    if (!entry) return res.status(404).json({ message: "Projection entry not found" });
+    res.json(entry);
+  });
+
+  app.delete("/api/retirement/projection-entries/:id", requireAuth, async (req: any, res) => {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id)) return res.status(400).json({ message: "Invalid entry id" });
+    const deleted = await db.delete(retirementProjectionEntries).where(and(
+      eq(retirementProjectionEntries.id, id),
+      eq(retirementProjectionEntries.userId, req.user.id),
+    )).returning({ id: retirementProjectionEntries.id });
+    if (deleted.length === 0) return res.status(404).json({ message: "Projection entry not found" });
+    res.status(204).send();
   });
 
   app.get("/api/retirement/pensions", requireAuth, async (req, res) => {

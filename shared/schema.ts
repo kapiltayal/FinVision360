@@ -288,6 +288,50 @@ export const insertRetirementPlannerSettingsSchema = createInsertSchema(retireme
 export type InsertRetirementPlannerSettings = z.infer<typeof insertRetirementPlannerSettingsSchema>;
 export type RetirementPlannerSettings = typeof retirementPlannerSettings.$inferSelect;
 
+export const retirementAssetProjectionOverrides = pgTable("retirement_asset_projection_overrides", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  assetId: integer("asset_id").notNull().references(() => assets.id, { onDelete: "cascade" }),
+  rateOfReturn: numeric("rate_of_return", { precision: 6, scale: 3 }).notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  userAssetUnique: uniqueIndex("retirement_asset_projection_overrides_user_asset_unique").on(table.userId, table.assetId),
+}));
+
+export const insertRetirementAssetProjectionOverrideSchema = createInsertSchema(retirementAssetProjectionOverrides).omit({
+  id: true,
+  updatedAt: true,
+});
+
+export type InsertRetirementAssetProjectionOverride = z.infer<typeof insertRetirementAssetProjectionOverrideSchema>;
+export type RetirementAssetProjectionOverride = typeof retirementAssetProjectionOverrides.$inferSelect;
+
+export const retirementProjectionEntries = pgTable("retirement_projection_entries", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  kind: text("kind").notNull(),
+  name: text("name").notNull(),
+  parentCategory: text("parent_category").notNull(),
+  category: text("category").notNull(),
+  amount: numeric("amount", { precision: 15, scale: 2 }).notNull(),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  userKindIndex: index("retirement_projection_entries_user_kind_idx").on(table.userId, table.kind),
+  validKind: check("retirement_projection_entries_kind_check", sql`${table.kind} IN ('asset', 'liability')`),
+  nonnegativeAmount: check("retirement_projection_entries_amount_check", sql`${table.amount} >= 0`),
+}));
+
+export const insertRetirementProjectionEntrySchema = createInsertSchema(retirementProjectionEntries).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertRetirementProjectionEntry = z.infer<typeof insertRetirementProjectionEntrySchema>;
+export type RetirementProjectionEntry = typeof retirementProjectionEntries.$inferSelect;
+
 export const retirementPensions = pgTable("retirement_pensions", {
   id: serial("id").primaryKey(),
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),

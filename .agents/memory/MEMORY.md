@@ -7,3 +7,4 @@
 - [Financial ingestion AI trust boundary](financial-ingestion-ai-trust.md) — AI assigns categories only; source values and server-owned row identities remain authoritative.
 - [Additive schema changes](additive-schema-changes.md) — avoid broad schema pushes when unrelated drift triggers destructive prompts; use narrowly scoped additive dev DDL.
 - [Recommendation thresholds](recommendation-thresholds.md) — recommendation settings use three aggregate savings thresholds instead of account or policy subtypes.
+- [Retirement net-worth projections](retirement-net-worth-projections.md) — use category fallback returns and conservative debt carry-forward rules when inputs are incomplete.
