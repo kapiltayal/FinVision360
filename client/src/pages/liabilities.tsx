@@ -17,7 +17,7 @@ import { type Liability, type PlaidAccount } from "@shared/schema";
 import { formatCurrency, formatPercent } from "@/lib/format";
 import { type BookCategory, categoryLabel, categoryParent, groupedBookCategories, groupedBookEntries } from "@/lib/book-categories";
 
-type LiabilitySortKey = "parentCategory" | "category" | "name" | "institution" | "balance" | "rate" | "minimumPayment";
+type LiabilitySortKey = "parentCategory" | "category" | "name" | "institution" | "balance" | "rate" | "minimumPayment" | "maturityDate";
 type SortDirection = "asc" | "desc";
 
 function LiabilitySortHeader({
@@ -77,6 +77,7 @@ function LiabilityForm({
     balance: liability?.balance || "",
     interestRate: liability?.interestRate || "0",
     minimumPayment: liability?.minimumPayment || "0",
+    maturityDate: liability?.maturityDate || "",
     institution: liability?.institution || "",
     notes: liability?.notes || "",
   });
@@ -121,6 +122,8 @@ function LiabilityForm({
   };
 
   const isPending = createMutation.isPending || updateMutation.isPending;
+  const selectedCategory = categories.find((category) => category.category === form.category);
+  const isClosedEndLiability = !!selectedCategory && selectedCategory.parentCategory !== "Revolving Credit";
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
@@ -141,7 +144,15 @@ function LiabilityForm({
             data-testid="select-liability-category"
             className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
             value={form.category}
-            onChange={(e) => setForm({ ...form, category: e.target.value })}
+            onChange={(e) => {
+              const category = e.target.value;
+              const parentCategory = categories.find((entry) => entry.category === category)?.parentCategory;
+              setForm({
+                ...form,
+                category,
+                maturityDate: parentCategory === "Revolving Credit" ? "" : form.maturityDate,
+              });
+            }}
             required
           >
             <option value="" disabled>Select a category</option>
@@ -189,6 +200,19 @@ function LiabilityForm({
             placeholder="0.00"
           />
         </div>
+        {isClosedEndLiability && (
+          <div className="space-y-2 col-span-2 sm:col-span-1">
+            <Label htmlFor="liability-maturity-date">Maturity Date</Label>
+            <Input
+              id="liability-maturity-date"
+              data-testid="input-liability-maturity-date"
+              type="date"
+              value={form.maturityDate}
+              onChange={(e) => setForm({ ...form, maturityDate: e.target.value })}
+            />
+            <p className="text-xs text-muted-foreground">Optional — leave blank if the payoff date is unknown.</p>
+          </div>
+        )}
         <div className="space-y-2 col-span-2">
           <Label>Institution</Label>
           <Input
@@ -267,6 +291,8 @@ export default function LiabilitiesPage() {
         comparison = parseFloat(a.balance || "0") - parseFloat(b.balance || "0");
       } else if (sortConfig.key === "rate") {
         comparison = parseFloat(a.interestRate || "0") - parseFloat(b.interestRate || "0");
+      } else if (sortConfig.key === "maturityDate") {
+        comparison = (a.maturityDate || "9999-12-31").localeCompare(b.maturityDate || "9999-12-31");
       } else {
         comparison = parseFloat(a.minimumPayment || "0") - parseFloat(b.minimumPayment || "0");
       }
@@ -323,13 +349,14 @@ export default function LiabilitiesPage() {
     filename: "Liabilities",
     sheets: [{
       name: "Liabilities",
-      columns: ["Name", "Category", "Balance ($)", "Interest Rate (%)", "Min Payment ($)", "Institution", "Notes"],
+      columns: ["Name", "Category", "Balance ($)", "Interest Rate (%)", "Min Payment ($)", "Maturity Date", "Institution", "Notes"],
       rows: liabilities.map((l) => [
         l.name,
         categoryLabel(categories, l.category),
         parseFloat(l.balance || "0"),
         parseFloat(l.interestRate || "0"),
         parseFloat(l.minimumPayment || "0"),
+        l.maturityDate || "",
         l.institution || "",
         l.notes || "",
       ]),
@@ -467,6 +494,7 @@ export default function LiabilitiesPage() {
                   <LiabilitySortHeader label="Balance" column="balance" sortConfig={sortConfig} onSort={handleSort} align="right" />
                   <LiabilitySortHeader label="Interest Rate" column="rate" sortConfig={sortConfig} onSort={handleSort} align="right" />
                   <LiabilitySortHeader label="Min Payment" column="minimumPayment" sortConfig={sortConfig} onSort={handleSort} align="right" />
+                  <LiabilitySortHeader label="Maturity Date" column="maturityDate" sortConfig={sortConfig} onSort={handleSort} />
                   <th scope="col" className="px-5 py-3 text-right font-medium">Actions</th>
                 </tr>
               </thead>
@@ -493,6 +521,11 @@ export default function LiabilitiesPage() {
                     <td className="px-5 py-3 text-right whitespace-nowrap">
                       {parseFloat(liability.minimumPayment || "0") > 0
                         ? `${formatCurrency(liability.minimumPayment || "0")}/mo`
+                        : "—"}
+                    </td>
+                    <td className="px-5 py-3 whitespace-nowrap text-muted-foreground">
+                      {liability.maturityDate
+                        ? new Date(`${liability.maturityDate}T12:00:00Z`).toLocaleDateString("en-US", { timeZone: "UTC" })
                         : "—"}
                     </td>
                     <td className="px-5 py-3">
@@ -613,6 +646,14 @@ export default function LiabilitiesPage() {
                                       <div className="flex items-center justify-between">
                                         <span className="text-sm text-muted-foreground">Min Payment</span>
                                         <span className="text-sm">{formatCurrency(liability.minimumPayment || "0")}/mo</span>
+                                      </div>
+                                    )}
+                                    {liability.maturityDate && (
+                                      <div className="flex items-center justify-between">
+                                        <span className="text-sm text-muted-foreground">Maturity Date</span>
+                                        <span className="text-sm">
+                                          {new Date(`${liability.maturityDate}T12:00:00Z`).toLocaleDateString("en-US", { timeZone: "UTC" })}
+                                        </span>
                                       </div>
                                     )}
                                   </div>

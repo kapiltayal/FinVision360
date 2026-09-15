@@ -84,6 +84,19 @@ function finiteNumber(value: unknown, fallback = 0): number {
   return Number.isFinite(number) ? number : fallback;
 }
 
+function optionalIsoDate(value: unknown): { value?: string | null; error?: string } {
+  if (value === undefined) return {};
+  if (value === null || value === "") return { value: null };
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return { error: "Maturity date must be a valid date" };
+  }
+  const parsed = new Date(`${value}T00:00:00Z`);
+  if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== value) {
+    return { error: "Maturity date must be a valid date" };
+  }
+  return { value };
+}
+
 function ageFromDateOfBirth(dateOfBirth: unknown): number | null {
   if (typeof dateOfBirth !== "string" || !dateOfBirth) return null;
   const birthDate = new Date(`${dateOfBirth}T00:00:00Z`);
@@ -270,6 +283,7 @@ export async function registerRoutes(
       const amount = hasSuppliedAmount ? Number(rawAmount) : Number.NaN;
       const interestRate = entry?.interestRate === undefined || entry?.interestRate === "" ? 0 : Number(entry.interestRate);
       const minimumPayment = entry?.minimumPayment === undefined || entry?.minimumPayment === "" ? 0 : Number(entry.minimumPayment);
+      const maturityDate = optionalIsoDate(entry?.maturityDate);
 
       if (!name || !category) {
         addSkipped("missing name or category");
@@ -289,6 +303,10 @@ export async function registerRoutes(
       }
       if (kind === "liability" && (!Number.isFinite(minimumPayment) || minimumPayment < 0)) {
         addSkipped("invalid minimum payment");
+        continue;
+      }
+      if (kind === "liability" && maturityDate.error) {
+        addSkipped("invalid maturity date");
         continue;
       }
 
@@ -315,6 +333,7 @@ export async function registerRoutes(
             balance: normalizedAmount.toFixed(2),
             interestRate: interestRate.toFixed(2),
             minimumPayment: minimumPayment.toFixed(2),
+            maturityDate: maturityDate.value ?? null,
             institution,
             notes,
           });
@@ -402,14 +421,19 @@ export async function registerRoutes(
 
   app.post("/api/liabilities", requireAuth, async (req, res) => {
     const userId = (req.user as any).id;
-    const { name, category, balance, interestRate, minimumPayment, institution, notes } = req.body;
+    const { name, category, balance, interestRate, minimumPayment, maturityDate, institution, notes } = req.body;
     if (!name || !category || !balance) {
       return res.status(400).json({ message: "Name, category, and balance are required" });
     }
     if (!await hasValidCategory("liability", category)) {
       return res.status(400).json({ message: "Invalid category" });
     }
-    const liability = await storage.createLiability({ userId, name, category, balance, interestRate, minimumPayment, institution, notes });
+    const parsedMaturityDate = optionalIsoDate(maturityDate);
+    if (parsedMaturityDate.error) return res.status(400).json({ message: parsedMaturityDate.error });
+    const liability = await storage.createLiability({
+      userId, name, category, balance, interestRate, minimumPayment,
+      maturityDate: parsedMaturityDate.value ?? null, institution, notes,
+    });
     res.status(201).json(liability);
   });
 
@@ -424,11 +448,16 @@ export async function registerRoutes(
   app.patch("/api/liabilities/:id", requireAuth, async (req, res) => {
     const userId = (req.user as any).id;
     const id = parseInt(req.params.id);
-    const { name, category, balance, interestRate, minimumPayment, institution, notes } = req.body;
+    const { name, category, balance, interestRate, minimumPayment, maturityDate, institution, notes } = req.body;
     if (category !== undefined && !await hasValidCategory("liability", category)) {
       return res.status(400).json({ message: "Invalid category" });
     }
-    const updated = await storage.updateLiability(id, userId, { name, category, balance, interestRate, minimumPayment, institution, notes });
+    const parsedMaturityDate = optionalIsoDate(maturityDate);
+    if (parsedMaturityDate.error) return res.status(400).json({ message: parsedMaturityDate.error });
+    const updated = await storage.updateLiability(id, userId, {
+      name, category, balance, interestRate, minimumPayment,
+      maturityDate: parsedMaturityDate.value, institution, notes,
+    });
     if (!updated) return res.status(404).json({ message: "Liability not found" });
     res.json(updated);
   });
@@ -1435,6 +1464,7 @@ Include a year-by-year overview, useful milestones, a conservative/base/optimist
             balance: l.balance,
             interestRate: l.interestRate ?? "0",
             minimumPayment: l.minimumPayment ?? "0",
+            maturityDate: l.maturityDate,
             institution: l.institution,
             notes: l.notes,
           }))

@@ -170,6 +170,7 @@ function normalizedRow(row: RawRow, category: string): RawRow {
     minimumPayment: normalizeNumber(
       find("minimumpayment", "payment", "monthlypayment") || textFinancials.minimumPayment,
     ),
+    maturityDate: find("maturitydate", "payoffdate", "enddate"),
     institution: find("institution", "bank", "provider", "company"),
     notes: find("notes", "memo", "description"),
   };
