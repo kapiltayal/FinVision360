@@ -125,7 +125,13 @@ export function buildRetirementNetWorthProjection(input: {
 
   const assetTypeByCategory = new Map(input.assetTypes.map((row) => [row.subCategory, row]));
   const liabilityTypeByCategory = new Map(input.liabilityTypes.map((row) => [row.subCategory, row]));
-  const overrideByAsset = new Map(input.assetOverrides.map((row) => [row.assetId, numberValue(row.rateOfReturn)]));
+  // Keep legacy overrides inside the slider's supported range. New values are
+  // validated by the API, but older rows may have been saved before the range
+  // was changed from -20% to 0%.
+  const overrideByAsset = new Map(input.assetOverrides.map((row) => [
+    row.assetId,
+    Math.min(30, Math.max(0, numberValue(row.rateOfReturn))),
+  ]));
 
   const projectedAssets: ProjectedAsset[] = input.assets.map((asset) => {
     const type = assetTypeByCategory.get(asset.category);
@@ -134,7 +140,7 @@ export function buildRetirementNetWorthProjection(input: {
     const hasOverride = overrideRate !== undefined;
     const hasAccountRate = accountRate !== null && accountRate !== 0;
     const typeRate = type ? numberValue(type.rateOfReturn) * 100 : 0;
-    const returnRate = hasOverride ? overrideRate : hasAccountRate ? accountRate : typeRate;
+    const returnRate = Math.min(30, Math.max(0, hasOverride ? overrideRate : hasAccountRate ? accountRate : typeRate));
     const currentValue = numberValue(asset.value);
     const projectedValue = currentValue * Math.pow(1 + returnRate / 100, yearsToRetirement);
 

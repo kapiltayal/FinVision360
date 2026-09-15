@@ -133,7 +133,7 @@ function AssetRow({ asset, actions }: { asset: RetirementProjectionAsset; action
       </div>
       <div className="mt-3 flex items-center gap-3">
         <Slider
-          min={-20}
+          min={0}
           max={30}
           step={0.1}
           value={[rate]}

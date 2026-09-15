@@ -587,8 +587,8 @@ export async function registerRoutes(
     const assetId = Number(req.params.assetId);
     const rateOfReturn = Number(req.body?.rateOfReturn);
     if (!Number.isInteger(assetId)) return res.status(400).json({ message: "Invalid asset id" });
-    if (!Number.isFinite(rateOfReturn) || rateOfReturn < -20 || rateOfReturn > 30) {
-      return res.status(400).json({ message: "Rate of return must be between -20% and 30%" });
+    if (!Number.isFinite(rateOfReturn) || rateOfReturn < 0 || rateOfReturn > 30) {
+      return res.status(400).json({ message: "Rate of return must be between 0% and 30%" });
     }
     if (!await storage.getAsset(assetId, userId)) return res.status(404).json({ message: "Asset not found" });
 
