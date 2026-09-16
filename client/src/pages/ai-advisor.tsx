@@ -214,14 +214,14 @@ export default function AIAdvisorPage() {
   const history = Array.isArray(historyRaw) ? historyRaw : [];
   const [deleteTarget, setDeleteTarget] = useState<AdvisorHistoryEntry | null>(null);
   const [clearArchiveOpen, setClearArchiveOpen] = useState(false);
-  const firstArchiveRef = useRef<HTMLDetailsElement | null>(null);
+  const archiveListRef = useRef<HTMLDivElement | null>(null);
   const { toast } = useToast();
 
-  useEffect(() => {
-    if (firstArchiveRef.current) {
-      firstArchiveRef.current.open = true;
-    }
-  }, [history]);
+  const collapseArchives = () => {
+    archiveListRef.current?.querySelectorAll<HTMLDetailsElement>("details").forEach((archive) => {
+      archive.open = false;
+    });
+  };
 
   const handleScenarioSubmit = () => {
     if (!scenarioQuery.trim()) return;
@@ -277,7 +277,12 @@ export default function AIAdvisorPage() {
         <p className="text-muted-foreground">Clear, personalized guidance for your financial future</p>
       </div>
 
-      <Tabs defaultValue="scenario">
+      <Tabs
+        defaultValue="scenario"
+        onValueChange={(value) => {
+          if (value === "history") collapseArchives();
+        }}
+      >
         <TabsList className="grid h-auto w-full grid-cols-1 gap-2 bg-transparent p-0 sm:grid-cols-3">
           <TabsTrigger
             value="scenario"
@@ -296,6 +301,7 @@ export default function AIAdvisorPage() {
           <TabsTrigger
             value="history"
             data-testid="tab-history"
+            onClick={collapseArchives}
             className="h-10 rounded-xl border border-border/70 bg-muted/70 px-4 text-muted-foreground shadow-sm hover:border-primary/40 hover:bg-muted data-[state=active]:border-primary data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md"
           >
             <History className="h-4 w-4 mr-2" /> {advisorName} Archives ({history.length})
@@ -442,11 +448,10 @@ export default function AIAdvisorPage() {
                   </p>
                 </div>
               ) : (
-                <div className="divide-y">
-                    {history.map((entry, index) => (
+                <div ref={archiveListRef} className="divide-y">
+                    {history.map((entry) => (
                     <details
                       key={entry.id}
-                      ref={index === 0 ? firstArchiveRef : undefined}
                       className="group p-3"
                     >
                       <summary className="cursor-pointer list-none">
