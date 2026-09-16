@@ -325,7 +325,7 @@ export default function AIAdvisorPage() {
                 <Sparkles className="h-4 w-4 text-primary" /> Ask About Your Finances
               </CardTitle>
               <p className="text-xs leading-relaxed text-muted-foreground">
-                AI-generated guidance may be inaccurate or incomplete. Review it carefully, verify important details,
+                Disclaimer: AI-generated guidance may be inaccurate or incomplete. Review it carefully, verify important details,
                 and consult a qualified financial advisor before making financial decisions.
               </p>
             </CardHeader>
@@ -391,7 +391,7 @@ export default function AIAdvisorPage() {
                 <CreditCard className="h-4 w-4 text-primary" /> Debt Reduction Strategy
               </CardTitle>
               <p className="text-xs leading-relaxed text-muted-foreground">
-                AI-generated guidance may be inaccurate or incomplete. Review it carefully, verify important details,
+                Disclaimer: AI-generated guidance may be inaccurate or incomplete. Review it carefully, verify important details,
                 and consult a qualified financial advisor before making financial decisions.
               </p>
             </CardHeader>
