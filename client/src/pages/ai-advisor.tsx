@@ -324,6 +324,10 @@ export default function AIAdvisorPage() {
               <CardTitle className="text-base flex items-center gap-2">
                 <Sparkles className="h-4 w-4 text-primary" /> Ask About Your Finances
               </CardTitle>
+              <p className="text-xs leading-relaxed text-muted-foreground">
+                AI-generated guidance may be inaccurate or incomplete. Review it carefully, verify important details,
+                and consult a qualified financial advisor before making financial decisions.
+              </p>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex flex-wrap gap-2">
@@ -386,6 +390,10 @@ export default function AIAdvisorPage() {
               <CardTitle className="text-base flex items-center gap-2">
                 <CreditCard className="h-4 w-4 text-primary" /> Debt Reduction Strategy
               </CardTitle>
+              <p className="text-xs leading-relaxed text-muted-foreground">
+                AI-generated guidance may be inaccurate or incomplete. Review it carefully, verify important details,
+                and consult a qualified financial advisor before making financial decisions.
+              </p>
             </CardHeader>
             <CardContent className="space-y-4">
               {liabilities.length === 0 ? (
