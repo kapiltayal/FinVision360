@@ -33,7 +33,7 @@ import {
   Info,
   Landmark,
 } from "lucide-react";
-import { type Asset, type Liability, type InsurancePolicy, type Retirement401kGoal, type EstateBeneficiary, type EstateDocument, type EstateContact, ESTATE_DOCUMENT_TYPES } from "@shared/schema";
+import { type Asset, type Liability, type InsurancePolicy, type Retirement401kGoal, type RetirementPlannerSettings, type EstateBeneficiary, type EstateDocument, type EstateContact, ESTATE_DOCUMENT_TYPES } from "@shared/schema";
 
 const INSURANCE_TYPES = [
   { key: "auto", label: "Auto", Icon: Car },
@@ -162,11 +162,14 @@ export default function SnapshotPage() {
   });
   const { data: policies = [], isLoading: pL } = useQuery<InsurancePolicy[]>({ queryKey: ["/api/insurance"] });
   const { data: goal401k } = useQuery<Retirement401kGoal | null>({ queryKey: ["/api/retirement/401k"] });
+  const { data: plannerSettings, isLoading: plannerSettingsLoading } = useQuery<RetirementPlannerSettings>({
+    queryKey: ["/api/retirement/planner-settings"],
+  });
   const { data: estateBeneficiaries = [] } = useQuery<EstateBeneficiary[]>({ queryKey: ["/api/estate/beneficiaries"] });
   const { data: estateDocuments = [] } = useQuery<EstateDocument[]>({ queryKey: ["/api/estate/documents"] });
   const { data: estateContacts = [] } = useQuery<EstateContact[]>({ queryKey: ["/api/estate/contacts"] });
 
-  const isLoading = aL || lL || cashFlowLoading || pL;
+  const isLoading = aL || lL || cashFlowLoading || pL || plannerSettingsLoading;
 
   const totalAssets = useMemo(() => assets.reduce((s, a) => s + parseFloat(a.value || "0"), 0), [assets]);
   const totalLiabilities = useMemo(() => liabilities.reduce((s, l) => s + parseFloat(l.balance || "0"), 0), [liabilities]);
@@ -182,7 +185,7 @@ export default function SnapshotPage() {
     assets.filter(a => a.category === "retirement_fund").reduce((s, a) => s + parseFloat(a.value || "0"), 0), [assets]);
   const k401Balance = goal401k ? parseFloat((goal401k as any).currentBalance || "0") : retirementAssets;
   const ssnMonthlyEst = Math.min(totalMonthlyIncome * 0.42, 3822);
-  const retirementAge = (goal401k as any)?.retirementAge ?? 65;
+  const retirementAge = plannerSettings?.retirementAge ?? (goal401k as any)?.retirementAge ?? 65;
   const yearsToRetire = age != null ? Math.max(retirementAge - age, 0) : null;
 
 
