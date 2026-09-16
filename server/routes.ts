@@ -14,6 +14,8 @@ import {
   liabilitiesTypeList,
   retirementAssetProjectionOverrides,
   retirementProjectionEntries,
+  type Retirement401kGoal,
+  type RetirementPlannerSettings,
 } from "@shared/schema";
 import { AI_ADVISOR_LIMITS, AIProviderError, type AdvisorMessage, streamAdvisorCompletion } from "./ai/provider";
 import { scrapeBank, DEFAULT_BANK_CONFIGS, type BankSelectorConfig } from "./scraper";
@@ -176,6 +178,24 @@ function toAdvisorLiabilityContext(items: Array<{
     interestRate: finiteNumber(item.interestRate),
     minimumPayment: finiteNumber(item.minimumPayment),
   }));
+}
+
+function toAdvisorRetirementContext(
+  goal: Retirement401kGoal | undefined,
+  plannerSettings: RetirementPlannerSettings | undefined,
+) {
+  if (!goal && !plannerSettings) return null;
+
+  return {
+    currentAge: goal?.currentAge ?? null,
+    // The Retirement Planner timeline is the authoritative retirement age
+    // used throughout the app, including the AI financial snapshot.
+    retirementAge: plannerSettings?.retirementAge ?? goal?.retirementAge ?? 65,
+    currentBalance: goal ? finiteNumber(goal.currentBalance) : null,
+    annualSalary: goal ? finiteNumber(goal.annualSalary) : null,
+    contributionPct: goal ? finiteNumber(goal.contributionPct) : null,
+    expectedReturn: goal ? finiteNumber(goal.expectedReturn) : null,
+  };
 }
 
 function setAdvisorStreamHeaders(res: Response) {
@@ -704,10 +724,11 @@ export async function registerRoutes(
     if (!scenario) return res.status(400).json({ message: "Please enter a financial question or scenario." });
 
     const userId = (req.user as any).id;
-    const [userAssets, userLiabilities, retirementGoal] = await Promise.all([
+    const [userAssets, userLiabilities, retirementGoal, plannerSettings] = await Promise.all([
       storage.getAssets(userId),
       storage.getLiabilities(userId),
       storage.getRetirement401kGoal(userId),
+      storage.getRetirementPlannerSettings(userId),
     ]);
     const assetContext = toAdvisorAssetContext(userAssets);
     const liabilityContext = toAdvisorLiabilityContext(userLiabilities);
@@ -730,16 +751,7 @@ ${JSON.stringify({
   netWorth: totalAssets - totalLiabilities,
   assets: assetContext,
   liabilities: liabilityContext,
-  retirementGoal: retirementGoal
-    ? {
-      currentAge: retirementGoal.currentAge,
-      retirementAge: retirementGoal.retirementAge,
-      currentBalance: finiteNumber(retirementGoal.currentBalance),
-      annualSalary: finiteNumber(retirementGoal.annualSalary),
-      contributionPct: finiteNumber(retirementGoal.contributionPct),
-      expectedReturn: finiteNumber(retirementGoal.expectedReturn),
-    }
-    : null,
+  retirementGoal: toAdvisorRetirementContext(retirementGoal, plannerSettings),
 })}
 </financial_snapshot>
 
@@ -793,10 +805,11 @@ Compare avalanche, snowball, and a suitable custom approach. Include debt priori
     }
 
     const userId = (req.user as any).id;
-    const [userAssets, userLiabilities, retirementGoal] = await Promise.all([
+    const [userAssets, userLiabilities, retirementGoal, plannerSettings] = await Promise.all([
       storage.getAssets(userId),
       storage.getLiabilities(userId),
       storage.getRetirement401kGoal(userId),
+      storage.getRetirementPlannerSettings(userId),
     ]);
 
     await streamAdvisorResponse(res, [
@@ -812,16 +825,7 @@ Compare avalanche, snowball, and a suitable custom approach. Include debt priori
 ${JSON.stringify({
   assets: toAdvisorAssetContext(userAssets),
   liabilities: toAdvisorLiabilityContext(userLiabilities),
-  retirementGoal: retirementGoal
-    ? {
-      currentAge: retirementGoal.currentAge,
-      retirementAge: retirementGoal.retirementAge,
-      currentBalance: finiteNumber(retirementGoal.currentBalance),
-      annualSalary: finiteNumber(retirementGoal.annualSalary),
-      contributionPct: finiteNumber(retirementGoal.contributionPct),
-      expectedReturn: finiteNumber(retirementGoal.expectedReturn),
-    }
-    : null,
+  retirementGoal: toAdvisorRetirementContext(retirementGoal, plannerSettings),
 })}
 </financial_snapshot>
 
