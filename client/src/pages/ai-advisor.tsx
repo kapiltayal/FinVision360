@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
-  Brain, History, CreditCard, Loader2, Sparkles, Send, Trash2,
+  Brain, History, CreditCard, Loader2, Sparkles, Send, Trash2, RotateCcw,
 } from "lucide-react";
 import { type Asset, type Liability } from "@shared/schema";
 import { getAccessToken } from "@/lib/supabase";
@@ -234,6 +234,16 @@ export default function AIAdvisorPage() {
     setDebtSubmitted({ monthlyBudget: debtBudget, requestId: debtRequestId.current });
   };
 
+  const clearScenario = () => {
+    setScenarioQuery("");
+    setScenarioSubmitted(null);
+  };
+
+  const resetDebtStrategy = () => {
+    setDebtBudget("500");
+    setDebtSubmitted(null);
+  };
+
   const refreshHistory = () => {
     queryClient.invalidateQueries({ queryKey: ["/api/ai/history"] });
   };
@@ -333,12 +343,28 @@ export default function AIAdvisorPage() {
                 <Textarea
                   value={scenarioQuery}
                   onChange={(e) => setScenarioQuery(e.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" && !event.shiftKey) {
+                      event.preventDefault();
+                      handleScenarioSubmit();
+                    }
+                  }}
                   placeholder="Describe a financial scenario or ask a question..."
                   rows={2}
                   className="flex-1"
                   data-testid="input-scenario-query"
                 />
-                <Button onClick={handleScenarioSubmit} className="self-end" data-testid="button-analyze-scenario">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={clearScenario}
+                  disabled={!scenarioQuery && !scenarioSubmitted}
+                  className="self-end"
+                  data-testid="button-clear-scenario"
+                >
+                  <RotateCcw className="mr-2 h-4 w-4" /> Clear
+                </Button>
+                <Button type="button" onClick={handleScenarioSubmit} className="self-end" data-testid="button-analyze-scenario">
                   <Send className="h-4 w-4" />
                 </Button>
               </div>
@@ -375,10 +401,19 @@ export default function AIAdvisorPage() {
                         type="number"
                         value={debtBudget}
                         onChange={(e) => setDebtBudget(e.target.value)}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter") {
+                            event.preventDefault();
+                            handleDebtSubmit();
+                          }
+                        }}
                         data-testid="input-debt-budget"
                         className="max-w-xs"
                       />
-                      <Button onClick={handleDebtSubmit} data-testid="button-analyze-debt">
+                      <Button type="button" variant="outline" onClick={resetDebtStrategy} data-testid="button-reset-debt">
+                        <RotateCcw className="mr-2 h-4 w-4" /> Reset
+                      </Button>
+                      <Button type="button" onClick={handleDebtSubmit} data-testid="button-analyze-debt">
                         <Brain className="h-4 w-4 mr-2" /> Analyze
                       </Button>
                     </div>
