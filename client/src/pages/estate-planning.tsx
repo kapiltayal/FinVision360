@@ -383,30 +383,31 @@ export default function EstatePlanningPage() {
       </div>
 
       {/* ── Section A: Beneficiary Designations ── */}
-      {activeTab === "beneficiaries" && <Card>
-        <CardHeader className="pb-3">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <div className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-md bg-blue-500/10 flex items-center justify-center">
-              <UserCheck className="h-4 w-4 text-blue-500" />
-            </div>
-            <div>
-              <CardTitle className="text-base">Beneficiary Designations</CardTitle>
-              <p className="text-xs text-muted-foreground mt-0.5">Mark which assets have a named beneficiary on file</p>
-            </div>
-            </div>
-            <div className="rounded-lg bg-blue-500/5 px-3 py-2 text-left sm:text-right">
-              <p className="text-xs text-muted-foreground">Asset value covered</p>
-              <p className="text-lg font-semibold leading-tight text-blue-600 dark:text-blue-400">
-                {beneficiaryValueCoverage}%
-              </p>
-              <p className="text-[11px] text-muted-foreground">
-                {formatCurrency(assignedBeneficiaryValue)} of {formatCurrency(totalAssetValue)}
-              </p>
-            </div>
+      {activeTab === "beneficiaries" && <>
+        <div className="mb-3 flex justify-end">
+          <div className="rounded-lg bg-blue-500/5 px-3 py-2 text-left sm:text-right">
+            <p className="text-xs text-muted-foreground">Asset value covered</p>
+            <p className="text-lg font-semibold leading-tight text-blue-600 dark:text-blue-400">
+              {beneficiaryValueCoverage}%
+            </p>
+            <p className="text-[11px] text-muted-foreground">
+              {formatCurrency(assignedBeneficiaryValue)} of {formatCurrency(totalAssetValue)}
+            </p>
           </div>
-        </CardHeader>
-        <CardContent className="pt-0">
+        </div>
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex items-center gap-2">
+              <div className="h-8 w-8 rounded-md bg-blue-500/10 flex items-center justify-center">
+                <UserCheck className="h-4 w-4 text-blue-500" />
+              </div>
+              <div>
+                <CardTitle className="text-base">Beneficiary Designations</CardTitle>
+                <p className="text-xs text-muted-foreground mt-0.5">Mark which assets have a named beneficiary on file</p>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="pt-0">
           {assets.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-6">No assets found. Add assets first to track beneficiary designations.</p>
           ) : (
@@ -655,7 +656,8 @@ export default function EstatePlanningPage() {
             </div>
           )}
         </CardContent>
-      </Card>}
+        </Card>
+      </>}
 
       {/* ── Section B: Estate Planning Documents ── */}
       {activeTab === "documents" && <Card>
@@ -753,8 +755,8 @@ export default function EstatePlanningPage() {
           <p className="text-xs text-muted-foreground mt-3 px-2">
             Click the check icon or document name to toggle its status. Expand an item to learn more. Consult a licensed estate attorney for personalized guidance.
           </p>
-        </CardContent>
-      </Card>}
+          </CardContent>
+        </Card>}
 
       {/* ── Section C: Key Contacts ── */}
       {activeTab === "contacts" && <Card>
