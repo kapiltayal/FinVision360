@@ -37,6 +37,44 @@ const ESTATE_TABS: { key: EstateTab; label: string; icon: typeof UserCheck }[] =
   { key: "contacts", label: "Contacts", icon: Users },
 ];
 
+const ESTATE_DOCUMENT_GUIDANCE: Record<
+  (typeof ESTATE_DOCUMENT_TYPES)[number]["key"],
+  { purpose: string; whenToUse: string }
+> = {
+  will: {
+    purpose: "States how you want assets distributed and can name an executor and guardians for minor children.",
+    whenToUse: "Use it to document your wishes when you have assets, dependents, or specific people and organizations you want to provide for. Review it after major life changes.",
+  },
+  trust: {
+    purpose: "Places assets under the care of a trustee who can manage them during your lifetime and distribute them according to your instructions.",
+    whenToUse: "Consider it when you want continuity if you become incapacitated, more privacy than probate may provide, or a structured transfer of assets. Assets generally need to be titled to the trust.",
+  },
+  poa_financial: {
+    purpose: "Names someone you trust to handle financial and legal matters if you cannot manage them yourself.",
+    whenToUse: "Set it up before an illness or emergency so your agent can help with banking, investments, real estate, and other financial transactions when needed.",
+  },
+  poa_healthcare: {
+    purpose: "Names a healthcare agent to make medical decisions for you when you are unable to make or communicate them.",
+    whenToUse: "Use it to make sure a trusted person can speak with your care team and make decisions that follow your wishes during an accident or serious illness.",
+  },
+  living_will: {
+    purpose: "Records your preferences about life-sustaining treatment and end-of-life care.",
+    whenToUse: "Complete it in advance so your family, healthcare agent, and doctors have guidance if you cannot communicate your treatment preferences.",
+  },
+  hipaa: {
+    purpose: "Authorizes specific people to receive protected health information from your healthcare providers.",
+    whenToUse: "Use it when you want family members or your healthcare agent to be able to discuss your medical information with providers.",
+  },
+  beneficiary_designations: {
+    purpose: "Directs accounts such as retirement plans and life insurance policies to the people or organizations you name.",
+    whenToUse: "Review it after marriage, divorce, births, deaths, or account changes, and make sure the designations match your broader estate plan.",
+  },
+  letter_of_intent: {
+    purpose: "Provides practical, personal instructions about items such as final wishes, pets, digital assets, and sentimental property.",
+    whenToUse: "Use it to communicate details that may not belong in a legal document. Keep it current and accessible to the people helping your family.",
+  },
+};
+
 // ── Contact form ─────────────────────────────────────────────────────────────
 
 function ContactForm({ contact, onClose }: { contact?: EstateContact; onClose: () => void }) {
@@ -126,6 +164,7 @@ export default function EstatePlanningPage() {
   const [editingContact, setEditingContact] = useState<EstateContact | undefined>();
   const [expandedAsset, setExpandedAsset] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState<EstateTab>("beneficiaries");
+  const [expandedDocuments, setExpandedDocuments] = useState<Record<string, boolean>>({});
   // Local beneficiary edits are only committed when the user clicks Save.
   const [benEdits, setBenEdits] = useState<Record<number, BeneficiaryDraft[]>>({});
 
@@ -615,39 +654,81 @@ export default function EstatePlanningPage() {
             {ESTATE_DOCUMENT_TYPES.map((doc) => {
               const record = documentMap.get(doc.key);
               const isComplete = record?.isComplete ?? false;
+              const guidance = ESTATE_DOCUMENT_GUIDANCE[doc.key];
+              const isExpanded = expandedDocuments[doc.key] ?? false;
 
               return (
-                <button
+                <div
                   key={doc.key}
-                  type="button"
-                  className="w-full flex items-center gap-3 py-3 px-2 rounded-lg hover:bg-muted/50 transition-colors cursor-pointer text-left"
-                  data-testid={`doc-row-${doc.key}`}
-                  onClick={() =>
-                    toggleDocumentMutation.mutate({
-                      documentType: doc.key,
-                      isComplete: !isComplete,
-                      notes: record?.notes ?? null,
-                    })
-                  }
+                  className="rounded-lg hover:bg-muted/50 transition-colors"
                 >
-                  {isComplete
-                    ? <CheckCircle2 className="h-5 w-5 text-emerald-500 shrink-0" />
-                    : <Circle className="h-5 w-5 text-muted-foreground/40 shrink-0" />
-                  }
-                  <span className={`text-sm flex-1 ${isComplete ? "line-through text-muted-foreground" : ""}`}>
-                    {doc.label}
-                  </span>
-                  {isComplete && (
-                    <Badge variant="outline" className="text-[10px] text-emerald-600 border-emerald-200 bg-emerald-50 dark:bg-emerald-950/20 dark:border-emerald-800 shrink-0">
-                      Done
-                    </Badge>
+                  <div className="flex items-center gap-2 px-2">
+                    <button
+                      type="button"
+                      className="flex flex-1 items-center gap-3 py-3 text-left"
+                      data-testid={`doc-row-${doc.key}`}
+                      onClick={() =>
+                        toggleDocumentMutation.mutate({
+                          documentType: doc.key,
+                          isComplete: !isComplete,
+                          notes: record?.notes ?? null,
+                        })
+                      }
+                    >
+                      {isComplete
+                        ? <CheckCircle2 className="h-5 w-5 text-emerald-500 shrink-0" />
+                        : <Circle className="h-5 w-5 text-muted-foreground/40 shrink-0" />
+                      }
+                      <span className={`text-sm flex-1 ${isComplete ? "line-through text-muted-foreground" : ""}`}>
+                        {doc.label}
+                      </span>
+                      {isComplete && (
+                        <Badge variant="outline" className="text-[10px] text-emerald-600 border-emerald-200 bg-emerald-50 dark:bg-emerald-950/20 dark:border-emerald-800 shrink-0">
+                          Done
+                        </Badge>
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      className="p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      aria-expanded={isExpanded}
+                      aria-controls={`document-guidance-${doc.key}`}
+                      aria-label={`${isExpanded ? "Collapse" : "Expand"} guidance for ${doc.label}`}
+                      data-testid={`button-expand-document-${doc.key}`}
+                      onClick={() =>
+                        setExpandedDocuments((current) => ({
+                          ...current,
+                          [doc.key]: !isExpanded,
+                        }))
+                      }
+                    >
+                      {isExpanded
+                        ? <ChevronDown className="h-4 w-4" />
+                        : <ChevronRight className="h-4 w-4" />
+                      }
+                    </button>
+                  </div>
+                  {isExpanded && (
+                    <div
+                      id={`document-guidance-${doc.key}`}
+                      className="ml-10 mr-10 mb-3 rounded-md border border-emerald-200/70 bg-emerald-50/50 px-3 py-2.5 text-xs leading-relaxed dark:border-emerald-900/60 dark:bg-emerald-950/20"
+                    >
+                      <p>
+                        <span className="font-semibold text-foreground">Purpose: </span>
+                        <span className="text-muted-foreground">{guidance.purpose}</span>
+                      </p>
+                      <p className="mt-1.5">
+                        <span className="font-semibold text-foreground">When to use: </span>
+                        <span className="text-muted-foreground">{guidance.whenToUse}</span>
+                      </p>
+                    </div>
                   )}
-                </button>
+                </div>
               );
             })}
           </div>
           <p className="text-xs text-muted-foreground mt-3 px-2">
-            Click any item to toggle its status. Consult a licensed estate attorney for personalized guidance.
+            Click the check icon or document name to toggle its status. Expand an item to learn more. Consult a licensed estate attorney for personalized guidance.
           </p>
         </CardContent>
       </Card>}
