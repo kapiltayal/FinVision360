@@ -445,8 +445,12 @@ export default function EstatePlanningPage() {
                             categoryAssets.map((asset) => {
                               const ben = beneficiaryMap.get(asset.id);
                               const hasBen = ben?.hasBeneficiary ?? false;
+                              const hasStoredBeneficiaryData = hasBen ||
+                                Boolean(ben?.beneficiaryName) ||
+                                Boolean(ben?.beneficiaries?.length);
                               const isExpanded = expandedAsset === asset.id;
                               const localEdit = benEdits[asset.id];
+                              const isRemovingAll = !(localEdit || []).length && hasStoredBeneficiaryData;
 
                               return (
                                 <Fragment key={asset.id}>
@@ -600,7 +604,7 @@ export default function EstatePlanningPage() {
                                                 Enter a name and valid allocation for every row. Allocations must total exactly 100%.
                                               </p>
                                             )}
-                                            {hasBen && !(localEdit || []).length && (
+                                            {isRemovingAll && (
                                               <p className="text-xs text-muted-foreground">
                                                 Saving now will remove all beneficiaries and mark this asset as unassigned.
                                               </p>
@@ -624,13 +628,13 @@ export default function EstatePlanningPage() {
                                               onClick={() =>
                                                 saveBenDetailsMutation.mutate({
                                                   assetId: asset.id,
-                                                  hasBeneficiary: hasBen && !(localEdit || []).length ? false : true,
-                                                  beneficiaries: hasBen && !(localEdit || []).length ? [] : draftsToPayload(localEdit || []),
+                                                  hasBeneficiary: isRemovingAll ? false : true,
+                                                  beneficiaries: isRemovingAll ? [] : draftsToPayload(localEdit || []),
                                                 })
                                               }
                                               disabled={
                                                 saveBenDetailsMutation.isPending ||
-                                                (!(localEdit || []).length && !hasBen) ||
+                                                (!(localEdit || []).length && !hasStoredBeneficiaryData) ||
                                                 ((localEdit || []).length > 0 && (
                                                   (localEdit || []).some((draft) =>
                                                     !draft.name.trim() ||
@@ -643,13 +647,13 @@ export default function EstatePlanningPage() {
                                               }
                                               data-testid={`button-save-beneficiary-${asset.id}`}
                                             >
-                                              {hasBen && !(localEdit || []).length
+                                              {isRemovingAll
                                                 ? <Trash2 className="h-3.5 w-3.5 mr-1.5" />
                                                 : <Save className="h-3.5 w-3.5 mr-1.5" />
                                               }
                                               {saveBenDetailsMutation.isPending
                                                 ? "Saving..."
-                                                : hasBen && !(localEdit || []).length
+                                                : isRemovingAll
                                                   ? "Remove All & Unassign"
                                                   : "Save & Assign"}
                                             </Button>
