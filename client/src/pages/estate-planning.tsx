@@ -384,13 +384,16 @@ export default function EstatePlanningPage() {
 
       {/* ── Section A: Beneficiary Designations ── */}
       {activeTab === "beneficiaries" && <>
-        <p className="mb-3 text-sm text-muted-foreground">
-          Asset value covered:{" "}
-          <span className="font-semibold text-blue-600 dark:text-blue-400">{beneficiaryValueCoverage}%</span>
-          <span className="ml-1 text-xs">
-            ({formatCurrency(assignedBeneficiaryValue)} of {formatCurrency(totalAssetValue)})
+        <div className="mb-4 flex flex-wrap items-center gap-x-2 gap-y-1 border-l-2 border-blue-500/60 pl-3">
+          <UserCheck className="h-4 w-4 shrink-0 text-blue-500" aria-hidden="true" />
+          <span className="text-sm font-medium text-foreground">Beneficiary coverage</span>
+          <span className="text-sm font-bold tabular-nums text-blue-600 dark:text-blue-400">
+            {beneficiaryValueCoverage}%
           </span>
-        </p>
+          <span className="text-xs text-muted-foreground">
+            ({formatCurrency(assignedBeneficiaryValue)} of {formatCurrency(totalAssetValue)} in total assets)
+          </span>
+        </div>
         <Card>
           <CardHeader className="pb-3">
             <div className="flex items-center gap-2">
