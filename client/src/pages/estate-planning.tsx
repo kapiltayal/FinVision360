@@ -323,7 +323,11 @@ export default function EstatePlanningPage() {
                 <span className={`ml-1 text-xs px-1.5 py-0.5 rounded-full ${
                   activeTab === tab.key ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
                 }`}>
-                  {tab.key === "documents" ? `${count}/${ESTATE_DOCUMENT_TYPES.length}` : count}
+                  {tab.key === "documents"
+                    ? `${count}/${ESTATE_DOCUMENT_TYPES.length}`
+                    : tab.key === "beneficiaries"
+                      ? `${count}/${assets.length}`
+                      : count}
                 </span>
               </button>
             );
