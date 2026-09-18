@@ -22,6 +22,7 @@ import {
   ESTATE_DOCUMENT_TYPES, ESTATE_CONTACT_ROLES,
 } from "@shared/schema";
 import { type BookCategory, categoryLabel, groupedBookEntries } from "@/lib/book-categories";
+import { formatCurrency } from "@/lib/format";
 
 type BeneficiaryDraft = {
   name: string;
@@ -189,6 +190,13 @@ export default function EstatePlanningPage() {
 
   const docsComplete = ESTATE_DOCUMENT_TYPES.filter((d) => documentMap.get(d.key)?.isComplete).length;
   const assetsWithBeneficiary = beneficiaries.filter((b) => b.hasBeneficiary).length;
+  const totalAssetValue = assets.reduce((sum, asset) => sum + Number(asset.value || 0), 0);
+  const assignedBeneficiaryValue = assets.reduce((sum, asset) => {
+    return sum + (beneficiaryMap.get(asset.id)?.hasBeneficiary ? Number(asset.value || 0) : 0);
+  }, 0);
+  const beneficiaryValueCoverage = totalAssetValue > 0
+    ? Math.round((assignedBeneficiaryValue / totalAssetValue) * 100)
+    : 0;
 
   // ── Beneficiary toggle (hasBeneficiary on/off) — optimistic ───────────────
   const toggleBeneficiaryMutation = useMutation({
@@ -377,13 +385,24 @@ export default function EstatePlanningPage() {
       {/* ── Section A: Beneficiary Designations ── */}
       {activeTab === "beneficiaries" && <Card>
         <CardHeader className="pb-3">
-          <div className="flex items-center gap-2">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="flex items-center gap-2">
             <div className="h-8 w-8 rounded-md bg-blue-500/10 flex items-center justify-center">
               <UserCheck className="h-4 w-4 text-blue-500" />
             </div>
             <div>
               <CardTitle className="text-base">Beneficiary Designations</CardTitle>
               <p className="text-xs text-muted-foreground mt-0.5">Mark which assets have a named beneficiary on file</p>
+            </div>
+            </div>
+            <div className="rounded-lg bg-blue-500/5 px-3 py-2 text-left sm:text-right">
+              <p className="text-xs text-muted-foreground">Asset value covered</p>
+              <p className="text-lg font-semibold leading-tight text-blue-600 dark:text-blue-400">
+                {beneficiaryValueCoverage}%
+              </p>
+              <p className="text-[11px] text-muted-foreground">
+                {formatCurrency(assignedBeneficiaryValue)} of {formatCurrency(totalAssetValue)}
+              </p>
             </div>
           </div>
         </CardHeader>
@@ -408,11 +427,12 @@ export default function EstatePlanningPage() {
                       </div>
                     </div>
                     <div className="overflow-x-auto">
-                      <table className="w-full min-w-[720px] text-sm" data-testid={`table-beneficiaries-${parentCategory}`}>
+                      <table className="w-full min-w-[800px] text-sm" data-testid={`table-beneficiaries-${parentCategory}`}>
                         <thead className="border-b bg-muted/50">
                           <tr className="text-left">
                             <th scope="col" className="px-5 py-3 font-medium">Category</th>
                             <th scope="col" className="px-5 py-3 font-medium">Account</th>
+                            <th scope="col" className="px-5 py-3 font-medium">Account Value</th>
                             <th scope="col" className="px-5 py-3 font-medium">Beneficiary</th>
                             <th scope="col" className="px-5 py-3 font-medium">Status</th>
                             <th scope="col" className="px-5 py-3 text-center font-medium">Assign</th>
@@ -436,6 +456,9 @@ export default function EstatePlanningPage() {
                                       {asset.institution && (
                                         <p className="text-xs text-muted-foreground">{asset.institution}</p>
                                       )}
+                                    </td>
+                                    <td className="whitespace-nowrap px-5 py-3 font-medium tabular-nums">
+                                      {formatCurrency(asset.value)}
                                     </td>
                                     <td className="max-w-56 px-5 py-3 text-muted-foreground">
                                       <span className="block truncate">
