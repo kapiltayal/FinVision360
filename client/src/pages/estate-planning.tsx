@@ -593,10 +593,16 @@ export default function EstatePlanningPage() {
                                                 </div>
                                               ))}
                                             </div>
-                                            {((localEdit || []).some((draft) => !draft.name.trim() || !Number.isFinite(Number(draft.percentage)) || Number(draft.percentage) <= 0 || Number(draft.percentage) > 100) ||
-                                              Math.abs((localEdit || []).reduce((sum, draft) => sum + (Number(draft.percentage) || 0), 0) - 100) > 0.001) && (
+                                            {(localEdit || []).length > 0 &&
+                                              ((localEdit || []).some((draft) => !draft.name.trim() || !Number.isFinite(Number(draft.percentage)) || Number(draft.percentage) <= 0 || Number(draft.percentage) > 100) ||
+                                                Math.abs((localEdit || []).reduce((sum, draft) => sum + (Number(draft.percentage) || 0), 0) - 100) > 0.001) && (
                                               <p className="text-xs text-amber-600">
                                                 Enter a name and valid allocation for every row. Allocations must total exactly 100%.
+                                              </p>
+                                            )}
+                                            {hasBen && !(localEdit || []).length && (
+                                              <p className="text-xs text-muted-foreground">
+                                                Saving now will remove all beneficiaries and mark this asset as unassigned.
                                               </p>
                                             )}
                                             <Button
@@ -618,25 +624,34 @@ export default function EstatePlanningPage() {
                                               onClick={() =>
                                                 saveBenDetailsMutation.mutate({
                                                   assetId: asset.id,
-                                                  hasBeneficiary: true,
-                                                  beneficiaries: draftsToPayload(localEdit || []),
+                                                  hasBeneficiary: hasBen && !(localEdit || []).length ? false : true,
+                                                  beneficiaries: hasBen && !(localEdit || []).length ? [] : draftsToPayload(localEdit || []),
                                                 })
                                               }
                                               disabled={
                                                 saveBenDetailsMutation.isPending ||
-                                                !(localEdit || []).length ||
-                                                (localEdit || []).some((draft) =>
-                                                  !draft.name.trim() ||
-                                                  !Number.isFinite(Number(draft.percentage)) ||
-                                                  Number(draft.percentage) <= 0 ||
-                                                  Number(draft.percentage) > 100
-                                                ) ||
-                                                Math.abs((localEdit || []).reduce((sum, draft) => sum + (Number(draft.percentage) || 0), 0) - 100) > 0.001
+                                                (!(localEdit || []).length && !hasBen) ||
+                                                ((localEdit || []).length > 0 && (
+                                                  (localEdit || []).some((draft) =>
+                                                    !draft.name.trim() ||
+                                                    !Number.isFinite(Number(draft.percentage)) ||
+                                                    Number(draft.percentage) <= 0 ||
+                                                    Number(draft.percentage) > 100
+                                                  ) ||
+                                                  Math.abs((localEdit || []).reduce((sum, draft) => sum + (Number(draft.percentage) || 0), 0) - 100) > 0.001
+                                                ))
                                               }
                                               data-testid={`button-save-beneficiary-${asset.id}`}
                                             >
-                                              <Save className="h-3.5 w-3.5 mr-1.5" />
-                                              {saveBenDetailsMutation.isPending ? "Saving..." : "Save & Assign"}
+                                              {hasBen && !(localEdit || []).length
+                                                ? <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+                                                : <Save className="h-3.5 w-3.5 mr-1.5" />
+                                              }
+                                              {saveBenDetailsMutation.isPending
+                                                ? "Saving..."
+                                                : hasBen && !(localEdit || []).length
+                                                  ? "Remove All & Unassign"
+                                                  : "Save & Assign"}
                                             </Button>
                                           </div>
                                         </div>
