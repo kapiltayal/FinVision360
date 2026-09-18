@@ -509,6 +509,12 @@ export class DatabaseStorage implements IStorage {
           "UPDATE estate_beneficiaries SET beneficiary_name = NULL, notes = NULL WHERE id = $1",
           [designationRecord.id],
         );
+      } else {
+        await client.query("DELETE FROM estate_beneficiary_entries WHERE designation_id = $1", [designationRecord.id]);
+        await client.query(
+          "UPDATE estate_beneficiaries SET beneficiary_name = NULL, notes = NULL WHERE id = $1",
+          [designationRecord.id],
+        );
       }
 
       await client.query("COMMIT");
