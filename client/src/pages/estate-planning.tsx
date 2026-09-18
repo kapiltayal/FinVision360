@@ -235,8 +235,9 @@ export default function EstatePlanningPage() {
   const saveBenDetailsMutation = useMutation({
     mutationFn: (data: { assetId: number; hasBeneficiary: boolean; beneficiaries: Array<{ name: string; percentage: number; notes: string | null }> }) =>
       apiRequest("PUT", "/api/estate/beneficiaries", data),
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       qc.invalidateQueries({ queryKey: ["/api/estate/beneficiaries"] });
+      setExpandedAsset((current) => current === variables.assetId ? null : current);
       toast({ title: "Beneficiaries saved" });
     },
     onError: (e: any) => toast({ title: "Failed to save", description: e.message, variant: "destructive" }),
