@@ -672,7 +672,7 @@ export default function SettingsPage() {
               <CardContent className="pt-5">
                 <div className="max-w-md space-y-1.5">
                   <Label htmlFor="aiAdvisorName" className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                    AI Lab Name
+                    AI Lab Assistant Name
                   </Label>
                   <Input
                     id="aiAdvisorName"
