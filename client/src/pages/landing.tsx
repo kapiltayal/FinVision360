@@ -495,7 +495,7 @@ export default function LandingPage() {
         </h1>
         <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto mb-8 leading-relaxed">
           Master your day-to-day finances, grow your savings, plan for retirement, and get
-          AI-powered guidance — all in one place.
+          AI-powered insight — all in one place.
         </p>
         {user ? (
           <Link href="/snapshot" className="inline-block">
