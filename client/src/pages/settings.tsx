@@ -665,14 +665,14 @@ export default function SettingsPage() {
 
             <Card>
               <CardHeader className="pb-4">
-                <CardTitle className="text-base">AI Advisor Settings</CardTitle>
-                <CardDescription>Customize the name shown throughout your AI Advisor experience</CardDescription>
+                <CardTitle className="text-base">AI Lab Settings</CardTitle>
+                <CardDescription>Customize the name shown throughout your AI Lab experience</CardDescription>
               </CardHeader>
               <Separator />
               <CardContent className="pt-5">
                 <div className="max-w-md space-y-1.5">
                   <Label htmlFor="aiAdvisorName" className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                    AI Advisor Name
+                    AI Lab Name
                   </Label>
                   <Input
                     id="aiAdvisorName"

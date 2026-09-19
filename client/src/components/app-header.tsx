@@ -34,7 +34,7 @@ const baseNavItems = [
   { title: "Retirement", url: "/retirement", icon: Landmark },
   { title: "Insurance", url: "/insurance", icon: ShieldCheck },
   { title: "Estate & Legacy", url: "/estate-planning", icon: ScrollText },
-  { title: "AI Advisor", url: "/ai-advisor", icon: Brain },
+  { title: "AI Lab", url: "/ai-advisor", icon: Brain },
 ];
 
 const adminNavItems = [

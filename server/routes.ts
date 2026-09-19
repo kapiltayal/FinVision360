@@ -889,7 +889,7 @@ Include a year-by-year overview, useful milestones, a conservative/base/optimist
       res.json({ deleted: rowCount ?? 0 });
     } catch (error) {
       console.error("AI history clear error:", error);
-      res.status(500).json({ message: "Failed to clear AI advisor archives" });
+      res.status(500).json({ message: "Failed to clear AI Lab archives" });
     }
   });
 
@@ -1159,7 +1159,7 @@ Include a year-by-year overview, useful milestones, a conservative/base/optimist
       ? req.body.aiAdvisorName.trim()
       : "Whizzy";
     if (!aiAdvisorName || aiAdvisorName.length > 20) {
-      return res.status(400).json({ message: "AI Advisor name must be between 1 and 20 characters." });
+      return res.status(400).json({ message: "AI Lab name must be between 1 and 20 characters." });
     }
     const settings = await storage.upsertRecommendationSettings({ userId, ...req.body, aiAdvisorName });
     res.json(settings);

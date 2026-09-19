@@ -78,7 +78,7 @@ export default function AboutPage() {
             {
               icon: Brain,
               title: "AI-Powered Guidance",
-              desc: "Our AI Advisor understands your full financial picture and gives you personalized strategies for debt payoff, retirement planning, and net worth growth.",
+              desc: "Our AI Lab understands your full financial picture and gives you personalized strategies for debt payoff, retirement planning, and net worth growth.",
             },
             {
               icon: ShieldCheck,

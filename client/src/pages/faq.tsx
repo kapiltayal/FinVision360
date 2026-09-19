@@ -60,19 +60,19 @@ const faqs = [
     ],
   },
   {
-    category: "AI Advisor",
+    category: "AI Lab",
     items: [
       {
-        q: "What can the AI Advisor help me with?",
-        a: "The AI Advisor can analyze your full financial picture and help with: debt payoff strategies (avalanche vs. snowball method), net worth forecasting over 10+ years, scenario analysis (e.g., 'What if I increase my monthly savings by $500?'), and open-ended financial questions.",
+        q: "What can the AI Lab help me with?",
+        a: "The AI Lab can analyze your full financial picture and help with: debt payoff strategies (avalanche vs. snowball method), net worth forecasting over 10+ years, scenario analysis (e.g., 'What if I increase my monthly savings by $500?'), and open-ended financial questions.",
       },
       {
-        q: "Is the AI Advisor advice I should act on?",
-        a: "The AI Advisor provides educational and organizational insights based on the data you've entered. It is not a licensed financial advisor. You should always consult a qualified financial professional before making significant financial decisions. See our Terms and Conditions for full details.",
+        q: "Is the AI Lab advice I should act on?",
+        a: "The AI Lab provides educational and organizational insights based on the data you've entered. It is not a licensed financial advisor. You should always consult a qualified financial professional before making significant financial decisions. See our Terms and Conditions for full details.",
       },
       {
         q: "Does the AI see all my financial data?",
-        a: "When you use the AI Advisor, a summary of your assets, liabilities, and financial profile is sent to OpenAI's API to generate your personalized response. Your name and email are not included in that request. See our Privacy Policy for more details.",
+        a: "When you use the AI Lab, a summary of your assets, liabilities, and financial profile is sent to OpenAI's API to generate your personalized response. Your name and email are not included in that request. See our Privacy Policy for more details.",
       },
     ],
   },
@@ -141,7 +141,7 @@ function FAQItem({ question, answer }: { question: string; answer: string }) {
 export default function FAQPage() {
   useSEO({
     title: "FAQ — Frequently Asked Questions | FinVision360",
-    description: "Find answers about FinVision360: how to track net worth, use the AI advisor, plan retirement, manage debt, and keep your financial data secure. Personal finance help from Tooothy LLC.",
+    description: "Find answers about FinVision360: how to track net worth, use the AI Lab, plan retirement, manage debt, and keep your financial data secure. Personal finance help from Tooothy LLC.",
     canonical: "https://finvision360.com/faq",
   });
   useJsonLd({

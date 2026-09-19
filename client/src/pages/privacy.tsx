@@ -58,7 +58,7 @@ export default function PrivacyPage() {
 
         <Section title="3. AI Features and Third-Party Services">
           <p>
-            FinVision360 uses OpenAI's API to power its AI Advisor features (debt strategy, net worth forecasting, and
+            FinVision360 uses OpenAI's API to power its AI Lab features (debt strategy, net worth forecasting, and
             scenario analysis). When you use these features, a summary of your financial data is transmitted to OpenAI's
             servers to generate responses. This data is subject to{" "}
             <a href="https://openai.com/policies/privacy-policy" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground">

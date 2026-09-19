@@ -33,7 +33,7 @@ const baseNavItems = [
   { title: "Assets", url: "/assets", icon: Wallet },
   { title: "Liabilities", url: "/liabilities", icon: CreditCard },
   { title: "Retirement", url: "/retirement", icon: Target },
-  { title: "AI Advisor", url: "/ai-advisor", icon: Brain },
+  { title: "AI Lab", url: "/ai-advisor", icon: Brain },
   { title: "Settings", url: "/settings", icon: Settings },
 ];
 
