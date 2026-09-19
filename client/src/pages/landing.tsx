@@ -487,7 +487,7 @@ export default function LandingPage() {
       <section className="max-w-6xl mx-auto px-4 pt-20 pb-24 text-center">
         <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary mb-6">
           <Brain className="h-3 w-3" />
-          AI-Powered Personal Finance
+          AI-Powered Personal Financial Intelligence
         </div>
         <h1 className="text-4xl md:text-6xl font-bold tracking-tight mb-5 leading-tight">
           Your Personal CFO <br />
