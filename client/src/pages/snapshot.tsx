@@ -657,7 +657,7 @@ export default function SnapshotPage() {
         </SnapshotCard>
 
         {/* ── Recommendations ── */}
-        <SnapshotCard title="Financial Recommendations" accent="#6366f1" icon={Lightbulb} className="md:col-span-3">
+        <SnapshotCard title="Financial Opportunities" accent="#6366f1" icon={Lightbulb} className="md:col-span-3">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {recommendationGroups.map((group) => {
               const groupRecommendations = recommendations.filter((rec) => rec.group === group.key);
