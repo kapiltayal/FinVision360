@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ChevronDown, Pencil, Plus, RotateCcw, Trash2 } from "lucide-react";
+import { ChevronDown, Info, Pencil, Plus, RotateCcw, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -51,6 +51,14 @@ export type RetirementProjection = {
   projectedLiabilityTotal: number;
   assets: RetirementProjectionAsset[];
   liabilities: RetirementProjectionLiability[];
+  assumptions: RetirementProjectionAssumption[];
+};
+
+export type RetirementProjectionAssumption = {
+  kind: "asset" | "liability";
+  name: string;
+  missingData: string[];
+  handling: string[];
 };
 
 export type ProjectionEntryInput = {
@@ -310,6 +318,68 @@ function ProjectionGroup({
   );
 }
 
+function AssumptionsCallouts({ assumptions }: { assumptions: RetirementProjectionAssumption[] }) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <section className="overflow-hidden rounded-xl border border-amber-200/80 dark:border-amber-900" data-testid="section-retirement-assumptions">
+      <button
+        type="button"
+        className="flex w-full items-center justify-between gap-3 bg-amber-50/70 px-4 py-3 text-left hover:bg-amber-100/70 dark:bg-amber-950/20 dark:hover:bg-amber-950/35"
+        onClick={() => setOpen((current) => !current)}
+        aria-expanded={open}
+      >
+        <span className="flex min-w-0 items-center gap-2">
+          <ChevronDown className={`h-4 w-4 shrink-0 transition-transform ${open ? "rotate-180" : ""}`} />
+          <Info className="h-4 w-4 shrink-0 text-amber-700 dark:text-amber-300" />
+          <span className="font-semibold">Assumptions &amp; Callouts</span>
+        </span>
+        <span className="shrink-0 text-xs text-muted-foreground">
+          {assumptions.length === 0
+            ? "No missing inputs"
+            : `${assumptions.length} ${assumptions.length === 1 ? "callout" : "callouts"}`}
+        </span>
+      </button>
+      {open && (
+        <div className="space-y-3 border-t bg-background p-4">
+          {assumptions.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              No missing asset or liability inputs were detected. Projection-only rows use the retirement values you entered.
+            </p>
+          ) : assumptions.map((assumption, index) => (
+            <div key={`${assumption.kind}-${assumption.name}-${index}`} className="rounded-lg border bg-muted/20 p-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
+                  assumption.kind === "asset"
+                    ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+                    : "bg-rose-500/10 text-rose-700 dark:text-rose-300"
+                }`}>
+                  {assumption.kind}
+                </span>
+                <p className="text-sm font-semibold">{assumption.name}</p>
+              </div>
+              <div className="mt-3 grid gap-3 text-xs sm:grid-cols-2">
+                <div>
+                  <p className="font-semibold text-foreground">Missing data</p>
+                  <ul className="mt-1 list-disc space-y-1 pl-4 text-muted-foreground">
+                    {assumption.missingData.map((item) => <li key={item}>{item}</li>)}
+                  </ul>
+                </div>
+                <div>
+                  <p className="font-semibold text-foreground">How it is handled</p>
+                  <ul className="mt-1 list-disc space-y-1 pl-4 text-muted-foreground">
+                    {assumption.handling.map((item, itemIndex) => <li key={`${item}-${itemIndex}`}>{item}</li>)}
+                  </ul>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
 function EntryDialog({
   open,
   onOpenChange,
@@ -438,6 +508,7 @@ export function RetirementNetWorthProjection({
         <ProjectionGroup kind="asset" entries={projection.assets} actions={wrappedActions} onAdd={() => openAdd("asset")} />
         <ProjectionGroup kind="liability" entries={projection.liabilities} actions={wrappedActions} onAdd={() => openAdd("liability")} />
       </div>
+      <AssumptionsCallouts assumptions={projection.assumptions ?? []} />
       {dialogKind && (
         <EntryDialog
           open

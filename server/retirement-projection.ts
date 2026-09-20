@@ -79,6 +79,13 @@ type ProjectedLiability = {
   isProjectionOnly: boolean;
 };
 
+type ProjectionAssumption = {
+  kind: "asset" | "liability";
+  name: string;
+  missingData: string[];
+  handling: string[];
+};
+
 function numberValue(value: string | number | null | undefined): number {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : 0;
@@ -132,17 +139,41 @@ export function buildRetirementNetWorthProjection(input: {
     row.assetId,
     Math.min(30, Math.max(0, numberValue(row.rateOfReturn))),
   ]));
+  const assumptions: ProjectionAssumption[] = [];
 
   const projectedAssets: ProjectedAsset[] = input.assets.map((asset) => {
     const type = assetTypeByCategory.get(asset.category);
     const accountRate = asset.interestRate === null ? null : numberValue(asset.interestRate);
     const overrideRate = overrideByAsset.get(asset.id);
     const hasOverride = overrideRate !== undefined;
-    const hasAccountRate = accountRate !== null && accountRate !== 0;
+    const hasAccountRate = asset.interestRate !== null
+      && asset.interestRate !== ""
+      && Number.isFinite(Number(asset.interestRate))
+      && accountRate !== 0;
     const typeRate = type ? numberValue(type.rateOfReturn) * 100 : 0;
-    const returnRate = Math.min(30, Math.max(0, hasOverride ? overrideRate : hasAccountRate ? accountRate : typeRate));
+    const returnRate = Math.min(30, Math.max(0, hasOverride ? overrideRate : hasAccountRate ? accountRate ?? 0 : typeRate));
     const currentValue = numberValue(asset.value);
     const projectedValue = currentValue * Math.pow(1 + returnRate / 100, yearsToRetirement);
+    const missingData: string[] = [];
+    const handling: string[] = [];
+
+    if (asset.value === null || asset.value === "" || !Number.isFinite(Number(asset.value))) {
+      missingData.push("Current account value");
+      handling.push("Treats the missing value as $0 before applying the projection rate.");
+    }
+    if (input.currentAge === null) {
+      missingData.push("Date of birth/current age");
+      handling.push("Uses 0 years to retirement, so the starting value is not grown.");
+    }
+    if (!hasOverride && !hasAccountRate) {
+      missingData.push("Account return rate");
+      handling.push(type
+        ? `Uses the ${type.subCategory} default return of ${typeRate.toFixed(1)}%.`
+        : "No asset-type default is available, so the projection uses a 0.0% return.");
+    }
+    if (missingData.length > 0) {
+      assumptions.push({ kind: "asset", name: asset.name, missingData, handling });
+    }
 
     return {
       id: asset.id,
@@ -165,10 +196,21 @@ export function buildRetirementNetWorthProjection(input: {
     const parentCategory = type?.parentCategory || "Uncategorized";
     const closedEnd = parentCategory !== "Revolving Credit";
     const currentBalance = numberValue(liability.balance);
-    const interestRateAvailable = liability.interestRate !== null && Number.isFinite(Number(liability.interestRate));
+    const interestRateAvailable = liability.interestRate !== null
+      && liability.interestRate !== ""
+      && Number.isFinite(Number(liability.interestRate));
     const interestRate = interestRateAvailable ? numberValue(liability.interestRate) : 0;
     const minimumPayment = numberValue(liability.minimumPayment);
     const maturityDate = liability.maturityDate;
+    const hasCurrentBalance = liability.balance !== null
+      && liability.balance !== ""
+      && Number.isFinite(Number(liability.balance));
+    const hasMinimumPayment = liability.minimumPayment !== null
+      && liability.minimumPayment !== ""
+      && Number.isFinite(Number(liability.minimumPayment))
+      && minimumPayment > 0;
+    const missingData: string[] = [];
+    const handling: string[] = [];
     let projectedBalance = currentBalance;
     let status: "paid-off" | "remaining" | "unknown" = currentBalance <= 0 ? "paid-off" : "remaining";
     let message: string | null = null;
@@ -204,6 +246,33 @@ export function buildRetirementNetWorthProjection(input: {
           ? "Expected to be paid off before retirement."
           : "Projected from the current balance, interest rate, and monthly payment.";
       }
+    }
+
+    if (!hasCurrentBalance) {
+      missingData.push("Current balance");
+      handling.push("Treats the missing balance as $0.");
+    }
+    if (input.currentAge === null) {
+      missingData.push("Date of birth/current age");
+      handling.push("Uses 0 years to retirement and carries the current balance forward.");
+    }
+    if (currentBalance > 0 && !interestRateAvailable) {
+      missingData.push("Interest rate");
+    }
+    if (currentBalance > 0 && !hasMinimumPayment) {
+      missingData.push("Minimum monthly payment");
+    }
+    if (closedEnd && !maturityDate) {
+      missingData.push("Maturity date");
+      handling.push("No scheduled maturity payoff is applied; the available payment data is used through retirement.");
+    }
+    if (!type) {
+      missingData.push("Recognized liability category");
+      handling.push("Uses the Uncategorized/closed-end fallback for payoff logic.");
+    }
+    if (missingData.length > 0) {
+      if (message) handling.push(message);
+      assumptions.push({ kind: "liability", name: liability.name, missingData, handling });
     }
 
     return {
@@ -274,5 +343,6 @@ export function buildRetirementNetWorthProjection(input: {
     projectedLiabilityTotal,
     assets: projectedAssets,
     liabilities: projectedLiabilities,
+    assumptions,
   };
 }
