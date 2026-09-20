@@ -348,17 +348,17 @@ function AssumptionsCallouts({ assumptions }: { assumptions: RetirementProjectio
             </p>
           ) : assumptions.map((assumption, index) => (
             <div key={`${assumption.kind}-${assumption.name}-${index}`} className="rounded-lg border bg-muted/20 p-3">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
-                  assumption.kind === "asset"
-                    ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
-                    : "bg-rose-500/10 text-rose-700 dark:text-rose-300"
-                }`}>
-                  {assumption.kind}
-                </span>
-                <p className="text-sm font-semibold">{assumption.name}</p>
-              </div>
-              <div className="mt-3 grid gap-3 text-xs sm:grid-cols-2">
+              <div className="grid gap-3 text-xs sm:grid-cols-[minmax(10rem,0.8fr)_minmax(0,1fr)_minmax(0,1.35fr)] sm:items-start">
+                <div className="flex min-w-0 flex-wrap items-center gap-2">
+                  <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
+                    assumption.kind === "asset"
+                      ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+                      : "bg-rose-500/10 text-rose-700 dark:text-rose-300"
+                  }`}>
+                    {assumption.kind}
+                  </span>
+                  <p className="min-w-0 text-sm font-semibold">{assumption.name}</p>
+                </div>
                 <div>
                   <p className="font-semibold text-foreground">Missing data</p>
                   <ul className="mt-1 list-disc space-y-1 pl-4 text-muted-foreground">
