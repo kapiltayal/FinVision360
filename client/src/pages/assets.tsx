@@ -84,6 +84,7 @@ function AssetForm({
     mutationFn: (data: any) => apiRequest("POST", "/api/assets", data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/assets"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/retirement/income-expense-projection"] });
       toast({ title: "Asset created" });
       onUpdated?.();
       onClose();
@@ -95,6 +96,7 @@ function AssetForm({
     mutationFn: (data: any) => apiRequest("PATCH", `/api/assets/${asset!.id}`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/assets"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/retirement/income-expense-projection"] });
       toast({ title: "Asset updated" });
       onUpdated?.();
       onClose();
@@ -227,6 +229,7 @@ export default function AssetsPage() {
     mutationFn: (id: number) => apiRequest("DELETE", `/api/assets/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/assets"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/retirement/income-expense-projection"] });
       toast({ title: "Asset deleted" });
       markUpdated();
     },
@@ -289,6 +292,7 @@ export default function AssetsPage() {
   const handleImported = () => {
     queryClient.invalidateQueries({ queryKey: ["/api/assets"] });
     queryClient.invalidateQueries({ queryKey: ["/api/plaid/accounts"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/retirement/income-expense-projection"] });
     markUpdated();
   };
 

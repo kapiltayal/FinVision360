@@ -16,6 +16,7 @@ import {
   retirementProjectionEntries,
   retirementIncomeExpenseSettings,
   retirementIncomeExpenseEntries,
+  retirementAccountWithdrawalRates,
   type Retirement401kGoal,
   type RetirementPlannerSettings,
 } from "@shared/schema";
@@ -639,7 +640,7 @@ export async function registerRoutes(
 
   app.get("/api/retirement/income-expense-projection", requireAuth, async (req: any, res) => {
     const userId = req.user.id;
-    const [plannerSettings, userAssets, userLiabilities, assetTypes, liabilityTypes, overrides, projectionEntries, pensions, socialSecurity, incomeExpenseSettings, incomeExpenseEntries] = await Promise.all([
+    const [plannerSettings, userAssets, userLiabilities, assetTypes, liabilityTypes, overrides, projectionEntries, pensions, socialSecurity, incomeExpenseSettings, incomeExpenseEntries, withdrawalRates] = await Promise.all([
       storage.getRetirementPlannerSettings(userId),
       storage.getAssets(userId),
       storage.getLiabilities(userId),
@@ -651,6 +652,7 @@ export async function registerRoutes(
       storage.getSocialSecuritySettings(userId),
       db.select().from(retirementIncomeExpenseSettings).where(eq(retirementIncomeExpenseSettings.userId, userId)),
       db.select().from(retirementIncomeExpenseEntries).where(eq(retirementIncomeExpenseEntries.userId, userId)),
+      db.select().from(retirementAccountWithdrawalRates).where(eq(retirementAccountWithdrawalRates.userId, userId)),
     ]);
 
     const retirementAge = plannerSettings?.retirementAge ?? 65;
@@ -674,10 +676,40 @@ export async function registerRoutes(
         dateOfBirth: req.user.dateOfBirth ?? null,
       },
       pensions,
+      projectedAssets: netWorthProjection.assets,
       projectedLiabilities: netWorthProjection.liabilities,
+      withdrawalRates,
       expectedMonthlyExpenses: savedIncomeExpenseSettings?.expectedMonthlyExpenses ?? 0,
       projectionEntries: incomeExpenseEntries,
     }));
+  });
+
+  app.put("/api/retirement/withdrawal-rate/:assetId", requireAuth, async (req: any, res) => {
+    const userId = req.user.id;
+    const assetId = Number(req.params.assetId);
+    const withdrawalRate = Number(req.body?.withdrawalRate);
+    if (!Number.isInteger(assetId)) return res.status(400).json({ message: "Invalid asset id" });
+    if (
+      !Number.isFinite(withdrawalRate)
+      || withdrawalRate < 0
+      || withdrawalRate > 100
+      || Math.abs(withdrawalRate * 100 - Math.round(withdrawalRate * 100)) > 0.000001
+    ) {
+      return res.status(400).json({ message: "Withdrawal rate must be between 0% and 100% with no more than two decimal places." });
+    }
+    if (!await storage.getAsset(assetId, userId)) return res.status(404).json({ message: "Asset not found" });
+
+    const [savedRate] = await db.insert(retirementAccountWithdrawalRates)
+      .values({ userId, assetId, withdrawalRate: withdrawalRate.toFixed(2) })
+      .onConflictDoUpdate({
+        target: [
+          retirementAccountWithdrawalRates.userId,
+          retirementAccountWithdrawalRates.assetId,
+        ],
+        set: { withdrawalRate: withdrawalRate.toFixed(2), updatedAt: new Date() },
+      })
+      .returning();
+    res.json(savedRate);
   });
 
   app.put("/api/retirement/income-expense-settings", requireAuth, async (req: any, res) => {

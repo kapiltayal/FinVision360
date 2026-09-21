@@ -1,11 +1,14 @@
 export type CashflowItem = {
   id: string;
   projectionEntryId?: number;
-  source: "social-security" | "pension" | "expected-expenses" | "debt-payment" | "projection-only";
+  source: "social-security" | "pension" | "retirement-account" | "expected-expenses" | "debt-payment" | "projection-only";
   name: string;
   monthlyAmount: number;
   details: string | null;
   isProjectionOnly: boolean;
+  assetId?: number;
+  projectedBalance?: number;
+  withdrawalRate?: number;
 };
 
 export type Assumption = {
@@ -34,6 +37,19 @@ type ProjectedLiabilityInput = {
   projectedBalance: number;
   minimumPayment: number;
   isProjectionOnly: boolean;
+};
+
+type ProjectedAssetInput = {
+  sourceAssetId: number | null;
+  name: string;
+  parentCategory: string;
+  projectedValue: number;
+  isProjectionOnly: boolean;
+};
+
+type WithdrawalRateInput = {
+  assetId: number;
+  withdrawalRate: string | number;
 };
 
 type ProjectionEntryInput = {
@@ -113,7 +129,9 @@ export function buildRetirementIncomeExpenseProjection(input: {
   retirementAge: number;
   socialSecurity: SocialSecurityInput | null | undefined;
   pensions: PensionInput[];
+  projectedAssets: ProjectedAssetInput[];
   projectedLiabilities: ProjectedLiabilityInput[];
+  withdrawalRates: WithdrawalRateInput[];
   expectedMonthlyExpenses: string | number | null | undefined;
   projectionEntries: ProjectionEntryInput[];
 }): {
@@ -209,6 +227,40 @@ export function buildRetirementIncomeExpenseProjection(input: {
       messages: [
         `${pension.frequency === "annual" ? "Annual amount is divided by 12" : "Monthly amount is used"} at retirement age ${retirementAge}.`,
         "Pension income is treated as gross with no tax or inflation adjustment.",
+      ],
+    });
+  }
+
+  const withdrawalRateByAsset = new Map(
+    input.withdrawalRates.map((row) => [row.assetId, Math.min(100, Math.max(0, numberValue(row.withdrawalRate)))]),
+  );
+  for (const asset of input.projectedAssets) {
+    if (
+      asset.isProjectionOnly
+      || asset.sourceAssetId === null
+      || asset.parentCategory !== "Retirement & Tax-Advantaged"
+    ) continue;
+
+    const withdrawalRate = withdrawalRateByAsset.get(asset.sourceAssetId) ?? 4;
+    const projectedBalance = Math.max(0, numberValue(asset.projectedValue));
+    const monthlyAmount = projectedBalance * withdrawalRate / 100 / 12;
+    income.push({
+      id: `retirement-account-${asset.sourceAssetId}`,
+      source: "retirement-account",
+      assetId: asset.sourceAssetId,
+      name: asset.name,
+      monthlyAmount,
+      projectedBalance,
+      withdrawalRate,
+      details: `${withdrawalRate.toFixed(2)}% annual withdrawal from the projected retirement balance.`,
+      isProjectionOnly: false,
+    });
+    assumptions.push({
+      kind: "income",
+      name: asset.name,
+      messages: [
+        `Uses the projected retirement balance of ${projectedBalance.toFixed(2)} and a ${withdrawalRate.toFixed(2)}% annual withdrawal rate.`,
+        "Annual withdrawals are divided by 12 and treated as gross monthly income; taxes and required minimum distributions are not modeled.",
       ],
     });
   }
