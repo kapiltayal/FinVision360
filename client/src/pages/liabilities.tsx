@@ -86,6 +86,7 @@ function LiabilityForm({
     mutationFn: (data: any) => apiRequest("POST", "/api/liabilities", data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/liabilities"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/retirement/income-expense-projection"] });
       toast({ title: "Liability created" });
       onUpdated?.();
       onClose();
@@ -97,6 +98,7 @@ function LiabilityForm({
     mutationFn: (data: any) => apiRequest("PATCH", `/api/liabilities/${liability!.id}`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/liabilities"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/retirement/income-expense-projection"] });
       toast({ title: "Liability updated" });
       onUpdated?.();
       onClose();
@@ -263,6 +265,7 @@ export default function LiabilitiesPage() {
     mutationFn: (id: number) => apiRequest("DELETE", `/api/liabilities/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/liabilities"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/retirement/income-expense-projection"] });
       toast({ title: "Liability deleted" });
       markUpdated();
     },
@@ -330,6 +333,7 @@ export default function LiabilitiesPage() {
   const handleImported = () => {
     queryClient.invalidateQueries({ queryKey: ["/api/liabilities"] });
     queryClient.invalidateQueries({ queryKey: ["/api/plaid/accounts"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/retirement/income-expense-projection"] });
     markUpdated();
   };
 

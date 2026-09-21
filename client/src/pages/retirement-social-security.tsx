@@ -23,6 +23,12 @@ import {
 } from "recharts";
 
 function getFRA(birthYear: number): number {
+  if (birthYear <= 1937) return 65;
+  if (birthYear === 1938) return 65 + 2 / 12;
+  if (birthYear === 1939) return 65 + 4 / 12;
+  if (birthYear === 1940) return 65 + 6 / 12;
+  if (birthYear === 1941) return 65 + 8 / 12;
+  if (birthYear === 1942) return 65 + 10 / 12;
   if (birthYear <= 1954) return 66;
   if (birthYear === 1955) return 66 + 2 / 12;
   if (birthYear === 1956) return 66 + 4 / 12;
@@ -33,6 +39,12 @@ function getFRA(birthYear: number): number {
 }
 
 function getFRALabel(birthYear: number): string {
+  if (birthYear <= 1937) return "65";
+  if (birthYear === 1938) return "65 & 2 months";
+  if (birthYear === 1939) return "65 & 4 months";
+  if (birthYear === 1940) return "65 & 6 months";
+  if (birthYear === 1941) return "65 & 8 months";
+  if (birthYear === 1942) return "65 & 10 months";
   if (birthYear <= 1954) return "66";
   if (birthYear === 1955) return "66 & 2 months";
   if (birthYear === 1956) return "66 & 4 months";
@@ -50,8 +62,22 @@ function getBenefitAt62(fraMonthlyBenefit: number, fra: number): number {
   return fraMonthlyBenefit * (1 - reduction);
 }
 
-function getBenefitAt70(fraMonthlyBenefit: number, fra: number): number {
-  return fraMonthlyBenefit * (1 + (70 - fra) * 12 * (8 / 100 / 12));
+function getDelayedRetirementCreditRate(birthYear: number): number {
+  if (birthYear <= 1924) return 3;
+  if (birthYear <= 1926) return 3.5;
+  if (birthYear <= 1928) return 4;
+  if (birthYear <= 1930) return 4.5;
+  if (birthYear <= 1932) return 5;
+  if (birthYear <= 1934) return 5.5;
+  if (birthYear <= 1936) return 6;
+  if (birthYear <= 1938) return 6.5;
+  if (birthYear <= 1940) return 7;
+  if (birthYear <= 1942) return 7.5;
+  return 8;
+}
+
+function getBenefitAt70(fraMonthlyBenefit: number, fra: number, birthYear: number): number {
+  return fraMonthlyBenefit * (1 + (70 - fra) * getDelayedRetirementCreditRate(birthYear) / 100);
 }
 
 const SS_FACTORS = [
@@ -167,6 +193,7 @@ export default function SocialSecurityPage() {
     mutationFn: (data: any) => apiRequest("PUT", "/api/social-security", data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/social-security"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/retirement/income-expense-projection"] });
       toast({ title: "Settings saved" });
     },
     onError: (e: any) => toast({ title: "Failed to save", description: e.message, variant: "destructive" }),
@@ -190,7 +217,7 @@ export default function SocialSecurityPage() {
 
   const monthlyAt62 = getBenefitAt62(benefit, fra);
   const monthlyAtFRA = benefit;
-  const monthlyAt70 = getBenefitAt70(benefit, fra);
+  const monthlyAt70 = getBenefitAt70(benefit, fra, birthYear);
 
   const breakEvenFRAvsEarly = useMemo(() => {
     if (!monthlyAt62 || !monthlyAtFRA) return null;

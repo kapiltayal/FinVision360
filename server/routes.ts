@@ -14,6 +14,8 @@ import {
   liabilitiesTypeList,
   retirementAssetProjectionOverrides,
   retirementProjectionEntries,
+  retirementIncomeExpenseSettings,
+  retirementIncomeExpenseEntries,
   type Retirement401kGoal,
   type RetirementPlannerSettings,
 } from "@shared/schema";
@@ -27,8 +29,10 @@ import {
   hasRecognizableStructure, type Category, type IngestionKind, type RawRow,
 } from "./asset-liability-ingestion";
 import { buildRetirementNetWorthProjection } from "./retirement-projection";
+import { buildRetirementIncomeExpenseProjection } from "./retirement-income-expense-projection";
 
 const MAX_PENSION_AMOUNT = 9_999_999_999_999.99;
+const MAX_SOCIAL_SECURITY_MONTHLY_BENEFIT = 99_999_999.99;
 const ingestionUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024, files: 1 } });
 const INVALID_FILE_TYPE = "Invalid file type. Please upload a valid CSV or JSON file.";
 const CORRUPT_FILE = "File content could not be read or appears corrupted.";
@@ -135,6 +139,36 @@ function projectionEntryInput(body: any) {
       notes: notes || null,
     },
   } as const;
+}
+
+function incomeExpenseEntryInput(body: any) {
+  const kind = body?.kind;
+  const name = boundedText(body?.name, 120);
+  const amount = Number(body?.amount);
+  const notes = boundedText(body?.notes, 1000);
+
+  if (kind !== "income" && kind !== "expense") return { error: "Entry type must be income or expense" } as const;
+  if (!name) return { error: "Name is required" } as const;
+  if (!Number.isFinite(amount) || amount < 0 || amount > MAX_PENSION_AMOUNT) {
+    return { error: "Amount must be a valid non-negative number" } as const;
+  }
+
+  return {
+    value: {
+      kind,
+      name,
+      amount: amount.toFixed(2),
+      notes: notes || null,
+    },
+  } as const;
+}
+
+function expectedMonthlyExpensesInput(body: any): { value: string } | { error: string } {
+  const amount = Number(body?.expectedMonthlyExpenses);
+  if (!Number.isFinite(amount) || amount < 0 || amount > MAX_PENSION_AMOUNT) {
+    return { error: "Expected monthly expenses must be a valid non-negative number" };
+  }
+  return { value: amount.toFixed(2) };
 }
 
 function ageFromDateOfBirth(dateOfBirth: unknown): number | null {
@@ -593,6 +627,7 @@ export async function registerRoutes(
     res.json(buildRetirementNetWorthProjection({
       retirementAge: settings?.retirementAge ?? 65,
       currentAge: ageFromDateOfBirth(req.user.dateOfBirth),
+      dateOfBirth: req.user.dateOfBirth ?? null,
       assets: userAssets,
       liabilities: userLiabilities,
       assetTypes,
@@ -600,6 +635,108 @@ export async function registerRoutes(
       assetOverrides: overrides,
       projectionEntries: entries,
     }));
+  });
+
+  app.get("/api/retirement/income-expense-projection", requireAuth, async (req: any, res) => {
+    const userId = req.user.id;
+    const [plannerSettings, userAssets, userLiabilities, assetTypes, liabilityTypes, overrides, projectionEntries, pensions, socialSecurity, incomeExpenseSettings, incomeExpenseEntries] = await Promise.all([
+      storage.getRetirementPlannerSettings(userId),
+      storage.getAssets(userId),
+      storage.getLiabilities(userId),
+      db.select().from(assetTypeList),
+      db.select().from(liabilitiesTypeList),
+      db.select().from(retirementAssetProjectionOverrides).where(eq(retirementAssetProjectionOverrides.userId, userId)),
+      db.select().from(retirementProjectionEntries).where(eq(retirementProjectionEntries.userId, userId)),
+      storage.getRetirementPensions(userId),
+      storage.getSocialSecuritySettings(userId),
+      db.select().from(retirementIncomeExpenseSettings).where(eq(retirementIncomeExpenseSettings.userId, userId)),
+      db.select().from(retirementIncomeExpenseEntries).where(eq(retirementIncomeExpenseEntries.userId, userId)),
+    ]);
+
+    const retirementAge = plannerSettings?.retirementAge ?? 65;
+    const netWorthProjection = buildRetirementNetWorthProjection({
+      retirementAge,
+      currentAge: ageFromDateOfBirth(req.user.dateOfBirth),
+      dateOfBirth: req.user.dateOfBirth ?? null,
+      assets: userAssets,
+      liabilities: userLiabilities,
+      assetTypes,
+      liabilityTypes,
+      assetOverrides: overrides,
+      projectionEntries,
+    });
+    const [savedIncomeExpenseSettings] = incomeExpenseSettings;
+
+    res.json(buildRetirementIncomeExpenseProjection({
+      retirementAge,
+      socialSecurity: {
+        fraMonthlyBenefit: socialSecurity?.fraMonthlyBenefit ?? null,
+        dateOfBirth: req.user.dateOfBirth ?? null,
+      },
+      pensions,
+      projectedLiabilities: netWorthProjection.liabilities,
+      expectedMonthlyExpenses: savedIncomeExpenseSettings?.expectedMonthlyExpenses ?? 0,
+      projectionEntries: incomeExpenseEntries,
+    }));
+  });
+
+  app.put("/api/retirement/income-expense-settings", requireAuth, async (req: any, res) => {
+    const parsed = expectedMonthlyExpensesInput(req.body);
+    if ("error" in parsed) return res.status(400).json({ message: parsed.error });
+
+    const [settings] = await db.insert(retirementIncomeExpenseSettings)
+      .values({
+        userId: req.user.id,
+        expectedMonthlyExpenses: parsed.value,
+        updatedAt: new Date(),
+      })
+      .onConflictDoUpdate({
+        target: retirementIncomeExpenseSettings.userId,
+        set: {
+          expectedMonthlyExpenses: parsed.value,
+          updatedAt: new Date(),
+        },
+      })
+      .returning();
+    res.json(settings);
+  });
+
+  app.post("/api/retirement/income-expense-entries", requireAuth, async (req: any, res) => {
+    const parsed = incomeExpenseEntryInput(req.body);
+    if ("error" in parsed) return res.status(400).json({ message: parsed.error });
+
+    const [entry] = await db.insert(retirementIncomeExpenseEntries)
+      .values({ userId: req.user.id, ...parsed.value })
+      .returning();
+    res.status(201).json(entry);
+  });
+
+  app.patch("/api/retirement/income-expense-entries/:id", requireAuth, async (req: any, res) => {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id)) return res.status(400).json({ message: "Invalid entry id" });
+    const parsed = incomeExpenseEntryInput(req.body);
+    if ("error" in parsed) return res.status(400).json({ message: parsed.error });
+
+    const [entry] = await db.update(retirementIncomeExpenseEntries)
+      .set({ ...parsed.value, updatedAt: new Date() })
+      .where(and(
+        eq(retirementIncomeExpenseEntries.id, id),
+        eq(retirementIncomeExpenseEntries.userId, req.user.id),
+      ))
+      .returning();
+    if (!entry) return res.status(404).json({ message: "Income or expense entry not found" });
+    res.json(entry);
+  });
+
+  app.delete("/api/retirement/income-expense-entries/:id", requireAuth, async (req: any, res) => {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id)) return res.status(400).json({ message: "Invalid entry id" });
+    const deleted = await db.delete(retirementIncomeExpenseEntries).where(and(
+      eq(retirementIncomeExpenseEntries.id, id),
+      eq(retirementIncomeExpenseEntries.userId, req.user.id),
+    )).returning({ id: retirementIncomeExpenseEntries.id });
+    if (deleted.length === 0) return res.status(404).json({ message: "Income or expense entry not found" });
+    res.status(204).send();
   });
 
   app.put("/api/retirement/asset-rate/:assetId", requireAuth, async (req: any, res) => {
@@ -1175,11 +1312,21 @@ Include a year-by-year overview, useful milestones, a conservative/base/optimist
 
   app.put("/api/social-security", requireAuth, async (req, res) => {
     const userId = (req.user as any).id;
-    const { fraMonthlyBenefit } = req.body;
+    const fraMonthlyBenefit = Number(req.body?.fraMonthlyBenefit);
+    if (
+      !Number.isFinite(fraMonthlyBenefit)
+      || fraMonthlyBenefit < 0
+      || fraMonthlyBenefit > MAX_SOCIAL_SECURITY_MONTHLY_BENEFIT
+      || Math.abs(fraMonthlyBenefit * 100 - Math.round(fraMonthlyBenefit * 100)) > 0.000001
+    ) {
+      return res.status(400).json({
+        message: "FRA monthly benefit must be a non-negative amount with no more than two decimal places.",
+      });
+    }
     const existing = await storage.getSocialSecuritySettings(userId);
     const settings = await storage.upsertSocialSecuritySettings({
       userId,
-      fraMonthlyBenefit,
+      fraMonthlyBenefit: fraMonthlyBenefit.toFixed(2),
       expectedLifeAge: existing?.expectedLifeAge ?? null,
     });
     res.json(settings);

@@ -288,6 +288,47 @@ export const insertRetirementPlannerSettingsSchema = createInsertSchema(retireme
 export type InsertRetirementPlannerSettings = z.infer<typeof insertRetirementPlannerSettingsSchema>;
 export type RetirementPlannerSettings = typeof retirementPlannerSettings.$inferSelect;
 
+export const retirementIncomeExpenseSettings = pgTable("retirement_income_expense_settings", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().unique().references(() => users.id, { onDelete: "cascade" }),
+  expectedMonthlyExpenses: numeric("expected_monthly_expenses", { precision: 15, scale: 2 }).notNull().default("0"),
+  updatedAt: timestamp("updated_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
+}, (table) => ({
+  nonnegativeExpenses: check("retirement_income_expense_settings_expenses_check", sql`${table.expectedMonthlyExpenses} >= 0`),
+}));
+
+export const insertRetirementIncomeExpenseSettingsSchema = createInsertSchema(retirementIncomeExpenseSettings).omit({
+  id: true,
+  updatedAt: true,
+});
+
+export type InsertRetirementIncomeExpenseSettings = z.infer<typeof insertRetirementIncomeExpenseSettingsSchema>;
+export type RetirementIncomeExpenseSettings = typeof retirementIncomeExpenseSettings.$inferSelect;
+
+export const retirementIncomeExpenseEntries = pgTable("retirement_income_expense_entries", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  kind: text("kind").notNull(),
+  name: text("name").notNull(),
+  amount: numeric("amount", { precision: 15, scale: 2 }).notNull(),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  userKindIndex: index("retirement_income_expense_entries_user_kind_idx").on(table.userId, table.kind),
+  validKind: check("retirement_income_expense_entries_kind_check", sql`${table.kind} IN ('income', 'expense')`),
+  nonnegativeAmount: check("retirement_income_expense_entries_amount_check", sql`${table.amount} >= 0`),
+}));
+
+export const insertRetirementIncomeExpenseEntrySchema = createInsertSchema(retirementIncomeExpenseEntries).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertRetirementIncomeExpenseEntry = z.infer<typeof insertRetirementIncomeExpenseEntrySchema>;
+export type RetirementIncomeExpenseEntry = typeof retirementIncomeExpenseEntries.$inferSelect;
+
 export const retirementAssetProjectionOverrides = pgTable("retirement_asset_projection_overrides", {
   id: serial("id").primaryKey(),
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
@@ -572,7 +613,9 @@ export const socialSecuritySettings = pgTable("social_security_settings", {
   fraMonthlyBenefit: numeric("fra_monthly_benefit", { precision: 10, scale: 2 }).default("2000"),
   expectedLifeAge: integer("expected_life_age").default(85),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
+}, (table) => ({
+  nonnegativeBenefit: check("social_security_settings_benefit_check", sql`${table.fraMonthlyBenefit} >= 0`),
+}));
 
 export type SocialSecuritySettings = typeof socialSecuritySettings.$inferSelect;
 export type InsertSocialSecuritySettings = typeof socialSecuritySettings.$inferInsert;

@@ -9,3 +9,4 @@
 - [Recommendation thresholds](recommendation-thresholds.md) — recommendation settings use three aggregate savings thresholds instead of account or policy subtypes.
 - [Retirement net-worth projections](retirement-net-worth-projections.md) — use category fallback returns and conservative debt carry-forward rules when inputs are incomplete.
 - [AI retirement timeline](ai-retirement-age.md) — AI snapshots use the Retirement Planner timeline as the authoritative retirement age.
+- [Inline TypeScript verification scripts](inline-tsx-verification.md) — wrap async tsx -e work in an IIFE and avoid newer runtime APIs not supported by the project Node version.

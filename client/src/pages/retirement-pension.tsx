@@ -102,6 +102,7 @@ export default function RetirementPensionPage() {
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/retirement/pensions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/retirement/income-expense-projection"] });
       setForm(EMPTY_FORM);
       setEditingId(null);
       setFormError(null);
@@ -116,6 +117,7 @@ export default function RetirementPensionPage() {
     mutationFn: (id: number) => apiRequest("DELETE", `/api/retirement/pensions/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/retirement/pensions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/retirement/income-expense-projection"] });
       setDeleteTarget(null);
       toast({ title: "Pension removed" });
     },

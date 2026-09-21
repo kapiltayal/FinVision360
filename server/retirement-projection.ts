@@ -97,6 +97,22 @@ function addUtcYears(date: Date, years: number): Date {
   return result;
 }
 
+function retirementDateFromDateOfBirth(dateOfBirth: string | null | undefined, retirementAge: number): Date | null {
+  if (!dateOfBirth || !/^\d{4}-\d{2}-\d{2}$/.test(dateOfBirth)) return null;
+  const birthDate = new Date(`${dateOfBirth}T00:00:00Z`);
+  if (Number.isNaN(birthDate.getTime())) return null;
+  birthDate.setUTCFullYear(birthDate.getUTCFullYear() + retirementAge);
+  return birthDate;
+}
+
+function monthsUntilDate(today: Date, target: Date): number {
+  if (target <= today) return 0;
+  const calendarMonths = (target.getUTCFullYear() - today.getUTCFullYear()) * 12
+    + target.getUTCMonth()
+    - today.getUTCMonth();
+  return Math.max(0, calendarMonths + (target.getUTCDate() > today.getUTCDate() ? 1 : 0));
+}
+
 function projectDebt(balance: number, annualRatePercent: number, monthlyPayment: number, months: number): number | null {
   if (balance <= 0) return 0;
   if (monthlyPayment <= 0 || months <= 0) return null;
@@ -115,6 +131,7 @@ function projectDebt(balance: number, annualRatePercent: number, monthlyPayment:
 export function buildRetirementNetWorthProjection(input: {
   retirementAge: number;
   currentAge: number | null;
+  dateOfBirth?: string | null;
   assets: AssetRow[];
   liabilities: LiabilityRow[];
   assetTypes: AssetTypeRow[];
@@ -122,13 +139,18 @@ export function buildRetirementNetWorthProjection(input: {
   assetOverrides: AssetOverrideRow[];
   projectionEntries: ProjectionEntryRow[];
 }) {
-  const yearsToRetirement = input.currentAge === null
+  const wholeYearsToRetirement = input.currentAge === null
     ? 0
     : Math.max(0, input.retirementAge - input.currentAge);
-  const monthsToRetirement = yearsToRetirement * 12;
-  const retirementDate = addUtcYears(new Date(), yearsToRetirement);
+  const today = new Date();
+  const dateOfBirthRetirementDate = retirementDateFromDateOfBirth(input.dateOfBirth, input.retirementAge);
+  const retirementDate = dateOfBirthRetirementDate ?? addUtcYears(today, wholeYearsToRetirement);
+  const monthsToRetirement = dateOfBirthRetirementDate
+    ? monthsUntilDate(today, retirementDate)
+    : wholeYearsToRetirement * 12;
+  const yearsToRetirement = monthsToRetirement / 12;
   const retirementDateIso = retirementDate.toISOString().slice(0, 10);
-  const todayIso = new Date().toISOString().slice(0, 10);
+  const todayIso = today.toISOString().slice(0, 10);
 
   const assetTypeByCategory = new Map(input.assetTypes.map((row) => [row.subCategory, row]));
   const liabilityTypeByCategory = new Map(input.liabilityTypes.map((row) => [row.subCategory, row]));
