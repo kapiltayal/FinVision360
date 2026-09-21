@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Slider } from "@/components/ui/slider";
 import { formatCurrency } from "@/lib/format";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -102,12 +103,28 @@ function RetirementAccountRow({ item, onSave, saving }: {
       <div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold">{item.name}</p><p className="text-xs text-muted-foreground">Projected balance: {formatCurrency(item.projectedBalance ?? 0)}</p></div>
       <div className="text-right"><p className="text-sm font-bold tabular-nums text-emerald-700 dark:text-emerald-300">{money(item.monthlyAmount)}</p><p className="text-[11px] text-muted-foreground">gross withdrawal</p></div>
     </div>
-    <div className="mt-2 flex items-center justify-end gap-2">
-      <Label htmlFor={`withdrawal-rate-${item.assetId}`} className="text-xs text-muted-foreground">Annual withdrawal rate</Label>
-      <div className="flex items-center">
-        <Input id={`withdrawal-rate-${item.assetId}`} className="h-8 w-20 text-right tabular-nums" type="number" min="0" max="100" step="0.1" value={rate} onChange={(event) => setRate(Math.min(100, Math.max(0, Number(event.target.value) || 0)))} onBlur={save} disabled={saving} />
-        <span className="ml-1 text-xs font-medium">%</span>
+    <div className="mt-3 space-y-1.5">
+      <div className="flex items-center justify-between gap-3">
+        <Label htmlFor={`withdrawal-rate-${item.assetId}`} className="text-xs text-muted-foreground">Annual withdrawal rate</Label>
+        <span className="text-sm font-semibold tabular-nums text-emerald-700 dark:text-emerald-300">{rate.toFixed(1)}%</span>
       </div>
+      <Slider
+        id={`withdrawal-rate-${item.assetId}`}
+        aria-label={`Annual withdrawal rate for ${item.name}`}
+        min={0}
+        max={100}
+        step={0.1}
+        value={[rate]}
+        onValueChange={([value]) => setRate(value ?? 0)}
+        onValueCommit={([value]) => {
+          const nextRate = value ?? 0;
+          setRate(nextRate);
+          if (item.assetId !== undefined && nextRate !== item.withdrawalRate) onSave(item.assetId, nextRate);
+        }}
+        disabled={saving}
+        className="py-1"
+      />
+      <div className="flex justify-between text-[10px] text-muted-foreground"><span>0%</span><span>100%</span></div>
     </div>
   </div>;
 }

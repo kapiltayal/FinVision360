@@ -42,6 +42,7 @@ type ProjectedLiabilityInput = {
 type ProjectedAssetInput = {
   sourceAssetId: number | null;
   name: string;
+  category: string;
   parentCategory: string;
   projectedValue: number;
   isProjectionOnly: boolean;
@@ -239,6 +240,8 @@ export function buildRetirementIncomeExpenseProjection(input: {
       asset.isProjectionOnly
       || asset.sourceAssetId === null
       || asset.parentCategory !== "Retirement & Tax-Advantaged"
+      || asset.category === "Health Savings (HSA)"
+      || asset.category === "Education Savings"
     ) continue;
 
     const withdrawalRate = withdrawalRateByAsset.get(asset.sourceAssetId) ?? 4;
