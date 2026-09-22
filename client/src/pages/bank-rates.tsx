@@ -471,12 +471,12 @@ export default function BankRatesPage() {
             >
               <FileSpreadsheet className="mx-auto mb-3 h-9 w-9 text-primary" />
               <p className="font-medium">{uploadFile ? uploadFile.name : "Choose a rates file"}</p>
-              <p className="mt-1 text-xs text-muted-foreground">CSV, tab-delimited, XLS, or XLSX · maximum 5 MiB</p>
+              <p className="mt-1 text-xs text-muted-foreground">CSV, tab-delimited, XLS, XLSX, or XLSM · maximum 5 MiB</p>
               <input
                 ref={fileInputRef}
                 type="file"
                 className="hidden"
-                accept=".csv,.tsv,.txt,.xls,.xlsx"
+                accept=".csv,.tsv,.txt,.xls,.xlsx,.xlsm"
                 onChange={chooseFile}
               />
             </div>

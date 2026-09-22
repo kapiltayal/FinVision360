@@ -99,19 +99,27 @@ function isBoundedXlsxArchive(buffer: Buffer): boolean {
 export function parseUpload(file: Express.Multer.File): RawRow[] | null {
   const extension = file.originalname.toLowerCase().match(/\.([a-z0-9]+)$/)?.[1];
   try {
-    if (extension === "xls" || extension === "xlsx") {
-      if (extension === "xlsx" && !isBoundedXlsxArchive(file.buffer)) return null;
+    if (extension === "xls" || extension === "xlsx" || extension === "xlsm") {
+      if (extension === "xlsx" || extension === "xlsm") {
+        if (!isBoundedXlsxArchive(file.buffer)) return null;
+      }
       const workbook = XLSX.read(file.buffer, { type: "buffer", WTF: true, sheetRows: MAX_ROWS + 2 });
-      const sheet = workbook.Sheets[workbook.SheetNames[0]];
-      if (!sheet) return null;
-      const grid = XLSX.utils.sheet_to_json<unknown[]>(sheet, {
-        header: 1,
-        defval: "",
-        raw: false,
-        blankrows: true,
-      });
-      while (grid.length && grid[grid.length - 1].every((cell) => !clean(cell))) grid.pop();
-      if (grid.length < 2 || grid.slice(0, 11).some((row) => row.every((cell) => !clean(cell)))) return null;
+      let grid: unknown[][] | null = null;
+      for (const sheetName of workbook.SheetNames) {
+        const candidate = XLSX.utils.sheet_to_json<unknown[]>(workbook.Sheets[sheetName], {
+          header: 1,
+          defval: "",
+          raw: false,
+          blankrows: true,
+        });
+        while (candidate.length && candidate[0].every((cell) => !clean(cell))) candidate.shift();
+        while (candidate.length && candidate[candidate.length - 1].every((cell) => !clean(cell))) candidate.pop();
+        if (candidate.length >= 2 && candidate[0].some((cell) => clean(cell))) {
+          grid = candidate;
+          break;
+        }
+      }
+      if (!grid) return null;
       const headers = grid[0].map((header, index) =>
         clean(header).toLowerCase().replace(/[^a-z0-9]/g, "") || `column${index + 1}`);
       return grid.slice(1, MAX_ROWS + 2).map((row) =>

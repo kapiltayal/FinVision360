@@ -51,18 +51,11 @@ const ingestionUploadFile = (req: any, res: any, next: any) => {
 
 function isSupportedUpload(file: Express.Multer.File): boolean {
   const ext = file.originalname.toLowerCase().match(/\.([a-z0-9]+)$/)?.[1];
-  const allowed: Record<string, string[]> = {
-    csv: ["text/csv", "application/csv", "text/plain"],
-    tsv: ["text/tab-separated-values", "text/tsv", "text/plain"],
-    txt: ["text/plain", "text/csv", "text/tab-separated-values"],
-    xls: ["application/vnd.ms-excel"],
-    xlsx: ["application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"],
-  };
-  if (!ext || !allowed[ext]?.includes(file.mimetype.toLowerCase())) return false;
+  if (!ext || !["csv", "tsv", "txt", "xls", "xlsx", "xlsm"].includes(ext)) return false;
   if (ext === "xls") {
     return file.buffer.subarray(0, 4).equals(Buffer.from([0xd0, 0xcf, 0x11, 0xe0]));
   }
-  if (ext === "xlsx") {
+  if (ext === "xlsx" || ext === "xlsm") {
     return file.buffer.subarray(0, 4).equals(Buffer.from([0x50, 0x4b, 0x03, 0x04]));
   }
   return !file.buffer.includes(0);
