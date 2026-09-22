@@ -1253,14 +1253,22 @@ Include a year-by-year overview, useful milestones, a conservative/base/optimist
 
   app.patch("/api/bank-rates/:id", requireAdmin, async (req, res) => {
     const id = Number.parseInt(req.params.id, 10);
-    const rateValue = typeof req.body?.rateValue === "string" ? req.body.rateValue.trim() : "";
     if (!Number.isInteger(id) || id <= 0) {
       return res.status(400).json({ error: "Invalid bank-rate record" });
     }
-    if (!rateValue) {
-      return res.status(400).json({ error: "Current rate is required" });
+    const fieldNames = ["bankName", "bankType", "rateType", "rateName", "rateValue"] as const;
+    const updates: Partial<Record<(typeof fieldNames)[number], string>> = {};
+    for (const fieldName of fieldNames) {
+      if (typeof req.body?.[fieldName] === "string") {
+        updates[fieldName] = req.body[fieldName].trim();
+      }
     }
-    const updated = await storage.updateBankRate(id, { rateValue });
+    const missingField = fieldNames.find((fieldName) => !updates[fieldName]);
+    if (missingField) {
+      return res.status(400).json({ error: "Institution, bank type, rate type, product, and current rate are required" });
+    }
+    updates.rateType = updates.rateType?.toLowerCase();
+    const updated = await storage.updateBankRate(id, updates);
     if (!updated) {
       return res.status(404).json({ error: "Bank-rate record not found" });
     }

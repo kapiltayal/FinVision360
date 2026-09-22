@@ -45,6 +45,8 @@ interface BankRate {
   scrapedAt: string;
 }
 
+type EditableBankRateFields = Pick<BankRate, "bankName" | "bankType" | "rateType" | "rateName" | "rateValue">;
+
 interface FinancialInstitution {
   name: string;
   type: string;
@@ -149,10 +151,12 @@ function RateTable({
   rates,
   onDelete,
   onUpdateRate,
+  editable,
 }: {
   rates: BankRate[];
   onDelete: (id: number) => void;
-  onUpdateRate: (id: number, rateValue: string) => Promise<void>;
+  onUpdateRate?: (id: number, fields: EditableBankRateFields) => Promise<void>;
+  editable: boolean;
 }) {
   type SortKey = "bankName" | "bankType" | "rateType" | "rateName" | "rateValue" | "scrapedAt";
   const [sort, setSort] = useState<{ key: SortKey; direction: "asc" | "desc" }>({
@@ -160,7 +164,7 @@ function RateTable({
     direction: "desc",
   });
   const [editingRateId, setEditingRateId] = useState<number | null>(null);
-  const [editingRateValue, setEditingRateValue] = useState("");
+  const [editingRateFields, setEditingRateFields] = useState<EditableBankRateFields | null>(null);
   const [savingRateId, setSavingRateId] = useState<number | null>(null);
 
   const sortedRates = useMemo(() => {
@@ -194,20 +198,29 @@ function RateTable({
 
   const beginEdit = (rate: BankRate) => {
     setEditingRateId(rate.id);
-    setEditingRateValue(rate.rateValue);
+    setEditingRateFields({
+      bankName: rate.bankName,
+      bankType: rate.bankType || "Standard Bank",
+      rateType: rate.rateType,
+      rateName: rate.rateName,
+      rateValue: rate.rateValue,
+    });
   };
 
   const cancelEdit = () => {
     setEditingRateId(null);
-    setEditingRateValue("");
+    setEditingRateFields(null);
   };
 
   const saveEdit = async (rate: BankRate) => {
-    const value = editingRateValue.trim();
-    if (!value || savingRateId !== null) return;
+    if (!editingRateFields || !onUpdateRate || savingRateId !== null) return;
+    const fields = Object.fromEntries(
+      Object.entries(editingRateFields).map(([key, value]) => [key, value.trim()]),
+    ) as EditableBankRateFields;
+    if (Object.values(fields).some((value) => !value)) return;
     setSavingRateId(rate.id);
     try {
-      await onUpdateRate(rate.id, value);
+      await onUpdateRate(rate.id, fields);
       cancelEdit();
     } finally {
       setSavingRateId(null);
@@ -233,6 +246,17 @@ function RateTable({
     </Button>
   );
 
+  const editInput = (field: keyof EditableBankRateFields, label: string) => (
+    <Input
+      value={editingRateFields?.[field] || ""}
+      onChange={(event) => setEditingRateFields((current) => (
+        current ? { ...current, [field]: event.target.value } : current
+      ))}
+      aria-label={label}
+      className="h-8 min-w-32"
+    />
+  );
+
   return (
     <div className="overflow-x-auto">
       <Table>
@@ -250,64 +274,28 @@ function RateTable({
         <TableBody>
           {sortedRates.map((rate) => (
             <TableRow key={rate.id}>
-              <TableCell className="font-medium">{rate.bankName}</TableCell>
-              <TableCell>
-                <Badge variant="outline" className="whitespace-nowrap font-normal">
-                  {rate.bankType || "Standard Bank"}
-                </Badge>
+              <TableCell className="font-medium">
+                {editingRateId === rate.id ? editInput("bankName", "Financial institution") : rate.bankName}
               </TableCell>
               <TableCell>
-                <span className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-medium ${RATE_TYPE_COLORS[rate.rateType] || "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200"}`}>
-                  {RATE_TYPE_LABELS[rate.rateType] || rate.rateType}
-                </span>
-              </TableCell>
-              <TableCell className="text-sm text-muted-foreground">{rate.rateName}</TableCell>
-              <TableCell className="font-bold text-primary">
-                {editingRateId === rate.id ? (
-                  <div className="flex min-w-48 items-center gap-1">
-                    <Input
-                      value={editingRateValue}
-                      onChange={(event) => setEditingRateValue(event.target.value)}
-                      onKeyDown={(event) => {
-                        if (event.key === "Enter") void saveEdit(rate);
-                        if (event.key === "Escape") cancelEdit();
-                      }}
-                      aria-label={`Current rate for ${rate.bankName} ${rate.rateName}`}
-                      autoFocus
-                      className="h-8"
-                    />
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-green-700"
-                      onClick={() => void saveEdit(rate)}
-                      disabled={!editingRateValue.trim() || savingRateId === rate.id}
-                      aria-label="Save current rate"
-                    >
-                      <Check className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8"
-                      onClick={cancelEdit}
-                      disabled={savingRateId === rate.id}
-                      aria-label="Cancel editing current rate"
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ) : (
-                  <Button
-                    variant="ghost"
-                    className="h-8 gap-1 px-2 font-bold text-primary"
-                    onClick={() => beginEdit(rate)}
-                    aria-label={`Edit current rate for ${rate.bankName} ${rate.rateName}`}
-                  >
-                    {rate.rateValue}
-                    <Pencil className="h-3.5 w-3.5 opacity-60" />
-                  </Button>
+                {editingRateId === rate.id ? editInput("bankType", "Institution type") : (
+                  <Badge variant="outline" className="whitespace-nowrap font-normal">
+                    {rate.bankType || "Standard Bank"}
+                  </Badge>
                 )}
+              </TableCell>
+              <TableCell>
+                {editingRateId === rate.id ? editInput("rateType", "Rate type") : (
+                  <span className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-medium ${RATE_TYPE_COLORS[rate.rateType] || "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200"}`}>
+                    {RATE_TYPE_LABELS[rate.rateType] || rate.rateType}
+                  </span>
+                )}
+              </TableCell>
+              <TableCell className="text-sm text-muted-foreground">
+                {editingRateId === rate.id ? editInput("rateName", "Product name") : rate.rateName}
+              </TableCell>
+              <TableCell className="font-bold text-primary">
+                {editingRateId === rate.id ? editInput("rateValue", "Current rate") : rate.rateValue}
               </TableCell>
               <TableCell className="text-xs text-muted-foreground">
                 <span className="flex items-center gap-1 whitespace-nowrap">
@@ -316,6 +304,41 @@ function RateTable({
                 </span>
               </TableCell>
               <TableCell>
+                {editable && editingRateId === rate.id && (
+                  <>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 text-green-700"
+                      onClick={() => void saveEdit(rate)}
+                      disabled={!editingRateFields || Object.values(editingRateFields).some((value) => !value.trim()) || savingRateId === rate.id}
+                      aria-label="Save rate changes"
+                    >
+                      <Check className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7"
+                      onClick={cancelEdit}
+                      disabled={savingRateId === rate.id}
+                      aria-label="Cancel rate changes"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </Button>
+                  </>
+                )}
+                {editable && editingRateId !== rate.id && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 text-muted-foreground"
+                    onClick={() => beginEdit(rate)}
+                    aria-label={`Edit ${rate.bankName} ${rate.rateName}`}
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                  </Button>
+                )}
                 <Button
                   variant="ghost"
                   size="icon"
@@ -432,8 +455,8 @@ export default function BankRatesPage() {
   });
 
   const updateRate = useMutation({
-    mutationFn: async ({ id, rateValue }: { id: number; rateValue: string }) => {
-      const response = await apiRequest("PATCH", `/api/bank-rates/${id}`, { rateValue });
+    mutationFn: async ({ id, fields }: { id: number; fields: EditableBankRateFields }) => {
+      const response = await apiRequest("PATCH", `/api/bank-rates/${id}`, fields);
       return response.json() as Promise<BankRate>;
     },
     onSuccess: () => {
@@ -542,7 +565,8 @@ export default function BankRatesPage() {
                 <RateTable
                   rates={latestRates}
                   onDelete={setDeleteRateId}
-                  onUpdateRate={(id, rateValue) => updateRate.mutateAsync({ id, rateValue }).then(() => undefined)}
+                  editable
+                  onUpdateRate={(id, fields) => updateRate.mutateAsync({ id, fields }).then(() => undefined)}
                 />
               </CardContent>
             </Card>
@@ -566,7 +590,7 @@ export default function BankRatesPage() {
                 <RateTable
                   rates={rates}
                   onDelete={setDeleteRateId}
-                  onUpdateRate={(id, rateValue) => updateRate.mutateAsync({ id, rateValue }).then(() => undefined)}
+                  editable={false}
                 />
               </CardContent>
             </Card>
