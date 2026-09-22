@@ -1193,7 +1193,7 @@ Include a year-by-year overview, useful milestones, a conservative/base/optimist
 
     const field = (row: RawRow, aliases: string[], mappedKey: string) => {
       const candidates = requestedMapping[mappedKey] ? [requestedMapping[mappedKey]] : aliases;
-      for (const alias of aliases) {
+      for (const alias of candidates) {
         const value = row[alias];
         if (typeof value === "string" || typeof value === "number") {
           const cleaned = String(value).trim();

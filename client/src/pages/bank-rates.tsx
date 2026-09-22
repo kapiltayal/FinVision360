@@ -49,6 +49,20 @@ interface FinancialInstitution {
   type: string;
 }
 
+interface BankRateUploadPreview {
+  headers: string[];
+  sampleRows: Record<string, unknown>[];
+  totalRows: number;
+}
+
+type BankRateMapping = {
+  bankName: string;
+  bankType: string;
+  rateType: string;
+  rateName: string;
+  rateValue: string;
+};
+
 const BANK_TYPES = [
   "Standard Bank",
   "Credit Union",
@@ -80,6 +94,45 @@ const EMPTY_MANUAL_FORM = {
   rateName: "",
   rateValue: "",
 };
+
+const EMPTY_BANK_RATE_MAPPING: BankRateMapping = {
+  bankName: "",
+  bankType: "",
+  rateType: "",
+  rateName: "",
+  rateValue: "",
+};
+
+const BANK_RATE_MAPPING_FIELDS: Array<{
+  key: keyof BankRateMapping;
+  label: string;
+  required: boolean;
+}> = [
+  { key: "bankName", label: "Institution Name", required: true },
+  { key: "bankType", label: "Bank Type", required: false },
+  { key: "rateType", label: "Rate Type", required: true },
+  { key: "rateName", label: "Product Name", required: true },
+  { key: "rateValue", label: "Rate Value", required: true },
+];
+
+const BANK_RATE_MAPPING_ALIASES: Record<keyof BankRateMapping, string[]> = {
+  bankName: ["bankname", "bank", "bankfinancialinstitution", "bankorfinancialinstitution", "financialinstitution", "financialinstitutionname", "institutionname", "institution", "banksource"],
+  bankType: ["banktype", "institutiontype", "financialinstitutiontype"],
+  rateType: ["ratetype", "type", "accounttype", "producttype"],
+  rateName: ["ratename", "productname", "product", "accountname"],
+  rateValue: ["ratevalue", "rate", "apy", "apr", "interestrate"],
+};
+
+function suggestBankRateMapping(headers: string[]): BankRateMapping {
+  const find = (aliases: string[]) => aliases.find((alias) => headers.includes(alias)) || "";
+  return {
+    bankName: find(BANK_RATE_MAPPING_ALIASES.bankName),
+    bankType: find(BANK_RATE_MAPPING_ALIASES.bankType),
+    rateType: find(BANK_RATE_MAPPING_ALIASES.rateType),
+    rateName: find(BANK_RATE_MAPPING_ALIASES.rateName),
+    rateValue: find(BANK_RATE_MAPPING_ALIASES.rateValue),
+  };
+}
 
 function formatDate(dateStr: string) {
   return new Date(dateStr).toLocaleString("en-US", {
@@ -165,6 +218,8 @@ export default function BankRatesPage() {
   const [deleteRateId, setDeleteRateId] = useState<number | null>(null);
   const [manualForm, setManualForm] = useState(EMPTY_MANUAL_FORM);
   const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadPreview, setUploadPreview] = useState<BankRateUploadPreview | null>(null);
+  const [uploadMapping, setUploadMapping] = useState<BankRateMapping>(EMPTY_BANK_RATE_MAPPING);
 
   const isAdmin = !!(user as any)?.isAdmin;
 
@@ -217,13 +272,33 @@ export default function BankRatesPage() {
     },
   });
 
-  const importRates = useMutation({
+  const previewRates = useMutation({
     mutationFn: async (file: File) => {
       const body = new FormData();
       body.append("file", file);
+      const response = await fetch("/api/bank-rates/preview", { method: "POST", body });
+      const result = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(result?.error || result?.message || "Could not preview the bank-rate file");
+      return result as BankRateUploadPreview;
+    },
+    onSuccess: (preview) => {
+      setUploadPreview(preview);
+      setUploadMapping(suggestBankRateMapping(preview.headers));
+    },
+    onError: (error: Error) => {
+      setUploadPreview(null);
+      toast({ title: "Could not preview file", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const importRates = useMutation({
+    mutationFn: async ({ file, mapping }: { file: File; mapping: BankRateMapping }) => {
+      const body = new FormData();
+      body.append("file", file);
+      body.append("mapping", JSON.stringify(mapping));
       const response = await fetch("/api/bank-rates/import", { method: "POST", body });
       const result = await response.json().catch(() => null);
-      if (!response.ok) throw new Error(result?.error || "Could not import the bank-rate file");
+      if (!response.ok) throw new Error(result?.error || result?.message || "Could not import the bank-rate file");
       return result as { imported: number };
     },
     onSuccess: ({ imported }) => {
@@ -231,6 +306,8 @@ export default function BankRatesPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/bank-rates/institutions"] });
       setUploadDialogOpen(false);
       setUploadFile(null);
+      setUploadPreview(null);
+      setUploadMapping(EMPTY_BANK_RATE_MAPPING);
       toast({ title: "Bank rates imported", description: `${imported} rate${imported === 1 ? "" : "s"} added.` });
     },
     onError: (error: Error) => {
@@ -267,8 +344,16 @@ export default function BankRatesPage() {
   };
 
   const chooseFile = (event: ChangeEvent<HTMLInputElement>) => {
-    setUploadFile(event.target.files?.[0] ?? null);
+    const file = event.target.files?.[0] ?? null;
+    setUploadFile(file);
+    setUploadPreview(null);
+    setUploadMapping(EMPTY_BANK_RATE_MAPPING);
+    if (file) previewRates.mutate(file);
   };
+
+  const requiredMappingComplete = BANK_RATE_MAPPING_FIELDS
+    .filter((field) => field.required)
+    .every((field) => Boolean(uploadMapping[field.key]));
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-6">
@@ -452,16 +537,20 @@ export default function BankRatesPage() {
         open={uploadDialogOpen}
         onOpenChange={(open) => {
           setUploadDialogOpen(open);
-          if (!open) setUploadFile(null);
+          if (!open) {
+            setUploadFile(null);
+            setUploadPreview(null);
+            setUploadMapping(EMPTY_BANK_RATE_MAPPING);
+          }
         }}
       >
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-h-[90vh] max-w-4xl overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Upload Bank Rates</DialogTitle>
+            <DialogTitle>{uploadPreview ? "Review Bank Rate Import" : "Upload Bank Rates"}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div
-              className="cursor-pointer rounded-xl border-2 border-dashed border-slate-300 p-7 text-center transition-colors hover:border-primary/60 hover:bg-primary/5 dark:border-slate-700"
+              className="cursor-pointer rounded-xl border-2 border-dashed border-slate-300 p-5 text-center transition-colors hover:border-primary/60 hover:bg-primary/5 dark:border-slate-700"
               onClick={() => fileInputRef.current?.click()}
               role="button"
               tabIndex={0}
@@ -472,6 +561,9 @@ export default function BankRatesPage() {
               <FileSpreadsheet className="mx-auto mb-3 h-9 w-9 text-primary" />
               <p className="font-medium">{uploadFile ? uploadFile.name : "Choose a rates file"}</p>
               <p className="mt-1 text-xs text-muted-foreground">CSV, tab-delimited, XLS, XLSX, or XLSM · maximum 5 MiB</p>
+              {previewRates.isPending && (
+                <p className="mt-2 text-sm text-primary">Reading file and preparing preview...</p>
+              )}
               <input
                 ref={fileInputRef}
                 type="file"
@@ -481,29 +573,124 @@ export default function BankRatesPage() {
               />
             </div>
 
-            <div className="rounded-lg bg-slate-50 p-4 text-sm dark:bg-slate-900">
-              <p className="mb-2 font-medium">File columns</p>
-              <ul className="list-inside list-disc space-y-1 text-muted-foreground">
-                <li><strong className="text-foreground">Institution Name</strong> — required</li>
-                <li><strong className="text-foreground">Bank Type</strong> — optional; defaults to Standard Bank</li>
-                <li><strong className="text-foreground">Rate Type</strong> — required</li>
-                <li><strong className="text-foreground">Product Name</strong> — required</li>
-                <li><strong className="text-foreground">Rate Value</strong> — required</li>
-              </ul>
-              <p className="mt-3 text-xs text-muted-foreground">
-                Common alternatives such as Bank Name, Type, Product, APY, APR, and Interest Rate are also recognized.
-              </p>
-            </div>
+            {!uploadPreview && !previewRates.isPending && (
+              <div className="rounded-lg bg-slate-50 p-4 text-sm dark:bg-slate-900">
+                <p className="mb-2 font-medium">What happens next</p>
+                <p className="text-muted-foreground">
+                  Select a file to preview its rows and map your columns before anything is saved.
+                </p>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  CSV, tab-delimited, XLS, XLSX, and XLSM files are supported. Maximum 500 data rows.
+                </p>
+              </div>
+            )}
+
+            {uploadPreview && (
+              <>
+                <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
+                  <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="font-medium">Map your columns</p>
+                      <p className="text-xs text-muted-foreground">
+                        Choose which uploaded column supplies each bank-rate field. Nothing is stored until you import.
+                      </p>
+                    </div>
+                    <Badge variant="secondary">{uploadPreview.totalRows} rows detected</Badge>
+                  </div>
+                  <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    {BANK_RATE_MAPPING_FIELDS.map((field) => (
+                      <div key={field.key} className="space-y-1.5">
+                        <Label>
+                          {field.label}{field.required ? " *" : " (optional)"}
+                        </Label>
+                        <Select
+                          value={uploadMapping[field.key] || "__none__"}
+                          onValueChange={(value) => setUploadMapping((current) => ({
+                            ...current,
+                            [field.key]: value === "__none__" ? "" : value,
+                          }))}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select a column" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__none__">
+                              {field.required ? "Not mapped" : "Not mapped (use default)"}
+                            </SelectItem>
+                            {uploadPreview.headers.map((header) => (
+                              <SelectItem key={`${field.key}-${header}`} value={header}>
+                                {header}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    ))}
+                  </div>
+                  {!requiredMappingComplete && (
+                    <p className="mt-3 text-sm text-destructive">
+                      Map all required fields before importing.
+                    </p>
+                  )}
+                </div>
+
+                <div>
+                  <div className="mb-2 flex items-center justify-between">
+                    <p className="font-medium">Preview</p>
+                    <span className="text-xs text-muted-foreground">Showing first {uploadPreview.sampleRows.length} rows</span>
+                  </div>
+                  <div className="overflow-x-auto rounded-lg border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          {uploadPreview.headers.map((header) => <TableHead key={header}>{header}</TableHead>)}
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {uploadPreview.sampleRows.map((row, rowIndex) => (
+                          <TableRow key={rowIndex}>
+                            {uploadPreview.headers.map((header) => (
+                              <TableCell key={`${rowIndex}-${header}`} className="max-w-48 truncate text-sm">
+                                {String(row[header] ?? "")}
+                              </TableCell>
+                            ))}
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setUploadDialogOpen(false)}>Cancel</Button>
+            {uploadPreview && (
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setUploadPreview(null);
+                  setUploadMapping(EMPTY_BANK_RATE_MAPPING);
+                }}
+              >
+                Choose Different File
+              </Button>
+            )}
             <Button
-              onClick={() => uploadFile && importRates.mutate(uploadFile)}
-              disabled={!uploadFile || importRates.isPending}
+              onClick={() => {
+                if (uploadFile && uploadPreview) {
+                  importRates.mutate({ file: uploadFile, mapping: uploadMapping });
+                } else if (!uploadFile) {
+                  fileInputRef.current?.click();
+                } else {
+                  previewRates.mutate(uploadFile);
+                }
+              }}
+              disabled={!uploadFile || previewRates.isPending || importRates.isPending || (!!uploadPreview && !requiredMappingComplete)}
               className="gap-2"
             >
-              <Upload className="h-4 w-4" />
-              {importRates.isPending ? "Importing..." : "Import Rates"}
+              {uploadPreview ? <Upload className="h-4 w-4" /> : <FileSpreadsheet className="h-4 w-4" />}
+              {importRates.isPending ? "Importing..." : uploadPreview ? "Import Rates" : "Preview File"}
             </Button>
           </DialogFooter>
         </DialogContent>
