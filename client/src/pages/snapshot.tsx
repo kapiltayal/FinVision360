@@ -54,6 +54,10 @@ const EMERGENCY_CASH_CATEGORIES = new Set([
   "Cash & Digital Wallets",
   "Checking Account",
 ]);
+const RETIREMENT_ACCOUNT_CATEGORIES = new Set([
+  "Employer Retirement",
+  "Individual Retirement",
+]);
 
 type Priority = "high" | "medium" | "low";
 type RecommendationGroup = "earn" | "save" | "other";
@@ -69,6 +73,14 @@ interface Rec {
 type CashFlowSummary = {
   period: { startMonth: string | null; endMonth: string | null; months: number };
   averages: { income: number; expenses: number; net: number; savingsRate: number };
+};
+
+type RetirementNetWorthProjectionSummary = {
+  projectedNetWorth: number;
+};
+
+type RetirementIncomeProjectionSummary = {
+  totalMonthlyIncome: number;
 };
 
 function SnapshotCard({
@@ -165,11 +177,19 @@ export default function SnapshotPage() {
   const { data: plannerSettings, isLoading: plannerSettingsLoading } = useQuery<RetirementPlannerSettings>({
     queryKey: ["/api/retirement/planner-settings"],
   });
+  const { data: retirementNetWorthProjection, isLoading: retirementNetWorthLoading } = useQuery<RetirementNetWorthProjectionSummary>({
+    queryKey: ["/api/retirement/net-worth-projection"],
+    staleTime: 0,
+  });
+  const { data: retirementIncomeProjection, isLoading: retirementIncomeLoading } = useQuery<RetirementIncomeProjectionSummary>({
+    queryKey: ["/api/retirement/income-expense-projection"],
+    staleTime: 0,
+  });
   const { data: estateBeneficiaries = [] } = useQuery<EstateBeneficiary[]>({ queryKey: ["/api/estate/beneficiaries"] });
   const { data: estateDocuments = [] } = useQuery<EstateDocument[]>({ queryKey: ["/api/estate/documents"] });
   const { data: estateContacts = [] } = useQuery<EstateContact[]>({ queryKey: ["/api/estate/contacts"] });
 
-  const isLoading = aL || lL || cashFlowLoading || pL || plannerSettingsLoading;
+  const isLoading = aL || lL || cashFlowLoading || pL || plannerSettingsLoading || retirementNetWorthLoading || retirementIncomeLoading;
 
   const totalAssets = useMemo(() => assets.reduce((s, a) => s + parseFloat(a.value || "0"), 0), [assets]);
   const totalLiabilities = useMemo(() => liabilities.reduce((s, l) => s + parseFloat(l.balance || "0"), 0), [liabilities]);
@@ -182,7 +202,9 @@ export default function SnapshotPage() {
   const savingsRate = cashFlow.savingsRate;
 
   const retirementAssets = useMemo(() =>
-    assets.filter(a => a.category === "retirement_fund").reduce((s, a) => s + parseFloat(a.value || "0"), 0), [assets]);
+    assets
+      .filter(a => RETIREMENT_ACCOUNT_CATEGORIES.has(a.category))
+      .reduce((s, a) => s + parseFloat(a.value || "0"), 0), [assets]);
   const k401Balance = goal401k ? parseFloat((goal401k as any).currentBalance || "0") : retirementAssets;
   const ssnMonthlyEst = Math.min(totalMonthlyIncome * 0.42, 3822);
   const retirementAge = plannerSettings?.retirementAge ?? (goal401k as any)?.retirementAge ?? 65;
@@ -472,8 +494,8 @@ export default function SnapshotPage() {
             <p className="text-xs text-muted-foreground mt-1">Current retirement savings</p>
           </div>
           <div className="space-y-2 pt-3 border-t border-slate-100 dark:border-slate-800">
-            <StatRow label="401k / Retirement Funds" value={formatCurrency(k401Balance || retirementAssets)} />
-            <StatRow label="SSN Est. (at retirement)" value={`~${formatCurrency(ssnMonthlyEst)}/mo`} />
+            <StatRow label="Projected Retirement Net worth" value={retirementNetWorthProjection ? formatCurrency(retirementNetWorthProjection.projectedNetWorth) : "—"} />
+            <StatRow label="Projected retirement Income" value={retirementIncomeProjection ? `~${formatCurrency(retirementIncomeProjection.totalMonthlyIncome)}/mo` : "—"} />
             <div>
               <div className="flex items-center justify-between gap-2 text-sm">
                 <span className="text-muted-foreground">Years to retire:</span>
