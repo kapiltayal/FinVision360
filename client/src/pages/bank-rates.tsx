@@ -278,7 +278,23 @@ function RateTable({
                 {editingRateId === rate.id ? editInput("bankName", "Financial institution") : rate.bankName}
               </TableCell>
               <TableCell>
-                {editingRateId === rate.id ? editInput("bankType", "Institution type") : (
+                {editingRateId === rate.id ? (
+                  <Select
+                    value={editingRateFields?.bankType || BANK_TYPES[0]}
+                    onValueChange={(value) => setEditingRateFields((current) => (
+                      current ? { ...current, bankType: value } : current
+                    ))}
+                  >
+                    <SelectTrigger className="h-8 min-w-36">
+                      <SelectValue aria-label="Institution type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {BANK_TYPES.map((bankType) => (
+                        <SelectItem key={bankType} value={bankType}>{bankType}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
                   <Badge variant="outline" className="whitespace-nowrap font-normal">
                     {rate.bankType || "Standard Bank"}
                   </Badge>
@@ -303,51 +319,53 @@ function RateTable({
                   {formatDate(rate.scrapedAt)}
                 </span>
               </TableCell>
-              <TableCell>
-                {editable && editingRateId === rate.id && (
-                  <>
+              <TableCell className="whitespace-nowrap">
+                <div className="flex items-center gap-1">
+                  {editable && editingRateId === rate.id && (
+                    <>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-green-700"
+                        onClick={() => void saveEdit(rate)}
+                        disabled={!editingRateFields || Object.values(editingRateFields).some((value) => !value.trim()) || savingRateId === rate.id}
+                        aria-label="Save rate changes"
+                      >
+                        <Check className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7"
+                        onClick={cancelEdit}
+                        disabled={savingRateId === rate.id}
+                        aria-label="Cancel rate changes"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </Button>
+                    </>
+                  )}
+                  {editable && editingRateId !== rate.id && (
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-7 w-7 text-green-700"
-                      onClick={() => void saveEdit(rate)}
-                      disabled={!editingRateFields || Object.values(editingRateFields).some((value) => !value.trim()) || savingRateId === rate.id}
-                      aria-label="Save rate changes"
+                      className="h-7 w-7 text-muted-foreground"
+                      onClick={() => beginEdit(rate)}
+                      aria-label={`Edit ${rate.bankName} ${rate.rateName}`}
                     >
-                      <Check className="h-3.5 w-3.5" />
+                      <Pencil className="h-3.5 w-3.5" />
                     </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7"
-                      onClick={cancelEdit}
-                      disabled={savingRateId === rate.id}
-                      aria-label="Cancel rate changes"
-                    >
-                      <X className="h-3.5 w-3.5" />
-                    </Button>
-                  </>
-                )}
-                {editable && editingRateId !== rate.id && (
+                  )}
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-7 w-7 text-muted-foreground"
-                    onClick={() => beginEdit(rate)}
-                    aria-label={`Edit ${rate.bankName} ${rate.rateName}`}
+                    className="h-7 w-7 text-muted-foreground hover:text-red-500"
+                    onClick={() => onDelete(rate.id)}
+                    aria-label={`Delete ${rate.bankName} ${rate.rateName} rate`}
                   >
-                    <Pencil className="h-3.5 w-3.5" />
+                    <Trash2 className="h-3.5 w-3.5" />
                   </Button>
-                )}
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7 text-muted-foreground hover:text-red-500"
-                  onClick={() => onDelete(rate.id)}
-                  aria-label={`Delete ${rate.bankName} ${rate.rateName} rate`}
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </Button>
+                </div>
               </TableCell>
             </TableRow>
           ))}
