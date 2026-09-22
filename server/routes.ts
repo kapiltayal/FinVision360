@@ -1103,6 +1103,25 @@ Include a year-by-year overview, useful milestones, a conservative/base/optimist
     res.json(rows);
   });
 
+  app.post("/api/bank-rates/preview", requireAdmin, ingestionUploadFile, async (req, res) => {
+    if (!req.file || !isSupportedUpload(req.file)) {
+      return res.status(400).json({ error: "Upload a valid CSV, TSV, TXT, XLS, XLSX, or XLSM file" });
+    }
+    const rows = parseUpload(req.file);
+    if (!rows?.length) {
+      return res.status(400).json({ error: "The file has no readable data rows" });
+    }
+    if (rows.length > 500) {
+      return res.status(400).json({ error: "The file contains more than 500 data rows. Split it into smaller files and try again." });
+    }
+    const headers = Array.from(new Set(rows.flatMap((row) => Object.keys(row))));
+    res.json({
+      headers,
+      sampleRows: rows.slice(0, 8),
+      totalRows: rows.length,
+    });
+  });
+
   // Manual rate entry
   app.post("/api/bank-rates/manual", requireAdmin, async (req, res) => {
     const bankName = typeof req.body.bankName === "string" ? req.body.bankName.trim() : "";
@@ -1151,7 +1170,29 @@ Include a year-by-year overview, useful milestones, a conservative/base/optimist
       return res.status(400).json({ error: "The file contains more than 500 data rows. Split it into smaller files and try again." });
     }
 
-    const field = (row: RawRow, aliases: string[]) => {
+    let requestedMapping: Record<string, string> = {};
+    if (req.body?.mapping) {
+      try {
+        const parsedMapping = JSON.parse(req.body.mapping);
+        if (!parsedMapping || typeof parsedMapping !== "object" || Array.isArray(parsedMapping)) {
+          return res.status(400).json({ error: "Column mapping must be an object" });
+        }
+        requestedMapping = parsedMapping;
+      } catch {
+        return res.status(400).json({ error: "Column mapping is not valid JSON" });
+      }
+    }
+    const headers = new Set(rows.flatMap((row) => Object.keys(row)));
+    const mappingKeys = ["bankName", "bankType", "rateType", "rateName", "rateValue"];
+    const invalidMappings = mappingKeys.filter((key) =>
+      requestedMapping[key] && !headers.has(requestedMapping[key]),
+    );
+    if (invalidMappings.length) {
+      return res.status(400).json({ error: "The selected column mapping does not match the uploaded file" });
+    }
+
+    const field = (row: RawRow, aliases: string[], mappedKey: string) => {
+      const candidates = requestedMapping[mappedKey] ? [requestedMapping[mappedKey]] : aliases;
       for (const alias of aliases) {
         const value = row[alias];
         if (typeof value === "string" || typeof value === "number") {
@@ -1163,11 +1204,11 @@ Include a year-by-year overview, useful milestones, a conservative/base/optimist
     };
     const parsedRows = rows.map((row, index) => ({
       rowNumber: index + 2,
-      bankName: field(row, ["bankname", "bank", "bankfinancialinstitution", "bankorfinancialinstitution", "financialinstitution", "financialinstitutionname", "institutionname", "institution", "banksource"]),
-      bankType: field(row, ["banktype", "institutiontype", "financialinstitutiontype"]) || "Standard Bank",
-      rateType: field(row, ["ratetype", "type", "accounttype", "producttype"]).toLowerCase(),
-      rateName: field(row, ["ratename", "productname", "product", "accountname"]),
-      rateValue: field(row, ["ratevalue", "rate", "apy", "apr", "interestrate"]),
+      bankName: field(row, ["bankname", "bank", "bankfinancialinstitution", "bankorfinancialinstitution", "financialinstitution", "financialinstitutionname", "institutionname", "institution", "banksource"], "bankName"),
+      bankType: field(row, ["banktype", "institutiontype", "financialinstitutiontype"], "bankType") || "Standard Bank",
+      rateType: field(row, ["ratetype", "type", "accounttype", "producttype"], "rateType").toLowerCase(),
+      rateName: field(row, ["ratename", "productname", "product", "accountname"], "rateName"),
+      rateValue: field(row, ["ratevalue", "rate", "apy", "apr", "interestrate"], "rateValue"),
     }));
     const invalidRows = parsedRows.filter((row) => !row.bankName || !row.rateType || !row.rateName || !row.rateValue);
     if (invalidRows.length) {
