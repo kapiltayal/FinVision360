@@ -3,6 +3,7 @@ import { useLocation } from "wouter";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -249,15 +250,7 @@ export default function BankRatesPage() {
 
   const addManualRate = useMutation({
     mutationFn: async () => {
-      const response = await fetch("/api/bank-rates/manual", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(manualForm),
-      });
-      if (!response.ok) {
-        const body = await response.json().catch(() => null);
-        throw new Error(body?.error || "Could not save the bank rate");
-      }
+      const response = await apiRequest("POST", "/api/bank-rates/manual", manualForm);
       return response.json();
     },
     onSuccess: () => {
@@ -276,10 +269,8 @@ export default function BankRatesPage() {
     mutationFn: async (file: File) => {
       const body = new FormData();
       body.append("file", file);
-      const response = await fetch("/api/bank-rates/preview", { method: "POST", body });
-      const result = await response.json().catch(() => null);
-      if (!response.ok) throw new Error(result?.error || result?.message || "Could not preview the bank-rate file");
-      return result as BankRateUploadPreview;
+      const response = await apiRequest("POST", "/api/bank-rates/preview", body);
+      return await response.json() as BankRateUploadPreview;
     },
     onSuccess: (preview) => {
       setUploadPreview(preview);
@@ -296,10 +287,8 @@ export default function BankRatesPage() {
       const body = new FormData();
       body.append("file", file);
       body.append("mapping", JSON.stringify(mapping));
-      const response = await fetch("/api/bank-rates/import", { method: "POST", body });
-      const result = await response.json().catch(() => null);
-      if (!response.ok) throw new Error(result?.error || result?.message || "Could not import the bank-rate file");
-      return result as { imported: number };
+      const response = await apiRequest("POST", "/api/bank-rates/import", body);
+      return await response.json() as { imported: number };
     },
     onSuccess: ({ imported }) => {
       queryClient.invalidateQueries({ queryKey: ["/api/bank-rates"] });
@@ -317,8 +306,7 @@ export default function BankRatesPage() {
 
   const deleteRate = useMutation({
     mutationFn: async (id: number) => {
-      const response = await fetch(`/api/bank-rates/${id}`, { method: "DELETE" });
-      if (!response.ok) throw new Error("Could not delete this rate");
+      await apiRequest("DELETE", `/api/bank-rates/${id}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/bank-rates"] });
