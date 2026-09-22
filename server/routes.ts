@@ -36,6 +36,7 @@ import { buildRetirementIncomeExpenseProjection } from "./retirement-income-expe
 const MAX_PENSION_AMOUNT = 9_999_999_999_999.99;
 const MAX_SOCIAL_SECURITY_MONTHLY_BENEFIT = 99_999_999.99;
 const ingestionUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024, files: 1 } });
+const BANK_RATE_IMPORT_MAX_ROWS = 5000;
 const INVALID_FILE_TYPE = "Invalid file type. Please upload a valid CSV or JSON file.";
 const CORRUPT_FILE = "File content could not be read or appears corrupted.";
 const NO_DETECTIONS = "Could not detect any valid assets or liabilities in this file.";
@@ -1111,8 +1112,8 @@ Include a year-by-year overview, useful milestones, a conservative/base/optimist
     if (!rows?.length) {
       return res.status(400).json({ error: "The file has no readable data rows" });
     }
-    if (rows.length > 500) {
-      return res.status(400).json({ error: "The file contains more than 500 data rows. Split it into smaller files and try again." });
+    if (rows.length > BANK_RATE_IMPORT_MAX_ROWS) {
+      return res.status(400).json({ error: `The file contains more than ${BANK_RATE_IMPORT_MAX_ROWS} data rows. Split it into smaller files and try again.` });
     }
     const headers = Array.from(new Set(rows.flatMap((row) => Object.keys(row))));
     res.json({
@@ -1166,8 +1167,8 @@ Include a year-by-year overview, useful milestones, a conservative/base/optimist
     if (!rows?.length) {
       return res.status(400).json({ error: "The file has no readable data rows" });
     }
-    if (rows.length > 500) {
-      return res.status(400).json({ error: "The file contains more than 500 data rows. Split it into smaller files and try again." });
+    if (rows.length > BANK_RATE_IMPORT_MAX_ROWS) {
+      return res.status(400).json({ error: `The file contains more than ${BANK_RATE_IMPORT_MAX_ROWS} data rows. Split it into smaller files and try again.` });
     }
 
     let requestedMapping: Record<string, string> = {};

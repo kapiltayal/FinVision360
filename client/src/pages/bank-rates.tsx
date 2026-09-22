@@ -568,7 +568,7 @@ export default function BankRatesPage() {
                   Select a file to preview its rows and map your columns before anything is saved.
                 </p>
                 <p className="mt-2 text-xs text-muted-foreground">
-                  CSV, tab-delimited, XLS, XLSX, and XLSM files are supported. Maximum 500 data rows.
+                  CSV, tab-delimited, XLS, XLSX, and XLSM files are supported. Maximum 5,000 data rows.
                 </p>
               </div>
             )}
