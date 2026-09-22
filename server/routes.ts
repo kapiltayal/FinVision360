@@ -1163,7 +1163,7 @@ Include a year-by-year overview, useful milestones, a conservative/base/optimist
     };
     const parsedRows = rows.map((row, index) => ({
       rowNumber: index + 2,
-      bankName: field(row, ["bankname", "bank", "financialinstitution", "institutionname", "institution", "banksource"]),
+      bankName: field(row, ["bankname", "bank", "bankfinancialinstitution", "bankorfinancialinstitution", "financialinstitution", "financialinstitutionname", "institutionname", "institution", "banksource"]),
       bankType: field(row, ["banktype", "institutiontype", "financialinstitutiontype"]) || "Standard Bank",
       rateType: field(row, ["ratetype", "accounttype", "producttype"]).toLowerCase(),
       rateName: field(row, ["ratename", "productname", "product", "accountname"]),
