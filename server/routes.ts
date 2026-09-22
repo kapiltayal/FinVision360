@@ -1251,6 +1251,22 @@ Include a year-by-year overview, useful milestones, a conservative/base/optimist
     res.status(201).json({ imported });
   });
 
+  app.patch("/api/bank-rates/:id", requireAdmin, async (req, res) => {
+    const id = Number.parseInt(req.params.id, 10);
+    const rateValue = typeof req.body?.rateValue === "string" ? req.body.rateValue.trim() : "";
+    if (!Number.isInteger(id) || id <= 0) {
+      return res.status(400).json({ error: "Invalid bank-rate record" });
+    }
+    if (!rateValue) {
+      return res.status(400).json({ error: "Current rate is required" });
+    }
+    const updated = await storage.updateBankRate(id, { rateValue });
+    if (!updated) {
+      return res.status(404).json({ error: "Bank-rate record not found" });
+    }
+    res.json(updated);
+  });
+
   // Delete a bank rate record
   app.delete("/api/bank-rates/:id", requireAdmin, async (req, res) => {
     const id = parseInt(req.params.id);

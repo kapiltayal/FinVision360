@@ -73,6 +73,7 @@ export interface IStorage {
 
   getBankRates(configId?: number, rateType?: string, limit?: number): Promise<BankRate[]>;
   createBankRate(data: InsertBankRate): Promise<BankRate>;
+  updateBankRate(id: number, data: Pick<InsertBankRate, "rateValue">): Promise<BankRate | undefined>;
   deleteBankRate(id: number): Promise<void>;
   deleteBankRatesByConfig(configId: number): Promise<void>;
 
@@ -345,6 +346,11 @@ export class DatabaseStorage implements IStorage {
   async createBankRate(data: InsertBankRate): Promise<BankRate> {
     const [created] = await db.insert(bankRates).values(data).returning();
     return created;
+  }
+
+  async updateBankRate(id: number, data: Pick<InsertBankRate, "rateValue">): Promise<BankRate | undefined> {
+    const [updated] = await db.update(bankRates).set(data).where(eq(bankRates.id, id)).returning();
+    return updated;
   }
 
   async deleteBankRate(id: number): Promise<void> {

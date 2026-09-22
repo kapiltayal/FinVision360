@@ -32,7 +32,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Clock, FileSpreadsheet, Landmark, PenLine, Trash2, Upload } from "lucide-react";
+import { Check, ChevronDown, ChevronUp, Clock, FileSpreadsheet, Landmark, Pencil, PenLine, Trash2, Upload, X } from "lucide-react";
 
 interface BankRate {
   id: number;
@@ -148,26 +148,107 @@ function formatDate(dateStr: string) {
 function RateTable({
   rates,
   onDelete,
+  onUpdateRate,
 }: {
   rates: BankRate[];
   onDelete: (id: number) => void;
+  onUpdateRate: (id: number, rateValue: string) => Promise<void>;
 }) {
+  type SortKey = "bankName" | "bankType" | "rateType" | "rateName" | "rateValue" | "scrapedAt";
+  const [sort, setSort] = useState<{ key: SortKey; direction: "asc" | "desc" }>({
+    key: "scrapedAt",
+    direction: "desc",
+  });
+  const [editingRateId, setEditingRateId] = useState<number | null>(null);
+  const [editingRateValue, setEditingRateValue] = useState("");
+  const [savingRateId, setSavingRateId] = useState<number | null>(null);
+
+  const sortedRates = useMemo(() => {
+    const getValue = (rate: BankRate, key: SortKey) => {
+      if (key === "rateValue") {
+        const numeric = Number.parseFloat(rate.rateValue.replace(/[^0-9.+-]/g, ""));
+        return Number.isFinite(numeric) ? numeric : rate.rateValue.toLocaleLowerCase();
+      }
+      if (key === "scrapedAt") return new Date(rate.scrapedAt).getTime();
+      return rate[key].toLocaleLowerCase();
+    };
+    return [...rates].sort((left, right) => {
+      const leftValue = getValue(left, sort.key);
+      const rightValue = getValue(right, sort.key);
+      let result: number;
+      if (typeof leftValue === "number" && typeof rightValue === "number") {
+        result = leftValue - rightValue;
+      } else {
+        result = String(leftValue).localeCompare(String(rightValue), undefined, { numeric: true, sensitivity: "base" });
+      }
+      return sort.direction === "asc" ? result : -result;
+    });
+  }, [rates, sort]);
+
+  const changeSort = (key: SortKey) => {
+    setSort((current) => ({
+      key,
+      direction: current.key === key && current.direction === "asc" ? "desc" : "asc",
+    }));
+  };
+
+  const beginEdit = (rate: BankRate) => {
+    setEditingRateId(rate.id);
+    setEditingRateValue(rate.rateValue);
+  };
+
+  const cancelEdit = () => {
+    setEditingRateId(null);
+    setEditingRateValue("");
+  };
+
+  const saveEdit = async (rate: BankRate) => {
+    const value = editingRateValue.trim();
+    if (!value || savingRateId !== null) return;
+    setSavingRateId(rate.id);
+    try {
+      await onUpdateRate(rate.id, value);
+      cancelEdit();
+    } finally {
+      setSavingRateId(null);
+    }
+  };
+
+  const sortIcon = (key: SortKey) => {
+    if (sort.key !== key) return <ChevronDown className="h-3.5 w-3.5 opacity-40" />;
+    return sort.direction === "asc"
+      ? <ChevronUp className="h-3.5 w-3.5" />
+      : <ChevronDown className="h-3.5 w-3.5" />;
+  };
+
+  const sortableHeader = (key: SortKey, label: string) => (
+    <Button
+      variant="ghost"
+      size="sm"
+      className="-ml-3 h-8 gap-1 px-3 font-semibold"
+      onClick={() => changeSort(key)}
+    >
+      {label}
+      {sortIcon(key)}
+    </Button>
+  );
+
   return (
     <div className="overflow-x-auto">
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Financial Institution</TableHead>
-            <TableHead>Institution Type</TableHead>
-            <TableHead>Rate Type</TableHead>
-            <TableHead>Product</TableHead>
-            <TableHead>Rate</TableHead>
-            <TableHead>Recorded At</TableHead>
+            <TableHead>{sortableHeader("bankName", "Financial Institution")}</TableHead>
+            <TableHead>{sortableHeader("bankType", "Institution Type")}</TableHead>
+            <TableHead>{sortableHeader("rateType", "Rate Type")}</TableHead>
+            <TableHead>{sortableHeader("rateName", "Product")}</TableHead>
+            <TableHead>{sortableHeader("rateValue", "Current Rate")}</TableHead>
+            <TableHead>{sortableHeader("scrapedAt", "Recorded At")}</TableHead>
             <TableHead className="w-10" />
           </TableRow>
         </TableHeader>
         <TableBody>
-          {rates.map((rate) => (
+          {sortedRates.map((rate) => (
             <TableRow key={rate.id}>
               <TableCell className="font-medium">{rate.bankName}</TableCell>
               <TableCell>
@@ -181,7 +262,53 @@ function RateTable({
                 </span>
               </TableCell>
               <TableCell className="text-sm text-muted-foreground">{rate.rateName}</TableCell>
-              <TableCell className="font-bold text-primary">{rate.rateValue}</TableCell>
+              <TableCell className="font-bold text-primary">
+                {editingRateId === rate.id ? (
+                  <div className="flex min-w-48 items-center gap-1">
+                    <Input
+                      value={editingRateValue}
+                      onChange={(event) => setEditingRateValue(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") void saveEdit(rate);
+                        if (event.key === "Escape") cancelEdit();
+                      }}
+                      aria-label={`Current rate for ${rate.bankName} ${rate.rateName}`}
+                      autoFocus
+                      className="h-8"
+                    />
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-green-700"
+                      onClick={() => void saveEdit(rate)}
+                      disabled={!editingRateValue.trim() || savingRateId === rate.id}
+                      aria-label="Save current rate"
+                    >
+                      <Check className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={cancelEdit}
+                      disabled={savingRateId === rate.id}
+                      aria-label="Cancel editing current rate"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ) : (
+                  <Button
+                    variant="ghost"
+                    className="h-8 gap-1 px-2 font-bold text-primary"
+                    onClick={() => beginEdit(rate)}
+                    aria-label={`Edit current rate for ${rate.bankName} ${rate.rateName}`}
+                  >
+                    {rate.rateValue}
+                    <Pencil className="h-3.5 w-3.5 opacity-60" />
+                  </Button>
+                )}
+              </TableCell>
               <TableCell className="text-xs text-muted-foreground">
                 <span className="flex items-center gap-1 whitespace-nowrap">
                   <Clock className="h-3 w-3" />
@@ -304,6 +431,21 @@ export default function BankRatesPage() {
     },
   });
 
+  const updateRate = useMutation({
+    mutationFn: async ({ id, rateValue }: { id: number; rateValue: string }) => {
+      const response = await apiRequest("PATCH", `/api/bank-rates/${id}`, { rateValue });
+      return response.json() as Promise<BankRate>;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/bank-rates"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/bank-rates/institutions"] });
+      toast({ title: "Current rate updated" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Could not update rate", description: error.message, variant: "destructive" });
+    },
+  });
+
   const deleteRate = useMutation({
     mutationFn: async (id: number) => {
       await apiRequest("DELETE", `/api/bank-rates/${id}`);
@@ -397,7 +539,11 @@ export default function BankRatesPage() {
           ) : (
             <Card>
               <CardContent className="p-0">
-                <RateTable rates={latestRates} onDelete={setDeleteRateId} />
+                <RateTable
+                  rates={latestRates}
+                  onDelete={setDeleteRateId}
+                  onUpdateRate={(id, rateValue) => updateRate.mutateAsync({ id, rateValue }).then(() => undefined)}
+                />
               </CardContent>
             </Card>
           )}
@@ -417,7 +563,11 @@ export default function BankRatesPage() {
                 <CardDescription>Manual and file-imported rate history ({rates.length} records)</CardDescription>
               </CardHeader>
               <CardContent className="p-0">
-                <RateTable rates={rates} onDelete={setDeleteRateId} />
+                <RateTable
+                  rates={rates}
+                  onDelete={setDeleteRateId}
+                  onUpdateRate={(id, rateValue) => updateRate.mutateAsync({ id, rateValue }).then(() => undefined)}
+                />
               </CardContent>
             </Card>
           )}
