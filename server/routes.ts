@@ -1165,7 +1165,7 @@ Include a year-by-year overview, useful milestones, a conservative/base/optimist
       rowNumber: index + 2,
       bankName: field(row, ["bankname", "bank", "bankfinancialinstitution", "bankorfinancialinstitution", "financialinstitution", "financialinstitutionname", "institutionname", "institution", "banksource"]),
       bankType: field(row, ["banktype", "institutiontype", "financialinstitutiontype"]) || "Standard Bank",
-      rateType: field(row, ["ratetype", "accounttype", "producttype"]).toLowerCase(),
+      rateType: field(row, ["ratetype", "type", "accounttype", "producttype"]).toLowerCase(),
       rateName: field(row, ["ratename", "productname", "product", "accountname"]),
       rateValue: field(row, ["ratevalue", "rate", "apy", "apr", "interestrate"]),
     }));

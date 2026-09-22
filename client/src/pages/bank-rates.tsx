@@ -491,7 +491,7 @@ export default function BankRatesPage() {
                 <li><strong className="text-foreground">Rate Value</strong> — required</li>
               </ul>
               <p className="mt-3 text-xs text-muted-foreground">
-                Common alternatives such as Bank Name, Institution Type, APY, APR, and Interest Rate are also recognized.
+                Common alternatives such as Bank Name, Type, Product, APY, APR, and Interest Rate are also recognized.
               </p>
             </div>
           </div>
