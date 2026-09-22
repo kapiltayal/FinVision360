@@ -429,6 +429,7 @@ export const bankRates = pgTable("bank_rates", {
   id: serial("id").primaryKey(),
   configId: integer("config_id").notNull().references(() => bankConfigs.id, { onDelete: "cascade" }),
   bankName: text("bank_name").notNull(),
+  bankType: text("bank_type").default("Standard Bank").notNull(),
   rateType: text("rate_type").notNull(),
   rateName: text("rate_name").notNull(),
   rateValue: text("rate_value").notNull(),

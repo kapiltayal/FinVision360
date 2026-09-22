@@ -1,6 +1,6 @@
 import type { Express, Response } from "express";
 import { createServer, type Server } from "http";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { storage } from "./storage";
 import { setupAuth, requireAuth, requireAdmin, authenticateSupabase } from "./auth";
 import { db, pool } from "./db";
@@ -17,11 +17,12 @@ import {
   retirementIncomeExpenseSettings,
   retirementIncomeExpenseEntries,
   retirementAccountWithdrawalRates,
+  bankConfigs,
+  bankRates,
   type Retirement401kGoal,
   type RetirementPlannerSettings,
 } from "@shared/schema";
 import { AI_ADVISOR_LIMITS, AIProviderError, type AdvisorMessage, streamAdvisorCompletion } from "./ai/provider";
-import { scrapeBank, DEFAULT_BANK_CONFIGS, type BankSelectorConfig } from "./scraper";
 import { Products, CountryCode } from "plaid";
 import { getPlaidClient } from "./plaid";
 import multer from "multer";
@@ -1091,42 +1092,6 @@ Include a year-by-year overview, useful milestones, a conservative/base/optimist
     res.status(204).send();
   });
 
-  // Bank configs routes
-  app.get("/api/bank-configs", requireAdmin, async (_req, res) => {
-    const configs = await storage.getBankConfigs();
-    res.json(configs);
-  });
-
-  app.post("/api/bank-configs", requireAdmin, async (req, res) => {
-    const { bankName, bankUrl, selectorsJson, notes, isActive } = req.body;
-    if (!bankName || !bankUrl || !selectorsJson) {
-      return res.status(400).json({ error: "bankName, bankUrl, and selectorsJson are required" });
-    }
-    try { JSON.parse(selectorsJson); } catch {
-      return res.status(400).json({ error: "selectorsJson must be valid JSON" });
-    }
-    const config = await storage.createBankConfig({ bankName, bankUrl, selectorsJson, notes, isActive: isActive ?? true });
-    res.status(201).json(config);
-  });
-
-  app.put("/api/bank-configs/:id", requireAdmin, async (req, res) => {
-    const id = parseInt(req.params.id);
-    if (req.body.selectorsJson) {
-      try { JSON.parse(req.body.selectorsJson); } catch {
-        return res.status(400).json({ error: "selectorsJson must be valid JSON" });
-      }
-    }
-    const config = await storage.updateBankConfig(id, req.body);
-    if (!config) return res.status(404).json({ error: "Config not found" });
-    res.json(config);
-  });
-
-  app.delete("/api/bank-configs/:id", requireAdmin, async (req, res) => {
-    const id = parseInt(req.params.id);
-    await storage.deleteBankConfig(id);
-    res.json({ ok: true });
-  });
-
   // Bank rates routes
   app.get("/api/bank-rates", requireAdmin, async (req, res) => {
     const configId = req.query.configId ? parseInt(req.query.configId as string) : undefined;
@@ -1134,50 +1099,121 @@ Include a year-by-year overview, useful milestones, a conservative/base/optimist
     res.json(rates);
   });
 
-  app.post("/api/bank-rates/scrape-all", requireAdmin, async (_req, res) => {
-    const configs = await storage.getBankConfigs();
-    const active = configs.filter((c) => c.isActive);
-    const results = await Promise.all(
-      active.map(async (config) => {
-        let selectors: BankSelectorConfig = {};
-        try { selectors = JSON.parse(config.selectorsJson); } catch { /* ignore */ }
-        const result = await scrapeBank(config.bankUrl, config.bankName, selectors);
-        if (result.success && result.rates.length > 0) {
-          await Promise.all(result.rates.map((r) =>
-            storage.createBankRate({ configId: config.id, bankName: config.bankName, rateType: r.rateType, rateName: r.rateName, rateValue: r.rateValue })
-          ));
-        }
-        return { configId: config.id, bankName: config.bankName, success: result.success, ratesFound: result.rates.length, error: result.error };
-      })
+  app.get("/api/bank-rates/institutions", requireAdmin, async (_req, res) => {
+    const { rows } = await pool.query<{ name: string; type: string }>(
+      `SELECT DISTINCT ON (LOWER(bank_name))
+         bank_name AS name,
+         bank_type AS type
+       FROM bank_rates
+       ORDER BY LOWER(bank_name), scraped_at DESC`,
     );
-    res.json(results);
-  });
-
-  app.post("/api/bank-rates/scrape/:id", requireAdmin, async (req, res) => {
-    const id = parseInt(req.params.id);
-    const config = await storage.getBankConfig(id);
-    if (!config) return res.status(404).json({ error: "Config not found" });
-    let selectors: BankSelectorConfig = {};
-    try { selectors = JSON.parse(config.selectorsJson); } catch { /* ignore */ }
-    const result = await scrapeBank(config.bankUrl, config.bankName, selectors);
-    if (result.success && result.rates.length > 0) {
-      await Promise.all(result.rates.map((r) =>
-        storage.createBankRate({ configId: config.id, bankName: config.bankName, rateType: r.rateType, rateName: r.rateName, rateValue: r.rateValue })
-      ));
-    }
-    res.json({ configId: config.id, bankName: config.bankName, success: result.success, ratesFound: result.rates.length, error: result.error });
+    res.json(rows);
   });
 
   // Manual rate entry
   app.post("/api/bank-rates/manual", requireAdmin, async (req, res) => {
-    const { configId, rateType, rateName, rateValue } = req.body;
-    if (!configId || !rateType || !rateName || !rateValue) {
-      return res.status(400).json({ error: "configId, rateType, rateName, and rateValue are required" });
+    const bankName = typeof req.body.bankName === "string" ? req.body.bankName.trim() : "";
+    const bankType = typeof req.body.bankType === "string" ? req.body.bankType.trim() : "";
+    const rateType = typeof req.body.rateType === "string" ? req.body.rateType.trim().toLowerCase() : "";
+    const rateName = typeof req.body.rateName === "string" ? req.body.rateName.trim() : "";
+    const rateValue = typeof req.body.rateValue === "string" ? req.body.rateValue.trim() : "";
+    if (!bankName || !bankType || !rateType || !rateName || !rateValue) {
+      return res.status(400).json({ error: "Institution name, institution type, rate type, product name, and rate value are required" });
     }
-    const config = await storage.getBankConfig(parseInt(configId));
-    if (!config) return res.status(404).json({ error: "Bank config not found" });
-    const rate = await storage.createBankRate({ configId: parseInt(configId), bankName: config.bankName, rateType, rateName, rateValue });
+    const rate = await db.transaction(async (tx) => {
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext('bank-rate-institutions'))`);
+      const configs = await tx.select().from(bankConfigs);
+      let config = configs.find((candidate) => candidate.bankName.toLocaleLowerCase() === bankName.toLocaleLowerCase());
+      if (!config) {
+        [config] = await tx.insert(bankConfigs).values({
+          bankName,
+          bankUrl: "",
+          selectorsJson: "{}",
+          notes: "Manual bank-rate entry",
+          isActive: true,
+        }).returning();
+      }
+      const [created] = await tx.insert(bankRates).values({
+        configId: config.id,
+        bankName,
+        bankType,
+        rateType,
+        rateName,
+        rateValue,
+      }).returning();
+      return created;
+    });
     res.status(201).json(rate);
+  });
+
+  app.post("/api/bank-rates/import", requireAdmin, ingestionUploadFile, async (req, res) => {
+    if (!req.file || !isSupportedUpload(req.file)) {
+      return res.status(400).json({ error: "Upload a valid CSV, TSV, TXT, XLS, or XLSX file" });
+    }
+    const rows = parseUpload(req.file);
+    if (!rows?.length) {
+      return res.status(400).json({ error: "The file has no readable data rows" });
+    }
+    if (rows.length > 500) {
+      return res.status(400).json({ error: "The file contains more than 500 data rows. Split it into smaller files and try again." });
+    }
+
+    const field = (row: RawRow, aliases: string[]) => {
+      for (const alias of aliases) {
+        const value = row[alias];
+        if (typeof value === "string" || typeof value === "number") {
+          const cleaned = String(value).trim();
+          if (cleaned) return cleaned;
+        }
+      }
+      return "";
+    };
+    const parsedRows = rows.map((row, index) => ({
+      rowNumber: index + 2,
+      bankName: field(row, ["bankname", "bank", "financialinstitution", "institutionname", "institution", "banksource"]),
+      bankType: field(row, ["banktype", "institutiontype", "financialinstitutiontype"]) || "Standard Bank",
+      rateType: field(row, ["ratetype", "accounttype", "producttype"]).toLowerCase(),
+      rateName: field(row, ["ratename", "productname", "product", "accountname"]),
+      rateValue: field(row, ["ratevalue", "rate", "apy", "apr", "interestrate"]),
+    }));
+    const invalidRows = parsedRows.filter((row) => !row.bankName || !row.rateType || !row.rateName || !row.rateValue);
+    if (invalidRows.length) {
+      return res.status(400).json({
+        error: `Missing required values in row${invalidRows.length === 1 ? "" : "s"} ${invalidRows.slice(0, 10).map((row) => row.rowNumber).join(", ")}. Required columns: Institution Name, Rate Type, Product Name, and Rate Value.`,
+      });
+    }
+
+    const imported = await db.transaction(async (tx) => {
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext('bank-rate-institutions'))`);
+      const configs = await tx.select().from(bankConfigs);
+      const configByName = new Map(configs.map((config) => [config.bankName.toLocaleLowerCase(), config]));
+      const values = [];
+      for (const row of parsedRows) {
+        const key = row.bankName.toLocaleLowerCase();
+        let config = configByName.get(key);
+        if (!config) {
+          [config] = await tx.insert(bankConfigs).values({
+            bankName: row.bankName,
+            bankUrl: "",
+            selectorsJson: "{}",
+            notes: "Bank-rate file import",
+            isActive: true,
+          }).returning();
+          configByName.set(key, config);
+        }
+        values.push({
+          configId: config.id,
+          bankName: row.bankName,
+          bankType: row.bankType,
+          rateType: row.rateType,
+          rateName: row.rateName,
+          rateValue: row.rateValue,
+        });
+      }
+      const created = await tx.insert(bankRates).values(values).returning({ id: bankRates.id });
+      return created.length;
+    });
+    res.status(201).json({ imported });
   });
 
   // Delete a bank rate record
@@ -1301,18 +1337,6 @@ Include a year-by-year overview, useful milestones, a conservative/base/optimist
 
   app.get("/api/feedback", requireAdmin, async (_req, res) => {
     res.json(await storage.getFeedback());
-  });
-
-  // Seed default bank configs if none exist
-  app.post("/api/bank-configs/seed-defaults", requireAdmin, async (_req, res) => {
-    const existing = await storage.getBankConfigs();
-    if (existing.length > 0) return res.json({ message: "Configs already exist", count: existing.length });
-    const created = await Promise.all(
-      DEFAULT_BANK_CONFIGS.map((c) =>
-        storage.createBankConfig({ bankName: c.bankName, bankUrl: c.bankUrl, selectorsJson: JSON.stringify(c.selectors, null, 2), notes: c.notes, isActive: true })
-      )
-    );
-    res.json({ message: "Seeded default configs", count: created.length });
   });
 
   // Recommendation settings routes
