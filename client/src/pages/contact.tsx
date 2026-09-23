@@ -55,7 +55,7 @@ export default function ContactPage() {
           <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-muted-foreground">
             <div className="flex items-center gap-1.5">
               <Mail className="h-4 w-4 shrink-0" />
-              <span>hello@finvision360.com</span>
+              <span>contactus@finvision360.com</span>
             </div>
             <div className="flex items-center gap-1.5">
               <MapPin className="h-4 w-4 shrink-0" />

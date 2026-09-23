@@ -78,7 +78,7 @@ export default function AboutPage() {
             {
               icon: Brain,
               title: "AI-Powered Guidance",
-              desc: "Our AI Lab understands your full financial picture and gives you personalized strategies for debt payoff, retirement planning, and net worth growth.",
+              desc: "Our AI Lab understands your full financial picture and gives you smart strategies for debt payoff, retirement planning, and net worth growth.",
             },
             {
               icon: ShieldCheck,
@@ -106,7 +106,7 @@ export default function AboutPage() {
               "Retirement planning calculators including 401(k) and Social Security projections",
               "Income and expense tracking by category",
               "Insurance policy management",
-              "AI-powered financial advisor for scenario analysis and debt strategy",
+              "AI-powered financial Copilot for scenario analysis and debt strategy",
               "Bank rate monitoring to find the best savings and lending rates",
             ].map((item) => (
               <li key={item} className="flex items-start gap-3 text-sm text-muted-foreground">
@@ -128,7 +128,7 @@ export default function AboutPage() {
             <div className="flex flex-wrap gap-x-4 gap-y-1 pt-1">
               <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                 <Mail className="h-3.5 w-3.5 shrink-0" />
-                <span>hello@finvision360.com</span>
+                <span>contactus@finvision360.com</span>
               </div>
               <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                 <MapPin className="h-3.5 w-3.5 shrink-0" />

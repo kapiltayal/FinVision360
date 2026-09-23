@@ -352,7 +352,7 @@ const features = [
   {
     icon: Target,
     title: "Retirement Planning",
-    desc: "Visualize your path to retirement with interactive projections, inflation-adjusted forecasts, and contribution planning.",
+    desc: "Visualize your path to retirement with interactive projections, forecasts, and contribution planning.",
     color: "text-orange-500",
     bg: "bg-orange-500/10",
   },
@@ -366,7 +366,7 @@ const features = [
   {
     icon: Brain,
     title: "AI-Powered Advisor",
-    desc: "Get personalized recommendations, debt payoff strategies, and net worth forecasts from your personal finance intelligence.",
+    desc: "Get recommendations, debt payoff strategies, and net worth forecasts from your personal finance Copilot.",
     color: "text-pink-500",
     bg: "bg-pink-500/10",
   },
@@ -376,14 +376,14 @@ const benefits = [
   "Track all assets and liabilities in one dashboard",
   "See your real net worth updated instantly",
   "Understand the interest you earn vs. what you pay",
-  "Plan retirement with inflation-adjusted projections",
+  "Plan retirement with net worth and income projections",
   "AI-powered debt reduction strategies",
   "Scenario planning: 'What if?' financial modeling",
 ];
 
 export default function LandingPage() {
   useSEO({
-    title: "FinVision360 — AI-Powered Personal Finance Intelligence",
+    title: "FinVision360 — AI-Powered Personal Finance Copilot",
     description: "FinVision360 gives you a complete 360° view of your finances. Track net worth, assets, liabilities, retirement, income & expenses, and get AI-powered financial guidance — all in one free app.",
     canonical: "https://finvision360.com/",
   });
@@ -487,7 +487,7 @@ export default function LandingPage() {
       <section className="max-w-6xl mx-auto px-4 pt-20 pb-24 text-center">
         <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary mb-6">
           <Brain className="h-3 w-3" />
-          AI-Powered Personal Financial Intelligence
+          AI-Powered Personal Financial Copilot
         </div>
         <h1 className="text-4xl md:text-6xl font-bold tracking-tight mb-5 leading-tight">
           Your Copilot <br />
@@ -643,10 +643,10 @@ export default function LandingPage() {
         <div className="max-w-4xl mx-auto px-4 text-center">
           <Brain className="h-10 w-10 text-primary-foreground/80 mx-auto mb-4" />
           <h2 className="text-3xl font-bold text-primary-foreground mb-4">
-            Meet Your Personal Finance Intelligence
+            Meet Your Personal Finance Copilot
           </h2>
           <p className="text-primary-foreground/80 text-lg max-w-2xl mx-auto mb-8 leading-relaxed">
-            Ask anything about your finances. Get personalized debt strategies, retirement forecasts,
+            Ask anything about your finances. Get prudent debt strategies, retirement forecasts,
             and "what-if" scenario analysis — powered by AI with full context of your financial picture.
           </p>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
@@ -687,7 +687,7 @@ export default function LandingPage() {
             <div className="space-y-2">
               <img src={logoPath} alt="FinVision360" className="h-9 w-auto" />
               <p className="text-xs text-muted-foreground max-w-xs">
-                Your personal finance intelligence for every stage of life.
+                Your personal finance Copilot for every stage of life.
               </p>
               <p className="text-xs text-muted-foreground">
                 A product of <strong>Tooothy LLC</strong> · Northbrook, IL

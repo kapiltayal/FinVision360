@@ -9,7 +9,7 @@ const faqs = [
     items: [
       {
         q: "What is FinVision360?",
-        a: "FinVision360 is a personal finance intelligence platform that gives you a complete 360° view of your finances. You can track assets and liabilities, monitor net worth, plan for retirement, manage income and expenses, and get AI-powered financial guidance — all in one place. FinVision360.com is a product of Tooothy LLC, a Northbrook, IL based company.",
+        a: "FinVision360 is a personal finance Copilot  that gives you a complete 360° view of your finances. You can track assets and liabilities, monitor net worth, plan for retirement, manage income and expenses, and get AI-powered financial guidance — all in one place. FinVision360.com is a product of Tooothy LLC, a Northbrook, IL based company.",
       },
       {
         q: "Is FinVision360 free to use?",
@@ -21,7 +21,7 @@ const faqs = [
       },
       {
         q: "Is there a demo account I can try?",
-        a: "Yes! You can log in with username 'demo' and password 'demo123' to explore the app with pre-filled sample financial data before creating your own account.",
+        a: "Yes! You can log in with username 'demo@finvision360.com' and password 'demo123' to explore the app with pre-filled sample financial data before creating your own account.",
       },
     ],
   },
@@ -51,7 +51,7 @@ const faqs = [
     items: [
       {
         q: "What retirement planning tools are available?",
-        a: "FinVision360 includes a general Retirement Goal Calculator, a 401(k) Projection tool with employer matching and tax bracket modeling, and a Social Security estimator. You can set a target retirement age and goal amount, and see whether you're on track.",
+        a: "FinVision360 includes a Net worth and Income projections at retirement, a 401(k) Projection tool with employer matching and tax bracket modeling, and a Social Security estimator. You can set a target retirement age and see whether you're on track.",
       },
       {
         q: "How does the 401(k) calculator work?",
@@ -85,15 +85,15 @@ const faqs = [
       },
       {
         q: "Does FinVision360 connect to my bank accounts?",
-        a: "No. FinVision360 does not connect to your bank or request any banking credentials. All financial data is entered manually by you. This is by design — we prioritize privacy and give you full control over what you share.",
+        a: "FinVision360 connects securely to bank accounts through Plaid for automated, read-only data feeds, ensuring login credentials are never stored or exposed. Users retain full control with the option to bypass live integration by uploading financial files or entering data manually. For more details, visit FinVision360.com",
       },
       {
         q: "Can I delete my account and data?",
-        a: "Yes. You can request deletion of your account and all associated data by emailing hello@finvision360.com. We will process your request promptly.",
+        a: "Yes. You can request deletion of your account and all associated data by emailing contactus@finvision360.com. We will process your request promptly.",
       },
       {
         q: "Who operates FinVision360?",
-        a: "FinVision360.com is operated by Tooothy LLC, a Northbrook, IL based company. For privacy or security concerns, please contact us at hello@finvision360.com.",
+        a: "FinVision360.com is operated by Tooothy LLC, a Northbrook, IL based company. For privacy or security concerns, please contact us at contactus@finvision360.com.",
       },
     ],
   },
@@ -102,7 +102,7 @@ const faqs = [
     items: [
       {
         q: "How do I update my profile information?",
-        a: "Go to Settings (accessible from the top navigation). From there you can update your full name and email address.",
+        a: "Go to Settings (accessible from the top navigation). From there you can update your full name, age, address and email address.",
       },
       {
         q: "How do I change my password?",
@@ -167,7 +167,7 @@ export default function FAQPage() {
           <h1 className="text-4xl font-bold tracking-tight">Frequently Asked Questions</h1>
           <p className="text-muted-foreground leading-relaxed">
             Everything you need to know about FinVision360. Can't find what you're looking for?{" "}
-            <a href="mailto:hello@finvision360.com" className="underline hover:text-foreground">
+            <a href="mailto:contactus@finvision360.com" className="underline hover:text-foreground">
               Email us
             </a>{" "}
             and we'll be happy to help.
@@ -191,10 +191,10 @@ export default function FAQPage() {
             Reach out to the team at Tooothy LLC — the Northbrook, IL based company behind FinVision360.
           </p>
           <a
-            href="mailto:hello@finvision360.com"
+            href="mailto:contactus@finvision360.com"
             className="inline-block text-sm font-medium text-primary hover:underline"
           >
-            hello@finvision360.com →
+            contactus@finvision360.com →
           </a>
         </div>
       </div>
