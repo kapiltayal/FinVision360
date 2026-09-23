@@ -240,6 +240,10 @@ export default function AssetsPage() {
   const weightedRate = totalValue > 0
     ? assets.reduce((sum, a) => sum + parseFloat(a.value || "0") * parseFloat(a.interestRate || "0"), 0) / totalValue
     : 0;
+  const annualInterestEarned = assets.reduce(
+    (sum, a) => sum + (parseFloat(a.value || "0") * parseFloat(a.interestRate || "0")) / 100,
+    0,
+  );
   const sortedAssets = useMemo(() => {
     const sorted = [...assets];
     sorted.sort((a, b) => {
@@ -389,11 +393,13 @@ export default function AssetsPage() {
                       </button>
                     </TooltipTrigger>
                     <TooltipContent side="top" className="max-w-xs text-xs leading-relaxed">
-                      Dollar-weighted average: each asset's rate is weighted by its current value. We calculate (asset value × rate) ÷ total asset value. Assets with a 0% rate still count in the total.
+                      Dollar-weighted average: each asset's rate is weighted by its current value. We calculate (asset value × rate) ÷ total asset value. The annual interest amount is the sum of (asset value × rate ÷ 100). Assets with a 0% rate still count in the total.
                     </TooltipContent>
                   </Tooltip>
                 </p>
                 <p className="text-xl font-bold text-emerald-600 dark:text-emerald-400" data-testid="text-avg-rate">{formatPercent(weightedRate)}</p>
+                <p className="mt-1 text-xs text-muted-foreground">Annual interest earned</p>
+                <p className="text-sm font-semibold text-emerald-600 dark:text-emerald-400" data-testid="text-annual-interest-earned">{formatCurrency(annualInterestEarned)}</p>
               </div>
             </div>
           </CardContent>

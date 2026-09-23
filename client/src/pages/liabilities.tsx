@@ -276,6 +276,10 @@ export default function LiabilitiesPage() {
   const weightedRate = totalBalance > 0
     ? liabilities.reduce((sum, l) => sum + parseFloat(l.balance || "0") * parseFloat(l.interestRate || "0"), 0) / totalBalance
     : 0;
+  const annualInterestOwed = liabilities.reduce(
+    (sum, l) => sum + (parseFloat(l.balance || "0") * parseFloat(l.interestRate || "0")) / 100,
+    0,
+  );
   const totalMinPayment = liabilities.reduce((sum, l) => sum + parseFloat(l.minimumPayment || "0"), 0);
   const sortedLiabilities = useMemo(() => {
     const sorted = [...liabilities];
@@ -432,11 +436,13 @@ export default function LiabilitiesPage() {
                       </button>
                     </TooltipTrigger>
                     <TooltipContent side="top" className="max-w-xs text-xs leading-relaxed">
-                      Dollar-weighted average: each liability's interest rate is weighted by its current balance. We calculate (balance × rate) ÷ total balance. Liabilities with a 0% rate still count in the total.
+                      Dollar-weighted average: each liability's interest rate is weighted by its current balance. We calculate (balance × rate) ÷ total balance. The annual interest amount is the sum of (balance × rate ÷ 100). Liabilities with a 0% rate still count in the total.
                     </TooltipContent>
                   </Tooltip>
                 </p>
                 <p className="text-xl font-bold text-red-600 dark:text-red-400" data-testid="text-avg-liability-rate">{formatPercent(weightedRate)}</p>
+                <p className="mt-1 text-xs text-muted-foreground">Annual interest owed</p>
+                <p className="text-sm font-semibold text-red-600 dark:text-red-400" data-testid="text-annual-interest-owed">{formatCurrency(annualInterestOwed)}</p>
               </div>
             </div>
           </CardContent>
