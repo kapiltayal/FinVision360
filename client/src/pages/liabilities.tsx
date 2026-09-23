@@ -427,24 +427,23 @@ export default function LiabilitiesPage() {
                 <TrendingDown className="h-5 w-5 text-red-600 dark:text-red-400" />
               </div>
               <div>
-                <div className="grid grid-cols-2 gap-x-4">
-                  <p className="flex items-center gap-1 text-sm text-muted-foreground">
-                    Avg Interest Rate
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <button type="button" className="inline-flex rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="How average interest rate and annual interest are calculated">
-                          <Info className="h-3.5 w-3.5 text-muted-foreground/70" />
-                        </button>
-                      </TooltipTrigger>
-                      <TooltipContent side="top" className="max-w-xs text-xs leading-relaxed">
-                        The average rate is dollar-weighted: (balance × rate) ÷ total balance. The absolute annual interest amount is the sum of (balance × rate ÷ 100). Liabilities with a 0% rate still count in the total.
-                      </TooltipContent>
-                    </Tooltip>
-                  </p>
-                  <p className="text-sm text-muted-foreground">Annual interest owed</p>
-                  <p className="mt-1 text-xl font-bold text-red-600 dark:text-red-400" data-testid="text-avg-liability-rate">{formatPercent(weightedRate)}</p>
-                  <p className="mt-1 text-xl font-bold text-red-600 dark:text-red-400" data-testid="text-annual-interest-owed">{formatCurrency(annualInterestOwed)}</p>
-                </div>
+                <p className="flex items-center gap-1 text-sm text-muted-foreground">
+                  Avg Interest Rate
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button type="button" className="inline-flex rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="How average interest rate is calculated">
+                        <Info className="h-3.5 w-3.5 text-muted-foreground/70" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="max-w-xs text-xs leading-relaxed">
+                      Dollar-weighted average: each liability's interest rate is weighted by its current balance. We calculate (balance × rate) ÷ total balance. The annual interest amount is the sum of (balance × rate ÷ 100). Liabilities with a 0% rate still count in the total.
+                    </TooltipContent>
+                  </Tooltip>
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">Annual interest owed</p>
+                <p className="text-xl font-bold text-red-600 dark:text-red-400" data-testid="text-avg-liability-rate">
+                  {formatCurrency(annualInterestOwed)} <span className="text-sm font-semibold">({formatPercent(weightedRate)})</span>
+                </p>
               </div>
             </div>
           </CardContent>
