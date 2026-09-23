@@ -37,7 +37,7 @@ export default function PrivacyPage() {
           <ul className="list-disc list-inside space-y-1 pl-2">
             <li><strong>Account information:</strong> username, email address, and full name.</li>
             <li><strong>Financial data:</strong> assets, liabilities, income, expenses, retirement goals, and insurance policies you enter into the app.</li>
-             <li><strong>Plaid-connected account information:</strong> if you connect a financial institution through Plaid, we receive and store the institution name and identifier, account name and official name, account type and subtype, Plaid account and connection identifiers, current and available balances, and connection and synchronization timestamps.</li>
+             <li><strong>Plaid-connected account information:</strong> if you connect a financial institution through Plaid, we receive and store the institution name and identifier, account name and official name, account type and subtype, Plaid account and connection identifiers, current and available balances, and connection and synchronization timestamps. If you choose to import transaction history, we also receive and store transaction dates, descriptions or merchant names, amounts, account and institution references, source identifiers, and transaction categories.</li>
             <li><strong>Usage data:</strong> how you interact with the app, such as features used and pages visited.</li>
           </ul>
           <p>
@@ -51,7 +51,7 @@ export default function PrivacyPage() {
           <p>We use the information we collect to:</p>
           <ul className="list-disc list-inside space-y-1 pl-2">
             <li>Provide, maintain, and improve FinVision360 services.</li>
-             <li>Connect to financial institutions through Plaid, retrieve account metadata and balances, refresh connected account information, and let you choose whether to add a connected account to your FinVision360 assets or liabilities.</li>
+             <li>Connect to financial institutions through Plaid, retrieve account metadata and balances, refresh connected account information, let you choose whether to add a connected account to your FinVision360 assets or liabilities, and import and categorize transaction history for income and expense tracking when you request it.</li>
             <li>Personalize your experience and deliver AI-generated financial insights.</li>
             <li>Respond to your comments, questions, and support requests.</li>
             <li>Send you service-related notices and updates.</li>
@@ -62,7 +62,7 @@ export default function PrivacyPage() {
         <Section title="3. AI Features and Third-Party Services">
           <p>
             FinVision360 uses Plaid to connect to participating financial institutions. Plaid receives the information
-            needed to establish the connection and provides FinVision360 with the account information described above.
+            needed to establish the connection and provides FinVision360 with the account and transaction information described above.
             The current integration is read-only: FinVision360 does not use Plaid to move money, initiate transactions, or
             make changes to your financial accounts. Plaid's handling of information is also subject to{" "}
             <a href="https://plaid.com/legal/#end-user-privacy-policy" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground">
