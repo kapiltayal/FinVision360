@@ -1,7 +1,7 @@
 import { PublicPageLayout } from "@/components/public-page-layout";
 import { useSEO } from "@/hooks/use-seo";
 
-const LAST_UPDATED = "January 1, 2025";
+const LAST_UPDATED = "September 23, 2026";
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -42,9 +42,16 @@ export default function TermsPage() {
 
         <Section title="2. Description of Service">
           <p>
-            FinVision360 is a personal finance management platform that allows you to track assets and liabilities,
-            plan for retirement, manage income and expenses, and receive AI-generated financial insights. The service is
-            provided for informational and organizational purposes only.
+            FinVision360 is a personal finance organization and planning platform operated by Tooothy LLC. Depending on
+            availability, the service may allow you to track assets and liabilities, calculate net worth, manage income
+            and expenses, create budgets and goals, plan for retirement, review insurance and estate-planning information,
+            import financial information from files or connected accounts, review bank-rate information, and receive
+            AI-generated financial insights.
+          </p>
+          <p>
+            FinVision360 is currently under active development. Features may be incomplete, unavailable, inaccurate,
+            changed, suspended, or removed without notice. Descriptions of features on the website are informational and
+            do not guarantee that a particular feature will be available, suitable, or error-free for you.
           </p>
         </Section>
 
@@ -54,17 +61,45 @@ export default function TermsPage() {
             <strong>not</strong> a licensed financial advisor, investment advisor, broker-dealer, or fiduciary.
           </p>
           <p>
-            All content, calculations, and AI-generated insights provided by FinVision360 are for informational
-            purposes only and do not constitute financial, investment, tax, or legal advice. You should consult a
-            licensed financial professional before making any significant financial decisions.
+            All content, calculations, projections, rates, categorizations, imported information, and AI-generated
+            insights provided by FinVision360 are for informational and organizational purposes only. They do not
+            constitute financial, investment, tax, accounting, legal, insurance, or other professional advice, and they
+            are not a recommendation to buy, sell, hold, borrow, refinance, insure, or take any other action.
           </p>
           <p>
-            Tooothy LLC and FinVision360.com are not responsible for any financial decisions made based on information
-            provided by this service.
+            You should independently verify information and calculations and consult qualified financial, tax, legal,
+            insurance, or other professionals before making significant financial decisions. You are solely responsible
+            for evaluating information provided by the service and for every decision or action you take.
           </p>
         </Section>
 
-        <Section title="4. Account Registration">
+        <Section title="4. Connected Accounts and Third-Party Data">
+          <p>
+            If you choose to connect a financial institution through Plaid, you authorize Plaid and the applicable
+            financial institution to provide account information to FinVision360. This may include account details,
+            balances, and transaction information used to display connected accounts, refresh balances, track assets and
+            liabilities, and support income and expense tracking. You enter your financial institution credentials
+            directly into Plaid Link; FinVision360 does not receive or store those login credentials.
+          </p>
+          <p>
+            Connected-account information and imported transactions may be delayed, incomplete, categorized incorrectly,
+            or otherwise inaccurate. Financial institutions, Plaid, and other third parties control the availability and
+            accuracy of the information they provide. FinVision360 does not guarantee that connected-account data,
+            transaction data, balances, rates, or other third-party information is accurate, complete, current, or
+            available. You are responsible for reviewing imported information and correcting or excluding it before
+            relying on it.
+          </p>
+          <p>
+            Plaid and other third-party services are independent services and may have their own terms and privacy
+            policies. For information about Plaid's handling of connected-account information, see{" "}
+            <a href="https://plaid.com/legal/#end-user-privacy-policy" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground">
+              Plaid's End User Privacy Policy
+            </a>
+            .
+          </p>
+        </Section>
+
+        <Section title="5. Account Registration">
           <ul className="list-disc list-inside space-y-1 pl-2">
             <li>You must provide accurate and complete registration information.</li>
             <li>You are responsible for maintaining the confidentiality of your password.</li>
@@ -74,7 +109,7 @@ export default function TermsPage() {
           </ul>
         </Section>
 
-        <Section title="5. Acceptable Use">
+        <Section title="6. Acceptable Use">
           <p>You agree not to:</p>
           <ul className="list-disc list-inside space-y-1 pl-2">
             <li>Use the service for any unlawful purpose or in violation of any applicable laws.</li>
@@ -86,16 +121,16 @@ export default function TermsPage() {
           </ul>
         </Section>
 
-        <Section title="6. Data and Privacy">
+        <Section title="7. Data and Privacy">
           <p>
             Your use of the service is also governed by our{" "}
             <a href="/privacy" className="underline hover:text-foreground">Privacy Policy</a>, which is incorporated
             into these Terms by reference. You are responsible for the accuracy of all financial data you enter into
-            the platform.
+            or import into the platform, and for reviewing data received from connected accounts before relying on it.
           </p>
         </Section>
 
-        <Section title="7. Intellectual Property">
+        <Section title="8. Intellectual Property">
           <p>
             The FinVision360 platform, including its design, features, code, and content, is owned by Tooothy LLC and
             protected by applicable intellectual property laws. You are granted a limited, non-exclusive,
@@ -108,16 +143,24 @@ export default function TermsPage() {
           </p>
         </Section>
 
-        <Section title="8. Disclaimers">
+        <Section title="9. Disclaimers and Accuracy">
           <p>
             THE SERVICE IS PROVIDED "AS IS" AND "AS AVAILABLE" WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR
             IMPLIED, INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND
             NON-INFRINGEMENT. TOOOTHY LLC DOES NOT WARRANT THAT THE SERVICE WILL BE UNINTERRUPTED, ERROR-FREE, OR
             FREE OF VIRUSES OR OTHER HARMFUL COMPONENTS.
           </p>
+          <p>
+            TO THE MAXIMUM EXTENT PERMITTED BY LAW, TOOOTHY LLC AND FINVISION360 ARE NOT RESPONSIBLE FOR ANY
+            INACCURACIES, ERRORS, OMISSIONS, DELAYS, OR INCOMPLETENESS IN USER-ENTERED DATA, FILE IMPORTS, CONNECTED
+            ACCOUNT OR TRANSACTION DATA, BANK-RATE INFORMATION, CATEGORIZATIONS, CALCULATIONS, PROJECTIONS, OR
+            AI-GENERATED CONTENT. WE ARE ALSO NOT RESPONSIBLE FOR ANY LOSS, DAMAGE, OR HARM RESULTING FROM YOUR
+            RELIANCE ON OR USE OF THAT INFORMATION. YOU MUST VERIFY INFORMATION THROUGH APPROPRIATE PRIMARY SOURCES
+            AND PROFESSIONAL ADVICE BEFORE ACTING ON IT.
+          </p>
         </Section>
 
-        <Section title="9. Limitation of Liability">
+        <Section title="10. Limitation of Liability">
           <p>
             TO THE MAXIMUM EXTENT PERMITTED BY LAW, TOOOTHY LLC AND ITS OFFICERS, DIRECTORS, EMPLOYEES, AND AGENTS
             SHALL NOT BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES, INCLUDING
@@ -129,7 +172,7 @@ export default function TermsPage() {
           </p>
         </Section>
 
-        <Section title="10. Termination">
+        <Section title="11. Termination">
           <p>
             We reserve the right to suspend or terminate your account at our sole discretion, with or without notice,
             for conduct that we believe violates these Terms or is harmful to other users, us, or third parties.
@@ -139,7 +182,7 @@ export default function TermsPage() {
           </p>
         </Section>
 
-        <Section title="11. Governing Law">
+        <Section title="12. Governing Law">
           <p>
             These Terms are governed by the laws of the State of Illinois, without regard to its conflict of law
             provisions. Any disputes arising under these Terms shall be subject to the exclusive jurisdiction of the
@@ -147,7 +190,7 @@ export default function TermsPage() {
           </p>
         </Section>
 
-        <Section title="12. Changes to Terms">
+        <Section title="13. Changes to Terms">
           <p>
             We reserve the right to modify these Terms at any time. We will notify you of material changes by updating
             the "Last updated" date. Your continued use of the service after changes are posted constitutes your
@@ -155,7 +198,7 @@ export default function TermsPage() {
           </p>
         </Section>
 
-        <Section title="13. Contact">
+        <Section title="14. Contact">
           <p>
             For questions about these Terms, please contact Tooothy LLC at:
           </p>
