@@ -385,19 +385,18 @@ export default function AssetsPage() {
               </div>
               <div>
                 <p className="flex items-center gap-1 text-sm text-muted-foreground">
-                  Avg Rate of Return
+                  Annual Interest Earned (Rate of Return)
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <button type="button" className="inline-flex rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="How average rate of return is calculated">
+                      <button type="button" className="inline-flex rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="How annual interest earned and rate of return are calculated">
                         <Info className="h-3.5 w-3.5 text-muted-foreground/70" />
                       </button>
                     </TooltipTrigger>
                     <TooltipContent side="top" className="max-w-xs text-xs leading-relaxed">
-                      Dollar-weighted average: each asset's rate is weighted by its current value. We calculate (asset value × rate) ÷ total asset value. The annual interest amount is the sum of (asset value × rate ÷ 100). Assets with a 0% rate still count in the total.
+                      Annual interest earned is the absolute dollar amount calculated as the sum of (asset value × rate ÷ 100). The rate of return is a dollar-weighted average calculated as (asset value × rate) ÷ total asset value. Assets with a 0% rate still count in the total.
                     </TooltipContent>
                   </Tooltip>
                 </p>
-                <p className="mt-1 text-xs text-muted-foreground">Annual interest earned</p>
                 <p className="text-xl font-bold text-emerald-600 dark:text-emerald-400" data-testid="text-avg-rate">
                   {formatCurrency(annualInterestEarned)} <span className="text-sm font-semibold">({formatPercent(weightedRate)})</span>
                 </p>
