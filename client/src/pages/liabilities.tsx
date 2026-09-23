@@ -440,9 +440,10 @@ export default function LiabilitiesPage() {
                     </TooltipContent>
                   </Tooltip>
                 </p>
-                <p className="text-xl font-bold text-red-600 dark:text-red-400" data-testid="text-avg-liability-rate">{formatPercent(weightedRate)}</p>
                 <p className="mt-1 text-xs text-muted-foreground">Annual interest owed</p>
-                <p className="text-sm font-semibold text-red-600 dark:text-red-400" data-testid="text-annual-interest-owed">{formatCurrency(annualInterestOwed)}</p>
+                <p className="text-xl font-bold text-red-600 dark:text-red-400" data-testid="text-avg-liability-rate">
+                  {formatCurrency(annualInterestOwed)} <span className="text-sm font-semibold">({formatPercent(weightedRate)})</span>
+                </p>
               </div>
             </div>
           </CardContent>

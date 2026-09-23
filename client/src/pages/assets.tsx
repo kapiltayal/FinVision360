@@ -397,9 +397,10 @@ export default function AssetsPage() {
                     </TooltipContent>
                   </Tooltip>
                 </p>
-                <p className="text-xl font-bold text-emerald-600 dark:text-emerald-400" data-testid="text-avg-rate">{formatPercent(weightedRate)}</p>
                 <p className="mt-1 text-xs text-muted-foreground">Annual interest earned</p>
-                <p className="text-sm font-semibold text-emerald-600 dark:text-emerald-400" data-testid="text-annual-interest-earned">{formatCurrency(annualInterestEarned)}</p>
+                <p className="text-xl font-bold text-emerald-600 dark:text-emerald-400" data-testid="text-avg-rate">
+                  {formatCurrency(annualInterestEarned)} <span className="text-sm font-semibold">({formatPercent(weightedRate)})</span>
+                </p>
               </div>
             </div>
           </CardContent>
