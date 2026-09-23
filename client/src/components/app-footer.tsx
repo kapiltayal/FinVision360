@@ -29,6 +29,8 @@ export function AppFooter() {
       <div className="bg-amber-50 dark:bg-amber-950/30 border-b border-amber-200 dark:border-amber-800/50 px-4 py-2 text-center">
         <p className="text-xs text-amber-800 dark:text-amber-300 font-medium">
           ⚠️ This app is currently under development and testing — please DO NOT share any personal and sensitive information. Use the website carefully and verify all information independently.
+          <br />
+          The information provided in FinVision360 is for educational and informational purposes only and is not intended as professional financial advice. Use of this information is at your own risk.
         </p>
       </div>
 
