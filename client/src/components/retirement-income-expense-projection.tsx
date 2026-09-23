@@ -161,6 +161,26 @@ function PensionIncomeSection({ items }: { items: CashflowItem[] }) {
   </div>;
 }
 
+function DebtPaymentsSection({ items }: { items: CashflowItem[] }) {
+  const [open, setOpen] = useState(false);
+  const total = items.reduce((sum, item) => sum + item.monthlyAmount, 0);
+  return <div className="border-b border-rose-200/60 bg-rose-50/30 dark:border-rose-900/60 dark:bg-rose-950/10">
+    <button type="button" className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-rose-50/70 dark:hover:bg-rose-950/20" onClick={() => setOpen(!open)} aria-expanded={open}>
+      <span className="flex items-center gap-2">
+        <ChevronDown className={`h-4 w-4 transition-transform ${open ? "rotate-180" : ""}`} />
+        <span>
+          <span className="block text-sm font-semibold">Debt payments</span>
+          <span className="block text-xs text-muted-foreground">{items.length} payment{items.length === 1 ? "" : "s"}</span>
+        </span>
+      </span>
+      <span className="text-sm font-bold tabular-nums text-rose-700 dark:text-rose-300">{money(total)}</span>
+    </button>
+    {open && <div className="border-t border-rose-200/60 dark:border-rose-900/60">
+      {items.map((item) => <CashflowRow key={item.id} item={item} onEdit={() => undefined} onDelete={() => undefined} />)}
+    </div>}
+  </div>;
+}
+
 function Column({ kind, items, onAdd, onEdit, onDelete, expected, onExpectedChange, onExpectedBlur, savingExpected, onWithdrawalRateChange, savingWithdrawalAssetId }: {
   kind: "income" | "expense"; items: CashflowItem[]; onAdd: () => void; onEdit: (item: CashflowItem) => void; onDelete: (item: CashflowItem) => void;
   expected?: number; onExpectedChange?: (value: number) => void; onExpectedBlur?: () => void; savingExpected?: boolean;
@@ -169,7 +189,8 @@ function Column({ kind, items, onAdd, onEdit, onDelete, expected, onExpectedChan
   const income = kind === "income";
   const retirementAccounts = items.filter((item) => item.source === "retirement-account");
   const pensionIncome = items.filter((item) => item.source === "pension");
-  const displayItems = items.filter((item) => item.source !== "expected-expenses" && item.source !== "retirement-account" && item.source !== "pension");
+  const debtPayments = items.filter((item) => item.source === "debt-payment");
+  const displayItems = items.filter((item) => item.source !== "expected-expenses" && item.source !== "retirement-account" && item.source !== "pension" && item.source !== "debt-payment");
   return (
     <section className={`overflow-hidden rounded-2xl border ${income ? "border-teal-200/80 dark:border-teal-900" : "border-amber-200/80 dark:border-amber-900"}`}>
       <header className={`flex items-center justify-between border-b px-4 py-3 ${income ? "bg-teal-50/70 dark:bg-teal-950/20" : "bg-amber-50/70 dark:bg-amber-950/20"}`}>
@@ -179,12 +200,13 @@ function Column({ kind, items, onAdd, onEdit, onDelete, expected, onExpectedChan
       <div className="bg-background">
         {income && onWithdrawalRateChange && <RetirementAccountsSection items={retirementAccounts} onSave={onWithdrawalRateChange} savingAssetId={savingWithdrawalAssetId ?? null} />}
         {income && <PensionIncomeSection items={pensionIncome} />}
+        {!income && expected !== undefined && onExpectedChange && <div className="border-b bg-amber-50/40 px-4 py-3 dark:bg-amber-950/10">
+          <div className="flex items-center gap-3"><div className="h-8 w-8 shrink-0 rounded-lg bg-amber-500/10" /><div className="min-w-0 flex-1"><p className="text-sm font-semibold">Expected lifestyle expenses</p><p className="text-xs text-muted-foreground">Your editable spending baseline</p></div><div className="flex items-center"><span className="text-sm font-bold text-amber-700 dark:text-amber-300">$</span><Input className="h-8 w-24 border-amber-300/70 bg-background text-right font-semibold tabular-nums" type="number" min="0" step="1" value={expected} onChange={(e) => onExpectedChange(Number(e.target.value) || 0)} onBlur={onExpectedBlur} disabled={savingExpected} /><span className="ml-1 text-xs font-medium text-amber-700 dark:text-amber-300">/mo</span></div></div>
+        </div>}
+        {!income && debtPayments.length > 0 && <DebtPaymentsSection items={debtPayments} />}
         {displayItems.length === 0 && income && retirementAccounts.length === 0 ? <div className="px-4 py-8 text-center text-sm text-muted-foreground">No projected income yet.</div> : displayItems.map((item) => (
           <CashflowRow key={item.id} item={item} onEdit={() => onEdit(item)} onDelete={() => onDelete(item)} />
         ))}
-        {!income && expected !== undefined && onExpectedChange && <div className="border-t bg-amber-50/40 px-4 py-3 dark:bg-amber-950/10">
-          <div className="flex items-center gap-3"><div className="h-8 w-8 shrink-0 rounded-lg bg-amber-500/10" /><div className="min-w-0 flex-1"><p className="text-sm font-semibold">Expected lifestyle expenses</p><p className="text-xs text-muted-foreground">Your editable spending baseline</p></div><div className="flex items-center"><span className="text-sm font-bold text-amber-700 dark:text-amber-300">$</span><Input className="h-8 w-24 border-amber-300/70 bg-background text-right font-semibold tabular-nums" type="number" min="0" step="1" value={expected} onChange={(e) => onExpectedChange(Number(e.target.value) || 0)} onBlur={onExpectedBlur} disabled={savingExpected} /><span className="ml-1 text-xs font-medium text-amber-700 dark:text-amber-300">/mo</span></div></div>
-        </div>}
       </div>
     </section>
   );
