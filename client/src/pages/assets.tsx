@@ -384,8 +384,8 @@ export default function AssetsPage() {
                 <TrendingUp className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
               </div>
               <div>
-                <p className="flex items-center gap-1 whitespace-nowrap">
-                  <span className="text-sm text-muted-foreground">Annual interest earned</span>
+                <p className="flex items-center gap-1 text-sm text-muted-foreground">
+                  Avg Rate of Return
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <button type="button" className="inline-flex rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="How average rate of return is calculated">
@@ -396,9 +396,10 @@ export default function AssetsPage() {
                       Dollar-weighted average: each asset's rate is weighted by its current value. We calculate (asset value × rate) ÷ total asset value. The annual interest amount is the sum of (asset value × rate ÷ 100). Assets with a 0% rate still count in the total.
                     </TooltipContent>
                   </Tooltip>
-                  <span className="ml-1 text-xl font-bold text-emerald-600 dark:text-emerald-400" data-testid="text-avg-rate">
-                    {formatCurrency(annualInterestEarned)} <span className="text-sm font-semibold">({formatPercent(weightedRate)})</span>
-                  </span>
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">Annual interest earned</p>
+                <p className="text-xl font-bold text-emerald-600 dark:text-emerald-400" data-testid="text-avg-rate">
+                  {formatCurrency(annualInterestEarned)} <span className="text-sm font-semibold">({formatPercent(weightedRate)})</span>
                 </p>
               </div>
             </div>

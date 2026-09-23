@@ -427,8 +427,8 @@ export default function LiabilitiesPage() {
                 <TrendingDown className="h-5 w-5 text-red-600 dark:text-red-400" />
               </div>
               <div>
-                <p className="flex items-center gap-1 whitespace-nowrap">
-                  <span className="text-sm text-muted-foreground">Annual interest owed</span>
+                <p className="flex items-center gap-1 text-sm text-muted-foreground">
+                  Avg Interest Rate
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <button type="button" className="inline-flex rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="How average interest rate is calculated">
@@ -439,9 +439,10 @@ export default function LiabilitiesPage() {
                       Dollar-weighted average: each liability's interest rate is weighted by its current balance. We calculate (balance × rate) ÷ total balance. The annual interest amount is the sum of (balance × rate ÷ 100). Liabilities with a 0% rate still count in the total.
                     </TooltipContent>
                   </Tooltip>
-                  <span className="ml-1 text-xl font-bold text-red-600 dark:text-red-400" data-testid="text-avg-liability-rate">
-                    {formatCurrency(annualInterestOwed)} <span className="text-sm font-semibold">({formatPercent(weightedRate)})</span>
-                  </span>
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">Annual interest owed</p>
+                <p className="text-xl font-bold text-red-600 dark:text-red-400" data-testid="text-avg-liability-rate">
+                  {formatCurrency(annualInterestOwed)} <span className="text-sm font-semibold">({formatPercent(weightedRate)})</span>
                 </p>
               </div>
             </div>
