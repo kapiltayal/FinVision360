@@ -12,10 +12,11 @@ import { useLastUpdated } from "@/hooks/use-last-updated";
 import { ExportMenu } from "@/components/export-menu";
 import { BookEntryDialog } from "@/components/book-entry-import";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { Plus, Pencil, Trash2, Wallet, TrendingUp, ChevronDown, Clock, Link2, LayoutGrid, Table2, Layers3, ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
+import { Plus, Pencil, Trash2, Wallet, TrendingUp, ChevronDown, Clock, Link2, LayoutGrid, Table2, Layers3, ArrowDown, ArrowUp, ArrowUpDown, Info } from "lucide-react";
 import { type Asset, type PlaidAccount } from "@shared/schema";
 import { formatCurrency, formatPercent } from "@/lib/format";
 import { type BookCategory, categoryLabel, categoryParent, groupedBookCategories, groupedBookEntries } from "@/lib/book-categories";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 type AssetSortKey = "parentCategory" | "category" | "name" | "institution" | "value" | "rate";
 type SortDirection = "asc" | "desc";
@@ -379,7 +380,19 @@ export default function AssetsPage() {
                 <TrendingUp className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Avg Rate of Return</p>
+                <p className="flex items-center gap-1 text-sm text-muted-foreground">
+                  Avg Rate of Return
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button type="button" className="inline-flex rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="How average rate of return is calculated">
+                        <Info className="h-3.5 w-3.5 text-muted-foreground/70" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="max-w-xs text-xs leading-relaxed">
+                      Dollar-weighted average: each asset's rate is weighted by its current value. We calculate (asset value × rate) ÷ total asset value. Assets with a 0% rate still count in the total.
+                    </TooltipContent>
+                  </Tooltip>
+                </p>
                 <p className="text-xl font-bold text-emerald-600 dark:text-emerald-400" data-testid="text-avg-rate">{formatPercent(weightedRate)}</p>
               </div>
             </div>

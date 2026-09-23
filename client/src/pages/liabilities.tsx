@@ -12,10 +12,11 @@ import { useLastUpdated } from "@/hooks/use-last-updated";
 import { ExportMenu } from "@/components/export-menu";
 import { BookEntryDialog } from "@/components/book-entry-import";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { Plus, Pencil, Trash2, CreditCard, TrendingDown, ChevronDown, Clock, Link2, LayoutGrid, Table2, Layers3, ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
+import { Plus, Pencil, Trash2, CreditCard, TrendingDown, ChevronDown, Clock, Link2, LayoutGrid, Table2, Layers3, ArrowDown, ArrowUp, ArrowUpDown, Info } from "lucide-react";
 import { type Liability, type PlaidAccount } from "@shared/schema";
 import { formatCurrency, formatPercent } from "@/lib/format";
 import { type BookCategory, categoryLabel, categoryParent, groupedBookCategories, groupedBookEntries } from "@/lib/book-categories";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 type LiabilitySortKey = "parentCategory" | "category" | "name" | "institution" | "balance" | "rate" | "minimumPayment" | "maturityDate";
 type SortDirection = "asc" | "desc";
@@ -422,7 +423,19 @@ export default function LiabilitiesPage() {
                 <TrendingDown className="h-5 w-5 text-red-600 dark:text-red-400" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Avg Interest Rate</p>
+                <p className="flex items-center gap-1 text-sm text-muted-foreground">
+                  Avg Interest Rate
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button type="button" className="inline-flex rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="How average interest rate is calculated">
+                        <Info className="h-3.5 w-3.5 text-muted-foreground/70" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="max-w-xs text-xs leading-relaxed">
+                      Dollar-weighted average: each liability's interest rate is weighted by its current balance. We calculate (balance × rate) ÷ total balance. Liabilities with a 0% rate still count in the total.
+                    </TooltipContent>
+                  </Tooltip>
+                </p>
                 <p className="text-xl font-bold text-red-600 dark:text-red-400" data-testid="text-avg-liability-rate">{formatPercent(weightedRate)}</p>
               </div>
             </div>
