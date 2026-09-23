@@ -98,7 +98,7 @@ export default function PrivacyPage() {
         <Section title="7. Your Rights and Choices">
           <ul className="list-disc list-inside space-y-1 pl-2">
             <li><strong>Access and correction:</strong> You can view and update your account information at any time in Settings.</li>
-            <li><strong>Data deletion:</strong> You may request deletion of your account and associated data by contacting us at hello@finvision360.com.</li>
+            <li><strong>Data deletion:</strong> You may request deletion of your account and associated data by contacting us at contactus@finvision360.com.</li>
             <li><strong>Opt-out:</strong> You may stop using the service at any time.</li>
           </ul>
         </Section>
@@ -128,8 +128,8 @@ export default function PrivacyPage() {
             <p>Northbrook, Illinois</p>
             <p>
               Email:{" "}
-              <a href="mailto:hello@finvision360.com" className="underline hover:text-foreground">
-                hello@finvision360.com
+              <a href="mailto:contactus@finvision360.com" className="underline hover:text-foreground">
+                contactus@finvision360.com
               </a>
             </p>
           </address>

@@ -135,7 +135,7 @@ export default function TermsPage() {
             for conduct that we believe violates these Terms or is harmful to other users, us, or third parties.
           </p>
           <p>
-            You may delete your account at any time by contacting us at hello@finvision360.com.
+            You may delete your account at any time by contacting us at contactus@finvision360.com.
           </p>
         </Section>
 
@@ -164,8 +164,8 @@ export default function TermsPage() {
             <p>Northbrook, Illinois</p>
             <p>
               Email:{" "}
-              <a href="mailto:hello@finvision360.com" className="underline hover:text-foreground">
-                hello@finvision360.com
+              <a href="mailto:contactus@finvision360.com" className="underline hover:text-foreground">
+                contactus@finvision360.com
               </a>
             </p>
           </address>

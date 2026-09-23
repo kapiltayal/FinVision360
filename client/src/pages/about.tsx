@@ -25,7 +25,7 @@ export default function AboutPage() {
         "addressRegion": "IL",
         "addressCountry": "US"
       },
-      "email": "hello@finvision360.com"
+      "email": "contactus@finvision360.com"
     }
   });
   return (
