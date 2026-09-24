@@ -105,12 +105,11 @@ function retirementDateFromDateOfBirth(dateOfBirth: string | null | undefined, r
   return birthDate;
 }
 
-function monthsUntilDate(today: Date, target: Date): number {
-  if (target <= today) return 0;
-  const calendarMonths = (target.getUTCFullYear() - today.getUTCFullYear()) * 12
-    + target.getUTCMonth()
-    - today.getUTCMonth();
-  return Math.max(0, calendarMonths + (target.getUTCDate() > today.getUTCDate() ? 1 : 0));
+function daysUntilDate(today: Date, target: Date): number {
+  const todayUtc = Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate());
+  const targetUtc = Date.UTC(target.getUTCFullYear(), target.getUTCMonth(), target.getUTCDate());
+  if (targetUtc <= todayUtc) return 0;
+  return Math.round((targetUtc - todayUtc) / (24 * 60 * 60 * 1000));
 }
 
 function projectDebt(balance: number, annualRatePercent: number, monthlyPayment: number, months: number): number | null {
@@ -145,10 +144,9 @@ export function buildRetirementNetWorthProjection(input: {
   const today = new Date();
   const dateOfBirthRetirementDate = retirementDateFromDateOfBirth(input.dateOfBirth, input.retirementAge);
   const retirementDate = dateOfBirthRetirementDate ?? addUtcYears(today, wholeYearsToRetirement);
-  const monthsToRetirement = dateOfBirthRetirementDate
-    ? monthsUntilDate(today, retirementDate)
-    : wholeYearsToRetirement * 12;
-  const yearsToRetirement = monthsToRetirement / 12;
+  const yearsToRetirement = dateOfBirthRetirementDate
+    ? daysUntilDate(today, retirementDate) / 365.25
+    : wholeYearsToRetirement;
   const retirementDateIso = retirementDate.toISOString().slice(0, 10);
   const todayIso = today.toISOString().slice(0, 10);
 

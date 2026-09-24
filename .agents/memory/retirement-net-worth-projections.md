@@ -9,6 +9,12 @@ Asset type default returns are stored as decimal fractions, while account rates 
 
 **How to apply:** Convert asset type defaults to percentages before display or compounding. Keep user overrides separate from source account data so resetting an override restores the account/category assumption.
 
+When a valid birth date is available, calculate time to retirement from the exact calendar-day difference to the retirement date and convert that duration to fractional years; only use whole age-based years as the fallback.
+
+**Why:** Month-based rounding can materially over- or understate compound growth for accounts whose retirement date falls partway through a month.
+
+**How to apply:** Normalize both dates to UTC calendar days, divide the day count by 365.25 for annual compounding, and preserve the existing current-age fallback when no birth date is available.
+
 Liability projections must carry the current balance to retirement when required inputs are missing or contradictory. A past maturity date with a positive balance is contradictory, not proof that the debt is paid.
 
 **Why:** Assuming zero interest or trusting a stale maturity date can understate retirement liabilities and overstate projected net worth.
