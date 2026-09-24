@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Slider } from "@/components/ui/slider";
+import { Switch } from "@/components/ui/switch";
 import { formatCurrency } from "@/lib/format";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -111,23 +112,25 @@ function RetirementAccountRow({ item, onSave, onEarlyWithdrawalAccessChange, sav
         <p className="text-xs text-muted-foreground">Projected balance: {formatCurrency(item.projectedBalance ?? 0)}</p>
         {item.isEarlyWithdrawalLocked && <p className="mt-1 flex items-center gap-1 text-xs font-medium text-amber-700 dark:text-amber-300"><Lock className="h-3 w-3" />Locked before age 59½</p>}
         {item.canOverrideEarlyWithdrawalLock && item.earlyWithdrawalUnlocked && <p className="mt-1 flex items-center gap-1 text-xs font-medium text-amber-700 dark:text-amber-300"><Unlock className="h-3 w-3" />Unlocked for this projection</p>}
+        {item.canOverrideEarlyWithdrawalLock && item.assetId !== undefined && (
+          <div className="mt-2 flex items-center gap-2">
+            <Switch
+              id={`early-withdrawal-access-${item.assetId}`}
+              size="sm"
+              checked={Boolean(item.earlyWithdrawalUnlocked)}
+              disabled={savingEarlyWithdrawalAccess}
+              onCheckedChange={(unlocked) => onEarlyWithdrawalAccessChange(item.assetId!, unlocked)}
+              aria-label={item.earlyWithdrawalUnlocked ? `Relock ${item.name}` : `Unlock ${item.name} for projection`}
+              data-testid={`switch-early-withdrawal-access-${item.assetId}`}
+            />
+            <Label htmlFor={`early-withdrawal-access-${item.assetId}`} className="cursor-pointer text-xs text-muted-foreground">
+              Include withdrawals in projection
+            </Label>
+          </div>
+        )}
       </div>
       <div className="text-right"><p className="text-sm font-bold tabular-nums text-emerald-700 dark:text-emerald-300">{money(item.monthlyAmount)}</p><p className="text-[11px] text-muted-foreground">gross withdrawal</p></div>
     </div>
-    {item.canOverrideEarlyWithdrawalLock && item.assetId !== undefined && (
-      <div className="mt-2 flex justify-end">
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          disabled={savingEarlyWithdrawalAccess}
-          onClick={() => onEarlyWithdrawalAccessChange(item.assetId!, !item.earlyWithdrawalUnlocked)}
-          data-testid={`button-${item.earlyWithdrawalUnlocked ? "relock" : "unlock"}-retirement-account-${item.assetId}`}
-        >
-          {item.earlyWithdrawalUnlocked ? <><Lock className="mr-1.5 h-3.5 w-3.5" />Relock account</> : <><Unlock className="mr-1.5 h-3.5 w-3.5" />Unlock for projection</>}
-        </Button>
-      </div>
-    )}
     <div className="mt-3 space-y-1.5">
       <div className="flex items-center justify-between gap-3">
         <Label htmlFor={`withdrawal-rate-${item.assetId}`} className="text-xs text-muted-foreground">Annual withdrawal rate</Label>
