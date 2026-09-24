@@ -13,7 +13,7 @@ When a valid birth date is available, calculate time to retirement from the exac
 
 **Why:** Month-based rounding can materially over- or understate compound growth for accounts whose retirement date falls partway through a month.
 
-**How to apply:** Normalize both dates to UTC calendar days, divide the day count by 365.25 for annual compounding, and preserve the existing current-age fallback when no birth date is available.
+**How to apply:** Normalize both dates to UTC calendar days, divide the day count by 365.25 for annual compounding, use the same day count for liability payoff timing with a prorated final monthly period, and preserve the existing current-age fallback when no birth date is available.
 
 Liability projections must carry the current balance to retirement when required inputs are missing or contradictory. A past maturity date with a positive balance is contradictory, not proof that the debt is paid.
 
