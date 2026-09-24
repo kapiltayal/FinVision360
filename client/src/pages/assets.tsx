@@ -385,7 +385,7 @@ export default function AssetsPage() {
               </div>
               <div>
                 <p className="flex items-center gap-1 text-sm text-muted-foreground">
-                  Annual Return(% Return)
+                  Annual Return (% Return)
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <button type="button" className="inline-flex rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="How annual return and percentage return are calculated">
