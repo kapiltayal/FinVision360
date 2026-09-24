@@ -9,6 +9,10 @@ export type CashflowItem = {
   assetId?: number;
   projectedBalance?: number;
   withdrawalRate?: number;
+  isPretaxRetirementAccount?: boolean;
+  canOverrideEarlyWithdrawalLock?: boolean;
+  earlyWithdrawalUnlocked?: boolean;
+  isEarlyWithdrawalLocked?: boolean;
 };
 
 export type Assumption = {
@@ -51,6 +55,7 @@ type ProjectedAssetInput = {
 type WithdrawalRateInput = {
   assetId: number;
   withdrawalRate: string | number;
+  earlyWithdrawalUnlocked?: boolean;
 };
 
 type ProjectionEntryInput = {
@@ -64,6 +69,13 @@ type ProjectionEntryInput = {
 function numberValue(value: string | number | null | undefined): number {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : 0;
+}
+
+export function isPretaxRetirementAccountCategory(category: string, name: string): boolean {
+  return (
+    (category === "Employer Retirement" || category === "Individual Retirement")
+    && !/\broth\b/i.test(name)
+  );
 }
 
 export function getSocialSecurityFullRetirementAge(birthYear: number): number {
@@ -246,7 +258,12 @@ export function buildRetirementIncomeExpenseProjection(input: {
 
     const withdrawalRate = withdrawalRateByAsset.get(asset.sourceAssetId) ?? 4;
     const projectedBalance = Math.max(0, numberValue(asset.projectedValue));
-    const monthlyAmount = projectedBalance * withdrawalRate / 100 / 12;
+    const isPretaxRetirementAccount = isPretaxRetirementAccountCategory(asset.category, asset.name);
+    const earlyWithdrawalUnlocked = isPretaxRetirementAccount
+      && input.withdrawalRates.find((row) => row.assetId === asset.sourceAssetId)?.earlyWithdrawalUnlocked === true;
+    const canOverrideEarlyWithdrawalLock = isPretaxRetirementAccount && retirementAge < 59.5;
+    const isEarlyWithdrawalLocked = canOverrideEarlyWithdrawalLock && !earlyWithdrawalUnlocked;
+    const monthlyAmount = isEarlyWithdrawalLocked ? 0 : projectedBalance * withdrawalRate / 100 / 12;
     income.push({
       id: `retirement-account-${asset.sourceAssetId}`,
       source: "retirement-account",
@@ -255,16 +272,32 @@ export function buildRetirementIncomeExpenseProjection(input: {
       monthlyAmount,
       projectedBalance,
       withdrawalRate,
-      details: `${withdrawalRate.toFixed(2)}% annual withdrawal from the projected retirement balance.`,
+      isPretaxRetirementAccount,
+      canOverrideEarlyWithdrawalLock,
+      earlyWithdrawalUnlocked,
+      isEarlyWithdrawalLocked,
+      details: isEarlyWithdrawalLocked
+        ? `Locked because retirement age ${retirementAge} is below 59½; assumed unavailable due to early-withdrawal tax penalties.`
+        : `${withdrawalRate.toFixed(2)}% annual withdrawal from the projected retirement balance.`,
       isProjectionOnly: false,
     });
     assumptions.push({
       kind: "income",
       name: asset.name,
-      messages: [
-        `Uses the projected retirement balance of ${projectedBalance.toFixed(2)} and a ${withdrawalRate.toFixed(2)}% annual withdrawal rate.`,
-        "Annual withdrawals are divided by 12 and treated as gross monthly income; taxes and required minimum distributions are not modeled.",
-      ],
+      messages: isEarlyWithdrawalLocked
+        ? [
+            `The projected retirement age is ${retirementAge}, below 59½, so this pretax account is assumed locked and contributes $0 monthly income.`,
+            "The account is treated as unavailable due to potential early-withdrawal tax penalties. Unlock it in the account list to include withdrawals in this projection.",
+          ]
+        : earlyWithdrawalUnlocked && canOverrideEarlyWithdrawalLock
+          ? [
+              `Uses the projected retirement balance of ${projectedBalance.toFixed(2)} and a ${withdrawalRate.toFixed(2)}% annual withdrawal rate.`,
+              "You unlocked this pretax account for the projection despite retiring before age 59½. Taxes and penalties are not modeled.",
+            ]
+          : [
+              `Uses the projected retirement balance of ${projectedBalance.toFixed(2)} and a ${withdrawalRate.toFixed(2)}% annual withdrawal rate.`,
+              "Annual withdrawals are divided by 12 and treated as gross monthly income; taxes and required minimum distributions are not modeled.",
+            ],
     });
   }
 

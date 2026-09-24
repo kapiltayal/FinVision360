@@ -333,6 +333,7 @@ export const retirementAccountWithdrawalRates = pgTable("retirement_account_with
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   assetId: integer("asset_id").notNull().references(() => assets.id, { onDelete: "cascade" }),
   withdrawalRate: numeric("withdrawal_rate", { precision: 5, scale: 2 }).notNull().default("4"),
+  earlyWithdrawalUnlocked: boolean("early_withdrawal_unlocked").notNull().default(false),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
   userAssetUnique: uniqueIndex("retirement_account_withdrawal_rates_user_asset_unique").on(table.userId, table.assetId),

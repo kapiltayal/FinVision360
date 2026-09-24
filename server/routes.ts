@@ -31,7 +31,7 @@ import {
   hasRecognizableStructure, type Category, type IngestionKind, type RawRow,
 } from "./asset-liability-ingestion";
 import { buildRetirementNetWorthProjection } from "./retirement-projection";
-import { buildRetirementIncomeExpenseProjection } from "./retirement-income-expense-projection";
+import { buildRetirementIncomeExpenseProjection, isPretaxRetirementAccountCategory } from "./retirement-income-expense-projection";
 
 const MAX_PENSION_AMOUNT = 9_999_999_999_999.99;
 const MAX_SOCIAL_SECURITY_MONTHLY_BENEFIT = 99_999_999.99;
@@ -705,6 +705,32 @@ export async function registerRoutes(
       })
       .returning();
     res.json(savedRate);
+  });
+
+  app.put("/api/retirement/early-withdrawal-access/:assetId", requireAuth, async (req: any, res) => {
+    const userId = req.user.id;
+    const assetId = Number(req.params.assetId);
+    const unlocked = req.body?.unlocked;
+    if (!Number.isInteger(assetId)) return res.status(400).json({ message: "Invalid asset id" });
+    if (typeof unlocked !== "boolean") return res.status(400).json({ message: "Unlocked must be a boolean" });
+
+    const asset = await storage.getAsset(assetId, userId);
+    if (!asset) return res.status(404).json({ message: "Asset not found" });
+    if (!isPretaxRetirementAccountCategory(asset.category, asset.name)) {
+      return res.status(400).json({ message: "Early-withdrawal access applies only to pretax retirement accounts." });
+    }
+
+    const [savedAccess] = await db.insert(retirementAccountWithdrawalRates)
+      .values({ userId, assetId, earlyWithdrawalUnlocked: unlocked })
+      .onConflictDoUpdate({
+        target: [
+          retirementAccountWithdrawalRates.userId,
+          retirementAccountWithdrawalRates.assetId,
+        ],
+        set: { earlyWithdrawalUnlocked: unlocked, updatedAt: new Date() },
+      })
+      .returning();
+    res.json(savedAccess);
   });
 
   app.put("/api/retirement/income-expense-settings", requireAuth, async (req: any, res) => {

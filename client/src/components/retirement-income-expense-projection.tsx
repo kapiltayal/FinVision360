@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { ChevronDown, CircleAlert, Landmark, Pencil, PiggyBank, Plus, ShieldCheck, Trash2, TrendingDown, TrendingUp, WalletCards } from "lucide-react";
+import { ChevronDown, CircleAlert, Landmark, Lock, Pencil, PiggyBank, Plus, ShieldCheck, Trash2, TrendingDown, TrendingUp, Unlock, WalletCards } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -22,6 +22,10 @@ export type CashflowItem = {
   assetId?: number;
   projectedBalance?: number;
   withdrawalRate?: number;
+  isPretaxRetirementAccount?: boolean;
+  canOverrideEarlyWithdrawalLock?: boolean;
+  earlyWithdrawalUnlocked?: boolean;
+  isEarlyWithdrawalLocked?: boolean;
 };
 type Assumption = { kind: "income" | "expense"; name: string; messages: string[] };
 type Projection = {
@@ -87,9 +91,11 @@ function CashflowRow({ item, onEdit, onDelete }: { item: CashflowItem; onEdit: (
   );
 }
 
-function RetirementAccountRow({ item, onSave, saving }: {
+function RetirementAccountRow({ item, onSave, onEarlyWithdrawalAccessChange, saving, savingEarlyWithdrawalAccess }: {
   item: CashflowItem;
   onSave: (assetId: number, withdrawalRate: number) => void;
+  onEarlyWithdrawalAccessChange: (assetId: number, unlocked: boolean) => void;
+  savingEarlyWithdrawalAccess: boolean;
   saving: boolean;
 }) {
   const [rate, setRate] = useState(item.withdrawalRate ?? 4);
@@ -100,9 +106,28 @@ function RetirementAccountRow({ item, onSave, saving }: {
   return <div className="border-t border-teal-200/50 px-4 py-3 first:border-t-0 dark:border-teal-900/60">
     <div className="flex items-center gap-3">
       <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"><PiggyBank className="h-4 w-4" /></div>
-      <div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold">{item.name}</p><p className="text-xs text-muted-foreground">Projected balance: {formatCurrency(item.projectedBalance ?? 0)}</p></div>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-semibold">{item.name}</p>
+        <p className="text-xs text-muted-foreground">Projected balance: {formatCurrency(item.projectedBalance ?? 0)}</p>
+        {item.isEarlyWithdrawalLocked && <p className="mt-1 flex items-center gap-1 text-xs font-medium text-amber-700 dark:text-amber-300"><Lock className="h-3 w-3" />Locked before age 59½</p>}
+        {item.canOverrideEarlyWithdrawalLock && item.earlyWithdrawalUnlocked && <p className="mt-1 flex items-center gap-1 text-xs font-medium text-amber-700 dark:text-amber-300"><Unlock className="h-3 w-3" />Unlocked for this projection</p>}
+      </div>
       <div className="text-right"><p className="text-sm font-bold tabular-nums text-emerald-700 dark:text-emerald-300">{money(item.monthlyAmount)}</p><p className="text-[11px] text-muted-foreground">gross withdrawal</p></div>
     </div>
+    {item.canOverrideEarlyWithdrawalLock && item.assetId !== undefined && (
+      <div className="mt-2 flex justify-end">
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          disabled={savingEarlyWithdrawalAccess}
+          onClick={() => onEarlyWithdrawalAccessChange(item.assetId!, !item.earlyWithdrawalUnlocked)}
+          data-testid={`button-${item.earlyWithdrawalUnlocked ? "relock" : "unlock"}-retirement-account-${item.assetId}`}
+        >
+          {item.earlyWithdrawalUnlocked ? <><Lock className="mr-1.5 h-3.5 w-3.5" />Relock account</> : <><Unlock className="mr-1.5 h-3.5 w-3.5" />Unlock for projection</>}
+        </Button>
+      </div>
+    )}
     <div className="mt-3 space-y-1.5">
       <div className="flex items-center justify-between gap-3">
         <Label htmlFor={`withdrawal-rate-${item.assetId}`} className="text-xs text-muted-foreground">Annual withdrawal rate</Label>
@@ -129,10 +154,12 @@ function RetirementAccountRow({ item, onSave, saving }: {
   </div>;
 }
 
-function RetirementAccountsSection({ items, onSave, savingAssetId }: {
+function RetirementAccountsSection({ items, onSave, savingAssetId, onEarlyWithdrawalAccessChange, savingEarlyWithdrawalAssetId }: {
   items: CashflowItem[];
   onSave: (assetId: number, withdrawalRate: number) => void;
   savingAssetId: number | null;
+  onEarlyWithdrawalAccessChange: (assetId: number, unlocked: boolean) => void;
+  savingEarlyWithdrawalAssetId: number | null;
 }) {
   const [open, setOpen] = useState(false);
   const total = items.reduce((sum, item) => sum + item.monthlyAmount, 0);
@@ -142,7 +169,7 @@ function RetirementAccountsSection({ items, onSave, savingAssetId }: {
       <span className="text-sm font-bold tabular-nums text-emerald-700 dark:text-emerald-300">{money(total)}</span>
     </button>
     {open && <div className="border-t border-teal-200/60 dark:border-teal-900/60">
-      {items.length ? items.map((item) => <RetirementAccountRow key={item.id} item={item} onSave={onSave} saving={savingAssetId === item.assetId} />) : <p className="px-4 py-4 text-sm text-muted-foreground">Add an asset in the Retirement &amp; Tax-Advantaged category to estimate withdrawals here.</p>}
+      {items.length ? items.map((item) => <RetirementAccountRow key={item.id} item={item} onSave={onSave} saving={savingAssetId === item.assetId} onEarlyWithdrawalAccessChange={onEarlyWithdrawalAccessChange} savingEarlyWithdrawalAccess={savingEarlyWithdrawalAssetId === item.assetId} />) : <p className="px-4 py-4 text-sm text-muted-foreground">Add an asset in the Retirement &amp; Tax-Advantaged category to estimate withdrawals here.</p>}
     </div>}
   </div>;
 }
@@ -181,10 +208,11 @@ function DebtPaymentsSection({ items }: { items: CashflowItem[] }) {
   </div>;
 }
 
-function Column({ kind, items, onAdd, onEdit, onDelete, expected, onExpectedChange, onExpectedBlur, savingExpected, onWithdrawalRateChange, savingWithdrawalAssetId }: {
+function Column({ kind, items, onAdd, onEdit, onDelete, expected, onExpectedChange, onExpectedBlur, savingExpected, onWithdrawalRateChange, savingWithdrawalAssetId, onEarlyWithdrawalAccessChange, savingEarlyWithdrawalAssetId }: {
   kind: "income" | "expense"; items: CashflowItem[]; onAdd: () => void; onEdit: (item: CashflowItem) => void; onDelete: (item: CashflowItem) => void;
   expected?: number; onExpectedChange?: (value: number) => void; onExpectedBlur?: () => void; savingExpected?: boolean;
   onWithdrawalRateChange?: (assetId: number, withdrawalRate: number) => void; savingWithdrawalAssetId?: number | null;
+  onEarlyWithdrawalAccessChange?: (assetId: number, unlocked: boolean) => void; savingEarlyWithdrawalAssetId?: number | null;
 }) {
   const income = kind === "income";
   const retirementAccounts = items.filter((item) => item.source === "retirement-account");
@@ -198,7 +226,7 @@ function Column({ kind, items, onAdd, onEdit, onDelete, expected, onExpectedChan
         <Button size="sm" variant="outline" onClick={onAdd}><Plus className="mr-1 h-3.5 w-3.5" /> Add</Button>
       </header>
       <div className="bg-background">
-        {income && onWithdrawalRateChange && <RetirementAccountsSection items={retirementAccounts} onSave={onWithdrawalRateChange} savingAssetId={savingWithdrawalAssetId ?? null} />}
+        {income && onWithdrawalRateChange && onEarlyWithdrawalAccessChange && <RetirementAccountsSection items={retirementAccounts} onSave={onWithdrawalRateChange} savingAssetId={savingWithdrawalAssetId ?? null} onEarlyWithdrawalAccessChange={onEarlyWithdrawalAccessChange} savingEarlyWithdrawalAssetId={savingEarlyWithdrawalAssetId ?? null} />}
         {income && <PensionIncomeSection items={pensionIncome} />}
         {!income && expected !== undefined && onExpectedChange && <div className="border-b bg-amber-50/40 px-4 py-3 dark:bg-amber-950/10">
           <div className="flex items-center gap-3"><div className="h-8 w-8 shrink-0 rounded-lg bg-amber-500/10" /><div className="min-w-0 flex-1"><p className="text-sm font-semibold">Expected lifestyle expenses</p><p className="text-xs text-muted-foreground">Your editable spending baseline</p></div><div className="flex items-center"><span className="text-sm font-bold text-amber-700 dark:text-amber-300">$</span><Input className="h-8 w-24 border-amber-300/70 bg-background text-right font-semibold tabular-nums" type="number" min="0" step="1" value={expected} onChange={(e) => onExpectedChange(Number(e.target.value) || 0)} onBlur={onExpectedBlur} disabled={savingExpected} /><span className="ml-1 text-xs font-medium text-amber-700 dark:text-amber-300">/mo</span></div></div>
@@ -265,6 +293,15 @@ export function RetirementIncomeExpenseProjection() {
     },
     onError: (error: Error) => toast({ title: "Could not save withdrawal rate", description: error.message, variant: "destructive" }),
   });
+  const earlyWithdrawalAccessMutation = useMutation({
+    mutationFn: ({ assetId, unlocked }: { assetId: number; unlocked: boolean }) =>
+      apiRequest("PUT", `/api/retirement/early-withdrawal-access/${assetId}`, { unlocked }),
+    onSuccess: async (_response, variables) => {
+      await invalidate();
+      toast({ title: variables.unlocked ? "Account unlocked for projection" : "Account locked for projection" });
+    },
+    onError: (error: Error) => toast({ title: "Could not update account access", description: error.message, variant: "destructive" }),
+  });
   const grouped = useMemo(() => ({ income: data?.income || [], expenses: data?.expenses || [] }), [data?.income, data?.expenses]);
   if (isLoading) return <div className="space-y-4"><div className="h-28 animate-pulse rounded-2xl bg-muted" /><div className="grid gap-4 md:grid-cols-2"><div className="h-64 animate-pulse rounded-2xl bg-muted" /><div className="h-64 animate-pulse rounded-2xl bg-muted" /></div></div>;
   if (isError || !data) return <div className="rounded-2xl border border-rose-200 bg-rose-50/60 p-8 text-center dark:border-rose-900 dark:bg-rose-950/20"><CircleAlert className="mx-auto h-8 w-8 text-rose-600" /><p className="mt-3 font-semibold">We couldn’t load your retirement cash flow</p><p className="mt-1 text-sm text-muted-foreground">Your saved plan is safe. Try loading it again.</p><Button className="mt-4" variant="outline" onClick={() => refetch()}>Try again</Button></div>;
@@ -277,7 +314,7 @@ export function RetirementIncomeExpenseProjection() {
       <div className="mt-5 grid grid-cols-2 divide-x rounded-xl border bg-background/70 sm:grid-cols-3"><div className="p-3"><p className="text-xs text-muted-foreground">Total income</p><p className="mt-1 text-lg font-bold tabular-nums text-teal-700 dark:text-teal-300">{money(data.totalMonthlyIncome)}</p></div><div className="p-3 pl-4"><p className="text-xs text-muted-foreground">Total expenses</p><p className="mt-1 text-lg font-bold tabular-nums text-amber-700 dark:text-amber-300">{money(data.totalMonthlyExpenses)}</p></div><div className="col-span-2 border-t p-3 sm:col-span-1 sm:border-l sm:border-t-0 sm:pl-4"><p className="text-xs text-muted-foreground">Income coverage</p><p className="mt-1 text-lg font-bold tabular-nums">{data.totalMonthlyExpenses ? `${Math.round(data.totalMonthlyIncome / data.totalMonthlyExpenses * 100)}%` : "—"}</p></div></div>
     </div>
     <div className="grid items-start gap-4 md:grid-cols-2">
-      <Column kind="income" items={grouped.income} onWithdrawalRateChange={(assetId, withdrawalRate) => withdrawalMutation.mutate({ assetId, withdrawalRate })} savingWithdrawalAssetId={withdrawalMutation.isPending ? withdrawalMutation.variables?.assetId ?? null : null} onAdd={() => openAdd("income")} onEdit={(item) => openEdit(item, "income")} onDelete={(item) => { if (window.confirm(`Remove ${item.name} from your projection?`)) deleteMutation.mutate(item); }} />
+      <Column kind="income" items={grouped.income} onWithdrawalRateChange={(assetId, withdrawalRate) => withdrawalMutation.mutate({ assetId, withdrawalRate })} savingWithdrawalAssetId={withdrawalMutation.isPending ? withdrawalMutation.variables?.assetId ?? null : null} onEarlyWithdrawalAccessChange={(assetId, unlocked) => earlyWithdrawalAccessMutation.mutate({ assetId, unlocked })} savingEarlyWithdrawalAssetId={earlyWithdrawalAccessMutation.isPending ? earlyWithdrawalAccessMutation.variables?.assetId ?? null : null} onAdd={() => openAdd("income")} onEdit={(item) => openEdit(item, "income")} onDelete={(item) => { if (window.confirm(`Remove ${item.name} from your projection?`)) deleteMutation.mutate(item); }} />
       <Column kind="expense" items={grouped.expenses} expected={expected ?? data.expectedMonthlyExpenses} onExpectedChange={(value) => { setExpected(value); setExpectedDirty(true); }} onExpectedBlur={() => { if (expected !== null) settingsMutation.mutate(expected); }} savingExpected={settingsMutation.isPending} onAdd={() => openAdd("expense")} onEdit={(item) => openEdit(item, "expense")} onDelete={(item) => { if (window.confirm(`Remove ${item.name} from your projection?`)) deleteMutation.mutate(item); }} />
     </div>
     <Assumptions assumptions={data.assumptions || []} />

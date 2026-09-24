@@ -8,5 +8,6 @@
 - [Additive schema changes](additive-schema-changes.md) — avoid broad schema pushes when unrelated drift triggers destructive prompts; use narrowly scoped additive dev DDL.
 - [Recommendation thresholds](recommendation-thresholds.md) — recommendation settings use three aggregate savings thresholds instead of account or policy subtypes.
 - [Retirement net-worth projections](retirement-net-worth-projections.md) — use category fallback returns and conservative debt carry-forward rules when inputs are incomplete.
+- [Early retirement account access](retirement-early-withdrawal-access.md) — under-59½ pretax locks use account category/name inference and a persisted per-account projection override.
 - [AI retirement timeline](ai-retirement-age.md) — AI snapshots use the Retirement Planner timeline as the authoritative retirement age.
 - [Inline TypeScript verification scripts](inline-tsx-verification.md) — wrap async tsx -e work in an IIFE and avoid newer runtime APIs not supported by the project Node version.
