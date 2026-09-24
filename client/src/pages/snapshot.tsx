@@ -194,6 +194,13 @@ export default function SnapshotPage() {
   const totalAssets = useMemo(() => assets.reduce((s, a) => s + parseFloat(a.value || "0"), 0), [assets]);
   const totalLiabilities = useMemo(() => liabilities.reduce((s, l) => s + parseFloat(l.balance || "0"), 0), [liabilities]);
   const netWorth = totalAssets - totalLiabilities;
+  const annualReturnOnAssets = useMemo(
+    () => assets.reduce(
+      (sum, asset) => sum + (parseFloat(asset.value || "0") * parseFloat(asset.interestRate || "0")) / 100,
+      0,
+    ),
+    [assets],
+  );
 
   const cashFlow = cashFlowSummary?.averages ?? { income: 0, expenses: 0, net: 0, savingsRate: 0 };
   const totalMonthlyIncome = cashFlow.income;
@@ -391,6 +398,7 @@ export default function SnapshotPage() {
           </div>
           <div className="space-y-2 pt-3 border-t border-slate-100 dark:border-slate-800">
             <StatRow label="Total Assets" value={formatCurrency(totalAssets)} className="text-emerald-600 dark:text-emerald-400 font-medium" />
+            <StatRow label="Net return on assets" value={formatCurrency(annualReturnOnAssets)} className="text-emerald-600 dark:text-emerald-400 font-medium" />
             <StatRow label="Total Liabilities" value={formatCurrency(totalLiabilities)} className="text-red-500 dark:text-red-400 font-medium" />
           </div>
         </SnapshotCard>
