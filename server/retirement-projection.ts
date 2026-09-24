@@ -112,18 +112,29 @@ function daysUntilDate(today: Date, target: Date): number {
   return Math.round((targetUtc - todayUtc) / (24 * 60 * 60 * 1000));
 }
 
-function projectDebt(balance: number, annualRatePercent: number, monthlyPayment: number, months: number): number | null {
+function projectDebt(balance: number, annualRatePercent: number, monthlyPayment: number, days: number): number | null {
   if (balance <= 0) return 0;
-  if (monthlyPayment <= 0 || months <= 0) return null;
+  if (monthlyPayment <= 0 || days <= 0) return null;
 
   const monthlyRate = Math.max(annualRatePercent, 0) / 100 / 12;
+  const months = days / (365.25 / 12);
+  const wholeMonths = Math.floor(months);
+  const partialMonth = months - wholeMonths;
   let remaining = balance;
-  for (let month = 0; month < months && remaining > 0; month += 1) {
+  for (let month = 0; month < wholeMonths && remaining > 0; month += 1) {
     const interest = remaining * monthlyRate;
     if (monthlyPayment >= remaining + interest) return 0;
     remaining = remaining + interest - monthlyPayment;
     if (!Number.isFinite(remaining)) return null;
   }
+
+  if (partialMonth > 0 && remaining > 0) {
+    const interest = remaining * monthlyRate * partialMonth;
+    const payment = monthlyPayment * partialMonth;
+    remaining = Math.max(0, remaining + interest - payment);
+    if (!Number.isFinite(remaining)) return null;
+  }
+
   return Math.max(0, remaining);
 }
 
@@ -144,9 +155,10 @@ export function buildRetirementNetWorthProjection(input: {
   const today = new Date();
   const dateOfBirthRetirementDate = retirementDateFromDateOfBirth(input.dateOfBirth, input.retirementAge);
   const retirementDate = dateOfBirthRetirementDate ?? addUtcYears(today, wholeYearsToRetirement);
-  const yearsToRetirement = dateOfBirthRetirementDate
-    ? daysUntilDate(today, retirementDate) / 365.25
-    : wholeYearsToRetirement;
+  const daysToRetirement = dateOfBirthRetirementDate
+    ? daysUntilDate(today, retirementDate)
+    : wholeYearsToRetirement * 365.25;
+  const yearsToRetirement = daysToRetirement / 365.25;
   const retirementDateIso = retirementDate.toISOString().slice(0, 10);
   const todayIso = today.toISOString().slice(0, 10);
 
@@ -250,7 +262,7 @@ export function buildRetirementNetWorthProjection(input: {
       message = `Paid off by ${maturityDate}.`;
     } else {
       const amortizedBalance = interestRateAvailable
-        ? projectDebt(currentBalance, interestRate, minimumPayment, monthsToRetirement)
+        ? projectDebt(currentBalance, interestRate, minimumPayment, daysToRetirement)
         : null;
       if (amortizedBalance === null) {
         status = "unknown";
@@ -264,7 +276,9 @@ export function buildRetirementNetWorthProjection(input: {
         status = projectedBalance <= 0 ? "paid-off" : "remaining";
         message = status === "paid-off"
           ? "Expected to be paid off before retirement."
-          : "Projected from the current balance, interest rate, and monthly payment.";
+          : dateOfBirthRetirementDate
+            ? "Projected from the current balance, interest rate, monthly payment, and exact days to retirement."
+            : "Projected from the current balance, interest rate, and monthly payment.";
       }
     }
 
