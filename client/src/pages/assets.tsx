@@ -385,15 +385,15 @@ export default function AssetsPage() {
               </div>
               <div>
                 <p className="flex items-center gap-1 text-sm text-muted-foreground">
-                  Annual Interest Earned (Rate of Return)
+                  Annual Return(% Return)
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <button type="button" className="inline-flex rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="How annual interest earned and rate of return are calculated">
+                      <button type="button" className="inline-flex rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="How annual return and percentage return are calculated">
                         <Info className="h-3.5 w-3.5 text-muted-foreground/70" />
                       </button>
                     </TooltipTrigger>
                     <TooltipContent side="top" className="max-w-xs text-xs leading-relaxed">
-                      Annual interest earned is the absolute dollar amount calculated as the sum of (asset value × rate ÷ 100). The rate of return is a dollar-weighted average calculated as (asset value × rate) ÷ total asset value. Assets with a 0% rate still count in the total.
+                      Annual return is the estimated absolute dollar change across all assets, calculated as the sum of (asset value × rate ÷ 100). The percentage return is a dollar-weighted average calculated as (asset value × rate) ÷ total asset value. This applies to both income-producing assets and assets that appreciate in value. Assets with a 0% rate still count in the total.
                     </TooltipContent>
                   </Tooltip>
                 </p>
