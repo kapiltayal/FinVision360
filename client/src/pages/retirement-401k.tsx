@@ -50,7 +50,6 @@ export default function Retirement401kPage() {
 
   const [form, setForm] = useState({
     currentAge: 35,
-    retirementAge: 65,
     currentBalance: "25000",
     annualSalary: "80000",
     contributionPct: 10,
@@ -65,7 +64,6 @@ export default function Retirement401kPage() {
     if (goal) {
       setForm({
         currentAge: ageFromProfile ?? goal.currentAge ?? 35,
-        retirementAge: plannerSettings?.retirementAge ?? goal.retirementAge ?? 65,
         currentBalance: goal.currentBalance ?? "25000",
         annualSalary: goal.annualSalary ?? "80000",
         contributionPct: parseFloat(goal.contributionPct ?? "10"),
@@ -77,12 +75,6 @@ export default function Retirement401kPage() {
       });
     }
   }, [goal, plannerSettings?.retirementAge]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  useEffect(() => {
-    if (plannerSettings?.retirementAge != null) {
-      setForm((current) => ({ ...current, retirementAge: plannerSettings.retirementAge }));
-    }
-  }, [plannerSettings?.retirementAge]);
 
   // Keep currentAge in sync whenever the profile DOB resolves
   useEffect(() => {
@@ -106,7 +98,8 @@ export default function Retirement401kPage() {
   const set = (key: keyof typeof form, val: string | number) =>
     setForm((f) => ({ ...f, [key]: val }));
 
-  const years = form.retirementAge - form.currentAge;
+  const retirementAge = plannerSettings?.retirementAge ?? 65;
+  const years = retirementAge - form.currentAge;
   const salary = parseFloat(form.annualSalary) || 0;
   const currentBalance = parseFloat(form.currentBalance) || 0;
   const annualContribution = Math.min(
@@ -200,7 +193,7 @@ export default function Retirement401kPage() {
                 columns: ["Setting", "Value"],
                 rows: [
                   ["Current Age", form.currentAge],
-                  ["Retirement Age", form.retirementAge],
+                  ["Retirement Age", retirementAge],
                   ["Current Balance ($)", parseFloat(form.currentBalance || "0")],
                   ["Annual Salary ($)", parseFloat(form.annualSalary || "0")],
                   ["Contribution (%)", form.contributionPct],

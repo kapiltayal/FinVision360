@@ -252,7 +252,6 @@ export const retirement401kGoals = pgTable("retirement_401k_goals", {
   id: serial("id").primaryKey(),
   userId: varchar("user_id").notNull().unique().references(() => users.id, { onDelete: "cascade" }),
   currentAge: integer("current_age").notNull().default(35),
-  retirementAge: integer("retirement_age").notNull().default(65),
   currentBalance: numeric("current_balance", { precision: 15, scale: 2 }).notNull().default("25000"),
   annualSalary: numeric("annual_salary", { precision: 15, scale: 2 }).notNull().default("80000"),
   contributionPct: numeric("contribution_pct", { precision: 5, scale: 2 }).notNull().default("10"),

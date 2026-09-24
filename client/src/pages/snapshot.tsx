@@ -207,7 +207,7 @@ export default function SnapshotPage() {
       .reduce((s, a) => s + parseFloat(a.value || "0"), 0), [assets]);
   const k401Balance = goal401k ? parseFloat((goal401k as any).currentBalance || "0") : retirementAssets;
   const ssnMonthlyEst = Math.min(totalMonthlyIncome * 0.42, 3822);
-  const retirementAge = plannerSettings?.retirementAge ?? (goal401k as any)?.retirementAge ?? 65;
+  const retirementAge = plannerSettings?.retirementAge ?? 65;
   const yearsToRetire = age != null ? Math.max(retirementAge - age, 0) : null;
 
 

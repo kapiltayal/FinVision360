@@ -220,7 +220,7 @@ function toAdvisorRetirementContext(
     currentAge: goal?.currentAge ?? null,
     // The Retirement Planner timeline is the authoritative retirement age
     // used throughout the app, including the AI financial snapshot.
-    retirementAge: plannerSettings?.retirementAge ?? goal?.retirementAge ?? 65,
+    retirementAge: plannerSettings?.retirementAge ?? 65,
     currentBalance: goal ? finiteNumber(goal.currentBalance) : null,
     annualSalary: goal ? finiteNumber(goal.annualSalary) : null,
     contributionPct: goal ? finiteNumber(goal.contributionPct) : null,
@@ -565,12 +565,12 @@ export async function registerRoutes(
 
   app.post("/api/retirement/401k", requireAuth, async (req, res) => {
     const userId = (req.user as any).id;
-    const { currentAge, retirementAge, currentBalance, annualSalary, contributionPct, employerMatchPct, employerMatchLimit, expectedReturn, taxBracket, rothTaxRate } = req.body;
-    if (!currentAge || !retirementAge) {
+    const { currentAge, currentBalance, annualSalary, contributionPct, employerMatchPct, employerMatchLimit, expectedReturn, taxBracket, rothTaxRate } = req.body;
+    if (!currentAge) {
       return res.status(400).json({ message: "Required fields missing" });
     }
     const goal = await storage.upsertRetirement401kGoal({
-      userId, currentAge, retirementAge, currentBalance, annualSalary, contributionPct, employerMatchPct, employerMatchLimit, expectedReturn, taxBracket, rothTaxRate,
+      userId, currentAge, currentBalance, annualSalary, contributionPct, employerMatchPct, employerMatchLimit, expectedReturn, taxBracket, rothTaxRate,
     });
     res.json(goal);
   });
