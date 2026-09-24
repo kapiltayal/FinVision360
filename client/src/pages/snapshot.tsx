@@ -142,10 +142,24 @@ function SnapshotCard({
   );
 }
 
-function StatRow({ label, value, className = "" }: { label: string; value: string; className?: string }) {
+function StatRow({ label, value, className = "", tooltip }: { label: string; value: string; className?: string; tooltip?: string }) {
   return (
     <div className={`flex items-center justify-between gap-2 text-sm ${className}`}>
-      <span className="text-muted-foreground">{label}</span>
+      <span className="inline-flex items-center gap-1 text-muted-foreground">
+        {label}
+        {tooltip && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="cursor-default" onClick={(e) => e.stopPropagation()}>
+                <Info className="h-3.5 w-3.5 text-muted-foreground/50 hover:text-muted-foreground transition-colors" />
+              </span>
+            </TooltipTrigger>
+            <TooltipContent side="top" className="max-w-xs text-xs leading-relaxed">
+              {tooltip}
+            </TooltipContent>
+          </Tooltip>
+        )}
+      </span>
       <span className="font-medium tabular-nums">{value}</span>
     </div>
   );
@@ -201,6 +215,14 @@ export default function SnapshotPage() {
     ),
     [assets],
   );
+  const annualInterestOwed = useMemo(
+    () => liabilities.reduce(
+      (sum, liability) => sum + (parseFloat(liability.balance || "0") * parseFloat(liability.interestRate || "0")) / 100,
+      0,
+    ),
+    [liabilities],
+  );
+  const netReturnOnAssets = annualReturnOnAssets - annualInterestOwed;
 
   const cashFlow = cashFlowSummary?.averages ?? { income: 0, expenses: 0, net: 0, savingsRate: 0 };
   const totalMonthlyIncome = cashFlow.income;
@@ -398,8 +420,13 @@ export default function SnapshotPage() {
           </div>
           <div className="space-y-2 pt-3 border-t border-slate-100 dark:border-slate-800">
             <StatRow label="Total Assets" value={formatCurrency(totalAssets)} className="text-emerald-600 dark:text-emerald-400 font-medium" />
-            <StatRow label="Net return on assets" value={formatCurrency(annualReturnOnAssets)} className="text-emerald-600 dark:text-emerald-400 font-medium" />
             <StatRow label="Total Liabilities" value={formatCurrency(totalLiabilities)} className="text-red-500 dark:text-red-400 font-medium" />
+            <StatRow
+              label="Net Return on Assets"
+              value={`${netReturnOnAssets >= 0 ? "+" : ""}${formatCurrency(netReturnOnAssets)}/yr`}
+              className="text-emerald-600 dark:text-emerald-400 font-medium"
+              tooltip="Net return on assets is the annual return on all assets minus the annual interest owed on all liabilities."
+            />
           </div>
         </SnapshotCard>
 
