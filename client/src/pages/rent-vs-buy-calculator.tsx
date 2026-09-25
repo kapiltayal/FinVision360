@@ -108,8 +108,9 @@ export default function RentVsBuyCalculator() {
     const investmentRate = Math.pow(1 + inputs.investmentReturnPct / 100, 1 / 12) - 1;
     const homeGrowth = 1 + inputs.homeAppreciationPct / 100;
     const rentGrowth = 1 + inputs.annualRentIncreasePct / 100;
-    const upfrontBuyerCash =
-      homePrice * (inputs.downPaymentPct + inputs.purchaseClosingCostPct) / 100;
+    const downPaymentCash = homePrice * inputs.downPaymentPct / 100;
+    const purchaseClosingCash = homePrice * inputs.purchaseClosingCostPct / 100;
+    const upfrontBuyerCash = downPaymentCash + purchaseClosingCash;
 
     let remainingMortgage = loanAmount;
     let renterInvestments = upfrontBuyerCash;
@@ -147,7 +148,7 @@ export default function RentVsBuyCalculator() {
     const futureHomeValue = homePrice * Math.pow(homeGrowth, horizonMonths / 12);
     const homeEquityAfterSelling = futureHomeValue * (1 - inputs.sellingCostPct / 100) -
       remainingMortgage;
-    const buyNetWorth = homeEquityAfterSelling + buyerInvestments;
+    const buyNetWorth = homeEquityAfterSelling - purchaseClosingCash + buyerInvestments;
     const rentNetWorth = renterInvestments;
     const difference = buyNetWorth - rentNetWorth;
 
@@ -173,6 +174,12 @@ export default function RentVsBuyCalculator() {
       : projection.difference < -500
         ? "Renting is ahead"
         : "The estimates are close";
+  const advantageLabel =
+    Math.abs(projection.difference) <= 500
+      ? "Estimated difference"
+      : projection.difference > 0
+        ? "Estimated buy advantage"
+        : "Estimated rent advantage";
   const comparisonIcon =
     projection.difference > 500
       ? ArrowUpRight
@@ -366,9 +373,7 @@ export default function RentVsBuyCalculator() {
                 </div>
               </div>
               <div className="flex items-center justify-between gap-3 border-t pt-3 text-sm">
-                <span className="text-muted-foreground">
-                  {projection.difference >= 0 ? "Estimated buy advantage" : "Estimated rent advantage"}
-                </span>
+                <span className="text-muted-foreground">{advantageLabel}</span>
                 <span className="font-semibold" data-testid="text-rent-buy-difference">
                   {formatCurrency(Math.abs(projection.difference))}
                 </span>
