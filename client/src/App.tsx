@@ -17,6 +17,7 @@ import NetWorthPage from "@/pages/net-worth";
 import RetirementPage from "@/pages/retirement";
 import InsurancePage from "@/pages/insurance";
 import AIAdvisorPage from "@/pages/ai-advisor";
+import CalculatorsPage from "@/pages/calculators";
 import EstatePlanningPage from "@/pages/estate-planning";
 import SettingsPage from "@/pages/settings";
 import IncomeExpensesTabsPage from "@/pages/income-expenses-tabs";
@@ -56,6 +57,7 @@ function AuthenticatedApp() {
           <Route path="/goals" component={GoalsPage} />
           <Route path="/finance-tracker" component={IncomeExpensesTabsPage} />
           <Route path="/ai-advisor" component={AIAdvisorPage} />
+          <Route path="/calculators" component={CalculatorsPage} />
           <Route path="/settings" component={SettingsPage} />
           <Route path="/bank-rates" component={BankRatesPage} />
           <Route path="/connected-accounts" component={ConnectedAccountsPage} />

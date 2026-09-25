@@ -14,9 +14,7 @@ import {
   Sparkles,
   Link2,
   ScrollText,
-  Receipt,
-  ClipboardList,
-  BarChart3,
+  Calculator,
   type LucideIcon,
 } from "lucide-react";
 import logoPath from "@assets/FinVision360_Logo_H_(transparent)_1776714495394.png";
@@ -118,6 +116,7 @@ const baseNavItems: NavigationItem[] = [
       { title: "AI Archives", url: "/ai-advisor?tab=history" },
     ],
   },
+  { title: "Calculators", url: "/calculators", icon: Calculator, tabs: [] },
 ];
 
 const adminNavItems = [
