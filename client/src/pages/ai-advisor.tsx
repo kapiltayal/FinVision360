@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { useLocation, useSearch } from "wouter";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -27,6 +28,9 @@ type AdvisorHistoryEntry = {
   responseText: string;
   createdAt: string;
 };
+
+type AdvisorTab = "scenario" | "debt" | "history";
+const ADVISOR_TABS: AdvisorTab[] = ["scenario", "debt", "history"];
 
 function escapeHtml(text: string): string {
   return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -191,6 +195,17 @@ function StreamingResponse({
 }
 
 export default function AIAdvisorPage() {
+  const [location, setLocation] = useLocation();
+  const search = useSearch();
+  const [activeTab, setActiveTab] = useState<AdvisorTab>(() => {
+    const tab = new URLSearchParams(window.location.search).get("tab");
+    return ADVISOR_TABS.includes(tab as AdvisorTab) ? (tab as AdvisorTab) : "scenario";
+  });
+  useEffect(() => {
+    const tab = new URLSearchParams(search).get("tab");
+    setActiveTab(ADVISOR_TABS.includes(tab as AdvisorTab) ? (tab as AdvisorTab) : "scenario");
+  }, [search]);
+
   const { data: assets = [] } = useQuery<Asset[]>({ queryKey: ["/api/assets"] });
   const { data: liabilities = [] } = useQuery<Liability[]>({ queryKey: ["/api/liabilities"] });
   const { data: advisorSettings } = useQuery<{ aiAdvisorName?: string }>({
@@ -221,6 +236,16 @@ export default function AIAdvisorPage() {
     archiveListRef.current?.querySelectorAll<HTMLDetailsElement>("details").forEach((archive) => {
       archive.open = false;
     });
+  };
+
+  const selectAdvisorTab = (value: string) => {
+    if (!ADVISOR_TABS.includes(value as AdvisorTab)) return;
+    const tab = value as AdvisorTab;
+    setActiveTab(tab);
+    const params = new URLSearchParams(search);
+    params.set("tab", tab);
+    setLocation(`${location}?${params.toString()}`, { replace: true });
+    if (tab === "history") collapseArchives();
   };
 
   const handleScenarioSubmit = () => {
@@ -288,10 +313,8 @@ export default function AIAdvisorPage() {
       </div>
 
       <Tabs
-        defaultValue="scenario"
-        onValueChange={(value) => {
-          if (value === "history") collapseArchives();
-        }}
+        value={activeTab}
+        onValueChange={selectAdvisorTab}
       >
         <TabsList className="grid h-auto w-full grid-cols-1 gap-2 bg-transparent p-0 sm:grid-cols-3">
           <TabsTrigger
@@ -311,7 +334,6 @@ export default function AIAdvisorPage() {
           <TabsTrigger
             value="history"
             data-testid="tab-history"
-            onClick={collapseArchives}
             className="h-10 rounded-xl border border-border/70 bg-muted/70 px-4 text-muted-foreground shadow-sm hover:border-primary/40 hover:bg-muted data-[state=active]:border-primary data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md"
           >
             <History className="h-4 w-4 mr-2" /> {advisorName} Archives ({history.length})

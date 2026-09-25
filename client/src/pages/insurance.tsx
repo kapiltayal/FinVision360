@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useLocation, useSearch } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -814,6 +815,8 @@ function PolicyCard({
 }
 
 export default function InsurancePage() {
+  const [location, setLocation] = useLocation();
+  const search = useSearch();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<TabType>(() => {
     const param = new URLSearchParams(window.location.search).get("tab");
@@ -831,6 +834,19 @@ export default function InsurancePage() {
   });
 
   const { formattedDate, markUpdated } = useLastUpdated("insurance");
+
+  useEffect(() => {
+    const param = new URLSearchParams(search).get("tab");
+    const valid: TabType[] = ["auto", "home", "life", "health", "other", "annuity"];
+    setActiveTab(valid.includes(param as TabType) ? (param as TabType) : "auto");
+  }, [search]);
+
+  const selectInsuranceTab = (tab: TabType) => {
+    setActiveTab(tab);
+    const params = new URLSearchParams(search);
+    params.set("tab", tab);
+    setLocation(`${location}?${params.toString()}`, { replace: true });
+  };
 
   const createMutation = useMutation({
     mutationFn: (data: any) => apiRequest("POST", "/api/insurance", data),
@@ -1048,7 +1064,7 @@ export default function InsurancePage() {
             return (
               <button
                 key={tab.key}
-                onClick={() => setActiveTab(tab.key)}
+                onClick={() => selectInsuranceTab(tab.key)}
                 data-testid={`tab-insurance-${tab.key}`}
                 className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
                   activeTab === tab.key

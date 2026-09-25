@@ -1,4 +1,5 @@
-import { Fragment, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
+import { useLocation, useSearch } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -158,16 +159,35 @@ function ContactForm({ contact, onClose }: { contact?: EstateContact; onClose: (
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function EstatePlanningPage() {
+  const [location, setLocation] = useLocation();
+  const search = useSearch();
   const { toast } = useToast();
   const qc = useQueryClient();
 
   const [contactDialogOpen, setContactDialogOpen] = useState(false);
   const [editingContact, setEditingContact] = useState<EstateContact | undefined>();
   const [expandedAsset, setExpandedAsset] = useState<number | null>(null);
-  const [activeTab, setActiveTab] = useState<EstateTab>("beneficiaries");
+  const [activeTab, setActiveTab] = useState<EstateTab>(() => {
+    const tab = new URLSearchParams(window.location.search).get("tab");
+    const validTabs: EstateTab[] = ["beneficiaries", "documents", "contacts"];
+    return validTabs.includes(tab as EstateTab) ? (tab as EstateTab) : "beneficiaries";
+  });
   const [expandedDocuments, setExpandedDocuments] = useState<Record<string, boolean>>({});
   // Local beneficiary edits are only committed when the user clicks Save.
   const [benEdits, setBenEdits] = useState<Record<number, BeneficiaryDraft[]>>({});
+
+  useEffect(() => {
+    const tab = new URLSearchParams(search).get("tab");
+    const validTabs: EstateTab[] = ["beneficiaries", "documents", "contacts"];
+    setActiveTab(validTabs.includes(tab as EstateTab) ? (tab as EstateTab) : "beneficiaries");
+  }, [search]);
+
+  const selectEstateTab = (tab: EstateTab) => {
+    setActiveTab(tab);
+    const params = new URLSearchParams(search);
+    params.set("tab", tab);
+    setLocation(`${location}?${params.toString()}`, { replace: true });
+  };
 
   const { data: assets = [], isLoading: aLoading } = useQuery<Asset[]>({ queryKey: ["/api/assets"] });
   const { data: categories = [], isLoading: categoriesLoading } = useQuery<BookCategory[]>({ queryKey: ["/api/assets/categories"] });
@@ -358,7 +378,7 @@ export default function EstatePlanningPage() {
               <button
                 key={tab.key}
                 type="button"
-                onClick={() => setActiveTab(tab.key)}
+                onClick={() => selectEstateTab(tab.key)}
                 data-testid={`tab-estate-${tab.key}`}
                 className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
                   activeTab === tab.key

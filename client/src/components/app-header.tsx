@@ -1,4 +1,4 @@
-import { useLocation, Link } from "wouter";
+import { useLocation, useSearch, Link } from "wouter";
 import { useEffect, useState } from "react";
 import {
   LayoutDashboard,
@@ -14,6 +14,10 @@ import {
   Sparkles,
   Link2,
   ScrollText,
+  Receipt,
+  ClipboardList,
+  BarChart3,
+  type LucideIcon,
 } from "lucide-react";
 import logoPath from "@assets/FinVision360_Logo_H_(transparent)_1776714495394.png";
 import { Button } from "@/components/ui/button";
@@ -23,18 +27,97 @@ import {
   DropdownMenuTrigger,
   DropdownMenuLabel,
   DropdownMenuSeparator,
+  DropdownMenuItem,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useAuth, useLogout } from "@/hooks/use-auth";
 
-const baseNavItems = [
-  { title: "Financial Snapshot", url: "/snapshot", icon: Sparkles },
-  { title: "Net Worth", url: "/", icon: LayoutDashboard, matches: ["/", "/assets", "/liabilities"] },
-  { title: "Income & Expenses", url: "/income-expenses", icon: ArrowLeftRight, matches: ["/income-expenses", "/income-expenses/budgeting-plan", "/income-expenses/finance-tracker", "/finance-tracker"] },
-  { title: "Goals & Tracking", url: "/goals", icon: Target },
-  { title: "Retirement", url: "/retirement", icon: Landmark },
-  { title: "Insurance", url: "/insurance", icon: ShieldCheck },
-  { title: "Estate & Legacy", url: "/estate-planning", icon: ScrollText },
-  { title: "AI Lab", url: "/ai-advisor", icon: Brain },
+type NavigationTab = {
+  title: string;
+  url: string;
+  matches?: string[];
+  default?: boolean;
+};
+
+type NavigationItem = {
+  title: string;
+  url: string;
+  icon: LucideIcon;
+  matches?: string[];
+  tabs: NavigationTab[];
+};
+
+const baseNavItems: NavigationItem[] = [
+  { title: "Financial Snapshot", url: "/snapshot", icon: Sparkles, tabs: [] },
+  {
+    title: "Net Worth",
+    url: "/",
+    icon: LayoutDashboard,
+    matches: ["/", "/assets", "/liabilities"],
+    tabs: [
+      { title: "Net Worth", url: "/" },
+      { title: "Assets", url: "/assets" },
+      { title: "Liabilities", url: "/liabilities" },
+    ],
+  },
+  {
+    title: "Income & Expenses",
+    url: "/income-expenses",
+    icon: ArrowLeftRight,
+    matches: ["/income-expenses", "/income-expenses/budgeting-plan", "/income-expenses/finance-tracker", "/finance-tracker"],
+    tabs: [
+      { title: "Historical Monthly Expenses", url: "/income-expenses" },
+      { title: "Budgeting Plan", url: "/income-expenses/budgeting-plan" },
+      { title: "Transactions", url: "/income-expenses/finance-tracker", matches: ["/finance-tracker"] },
+    ],
+  },
+  { title: "Goals & Tracking", url: "/goals", icon: Target, tabs: [] },
+  {
+    title: "Retirement",
+    url: "/retirement",
+    icon: Landmark,
+    tabs: [
+      { title: "Retirement Planner", url: "/retirement" },
+      { title: "Social Security", url: "/retirement/social-security" },
+      { title: "Pension", url: "/retirement/pension" },
+      { title: "401k Calculator", url: "/retirement/401k" },
+    ],
+  },
+  {
+    title: "Insurance",
+    url: "/insurance",
+    icon: ShieldCheck,
+    tabs: [
+      { title: "Auto", url: "/insurance?tab=auto", default: true },
+      { title: "Home", url: "/insurance?tab=home" },
+      { title: "Life", url: "/insurance?tab=life" },
+      { title: "Health", url: "/insurance?tab=health" },
+      { title: "Other", url: "/insurance?tab=other" },
+      { title: "Annuities", url: "/insurance?tab=annuity" },
+    ],
+  },
+  {
+    title: "Estate & Legacy",
+    url: "/estate-planning",
+    icon: ScrollText,
+    tabs: [
+      { title: "Beneficiaries", url: "/estate-planning?tab=beneficiaries", default: true },
+      { title: "Documents", url: "/estate-planning?tab=documents" },
+      { title: "Contacts", url: "/estate-planning?tab=contacts" },
+    ],
+  },
+  {
+    title: "AI Lab",
+    url: "/ai-advisor",
+    icon: Brain,
+    tabs: [
+      { title: "Ask AI Advisor", url: "/ai-advisor?tab=scenario", default: true },
+      { title: "Debt Strategy", url: "/ai-advisor?tab=debt" },
+      { title: "AI Archives", url: "/ai-advisor?tab=history" },
+    ],
+  },
 ];
 
 const adminNavItems = [
@@ -43,6 +126,7 @@ const adminNavItems = [
 
 export function AppHeader() {
   const [location] = useLocation();
+  const search = useSearch();
   const [navOpen, setNavOpen] = useState(false);
   const [userOpen, setUserOpen] = useState(false);
   const { user } = useAuth();
@@ -64,10 +148,19 @@ export function AppHeader() {
     };
   }, [user?.id]);
 
-  const isNavItemActive = (item: (typeof baseNavItems)[number]) =>
+  const isNavItemActive = (item: NavigationItem) =>
     item.matches?.includes(location) ||
     location === item.url ||
     (item.url !== "/" && location.startsWith(item.url));
+  const isTabActive = (tab: NavigationTab) => {
+    const [path, query = ""] = tab.url.split("?", 2);
+    if (location !== path && !tab.matches?.includes(location)) return false;
+
+    const targetTab = new URLSearchParams(query).get("tab");
+    if (!targetTab) return true;
+    const currentTab = new URLSearchParams(search).get("tab");
+    return currentTab === targetTab || (!currentTab && tab.default === true);
+  };
   const currentPage = baseNavItems.find(isNavItemActive);
   const currentAdminPage = adminNavItems.find(
     (item) => location === item.url || (item.url !== "/" && location.startsWith(item.url))
@@ -103,24 +196,60 @@ export function AppHeader() {
               <ChevronDown className="h-4 w-4 opacity-70" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-48">
+          <DropdownMenuContent align="end" className="w-56">
             <div className="px-2 py-1.5 text-sm font-semibold">Navigation</div>
             <div className="h-px bg-border my-1" />
-            {baseNavItems.map((item) => (
-              <Link
-                key={item.title}
-                href={item.url}
-                onClick={() => setNavOpen(false)}
-                className="flex items-center gap-2 px-2 py-2 text-sm hover:bg-accent rounded cursor-pointer"
-                data-testid={`nav-${item.title.toLowerCase().replace(/\s/g, "-")}`}
-              >
-                <item.icon className="h-4 w-4 shrink-0" />
-                <span className="flex-1">{item.title}</span>
-                {isNavItemActive(item) && (
-                  <span className="text-primary">✓</span>
-                )}
-              </Link>
-            ))}
+            {baseNavItems.map((item) => {
+              const testId = `nav-${item.title.toLowerCase().replace(/\s/g, "-")}`;
+              const itemIsActive = isNavItemActive(item);
+
+              if (item.tabs.length > 0) {
+                return (
+                  <DropdownMenuSub key={item.title}>
+                    <DropdownMenuSubTrigger
+                      className="gap-2 px-2 py-2"
+                      data-testid={testId}
+                    >
+                      <item.icon className="h-4 w-4 shrink-0" />
+                      <span className="flex-1">{item.title}</span>
+                      {itemIsActive && <span className="text-primary">✓</span>}
+                    </DropdownMenuSubTrigger>
+                    <DropdownMenuSubContent className="max-h-[70vh] w-56 overflow-y-auto">
+                      {item.tabs.map((tab) => (
+                        <DropdownMenuItem
+                          key={tab.title}
+                          asChild
+                          data-testid={`${testId}-${tab.title.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`}
+                        >
+                          <Link
+                            href={tab.url}
+                            onClick={() => setNavOpen(false)}
+                            className="flex items-center gap-2"
+                          >
+                            <span className="flex-1">{tab.title}</span>
+                            {isTabActive(tab) && <span className="text-primary">✓</span>}
+                          </Link>
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuSubContent>
+                  </DropdownMenuSub>
+                );
+              }
+
+              return (
+                <Link
+                  key={item.title}
+                  href={item.url}
+                  onClick={() => setNavOpen(false)}
+                  className="flex items-center gap-2 rounded px-2 py-2 text-sm hover:bg-accent"
+                  data-testid={testId}
+                >
+                  <item.icon className="h-4 w-4 shrink-0" />
+                  <span className="flex-1">{item.title}</span>
+                  {itemIsActive && <span className="text-primary">✓</span>}
+                </Link>
+              );
+            })}
           </DropdownMenuContent>
         </DropdownMenu>
 
