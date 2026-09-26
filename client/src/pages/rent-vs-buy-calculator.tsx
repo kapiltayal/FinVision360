@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { FormattedNumberInput } from "@/components/ui/formatted-number-input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { formatCurrency } from "@/lib/format";
@@ -31,7 +32,7 @@ type RentVsBuyInputs = {
   yearsToCompare: number;
 };
 
-type RangeFieldProps = {
+type NumericFieldProps = {
   id: string;
   label: string;
   value: number;
@@ -40,7 +41,6 @@ type RangeFieldProps = {
   min?: number;
   max?: number;
   suffix?: string;
-  currency?: boolean;
 };
 
 const INITIAL_INPUTS: RentVsBuyInputs = {
@@ -60,32 +60,7 @@ const INITIAL_INPUTS: RentVsBuyInputs = {
   yearsToCompare: 10,
 };
 
-const currencyValueFormatter = new Intl.NumberFormat("en-US", {
-  style: "currency",
-  currency: "USD",
-  maximumFractionDigits: 0,
-});
-const compactCurrencyFormatter = new Intl.NumberFormat("en-US", {
-  style: "currency",
-  currency: "USD",
-  notation: "compact",
-  maximumFractionDigits: 1,
-});
-
-function formatRangeValue(value: number, suffix?: string, currency = false): string {
-  if (suffix === "years") {
-    return `${value} ${value === 1 ? "year" : "years"}`;
-  }
-  if (currency) return currencyValueFormatter.format(value);
-  return `${value.toLocaleString("en-US")}${suffix ?? ""}`;
-}
-
-function formatRangeEndpoint(value: number, suffix?: string, currency = false): string {
-  if (currency) return compactCurrencyFormatter.format(value);
-  return formatRangeValue(value, suffix);
-}
-
-function RangeField({
+function NumericField({
   id,
   label,
   value,
@@ -94,35 +69,26 @@ function RangeField({
   min = 0,
   max = 100,
   suffix,
-  currency = false,
-}: RangeFieldProps) {
+}: NumericFieldProps) {
   return (
     <div className="space-y-2">
-      <div className="flex items-center justify-between gap-3">
-        <Label id={`${id}-label`}>{label}</Label>
-        <span
-          className="shrink-0 rounded-md bg-muted px-2 py-1 text-sm font-semibold tabular-nums"
-          data-testid={`value-${id}`}
-        >
-          {formatRangeValue(value, suffix, currency)}
-        </span>
-      </div>
-      <Slider
-        value={[value]}
-        onValueChange={([nextValue]) => {
-          if (nextValue !== undefined) onChange(nextValue);
-        }}
-        min={min}
-        max={max}
-        step={step}
-        thumbLabels={[label]}
-        aria-labelledby={`${id}-label`}
-        className="py-1"
-        data-testid={`slider-${id}`}
-      />
-      <div className="flex justify-between text-xs text-muted-foreground">
-        <span>{formatRangeEndpoint(min, suffix, currency)}</span>
-        <span>{formatRangeEndpoint(max, suffix, currency)}</span>
+      <Label htmlFor={id}>{label}</Label>
+      <div className="relative">
+        <FormattedNumberInput
+          id={id}
+          value={value}
+          min={min}
+          max={max}
+          step={step}
+          onValueChange={onChange}
+          className={`h-11 rounded-lg bg-background/80 ${suffix ? "pr-16" : ""}`}
+          data-testid={`input-${id}`}
+        />
+        {suffix && (
+          <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center whitespace-nowrap text-xs text-muted-foreground">
+            {suffix}
+          </span>
+        )}
       </div>
     </div>
   );
@@ -316,7 +282,7 @@ export default function RentVsBuyCalculator() {
             </div>
           </div>
           <div className="space-y-2 md:border-l md:pl-6">
-            <RangeField
+            <NumericField
               id="investment-return"
               label="Annual investment return"
               value={inputs.investmentReturnPct}
@@ -354,16 +320,15 @@ export default function RentVsBuyCalculator() {
                 Purchase &amp; financing
               </p>
               <div className="grid gap-4 sm:grid-cols-2">
-                <RangeField
+                <NumericField
                   id="home-price"
                   label="Home price ($)"
                   value={inputs.homePrice}
-                  currency
                   max={10000000}
                   step={5000}
                   onChange={(value) => update("homePrice", value)}
                 />
-                <RangeField
+                <NumericField
                   id="down-payment"
                   label="Down payment"
                   value={inputs.downPaymentPct}
@@ -372,7 +337,7 @@ export default function RentVsBuyCalculator() {
                   step={1}
                   onChange={(value) => update("downPaymentPct", value)}
                 />
-                <RangeField
+                <NumericField
                   id="mortgage-rate"
                   label="Mortgage interest rate"
                   value={inputs.mortgageRatePct}
@@ -381,7 +346,7 @@ export default function RentVsBuyCalculator() {
                   step={0.1}
                   onChange={(value) => update("mortgageRatePct", value)}
                 />
-                <RangeField
+                <NumericField
                   id="mortgage-term"
                   label="Mortgage term"
                   value={inputs.mortgageTermYears}
@@ -399,7 +364,7 @@ export default function RentVsBuyCalculator() {
                 Ownership costs &amp; home value
               </p>
               <div className="grid gap-4 sm:grid-cols-2">
-                <RangeField
+                <NumericField
                   id="property-tax"
                   label="Property tax rate"
                   value={inputs.propertyTaxPct}
@@ -408,16 +373,15 @@ export default function RentVsBuyCalculator() {
                   step={0.1}
                   onChange={(value) => update("propertyTaxPct", value)}
                 />
-                <RangeField
+                <NumericField
                   id="home-insurance"
                   label="Home insurance per year ($)"
                   value={inputs.annualHomeInsurance}
-                  currency
                   max={100000}
                   step={100}
                   onChange={(value) => update("annualHomeInsurance", value)}
                 />
-                <RangeField
+                <NumericField
                   id="maintenance-rate"
                   label="Maintenance allowance"
                   value={inputs.annualMaintenancePct}
@@ -426,7 +390,7 @@ export default function RentVsBuyCalculator() {
                   step={0.1}
                   onChange={(value) => update("annualMaintenancePct", value)}
                 />
-                <RangeField
+                <NumericField
                   id="home-appreciation"
                   label="Home appreciation"
                   value={inputs.homeAppreciationPct}
@@ -436,7 +400,7 @@ export default function RentVsBuyCalculator() {
                   step={0.1}
                   onChange={(value) => update("homeAppreciationPct", value)}
                 />
-                <RangeField
+                <NumericField
                   id="closing-cost"
                   label="Buyer closing costs"
                   value={inputs.purchaseClosingCostPct}
@@ -445,7 +409,7 @@ export default function RentVsBuyCalculator() {
                   step={0.1}
                   onChange={(value) => update("purchaseClosingCostPct", value)}
                 />
-                <RangeField
+                <NumericField
                   id="selling-cost"
                   label="Selling costs"
                   value={inputs.sellingCostPct}
@@ -475,16 +439,15 @@ export default function RentVsBuyCalculator() {
           </CardHeader>
           <CardContent className="space-y-5 p-5 sm:p-6">
             <div className="grid gap-4 sm:grid-cols-2">
-              <RangeField
+              <NumericField
                 id="monthly-rent"
                 label="Monthly rent ($)"
                 value={inputs.monthlyRent}
-                currency
                 max={100000}
                 step={50}
                 onChange={(value) => update("monthlyRent", value)}
               />
-              <RangeField
+              <NumericField
                 id="rent-increase"
                 label="Annual rent increase"
                 value={inputs.annualRentIncreasePct}
