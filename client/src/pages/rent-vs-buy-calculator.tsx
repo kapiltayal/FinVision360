@@ -93,25 +93,22 @@ function NumericField({
         )}
       </div>
       {slider ? (
-        <div className="space-y-1.5 pt-1">
-          <Slider
-            value={[value]}
-            onValueChange={([nextValue]) => {
-              if (nextValue !== undefined) onChange(nextValue);
-            }}
-            min={min}
-            max={max}
-            step={step}
-            thumbLabels={[label]}
-            aria-labelledby={`${id}-label`}
-            className="py-1"
-            data-testid={`slider-${id}`}
-          />
-          <div className="flex justify-between text-xs text-muted-foreground">
-            <span>{formatEndpoint(min)}</span>
-            <span>{formatEndpoint(max)}</span>
-          </div>
-        </div>
+        <Slider
+          value={[value]}
+          onValueChange={([nextValue]) => {
+            if (nextValue !== undefined) onChange(nextValue);
+          }}
+          min={min}
+          max={max}
+          step={step}
+          thumbLabels={[label]}
+          aria-labelledby={`${id}-label`}
+          markFormatter={(number) =>
+            suffix === "years" ? `${number}y` : `${number.toLocaleString("en-US")}${suffix ?? ""}`
+          }
+          className="py-1"
+          data-testid={`slider-${id}`}
+        />
       ) : (
         <div className="relative">
           <FormattedNumberInput
@@ -314,13 +311,10 @@ export default function RentVsBuyCalculator() {
               max={50}
               step={1}
               aria-labelledby="comparison-period-label comparison-period-value"
+              markFormatter={(value) => `${value}y`}
               data-testid="slider-comparison-period"
               className="py-1"
             />
-            <div className="flex justify-between text-xs text-muted-foreground">
-              <span>1 year</span>
-              <span>50 years</span>
-            </div>
           </div>
           <div className="space-y-2 md:border-l md:pl-6">
             <NumericField

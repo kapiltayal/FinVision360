@@ -145,6 +145,7 @@ function AssetRow({ asset, actions }: { asset: RetirementProjectionAsset; action
           max={30}
           step={0.1}
           value={[rate]}
+          markFormatter={(value) => `${Number(value.toFixed(1))}%`}
           onValueChange={([nextRate]) => setRate(nextRate)}
           disabled={savingRate}
           onValueCommit={async ([nextRate]) => {

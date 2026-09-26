@@ -8,6 +8,7 @@ type SliderProps = React.ComponentPropsWithoutRef<typeof SliderPrimitive.Root> &
   thumbClassNames?: string[];
   onThumbPointerDown?: (index: number) => void;
   onThumbKeyDown?: (index: number) => void;
+  markFormatter?: (value: number) => string;
   trackFill?: {
     startPercent: number;
     endPercent: number;
@@ -18,16 +19,29 @@ type SliderProps = React.ComponentPropsWithoutRef<typeof SliderPrimitive.Root> &
 const Slider = React.forwardRef<
   React.ElementRef<typeof SliderPrimitive.Root>,
   SliderProps
->(({ className, thumbLabels, thumbClassNames, onThumbPointerDown, onThumbKeyDown, trackFill, ...props }, ref) => {
+>(({ className, thumbLabels, thumbClassNames, onThumbPointerDown, onThumbKeyDown, markFormatter, trackFill, ...props }, ref) => {
   const values = props.value ?? props.defaultValue;
   const thumbCount = Array.isArray(values) ? Math.max(values.length, 1) : 1;
+  const min = props.min ?? 0;
+  const max = props.max ?? 100;
+  const step = props.step ?? 1;
+  const marks = max > min
+    ? Array.from({ length: 4 }, (_, index) => {
+        const target = min + ((max - min) * index) / 3;
+        const alignedValue = min + Math.round((target - min) / step) * step;
+        const decimals = Math.min(6, Math.max(0, (String(step).split(".")[1] ?? "").length));
+        const value = Number(Math.min(max, Math.max(min, alignedValue)).toFixed(decimals));
+        return { value, label: markFormatter?.(value) ?? value.toLocaleString("en-US") };
+      })
+    : [];
 
   return (
     <SliderPrimitive.Root
       ref={ref}
       className={cn(
         "relative flex w-full touch-none select-none items-center",
-        className
+        className,
+        "pb-6",
       )}
       {...props}
     >
@@ -56,6 +70,33 @@ const Slider = React.forwardRef<
           )}
         />
       ))}
+      <span
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-x-0 bottom-0 h-5 text-[10px] leading-3 text-muted-foreground"
+      >
+        {marks.map((mark, index) => {
+          const position = ((mark.value - min) / (max - min)) * 100;
+          const labelPosition =
+            index === 0
+              ? "left-0"
+              : index === marks.length - 1
+                ? "right-0"
+                : "left-1/2 -translate-x-1/2";
+
+          return (
+            <span
+              key={`${mark.value}-${index}`}
+              className="absolute top-0"
+              style={{ left: `${position}%` }}
+            >
+              <span className="absolute left-0 top-0 h-1.5 w-px -translate-x-1/2 bg-muted-foreground/60" />
+              <span className={cn("absolute top-1.5 whitespace-nowrap", labelPosition)}>
+                {mark.label}
+              </span>
+            </span>
+          );
+        })}
+      </span>
     </SliderPrimitive.Root>
   );
 })

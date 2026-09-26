@@ -99,25 +99,22 @@ function NumberField({
         </div>
       )}
       {slider && (
-        <div className="space-y-1.5 pt-1">
-          <Slider
-            value={[value]}
-            onValueChange={([nextValue]) => {
-              if (nextValue !== undefined) onChange(nextValue);
-            }}
-            min={min}
-            max={max}
-            step={step}
-            thumbLabels={[label]}
-            aria-labelledby={`${id}-label`}
-            className="py-1"
-            data-testid={`slider-${id}`}
-          />
-          <div className="flex justify-between text-xs text-muted-foreground">
-            <span>{formatEndpoint(min)}</span>
-            <span>{formatEndpoint(max)}</span>
-          </div>
-        </div>
+        <Slider
+          value={[value]}
+          onValueChange={([nextValue]) => {
+            if (nextValue !== undefined) onChange(nextValue);
+          }}
+          min={min}
+          max={max}
+          step={step}
+          thumbLabels={[label]}
+          aria-labelledby={`${id}-label`}
+          markFormatter={(number) =>
+            suffix === "years" ? `${number}y` : `${number.toLocaleString("en-US")}${suffix ?? ""}`
+          }
+          className="py-1"
+          data-testid={`slider-${id}`}
+        />
       )}
     </div>
   );

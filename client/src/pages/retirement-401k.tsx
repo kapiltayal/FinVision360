@@ -324,7 +324,7 @@ export default function Retirement401kPage() {
                   )}
                 </div>
               </div>
-              <Slider value={[form.contributionPct]} onValueChange={([v]) => set("contributionPct", v)} min={1} max={50} step={1} data-testid="slider-401k-contribution" />
+              <Slider value={[form.contributionPct]} onValueChange={([v]) => set("contributionPct", v)} min={1} max={50} step={1} markFormatter={(value) => `${value}%`} data-testid="slider-401k-contribution" />
               <p className="text-xs text-muted-foreground">{formatCurrency(annualContribution)}/yr · {contributionPctOfLimit.toFixed(0)}% of {form.currentAge >= 50 ? "$30,500" : "$23,000"} limit {isMaxingOut && "✓ Maxing out!"}</p>
             </div>
 
@@ -336,11 +336,11 @@ export default function Retirement401kPage() {
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <p className="text-xs text-muted-foreground mb-1">Match %</p>
-                  <Slider value={[form.employerMatchPct]} onValueChange={([v]) => set("employerMatchPct", v)} min={0} max={10} step={0.5} data-testid="slider-employer-match-pct" />
+                  <Slider value={[form.employerMatchPct]} onValueChange={([v]) => set("employerMatchPct", v)} min={0} max={10} step={0.5} markFormatter={(value) => `${Number(value.toFixed(1))}%`} data-testid="slider-employer-match-pct" />
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground mb-1">Up to salary %</p>
-                  <Slider value={[form.employerMatchLimit]} onValueChange={([v]) => set("employerMatchLimit", v)} min={1} max={20} step={1} data-testid="slider-employer-match-limit" />
+                  <Slider value={[form.employerMatchLimit]} onValueChange={([v]) => set("employerMatchLimit", v)} min={1} max={20} step={1} markFormatter={(value) => `${value}%`} data-testid="slider-employer-match-limit" />
                 </div>
               </div>
             </div>
@@ -350,7 +350,7 @@ export default function Retirement401kPage() {
                 <Label>Expected Annual Return</Label>
                 <span className="text-sm font-medium">{form.expectedReturn}%</span>
               </div>
-              <Slider value={[form.expectedReturn]} onValueChange={([v]) => set("expectedReturn", v)} min={1} max={15} step={0.5} data-testid="slider-401k-return" />
+              <Slider value={[form.expectedReturn]} onValueChange={([v]) => set("expectedReturn", v)} min={1} max={15} step={0.5} markFormatter={(value) => `${Number(value.toFixed(1))}%`} data-testid="slider-401k-return" />
             </div>
 
             <div className="space-y-2">
@@ -358,7 +358,7 @@ export default function Retirement401kPage() {
                 <Label>Current Tax Bracket (Trad.)</Label>
                 <span className="text-sm font-medium">{form.taxBracket}%</span>
               </div>
-              <Slider value={[form.taxBracket]} onValueChange={([v]) => set("taxBracket", v)} min={10} max={37} step={1} data-testid="slider-tax-bracket" />
+              <Slider value={[form.taxBracket]} onValueChange={([v]) => set("taxBracket", v)} min={10} max={37} step={1} markFormatter={(value) => `${value}%`} data-testid="slider-tax-bracket" />
             </div>
           </CardContent>
         </Card>

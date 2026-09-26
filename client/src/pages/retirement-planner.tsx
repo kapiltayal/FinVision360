@@ -200,10 +200,6 @@ export default function RetirementPlannerPage() {
   };
   const lifeExpectancyPercent =
     ((lifeExpectancyValue - currentAgeFloor + 1) / (MAX_AGE - currentAgeFloor + 1)) * 100;
-  const decadeMarkers = Array.from(
-    { length: Math.floor(MAX_AGE / 10) - Math.ceil(currentAgeFloor / 10) + 1 },
-    (_, index) => Math.ceil(currentAgeFloor / 10) * 10 + index * 10,
-  ).filter((age) => age <= MAX_AGE);
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
       <div className="page-header-gradient">
@@ -287,6 +283,7 @@ export default function RetirementPlannerPage() {
                     saveTimeline(nextRetirementAge, nextLifeExpectancy);
                   }}
                   thumbLabels={["Retirement Age", "Life Expectancy"]}
+                  markFormatter={(age) => `Age ${age}`}
                   thumbClassNames={[
                     "border-violet-600 bg-violet-100 dark:border-violet-400 dark:bg-violet-950",
                     "border-emerald-600 bg-emerald-100 dark:border-emerald-400 dark:bg-emerald-950",
@@ -305,29 +302,6 @@ export default function RetirementPlannerPage() {
                   aria-label="Retirement timeline"
                   data-testid="slider-retirement-timeline"
                 />
-                <div className="relative h-7 text-[10px] text-muted-foreground">
-                  <span className="absolute left-0 -translate-x-1/2 text-center">
-                    <span className="mx-auto mb-0.5 block h-1.5 w-px bg-muted-foreground/60" />
-                    {currentAge}
-                  </span>
-                  {decadeMarkers.map((age) => {
-                    const markerPercent = ((age - currentAge) / (MAX_AGE - currentAge)) * 100;
-                    return (
-                      <span
-                        key={age}
-                        className="absolute -translate-x-1/2 text-center"
-                        style={{ left: `${markerPercent}%` }}
-                      >
-                        <span className="mx-auto mb-0.5 block h-1.5 w-px bg-muted-foreground/60" />
-                        {age}
-                      </span>
-                    );
-                  })}
-                  <span className="absolute right-0 translate-x-1/2 text-center">
-                    <span className="mx-auto mb-0.5 block h-1.5 w-px bg-muted-foreground/60" />
-                    {MAX_AGE}
-                  </span>
-                </div>
               </div>
             </div>
           )}

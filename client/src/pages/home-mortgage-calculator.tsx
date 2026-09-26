@@ -152,13 +152,12 @@ function RangeField({
         step={step}
         thumbLabels={[label]}
         aria-labelledby={`${id}-label`}
+        markFormatter={(number) =>
+          suffix === "years" ? `${number}y` : formatRangeValue(number, suffix)
+        }
         className="py-1"
         data-testid={`slider-${id}`}
       />
-      <div className="flex justify-between text-xs text-muted-foreground">
-        <span>{formatRangeValue(min, suffix)}</span>
-        <span>{formatRangeValue(max, suffix)}</span>
-      </div>
     </div>
   );
 }

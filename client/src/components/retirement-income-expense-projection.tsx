@@ -144,6 +144,7 @@ function RetirementAccountRow({ item, onSave, onEarlyWithdrawalAccessChange, sav
         step={0.1}
         value={[rate]}
         onValueChange={([value]) => setRate(value ?? 0)}
+        markFormatter={(value) => `${Number(value.toFixed(1))}%`}
         onValueCommit={([value]) => {
           const nextRate = value ?? 0;
           setRate(nextRate);
@@ -152,7 +153,6 @@ function RetirementAccountRow({ item, onSave, onEarlyWithdrawalAccessChange, sav
         disabled={saving}
         className="py-1"
       />
-      <div className="flex justify-between text-[10px] text-muted-foreground"><span>0%</span><span>100%</span></div>
     </div>
   </div>;
 }
