@@ -1,6 +1,8 @@
 import { useMemo, useState } from "react";
 import {
   ArrowUpRight,
+  Calculator,
+  ChevronDown,
   House,
   Info,
   KeyRound,
@@ -123,6 +125,10 @@ export default function RentVsBuyCalculator() {
     let renterInvestments = upfrontBuyerCash;
     let buyerInvestments = 0;
     let firstMonthOwnerCost = 0;
+    let firstMonthMortgagePayment = 0;
+    let firstMonthPropertyTax = 0;
+    let firstMonthMaintenance = 0;
+    let firstMonthInsurance = 0;
 
     for (let month = 0; month < horizonMonths; month += 1) {
       const yearFraction = month / 12;
@@ -143,7 +149,13 @@ export default function RentVsBuyCalculator() {
       const ownerHousingCost =
         mortgagePaymentThisMonth + propertyTax + maintenance + insurance;
 
-      if (month === 0) firstMonthOwnerCost = ownerHousingCost;
+      if (month === 0) {
+        firstMonthOwnerCost = ownerHousingCost;
+        firstMonthMortgagePayment = mortgagePaymentThisMonth;
+        firstMonthPropertyTax = propertyTax;
+        firstMonthMaintenance = maintenance;
+        firstMonthInsurance = insurance;
+      }
 
       // Each scenario invests its up-front cash or monthly housing-cost savings.
       renterInvestments = renterInvestments * (1 + investmentRate) +
@@ -162,6 +174,12 @@ export default function RentVsBuyCalculator() {
     return {
       mortgagePayment,
       firstMonthOwnerCost,
+      firstMonthMortgagePayment,
+      firstMonthPropertyTax,
+      firstMonthMaintenance,
+      firstMonthInsurance,
+      downPaymentCash,
+      purchaseClosingCash,
       upfrontBuyerCash,
       futureHomeValue,
       remainingMortgage,
@@ -599,6 +617,157 @@ export default function RentVsBuyCalculator() {
           </Card>
         </div>
       </section>
+
+      <Card className="overflow-hidden shadow-sm">
+        <details open className="group">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 sm:px-6">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                <Calculator className="h-5 w-5" aria-hidden="true" />
+              </div>
+              <div>
+                <h3 className="font-semibold">How are these estimates calculated?</h3>
+                <p className="mt-0.5 text-sm text-muted-foreground">
+                  A live breakdown using your selected assumptions
+                </p>
+              </div>
+            </div>
+            <ChevronDown className="h-5 w-5 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" aria-hidden="true" />
+          </summary>
+
+          <div className="border-t bg-muted/20 p-4 sm:p-6">
+            <div className="grid gap-4 xl:grid-cols-2">
+              <div className="space-y-4 rounded-xl border border-sky-200/80 bg-background p-4 dark:border-sky-900/70">
+                <div>
+                  <h4 className="font-semibold text-sky-800 dark:text-sky-200">Buy scenario</h4>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    First, estimate the monthly cost of owning:
+                  </p>
+                </div>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between gap-3">
+                    <span className="text-muted-foreground">Mortgage payment (principal + interest)</span>
+                    <span className="font-medium tabular-nums">{formatCurrency(projection.firstMonthMortgagePayment)}</span>
+                  </div>
+                  <div className="flex justify-between gap-3">
+                    <span className="text-muted-foreground">Property tax</span>
+                    <span className="font-medium tabular-nums">{formatCurrency(projection.firstMonthPropertyTax)}</span>
+                  </div>
+                  <div className="flex justify-between gap-3">
+                    <span className="text-muted-foreground">Maintenance allowance</span>
+                    <span className="font-medium tabular-nums">{formatCurrency(projection.firstMonthMaintenance)}</span>
+                  </div>
+                  <div className="flex justify-between gap-3">
+                    <span className="text-muted-foreground">Home insurance</span>
+                    <span className="font-medium tabular-nums">{formatCurrency(projection.firstMonthInsurance)}</span>
+                  </div>
+                  <div className="flex justify-between gap-3 border-t pt-2 font-semibold">
+                    <span>Starting monthly owner cost</span>
+                    <span className="tabular-nums">{formatCurrency(projection.firstMonthOwnerCost)}</span>
+                  </div>
+                </div>
+
+                <div className="space-y-2 border-t pt-4 text-sm">
+                  <p className="font-medium">Then estimate the position if you sell:</p>
+                  <div className="flex justify-between gap-3">
+                    <span className="text-muted-foreground">Home value after {projection.horizonYears} years</span>
+                    <span className="font-medium tabular-nums">{formatCurrency(projection.futureHomeValue)}</span>
+                  </div>
+                  <div className="flex justify-between gap-3">
+                    <span className="text-muted-foreground">Selling costs ({inputs.sellingCostPct}%)</span>
+                    <span className="font-medium tabular-nums">
+                      {formatCurrency(-(projection.futureHomeValue * inputs.sellingCostPct / 100))}
+                    </span>
+                  </div>
+                  <div className="flex justify-between gap-3">
+                    <span className="text-muted-foreground">Remaining mortgage</span>
+                    <span className="font-medium tabular-nums">{formatCurrency(-projection.remainingMortgage)}</span>
+                  </div>
+                  <div className="flex justify-between gap-3 border-t pt-2 font-medium">
+                    <span>Equity after selling costs</span>
+                    <span className="tabular-nums">{formatCurrency(projection.homeEquityAfterSelling)}</span>
+                  </div>
+                  <div className="flex justify-between gap-3">
+                    <span className="text-muted-foreground">Buyer closing costs</span>
+                    <span className="font-medium tabular-nums">{formatCurrency(-projection.purchaseClosingCash)}</span>
+                  </div>
+                  <div className="flex justify-between gap-3">
+                    <span className="text-muted-foreground">Investment balance from monthly cost differences</span>
+                    <span className="font-medium tabular-nums">{formatCurrency(projection.buyerInvestments)}</span>
+                  </div>
+                  <div className="flex justify-between gap-3 border-t pt-2 font-semibold text-sky-800 dark:text-sky-200">
+                    <span>Estimated buy position</span>
+                    <span className="tabular-nums">{formatCurrency(projection.buyNetWorth)}</span>
+                  </div>
+                </div>
+                <p className="text-xs leading-relaxed text-muted-foreground">
+                  The down payment is reflected in the lower mortgage balance and resulting home equity; it is not
+                  subtracted a second time.
+                </p>
+              </div>
+
+              <div className="space-y-4 rounded-xl border border-emerald-200/80 bg-background p-4 dark:border-emerald-900/70">
+                <div>
+                  <h4 className="font-semibold text-emerald-800 dark:text-emerald-200">Rent scenario</h4>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    The renter invests the money that would otherwise go toward buying:
+                  </p>
+                </div>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between gap-3">
+                    <span className="text-muted-foreground">Down payment invested</span>
+                    <span className="font-medium tabular-nums">{formatCurrency(projection.downPaymentCash)}</span>
+                  </div>
+                  <div className="flex justify-between gap-3">
+                    <span className="text-muted-foreground">Buyer closing costs invested</span>
+                    <span className="font-medium tabular-nums">{formatCurrency(projection.purchaseClosingCash)}</span>
+                  </div>
+                  <div className="flex justify-between gap-3 border-t pt-2 font-semibold">
+                    <span>Starting investment balance</span>
+                    <span className="tabular-nums">{formatCurrency(projection.upfrontBuyerCash)}</span>
+                  </div>
+                </div>
+
+                <div className="rounded-lg bg-emerald-50/70 p-3 text-sm leading-relaxed text-emerald-950/80 dark:bg-emerald-950/30 dark:text-emerald-100/80">
+                  Each month, the balance grows at the monthly equivalent of the{" "}
+                  {inputs.investmentReturnPct}% annual return, then adds the owner’s housing cost minus that month’s
+                  rent. Rent and home-related costs rise according to their annual increase assumptions.
+                </div>
+
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between gap-3">
+                    <span className="text-muted-foreground">First-month owner cost minus rent</span>
+                    <span className="font-medium tabular-nums">
+                      {formatCurrency(projection.firstMonthOwnerCost - inputs.monthlyRent)}
+                    </span>
+                  </div>
+                  <p className="text-xs leading-relaxed text-muted-foreground">
+                    A positive amount is added to the renter’s investments; if renting costs more, the amount is
+                    withdrawn instead. The buy scenario tracks the opposite monthly difference.
+                  </p>
+                  <div className="flex justify-between gap-3 border-t pt-3 font-semibold text-emerald-800 dark:text-emerald-200">
+                    <span>Estimated rent-side investment balance</span>
+                    <span className="tabular-nums">{formatCurrency(projection.rentNetWorth)}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-4 flex flex-col gap-1 rounded-xl border bg-background px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between">
+              <span className="text-muted-foreground">
+                Difference between the two estimated positions after {projection.horizonYears} years
+              </span>
+              <span className="font-semibold tabular-nums">
+                {winnerLabel}: {formatCurrency(Math.abs(projection.difference))}
+              </span>
+            </div>
+            <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
+              The projection compounds investments monthly and uses unrounded amounts internally; displayed dollars
+              are rounded. It excludes taxes, HOA fees, renter insurance, and costs beyond the maintenance allowance.
+            </p>
+          </div>
+        </details>
+      </Card>
 
       <p className="flex gap-2 rounded-xl border bg-muted/30 p-4 text-xs leading-relaxed text-muted-foreground">
         <Info className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
