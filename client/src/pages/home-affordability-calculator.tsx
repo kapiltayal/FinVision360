@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { FormattedNumberInput } from "@/components/ui/formatted-number-input";
 import { Label } from "@/components/ui/label";
+import { Slider } from "@/components/ui/slider";
 import { formatCurrency } from "@/lib/format";
 
 type HomeAffordabilityInputs = {
@@ -31,6 +32,7 @@ type NumberFieldProps = {
   max: number;
   step: number;
   suffix?: string;
+  slider?: boolean;
 };
 
 const INITIAL_INPUTS: HomeAffordabilityInputs = {
@@ -57,10 +59,16 @@ function NumberField({
   max,
   step,
   suffix,
+  slider = false,
 }: NumberFieldProps) {
+  const formatEndpoint = (number: number) =>
+    suffix === "years"
+      ? `${number} ${number === 1 ? "year" : "years"}`
+      : `${number.toLocaleString("en-US")}${suffix ?? ""}`;
+
   return (
     <div className="space-y-2">
-      <Label htmlFor={id}>{label}</Label>
+      <Label id={`${id}-label`} htmlFor={id}>{label}</Label>
       <div className="relative">
         <FormattedNumberInput
           id={id}
@@ -78,6 +86,27 @@ function NumberField({
           </span>
         )}
       </div>
+      {slider && (
+        <div className="space-y-1.5 pt-1">
+          <Slider
+            value={[value]}
+            onValueChange={([nextValue]) => {
+              if (nextValue !== undefined) onChange(nextValue);
+            }}
+            min={min}
+            max={max}
+            step={step}
+            thumbLabels={[label]}
+            aria-labelledby={`${id}-label`}
+            className="py-1"
+            data-testid={`slider-${id}`}
+          />
+          <div className="flex justify-between text-xs text-muted-foreground">
+            <span>{formatEndpoint(min)}</span>
+            <span>{formatEndpoint(max)}</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -250,8 +279,9 @@ export default function HomeAffordabilityCalculator() {
                 value={inputs.housingDtiPct}
                 suffix="%"
                 min={0}
-                max={70}
+                max={100}
                 step={0.5}
+                slider
                 onChange={(value) => update("housingDtiPct", value)}
               />
               <NumberField
@@ -260,8 +290,9 @@ export default function HomeAffordabilityCalculator() {
                 value={inputs.totalDtiPct}
                 suffix="%"
                 min={0}
-                max={70}
+                max={100}
                 step={0.5}
+                slider
                 onChange={(value) => update("totalDtiPct", value)}
               />
             </CardContent>
@@ -310,6 +341,7 @@ export default function HomeAffordabilityCalculator() {
                     min={0}
                     max={100}
                     step={1}
+                    slider
                     onChange={(value) => update("downPaymentPct", value)}
                   />
                   <NumberField
@@ -318,8 +350,9 @@ export default function HomeAffordabilityCalculator() {
                     value={inputs.mortgageRatePct}
                     suffix="%"
                     min={0}
-                    max={25}
+                    max={20}
                     step={0.1}
+                    slider
                     onChange={(value) => update("mortgageRatePct", value)}
                   />
                   <NumberField
@@ -330,6 +363,7 @@ export default function HomeAffordabilityCalculator() {
                     min={1}
                     max={50}
                     step={1}
+                    slider
                     onChange={(value) => update("mortgageTermYears", value)}
                   />
                   <NumberField
@@ -340,6 +374,7 @@ export default function HomeAffordabilityCalculator() {
                     min={0}
                     max={10}
                     step={0.1}
+                    slider
                     onChange={(value) => update("propertyTaxPct", value)}
                   />
                   <NumberField

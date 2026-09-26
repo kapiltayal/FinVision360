@@ -11,3 +11,4 @@
 - [Early retirement account access](retirement-early-withdrawal-access.md) — under-59½ pretax locks use account category/name inference and a persisted per-account projection override.
 - [AI retirement timeline](ai-retirement-age.md) — AI snapshots use the Retirement Planner timeline as the authoritative retirement age.
 - [Inline TypeScript verification scripts](inline-tsx-verification.md) — wrap async tsx -e work in an IIFE and avoid newer runtime APIs not supported by the project Node version.
+- [Home affordability input controls](home-affordability-inputs.md) — keep precise numeric fields synchronized with sliders for percentage and term settings.
