@@ -41,6 +41,7 @@ type NumericFieldProps = {
   min?: number;
   max?: number;
   suffix?: string;
+  slider?: boolean;
 };
 
 const INITIAL_INPUTS: RentVsBuyInputs = {
@@ -69,27 +70,67 @@ function NumericField({
   min = 0,
   max = 100,
   suffix,
+  slider = false,
 }: NumericFieldProps) {
+  const formatEndpoint = (number: number) =>
+    suffix === "years"
+      ? `${number} ${number === 1 ? "year" : "years"}`
+      : `${number.toLocaleString("en-US")}${suffix ?? ""}`;
+
   return (
     <div className="space-y-2">
-      <Label htmlFor={id}>{label}</Label>
-      <div className="relative">
-        <FormattedNumberInput
-          id={id}
-          value={value}
-          min={min}
-          max={max}
-          step={step}
-          onValueChange={onChange}
-          className={`h-11 rounded-lg bg-background/80 ${suffix ? "pr-16" : ""}`}
-          data-testid={`input-${id}`}
-        />
-        {suffix && (
-          <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center whitespace-nowrap text-xs text-muted-foreground">
-            {suffix}
+      <div className="flex items-center justify-between gap-3">
+        <Label id={slider ? `${id}-label` : undefined} htmlFor={slider ? undefined : id}>
+          {label}
+        </Label>
+        {slider && (
+          <span
+            className="shrink-0 rounded-md bg-muted px-2 py-1 text-sm font-semibold tabular-nums"
+            data-testid={`value-${id}`}
+          >
+            {formatEndpoint(value)}
           </span>
         )}
       </div>
+      {slider ? (
+        <div className="space-y-1.5 pt-1">
+          <Slider
+            value={[value]}
+            onValueChange={([nextValue]) => {
+              if (nextValue !== undefined) onChange(nextValue);
+            }}
+            min={min}
+            max={max}
+            step={step}
+            thumbLabels={[label]}
+            aria-labelledby={`${id}-label`}
+            className="py-1"
+            data-testid={`slider-${id}`}
+          />
+          <div className="flex justify-between text-xs text-muted-foreground">
+            <span>{formatEndpoint(min)}</span>
+            <span>{formatEndpoint(max)}</span>
+          </div>
+        </div>
+      ) : (
+        <div className="relative">
+          <FormattedNumberInput
+            id={id}
+            value={value}
+            min={min}
+            max={max}
+            step={step}
+            onValueChange={onChange}
+            className={`h-11 rounded-lg bg-background/80 ${suffix ? "pr-16" : ""}`}
+            data-testid={`input-${id}`}
+          />
+          {suffix && (
+            <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center whitespace-nowrap text-xs text-muted-foreground">
+              {suffix}
+            </span>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -335,6 +376,7 @@ export default function RentVsBuyCalculator() {
                   suffix="%"
                   max={100}
                   step={1}
+                  slider
                   onChange={(value) => update("downPaymentPct", value)}
                 />
                 <NumericField
@@ -344,6 +386,7 @@ export default function RentVsBuyCalculator() {
                   suffix="%"
                   max={25}
                   step={0.1}
+                  slider
                   onChange={(value) => update("mortgageRatePct", value)}
                 />
                 <NumericField
@@ -354,6 +397,7 @@ export default function RentVsBuyCalculator() {
                   min={1}
                   max={50}
                   step={1}
+                  slider
                   onChange={(value) => update("mortgageTermYears", value)}
                 />
               </div>
@@ -371,6 +415,7 @@ export default function RentVsBuyCalculator() {
                   suffix="%"
                   max={10}
                   step={0.1}
+                  slider
                   onChange={(value) => update("propertyTaxPct", value)}
                 />
                 <NumericField
@@ -398,6 +443,7 @@ export default function RentVsBuyCalculator() {
                   min={-10}
                   max={20}
                   step={0.1}
+                  slider
                   onChange={(value) => update("homeAppreciationPct", value)}
                 />
                 <NumericField
@@ -455,6 +501,7 @@ export default function RentVsBuyCalculator() {
                 min={-10}
                 max={20}
                 step={0.1}
+                slider
                 onChange={(value) => update("annualRentIncreasePct", value)}
               />
             </div>
