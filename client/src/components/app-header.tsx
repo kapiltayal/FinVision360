@@ -116,7 +116,16 @@ const baseNavItems: NavigationItem[] = [
       { title: "AI Archives", url: "/ai-advisor?tab=history" },
     ],
   },
-  { title: "Calculators", url: "/calculators", icon: Calculator, tabs: [] },
+  {
+    title: "Calculators",
+    url: "/calculators",
+    icon: Calculator,
+    tabs: [
+      { title: "401(k) Calculator", url: "/calculators?tab=401k", default: true },
+      { title: "Rent vs. Buy", url: "/calculators?tab=rent-vs-buy" },
+      { title: "Home Affordability", url: "/calculators?tab=home-affordability" },
+    ],
+  },
 ];
 
 const adminNavItems = [

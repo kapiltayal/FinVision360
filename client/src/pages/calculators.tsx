@@ -1,9 +1,19 @@
+import { useLocation, useSearch } from "wouter";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import Retirement401kPage from "./retirement-401k";
 import RentVsBuyCalculator from "./rent-vs-buy-calculator";
 import HomeAffordabilityCalculator from "./home-affordability-calculator";
 
+const calculatorTabs = ["401k", "rent-vs-buy", "home-affordability"] as const;
+
 export default function CalculatorsPage() {
+  const [, setLocation] = useLocation();
+  const search = useSearch();
+  const requestedTab = new URLSearchParams(search).get("tab");
+  const activeTab = calculatorTabs.includes(requestedTab as (typeof calculatorTabs)[number])
+    ? requestedTab as (typeof calculatorTabs)[number]
+    : "401k";
+
   return (
     <div className="mx-auto max-w-7xl space-y-5 p-6">
       <header className="page-header-gradient">
@@ -16,7 +26,11 @@ export default function CalculatorsPage() {
         </p>
       </header>
 
-      <Tabs defaultValue="401k" className="space-y-4">
+      <Tabs
+        value={activeTab}
+        onValueChange={(value) => setLocation(`/calculators?tab=${value}`)}
+        className="space-y-4"
+      >
         <TabsList className="grid h-auto w-full max-w-4xl grid-cols-1 gap-1 sm:grid-cols-3">
           <TabsTrigger value="401k" data-testid="tab-calculator-401k">
             401(k) Calculator
