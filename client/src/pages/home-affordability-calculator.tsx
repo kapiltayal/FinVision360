@@ -98,6 +98,10 @@ function ResultLine({
   );
 }
 
+function formatPriceLimit(value: number): string {
+  return Number.isFinite(value) ? formatCurrency(value) : "No limit";
+}
+
 export default function HomeAffordabilityCalculator() {
   const [inputs, setInputs] = useState(INITIAL_INPUTS);
   const update = <K extends keyof HomeAffordabilityInputs>(key: K, value: number) =>
@@ -365,6 +369,23 @@ export default function HomeAffordabilityCalculator() {
                 <p className="text-sm text-muted-foreground">Estimated purchase price</p>
                 <p className="mt-1 text-3xl font-bold tracking-tight tabular-nums text-sky-800 dark:text-sky-200" data-testid="text-home-affordability-max-price">
                   {formatCurrency(estimate.maxHomePrice)}
+                </p>
+                <div className="mt-3 grid grid-cols-2 gap-3">
+                  <div className="rounded-lg border border-sky-200/70 bg-background/70 p-3 dark:border-sky-900/70">
+                    <p className="text-xs text-muted-foreground">Limit from monthly budget</p>
+                    <p className="mt-1 text-sm font-semibold tabular-nums" data-testid="text-home-affordability-monthly-limit">
+                      {formatPriceLimit(estimate.priceLimitFromMonthlyBudget)}
+                    </p>
+                  </div>
+                  <div className="rounded-lg border border-sky-200/70 bg-background/70 p-3 dark:border-sky-900/70">
+                    <p className="text-xs text-muted-foreground">Limit from available cash</p>
+                    <p className="mt-1 text-sm font-semibold tabular-nums" data-testid="text-home-affordability-cash-limit">
+                      {formatPriceLimit(estimate.priceLimitFromAvailableCash)}
+                    </p>
+                  </div>
+                </div>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  The estimated price is the lower of these two limits. Changes to the other limit won’t affect it until that limit becomes tighter.
                 </p>
               </div>
 
