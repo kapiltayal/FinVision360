@@ -293,83 +293,83 @@ export default function HomeAffordabilityCalculator() {
               </CardHeader>
               <CollapsibleContent id="home-affordability-cost-settings">
                 <CardContent className="grid gap-4 p-5 sm:grid-cols-2 sm:p-6">
-              <NumberField
-                id="home-affordability-cash"
-                label="Cash available for down payment & closing ($)"
-                value={inputs.availableCash}
-                min={0}
-                max={10000000}
-                step={1000}
-                onChange={(value) => update("availableCash", value)}
-              />
-              <NumberField
-                id="home-affordability-down-payment"
-                label="Down payment"
-                value={inputs.downPaymentPct}
-                suffix="%"
-                min={0}
-                max={100}
-                step={1}
-                onChange={(value) => update("downPaymentPct", value)}
-              />
-              <NumberField
-                id="home-affordability-rate"
-                label="Mortgage interest rate"
-                value={inputs.mortgageRatePct}
-                suffix="%"
-                min={0}
-                max={25}
-                step={0.1}
-                onChange={(value) => update("mortgageRatePct", value)}
-              />
-              <NumberField
-                id="home-affordability-term"
-                label="Mortgage term"
-                value={inputs.mortgageTermYears}
-                suffix="years"
-                min={1}
-                max={50}
-                step={1}
-                onChange={(value) => update("mortgageTermYears", value)}
-              />
-              <NumberField
-                id="home-affordability-tax"
-                label="Property tax rate"
-                value={inputs.propertyTaxPct}
-                suffix="%"
-                min={0}
-                max={10}
-                step={0.1}
-                onChange={(value) => update("propertyTaxPct", value)}
-              />
-              <NumberField
-                id="home-affordability-insurance"
-                label="Home insurance per year ($)"
-                value={inputs.annualInsurance}
-                min={0}
-                max={100000}
-                step={100}
-                onChange={(value) => update("annualInsurance", value)}
-              />
-              <NumberField
-                id="home-affordability-hoa"
-                label="Monthly HOA fees ($)"
-                value={inputs.monthlyHoa}
-                min={0}
-                max={100000}
-                step={25}
-                onChange={(value) => update("monthlyHoa", value)}
-              />
-              <NumberField
-                id="home-affordability-closing-cost"
-                label="Buyer closing costs"
-                value={inputs.closingCostPct}
-                suffix="%"
-                min={0}
-                max={20}
-                step={0.1}
-                onChange={(value) => update("closingCostPct", value)}
-              />
+                  <NumberField
+                    id="home-affordability-cash"
+                    label="Cash available for down payment & closing ($)"
+                    value={inputs.availableCash}
+                    min={0}
+                    max={10000000}
+                    step={1000}
+                    onChange={(value) => update("availableCash", value)}
+                  />
+                  <NumberField
+                    id="home-affordability-down-payment"
+                    label="Down payment"
+                    value={inputs.downPaymentPct}
+                    suffix="%"
+                    min={0}
+                    max={100}
+                    step={1}
+                    onChange={(value) => update("downPaymentPct", value)}
+                  />
+                  <NumberField
+                    id="home-affordability-rate"
+                    label="Mortgage interest rate"
+                    value={inputs.mortgageRatePct}
+                    suffix="%"
+                    min={0}
+                    max={25}
+                    step={0.1}
+                    onChange={(value) => update("mortgageRatePct", value)}
+                  />
+                  <NumberField
+                    id="home-affordability-term"
+                    label="Mortgage term"
+                    value={inputs.mortgageTermYears}
+                    suffix="years"
+                    min={1}
+                    max={50}
+                    step={1}
+                    onChange={(value) => update("mortgageTermYears", value)}
+                  />
+                  <NumberField
+                    id="home-affordability-tax"
+                    label="Property tax rate"
+                    value={inputs.propertyTaxPct}
+                    suffix="%"
+                    min={0}
+                    max={10}
+                    step={0.1}
+                    onChange={(value) => update("propertyTaxPct", value)}
+                  />
+                  <NumberField
+                    id="home-affordability-insurance"
+                    label="Home insurance per year ($)"
+                    value={inputs.annualInsurance}
+                    min={0}
+                    max={100000}
+                    step={100}
+                    onChange={(value) => update("annualInsurance", value)}
+                  />
+                  <NumberField
+                    id="home-affordability-hoa"
+                    label="Monthly HOA fees ($)"
+                    value={inputs.monthlyHoa}
+                    min={0}
+                    max={100000}
+                    step={25}
+                    onChange={(value) => update("monthlyHoa", value)}
+                  />
+                  <NumberField
+                    id="home-affordability-closing-cost"
+                    label="Buyer closing costs"
+                    value={inputs.closingCostPct}
+                    suffix="%"
+                    min={0}
+                    max={20}
+                    step={0.1}
+                    onChange={(value) => update("closingCostPct", value)}
+                  />
                 </CardContent>
               </CollapsibleContent>
             </Card>
