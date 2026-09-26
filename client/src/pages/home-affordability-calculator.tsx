@@ -395,6 +395,26 @@ export default function HomeAffordabilityCalculator() {
                 </p>
               </div>
 
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="rounded-lg border bg-background/70 p-3">
+                    <p className="text-xs text-muted-foreground">Limit from monthly budget</p>
+                    <p className="mt-1 text-sm font-semibold tabular-nums" data-testid="text-home-affordability-monthly-limit">
+                      {formatPriceLimit(estimate.priceLimitFromMonthlyBudget)}
+                    </p>
+                  </div>
+                  <div className="rounded-lg border bg-background/70 p-3">
+                    <p className="text-xs text-muted-foreground">Limit from available cash</p>
+                    <p className="mt-1 text-sm font-semibold tabular-nums" data-testid="text-home-affordability-cash-limit">
+                      {formatPriceLimit(estimate.priceLimitFromAvailableCash)}
+                    </p>
+                  </div>
+                </div>
+                <p className="text-xs leading-relaxed text-muted-foreground">
+                  The estimated price is the lower of these two limits. Changes to the other limit won’t affect it until that limit becomes tighter.
+                </p>
+              </div>
+
               <Collapsible open={explanationOpen} onOpenChange={setExplanationOpen}>
                 <CollapsibleTrigger asChild>
                   <button
@@ -411,24 +431,6 @@ export default function HomeAffordabilityCalculator() {
                 </CollapsibleTrigger>
                 <CollapsibleContent id="home-affordability-explanation" className="pt-4">
                   <div className="space-y-5">
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="rounded-lg border bg-background/70 p-3">
-                        <p className="text-xs text-muted-foreground">Limit from monthly budget</p>
-                        <p className="mt-1 text-sm font-semibold tabular-nums" data-testid="text-home-affordability-monthly-limit">
-                          {formatPriceLimit(estimate.priceLimitFromMonthlyBudget)}
-                        </p>
-                      </div>
-                      <div className="rounded-lg border bg-background/70 p-3">
-                        <p className="text-xs text-muted-foreground">Limit from available cash</p>
-                        <p className="mt-1 text-sm font-semibold tabular-nums" data-testid="text-home-affordability-cash-limit">
-                          {formatPriceLimit(estimate.priceLimitFromAvailableCash)}
-                        </p>
-                      </div>
-                    </div>
-                    <p className="text-xs leading-relaxed text-muted-foreground">
-                      The estimated price is the lower of these two limits. Changes to the other limit won’t affect it until that limit becomes tighter.
-                    </p>
-
                     {noMonthlyRoom && (
                       <p className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
                         Monthly insurance and HOA costs already exceed the estimated housing budget. Adjust the budget or costs to see an affordable price.
