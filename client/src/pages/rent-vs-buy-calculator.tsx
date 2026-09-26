@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import { FormattedNumberInput } from "@/components/ui/formatted-number-input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { formatCurrency } from "@/lib/format";
@@ -74,19 +74,13 @@ function NumericField({
     <div className="space-y-2">
       <Label htmlFor={id}>{label}</Label>
       <div className="relative">
-        <Input
+        <FormattedNumberInput
           id={id}
-          type="number"
-          inputMode="decimal"
           value={value}
           min={min}
           max={max}
           step={step}
-          onChange={(event) => {
-            const parsed = event.currentTarget.valueAsNumber;
-            if (!Number.isFinite(parsed)) return;
-            onChange(Math.min(max, Math.max(min, parsed)));
-          }}
+          onValueChange={onChange}
           className={`h-11 rounded-lg bg-background/80 ${suffix ? "pr-16" : ""}`}
           data-testid={`input-${id}`}
         />
