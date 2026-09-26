@@ -68,24 +68,36 @@ function NumberField({
 
   return (
     <div className="space-y-2">
-      <Label id={`${id}-label`} htmlFor={id}>{label}</Label>
-      <div className="relative">
-        <FormattedNumberInput
-          id={id}
-          value={value}
-          min={min}
-          max={max}
-          step={step}
-          onValueChange={onChange}
-          className={`h-11 rounded-lg bg-background/80 ${suffix ? "pr-20" : ""}`}
-          data-testid={`input-${id}`}
-        />
-        {suffix && (
-          <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center whitespace-nowrap text-xs text-muted-foreground">
-            {suffix}
+      <div className="flex items-center justify-between gap-3">
+        <Label id={`${id}-label`} htmlFor={slider ? undefined : id}>{label}</Label>
+        {slider && (
+          <span
+            className="shrink-0 rounded-md bg-muted px-2 py-1 text-sm font-semibold tabular-nums"
+            data-testid={`value-${id}`}
+          >
+            {formatEndpoint(value)}
           </span>
         )}
       </div>
+      {!slider && (
+        <div className="relative">
+          <FormattedNumberInput
+            id={id}
+            value={value}
+            min={min}
+            max={max}
+            step={step}
+            onValueChange={onChange}
+            className={`h-11 rounded-lg bg-background/80 ${suffix ? "pr-20" : ""}`}
+            data-testid={`input-${id}`}
+          />
+          {suffix && (
+            <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center whitespace-nowrap text-xs text-muted-foreground">
+              {suffix}
+            </span>
+          )}
+        </div>
+      )}
       {slider && (
         <div className="space-y-1.5 pt-1">
           <Slider
