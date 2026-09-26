@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react";
-import { Calculator, CircleDollarSign, House, Wallet } from "lucide-react";
+import { Calculator, ChevronDown, CircleDollarSign, House, Wallet } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { FormattedNumberInput } from "@/components/ui/formatted-number-input";
 import { Label } from "@/components/ui/label";
 import { formatCurrency } from "@/lib/format";
@@ -104,6 +105,8 @@ function formatPriceLimit(value: number): string {
 
 export default function HomeAffordabilityCalculator() {
   const [inputs, setInputs] = useState(INITIAL_INPUTS);
+  const [costSettingsOpen, setCostSettingsOpen] = useState(false);
+  const [explanationOpen, setExplanationOpen] = useState(false);
   const update = <K extends keyof HomeAffordabilityInputs>(key: K, value: number) =>
     setInputs((current) => ({ ...current, [key]: value }));
 
@@ -264,14 +267,32 @@ export default function HomeAffordabilityCalculator() {
             </CardContent>
           </Card>
 
-          <Card className="overflow-hidden shadow-sm">
-            <CardHeader className="border-b bg-muted/20 px-5 py-4 sm:px-6">
-              <CardTitle className="text-base">Cash, loan &amp; home costs</CardTitle>
-              <p className="text-sm text-muted-foreground">
-                Include upfront funds and recurring expenses beyond the mortgage.
-              </p>
-            </CardHeader>
-            <CardContent className="grid gap-4 p-5 sm:grid-cols-2 sm:p-6">
+          <Collapsible open={costSettingsOpen} onOpenChange={setCostSettingsOpen}>
+            <Card className="overflow-hidden shadow-sm">
+              <CardHeader className="border-b bg-muted/20 px-5 py-4 sm:px-6">
+                <CollapsibleTrigger asChild>
+                  <button
+                    type="button"
+                    className="flex w-full items-center justify-between gap-4 rounded-sm text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    data-testid="button-toggle-home-cost-settings"
+                  >
+                    <span className="min-w-0 space-y-1">
+                      <span className="block text-base font-semibold leading-none tracking-tight">
+                        Cash, loan &amp; home costs
+                      </span>
+                      <span className="block text-sm text-muted-foreground">
+                        Include upfront funds and recurring expenses beyond the mortgage.
+                      </span>
+                    </span>
+                    <ChevronDown
+                      className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${costSettingsOpen ? "rotate-180" : ""}`}
+                      aria-hidden="true"
+                    />
+                  </button>
+                </CollapsibleTrigger>
+              </CardHeader>
+              <CollapsibleContent id="home-affordability-cost-settings">
+                <CardContent className="grid gap-4 p-5 sm:grid-cols-2 sm:p-6">
               <NumberField
                 id="home-affordability-cash"
                 label="Cash available for down payment & closing ($)"
@@ -349,8 +370,10 @@ export default function HomeAffordabilityCalculator() {
                 step={0.1}
                 onChange={(value) => update("closingCostPct", value)}
               />
-            </CardContent>
-          </Card>
+                </CardContent>
+              </CollapsibleContent>
+            </Card>
+          </Collapsible>
         </div>
 
         <aside className="space-y-5">
@@ -370,82 +393,100 @@ export default function HomeAffordabilityCalculator() {
                 <p className="mt-1 text-3xl font-bold tracking-tight tabular-nums text-sky-800 dark:text-sky-200" data-testid="text-home-affordability-max-price">
                   {formatCurrency(estimate.maxHomePrice)}
                 </p>
-                <div className="mt-3 grid grid-cols-2 gap-3">
-                  <div className="rounded-lg border border-sky-200/70 bg-background/70 p-3 dark:border-sky-900/70">
-                    <p className="text-xs text-muted-foreground">Limit from monthly budget</p>
-                    <p className="mt-1 text-sm font-semibold tabular-nums" data-testid="text-home-affordability-monthly-limit">
-                      {formatPriceLimit(estimate.priceLimitFromMonthlyBudget)}
+              </div>
+
+              <Collapsible open={explanationOpen} onOpenChange={setExplanationOpen}>
+                <CollapsibleTrigger asChild>
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-1.5 rounded-sm text-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    data-testid="button-explain-home-affordability"
+                  >
+                    <span>Explain How</span>
+                    <ChevronDown
+                      className={`h-4 w-4 transition-transform ${explanationOpen ? "rotate-180" : ""}`}
+                      aria-hidden="true"
+                    />
+                  </button>
+                </CollapsibleTrigger>
+                <CollapsibleContent id="home-affordability-explanation" className="pt-4">
+                  <div className="space-y-5">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="rounded-lg border bg-background/70 p-3">
+                        <p className="text-xs text-muted-foreground">Limit from monthly budget</p>
+                        <p className="mt-1 text-sm font-semibold tabular-nums" data-testid="text-home-affordability-monthly-limit">
+                          {formatPriceLimit(estimate.priceLimitFromMonthlyBudget)}
+                        </p>
+                      </div>
+                      <div className="rounded-lg border bg-background/70 p-3">
+                        <p className="text-xs text-muted-foreground">Limit from available cash</p>
+                        <p className="mt-1 text-sm font-semibold tabular-nums" data-testid="text-home-affordability-cash-limit">
+                          {formatPriceLimit(estimate.priceLimitFromAvailableCash)}
+                        </p>
+                      </div>
+                    </div>
+                    <p className="text-xs leading-relaxed text-muted-foreground">
+                      The estimated price is the lower of these two limits. Changes to the other limit won’t affect it until that limit becomes tighter.
                     </p>
-                  </div>
-                  <div className="rounded-lg border border-sky-200/70 bg-background/70 p-3 dark:border-sky-900/70">
-                    <p className="text-xs text-muted-foreground">Limit from available cash</p>
-                    <p className="mt-1 text-sm font-semibold tabular-nums" data-testid="text-home-affordability-cash-limit">
-                      {formatPriceLimit(estimate.priceLimitFromAvailableCash)}
-                    </p>
-                  </div>
-                </div>
-                <p className="mt-2 text-xs text-muted-foreground">
-                  The estimated price is the lower of these two limits. Changes to the other limit won’t affect it until that limit becomes tighter.
-                </p>
-              </div>
 
-              {noMonthlyRoom && (
-                <p className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
-                  Monthly insurance and HOA costs already exceed the estimated housing budget. Adjust the budget or costs to see an affordable price.
-                </p>
-              )}
+                    {noMonthlyRoom && (
+                      <p className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
+                        Monthly insurance and HOA costs already exceed the estimated housing budget. Adjust the budget or costs to see an affordable price.
+                      </p>
+                    )}
 
-              <div className="space-y-3">
-                <div className="flex items-center gap-2 text-sm font-semibold">
-                  <Wallet className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
-                  <span>Cash needed at closing</span>
-                </div>
-                <div className="space-y-2">
-                  <ResultLine label="Down payment" value={formatCurrency(estimate.downPayment)} />
-                  <ResultLine label="Estimated buyer closing costs" value={formatCurrency(estimate.closingCosts)} />
-                  <ResultLine label="Total cash used" value={formatCurrency(estimate.downPayment + estimate.closingCosts)} emphasis />
-                  <ResultLine label="Cash remaining" value={formatCurrency(estimate.cashRemaining)} />
-                </div>
-              </div>
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2 text-sm font-semibold">
+                        <Wallet className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                        <span>Cash needed at closing</span>
+                      </div>
+                      <div className="space-y-2">
+                        <ResultLine label="Down payment" value={formatCurrency(estimate.downPayment)} />
+                        <ResultLine label="Estimated buyer closing costs" value={formatCurrency(estimate.closingCosts)} />
+                        <ResultLine label="Total cash used" value={formatCurrency(estimate.downPayment + estimate.closingCosts)} emphasis />
+                        <ResultLine label="Cash remaining" value={formatCurrency(estimate.cashRemaining)} />
+                      </div>
+                    </div>
 
-              <div className="space-y-3 border-t pt-4">
-                <div className="flex items-center gap-2 text-sm font-semibold">
-                  <Calculator className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
-                  <span>Estimated monthly housing cost</span>
-                </div>
-                <div className="space-y-2">
-                  <ResultLine label="Mortgage (principal & interest)" value={formatCurrency(estimate.mortgagePayment)} />
-                  <ResultLine label="Property tax" value={formatCurrency(estimate.propertyTax)} />
-                  <ResultLine label="Home insurance" value={formatCurrency(estimate.monthlyInsurance)} />
-                  <ResultLine label="HOA fees" value={formatCurrency(inputs.monthlyHoa)} />
-                  <ResultLine label="Total monthly housing cost" value={formatCurrency(estimate.monthlyHousingCost)} emphasis />
-                </div>
-                <div className="grid grid-cols-2 gap-3 rounded-lg bg-muted/40 p-3 text-xs">
-                  <div>
-                    <p className="text-muted-foreground">Housing DTI</p>
-                    <p className="mt-0.5 font-semibold tabular-nums">{estimate.housingDti.toFixed(1)}%</p>
+                    <div className="space-y-3 border-t pt-4">
+                      <div className="flex items-center gap-2 text-sm font-semibold">
+                        <Calculator className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                        <span>Estimated monthly housing cost</span>
+                      </div>
+                      <div className="space-y-2">
+                        <ResultLine label="Mortgage (principal & interest)" value={formatCurrency(estimate.mortgagePayment)} />
+                        <ResultLine label="Property tax" value={formatCurrency(estimate.propertyTax)} />
+                        <ResultLine label="Home insurance" value={formatCurrency(estimate.monthlyInsurance)} />
+                        <ResultLine label="HOA fees" value={formatCurrency(inputs.monthlyHoa)} />
+                        <ResultLine label="Total monthly housing cost" value={formatCurrency(estimate.monthlyHousingCost)} emphasis />
+                      </div>
+                      <div className="grid grid-cols-2 gap-3 rounded-lg bg-muted/40 p-3 text-xs">
+                        <div>
+                          <p className="text-muted-foreground">Housing DTI</p>
+                          <p className="mt-0.5 font-semibold tabular-nums">{estimate.housingDti.toFixed(1)}%</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">Total DTI with debts</p>
+                          <p className="mt-0.5 font-semibold tabular-nums">{estimate.totalDti.toFixed(1)}%</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2 border-t pt-4 text-xs leading-relaxed text-muted-foreground">
+                      <p className="font-semibold text-foreground">How the estimate is limited</p>
+                      <p>
+                        The monthly housing budget is the lower of {inputs.housingDtiPct}% of gross monthly income, or{" "}
+                        {inputs.totalDtiPct}% less existing monthly debt payments. The estimated price is then capped by
+                        whichever is lower: that monthly budget or the cash available for the down payment and closing costs.
+                      </p>
+                      <p>
+                        This is a planning estimate, not a loan approval. Lenders may use different debt limits, rates, fees,
+                        credit requirements, and property costs.
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-muted-foreground">Total DTI with debts</p>
-                    <p className="mt-0.5 font-semibold tabular-nums">{estimate.totalDti.toFixed(1)}%</p>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="space-y-2 p-4 text-xs leading-relaxed text-muted-foreground">
-              <p className="font-semibold text-foreground">How the estimate is limited</p>
-              <p>
-                The monthly housing budget is the lower of {inputs.housingDtiPct}% of gross monthly income, or{" "}
-                {inputs.totalDtiPct}% less existing monthly debt payments. The estimated price is then capped by
-                whichever is lower: that monthly budget or the cash available for the down payment and closing costs.
-              </p>
-              <p>
-                This is a planning estimate, not a loan approval. Lenders may use different debt limits, rates, fees,
-                credit requirements, and property costs.
-              </p>
+                </CollapsibleContent>
+              </Collapsible>
             </CardContent>
           </Card>
         </aside>
