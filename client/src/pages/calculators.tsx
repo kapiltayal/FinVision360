@@ -3,8 +3,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import Retirement401kPage from "./retirement-401k";
 import RentVsBuyCalculator from "./rent-vs-buy-calculator";
 import HomeAffordabilityCalculator from "./home-affordability-calculator";
+import HomeMortgageCalculator from "./home-mortgage-calculator";
 
-const calculatorTabs = ["401k", "rent-vs-buy", "home-affordability"] as const;
+const calculatorTabs = ["401k", "rent-vs-buy", "home-affordability", "mortgage-amortization"] as const;
 
 export default function CalculatorsPage() {
   const [, setLocation] = useLocation();
@@ -22,7 +23,7 @@ export default function CalculatorsPage() {
           Calculators
         </h1>
         <p className="mt-1 text-muted-foreground">
-          Explore retirement savings and housing decisions with interactive estimates.
+          Explore retirement savings, housing costs, and mortgage payoff plans with interactive estimates.
         </p>
       </header>
 
@@ -31,7 +32,7 @@ export default function CalculatorsPage() {
         onValueChange={(value) => setLocation(`/calculators?tab=${value}`)}
         className="space-y-4"
       >
-        <TabsList className="grid h-auto w-full max-w-4xl grid-cols-1 gap-1 sm:grid-cols-3">
+        <TabsList className="grid h-auto w-full max-w-5xl grid-cols-2 gap-1 sm:grid-cols-4">
           <TabsTrigger value="401k" data-testid="tab-calculator-401k">
             401(k) Calculator
           </TabsTrigger>
@@ -40,6 +41,9 @@ export default function CalculatorsPage() {
           </TabsTrigger>
           <TabsTrigger value="home-affordability" data-testid="tab-calculator-home-affordability">
             Home affordability
+          </TabsTrigger>
+          <TabsTrigger value="mortgage-amortization" data-testid="tab-calculator-mortgage-amortization">
+            Mortgage &amp; amortization
           </TabsTrigger>
         </TabsList>
 
@@ -63,6 +67,13 @@ export default function CalculatorsPage() {
           className="mt-0 data-[state=inactive]:hidden"
         >
           <HomeAffordabilityCalculator />
+        </TabsContent>
+        <TabsContent
+          value="mortgage-amortization"
+          forceMount
+          className="mt-0 data-[state=inactive]:hidden"
+        >
+          <HomeMortgageCalculator />
         </TabsContent>
       </Tabs>
     </div>

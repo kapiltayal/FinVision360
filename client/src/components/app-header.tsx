@@ -124,6 +124,7 @@ const baseNavItems: NavigationItem[] = [
       { title: "401(k) Calculator", url: "/calculators?tab=401k", default: true },
       { title: "Rent vs. Buy", url: "/calculators?tab=rent-vs-buy" },
       { title: "Home Affordability", url: "/calculators?tab=home-affordability" },
+      { title: "Home Mortgage & Amortization", url: "/calculators?tab=mortgage-amortization" },
     ],
   },
 ];
