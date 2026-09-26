@@ -1,10 +1,10 @@
 ---
 name: Home affordability input controls
-description: Design rule for paired numeric and slider controls in the home affordability calculator.
+description: Design rule for slider-controlled percentage and term inputs in calculators.
 ---
 
-Keep numeric entry fields alongside sliders for the calculator’s percentage and term settings, with both controls bound to the same value.
+For slider-controlled percentage and term inputs, show the slider and a live value readout without a duplicate numeric input.
 
-**Why:** Sliders make bounded adjustments easy to see and change, while numeric entry supports precise values.
+**Why:** The user prefers a cleaner slider control with its current value displayed, rather than two controls for the same setting.
 
-**How to apply:** When adding or changing these controls, preserve matching bounds and step sizes for both input methods.
+**How to apply:** Bind the slider thumb and visible value to the same state, keep the configured bounds and step, and reserve numeric inputs for fields without sliders.

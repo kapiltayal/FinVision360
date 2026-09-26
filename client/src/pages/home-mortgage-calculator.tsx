@@ -203,7 +203,6 @@ export default function HomeMortgageCalculator() {
       { month: 0, year: 0, remainingBalance: loanAmount },
     ];
     let remainingBalance = loanAmount;
-    let totalPrincipalPaid = 0;
     let totalInterestPaid = 0;
     let totalLoanPayments = 0;
     let payoffMonths = 0;
@@ -220,7 +219,6 @@ export default function HomeMortgageCalculator() {
       remainingBalance = Math.max(0, remainingBalance - principalPaid);
       if (remainingBalance < 0.005) remainingBalance = 0;
 
-      totalPrincipalPaid += principalPaid;
       totalInterestPaid += interestPaid;
       totalLoanPayments += payment;
       yearPrincipalPaid += principalPaid;
@@ -270,7 +268,6 @@ export default function HomeMortgageCalculator() {
       monthlyInsurance,
       monthlyHousingCosts,
       firstMonthOutflow,
-      totalPrincipalPaid,
       totalInterestPaid,
       totalLoanPayments,
       payoffMonths,
@@ -384,6 +381,9 @@ export default function HomeMortgageCalculator() {
               step={25}
               onChange={(value) => update("monthlyHoa", value)}
             />
+            <p className="text-xs leading-relaxed text-muted-foreground sm:col-span-2">
+              Extra principal is modeled as a monthly payment with no prepayment penalty. Taxes, insurance, and HOA are estimates outside the loan.
+            </p>
           </CardContent>
         </Card>
 
@@ -396,6 +396,9 @@ export default function HomeMortgageCalculator() {
                   <p className="text-xs text-muted-foreground">Loan amount</p>
                   <p className="truncate font-semibold tabular-nums" data-testid="text-home-mortgage-loan-amount">
                     {formatCurrency(estimate.loanAmount)}
+                  </p>
+                  <p className="truncate text-xs text-muted-foreground">
+                    {formatCurrency(inputs.homePrice)} home · {formatCurrency(estimate.downPayment)} down
                   </p>
                 </div>
               </CardContent>
@@ -430,7 +433,9 @@ export default function HomeMortgageCalculator() {
                   <p className="truncate font-semibold tabular-nums" data-testid="text-home-mortgage-payoff-time">
                     {formatDuration(estimate.payoffMonths)}
                   </p>
-                  {estimate.monthsSaved > 0 && inputs.extraMonthlyPrincipal > 0 && (
+                  {estimate.loanAmount > 0 &&
+                    estimate.monthsSaved > 0 &&
+                    inputs.extraMonthlyPrincipal > 0 && (
                     <p className="text-xs text-muted-foreground">
                       {estimate.monthsSaved} months sooner
                     </p>
@@ -455,7 +460,7 @@ export default function HomeMortgageCalculator() {
               <ResultLine label="Estimated property tax" value={formatCurrency(estimate.monthlyPropertyTax)} />
               <ResultLine label="Home insurance" value={formatCurrency(estimate.monthlyInsurance)} />
               <ResultLine label="HOA fees" value={formatCurrency(inputs.monthlyHoa)} />
-              {inputs.extraMonthlyPrincipal > 0 && (
+              {estimate.loanAmount > 0 && inputs.extraMonthlyPrincipal > 0 && (
                 <ResultLine
                   label="Extra principal payment"
                   value={formatCurrency(Math.max(0, estimate.firstMonthOutflow - estimate.monthlyHousingCosts))}
