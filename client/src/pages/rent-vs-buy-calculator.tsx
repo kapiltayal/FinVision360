@@ -618,24 +618,22 @@ export default function RentVsBuyCalculator() {
         </div>
       </section>
 
-      <Card className="overflow-hidden shadow-sm">
-        <details open className="group">
-          <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 sm:px-6">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                <Calculator className="h-5 w-5" aria-hidden="true" />
-              </div>
-              <div>
-                <h3 className="font-semibold">How are these estimates calculated?</h3>
-                <p className="mt-0.5 text-sm text-muted-foreground">
-                  A live breakdown using your selected assumptions
-                </p>
-              </div>
-            </div>
-            <ChevronDown className="h-5 w-5 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" aria-hidden="true" />
-          </summary>
+      <details className="group">
+        <summary className="inline-flex cursor-pointer list-none items-center gap-2 rounded-md py-1 text-sm font-semibold text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+          <Calculator className="h-4 w-4" aria-hidden="true" />
+          <span className="group-open:hidden">Explain how</span>
+          <span className="hidden group-open:inline">Hide explanation</span>
+          <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" aria-hidden="true" />
+        </summary>
 
-          <div className="border-t bg-muted/20 p-4 sm:p-6">
+        <Card className="mt-4 overflow-hidden shadow-sm">
+          <div className="border-b px-5 py-4 sm:px-6">
+            <h3 className="font-semibold">How the final estimates are calculated</h3>
+            <p className="mt-0.5 text-sm text-muted-foreground">
+              A live breakdown using your selected assumptions
+            </p>
+          </div>
+          <div className="bg-muted/20 p-4 sm:p-6">
             <div className="grid gap-4 xl:grid-cols-2">
               <div className="space-y-4 rounded-xl border border-sky-200/80 bg-background p-4 dark:border-sky-900/70">
                 <div>
@@ -766,8 +764,8 @@ export default function RentVsBuyCalculator() {
               are rounded. It excludes taxes, HOA fees, renter insurance, and costs beyond the maintenance allowance.
             </p>
           </div>
-        </details>
-      </Card>
+        </Card>
+      </details>
 
       <p className="flex gap-2 rounded-xl border bg-muted/30 p-4 text-xs leading-relaxed text-muted-foreground">
         <Info className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
