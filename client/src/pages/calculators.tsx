@@ -8,7 +8,7 @@ import HomeMortgageCalculator from "./home-mortgage-calculator";
 
 const calculatorTabs = ["401k", "rent-vs-buy", "home-affordability", "mortgage-amortization"] as const;
 const calculatorTabClassName =
-  "group flex min-h-14 w-full flex-col gap-2 whitespace-normal rounded-xl border border-transparent px-2 py-3 text-center text-xs font-semibold leading-tight text-muted-foreground transition-all duration-200 hover:bg-background hover:text-foreground focus-visible:ring-offset-background data-[state=active]:border-primary/20 data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:shadow-md dark:data-[state=active]:border-primary/30 dark:data-[state=active]:bg-slate-950 dark:data-[state=active]:text-sky-300 lg:flex-row lg:justify-start lg:gap-3 lg:px-4 lg:text-left lg:text-sm";
+  "group flex min-h-9 w-full items-center justify-center gap-1.5 whitespace-normal rounded-lg border border-transparent px-2 py-2 text-center text-[11px] font-medium leading-tight text-muted-foreground transition-all duration-200 hover:bg-background/70 hover:text-foreground focus-visible:ring-offset-background data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm sm:px-3 sm:text-xs";
 
 export default function CalculatorsPage() {
   const [, setLocation] = useLocation();
@@ -35,29 +35,21 @@ export default function CalculatorsPage() {
         onValueChange={(value) => setLocation(`/calculators?tab=${value}`)}
         className="space-y-4"
       >
-        <TabsList className="grid h-auto w-full max-w-5xl grid-cols-2 gap-2 rounded-2xl border border-border/70 bg-muted/50 p-2 shadow-sm lg:grid-cols-4">
+        <TabsList className="grid h-auto w-full max-w-5xl grid-cols-2 gap-1 rounded-xl border border-border/60 bg-muted/60 p-1 shadow-sm lg:grid-cols-4">
           <TabsTrigger value="401k" data-testid="tab-calculator-401k" className={calculatorTabClassName}>
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-muted/80 text-muted-foreground transition-colors group-data-[state=active]:bg-primary group-data-[state=active]:text-primary-foreground">
-              <Briefcase className="h-4 w-4" aria-hidden="true" />
-            </span>
+            <Briefcase className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
             <span>401(k) Calculator</span>
           </TabsTrigger>
           <TabsTrigger value="rent-vs-buy" data-testid="tab-calculator-rent-vs-buy" className={calculatorTabClassName}>
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-muted/80 text-muted-foreground transition-colors group-data-[state=active]:bg-primary group-data-[state=active]:text-primary-foreground">
-              <Scale className="h-4 w-4" aria-hidden="true" />
-            </span>
+            <Scale className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
             <span>Rent vs. Buy</span>
           </TabsTrigger>
           <TabsTrigger value="home-affordability" data-testid="tab-calculator-home-affordability" className={calculatorTabClassName}>
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-muted/80 text-muted-foreground transition-colors group-data-[state=active]:bg-primary group-data-[state=active]:text-primary-foreground">
-              <House className="h-4 w-4" aria-hidden="true" />
-            </span>
+            <House className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
             <span>Home Affordability</span>
           </TabsTrigger>
           <TabsTrigger value="mortgage-amortization" data-testid="tab-calculator-mortgage-amortization" className={calculatorTabClassName}>
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-muted/80 text-muted-foreground transition-colors group-data-[state=active]:bg-primary group-data-[state=active]:text-primary-foreground">
-              <Calculator className="h-4 w-4" aria-hidden="true" />
-            </span>
+            <Calculator className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
             <span>Mortgage &amp; Amortization</span>
           </TabsTrigger>
         </TabsList>
