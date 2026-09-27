@@ -8,6 +8,7 @@ import {
   Settings,
   LogOut,
   ChevronDown,
+  ChevronRight,
   ArrowLeftRight,
   Landmark,
   ShieldAlert,
@@ -273,7 +274,7 @@ export function AppHeader() {
                         if (event.pointerType === "mouse") scheduleNavSubmenuClose(item.title);
                       }}
                     >
-                      <DropdownMenuSubTrigger asChild data-testid={testId} indicatorTestId={`${testId}-submenu`}>
+                      <DropdownMenuSubTrigger asChild data-testid={testId}>
                         <Link
                           href={firstTabUrl(item)}
                           onClick={(event) => {
@@ -296,6 +297,11 @@ export function AppHeader() {
                           <item.icon className="h-4 w-4 shrink-0" />
                           <span className="flex-1">{item.title}</span>
                           {itemIsActive && <span className="text-primary">✓</span>}
+                          <ChevronRight
+                            className="h-4 w-4 shrink-0"
+                            data-testid={`${testId}-submenu`}
+                            aria-hidden="true"
+                          />
                         </Link>
                       </DropdownMenuSubTrigger>
                     </div>
