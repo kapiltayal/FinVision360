@@ -133,6 +133,10 @@ const adminNavItems = [
   { title: "Bank Rates", url: "/bank-rates", icon: Landmark },
 ];
 
+function firstTabUrl(item: NavigationItem): string {
+  return item.tabs.find((tab) => tab.default)?.url ?? item.tabs[0]?.url ?? item.url;
+}
+
 export function AppHeader() {
   const [location] = useLocation();
   const search = useSearch();
@@ -215,14 +219,28 @@ export function AppHeader() {
               if (item.tabs.length > 0) {
                 return (
                   <DropdownMenuSub key={item.title}>
-                    <DropdownMenuSubTrigger
-                      className="gap-2 px-2 py-2"
-                      data-testid={testId}
-                    >
-                      <item.icon className="h-4 w-4 shrink-0" />
-                      <span className="flex-1">{item.title}</span>
-                      {itemIsActive && <span className="text-primary">✓</span>}
-                    </DropdownMenuSubTrigger>
+                    <div role="none" className="relative">
+                      <DropdownMenuItem
+                        asChild
+                        className="pr-10"
+                        data-testid={testId}
+                      >
+                        <Link
+                          href={firstTabUrl(item)}
+                          onClick={() => setNavOpen(false)}
+                          className="flex items-center gap-2"
+                        >
+                          <item.icon className="h-4 w-4 shrink-0" />
+                          <span className="flex-1">{item.title}</span>
+                          {itemIsActive && <span className="text-primary">✓</span>}
+                        </Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuSubTrigger
+                        aria-label={`Open ${item.title} pages`}
+                        className="absolute right-1 top-1/2 h-7 w-7 -translate-y-1/2 justify-center rounded-sm p-0 focus:bg-accent"
+                        data-testid={`${testId}-submenu`}
+                      />
+                    </div>
                     <DropdownMenuSubContent className="max-h-[70vh] w-56 overflow-y-auto">
                       {item.tabs.map((tab) => (
                         <DropdownMenuItem
