@@ -141,6 +141,7 @@ export function AppHeader() {
   const [location] = useLocation();
   const search = useSearch();
   const [navOpen, setNavOpen] = useState(false);
+  const [openNavSubmenu, setOpenNavSubmenu] = useState<string | null>(null);
   const [userOpen, setUserOpen] = useState(false);
   const { user } = useAuth();
   const logout = useLogout();
@@ -189,7 +190,13 @@ export function AppHeader() {
 
         {/* Navigation Dropdown */}
         <div className="flex-1" />
-        <DropdownMenu open={navOpen} onOpenChange={setNavOpen}>
+        <DropdownMenu
+          open={navOpen}
+          onOpenChange={(open) => {
+            setNavOpen(open);
+            if (!open) setOpenNavSubmenu(null);
+          }}
+        >
           <DropdownMenuTrigger asChild>
             <Button
               variant="outline"
@@ -218,8 +225,18 @@ export function AppHeader() {
 
               if (item.tabs.length > 0) {
                 return (
-                  <DropdownMenuSub key={item.title}>
-                    <div role="none" className="relative">
+                  <DropdownMenuSub
+                    key={item.title}
+                    open={openNavSubmenu === item.title}
+                    onOpenChange={(open) => setOpenNavSubmenu(open ? item.title : null)}
+                  >
+                    <div
+                      role="none"
+                      className="relative"
+                      onPointerEnter={(event) => {
+                        if (event.pointerType === "mouse") setOpenNavSubmenu(item.title);
+                      }}
+                    >
                       <DropdownMenuItem
                         asChild
                         className="pr-10"
@@ -268,6 +285,9 @@ export function AppHeader() {
                   key={item.title}
                   href={item.url}
                   onClick={() => setNavOpen(false)}
+                  onPointerEnter={(event) => {
+                    if (event.pointerType === "mouse") setOpenNavSubmenu(null);
+                  }}
                   className="flex items-center gap-2 rounded px-2 py-2 text-sm hover:bg-accent"
                   data-testid={testId}
                 >
