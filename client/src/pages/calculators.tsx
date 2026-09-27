@@ -8,7 +8,7 @@ import HomeMortgageCalculator from "./home-mortgage-calculator";
 
 const calculatorTabs = ["401k", "rent-vs-buy", "home-affordability", "mortgage-amortization"] as const;
 const calculatorTabClassName =
-  "group flex min-h-9 w-full items-center justify-center gap-1.5 whitespace-normal rounded-lg border border-transparent px-2 py-2 text-center text-[16.5px] font-medium leading-tight text-muted-foreground transition-all duration-200 hover:bg-background/70 hover:text-foreground focus-visible:ring-offset-background data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm sm:px-3 sm:text-[18px]";
+  "group flex min-h-9 w-full items-center justify-center gap-1.5 whitespace-normal rounded-lg border border-transparent px-2 py-2 text-center text-[11px] font-medium leading-tight text-muted-foreground transition-all duration-200 hover:bg-background/70 hover:text-foreground focus-visible:ring-offset-background data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm sm:px-3 sm:text-xs";
 
 export default function CalculatorsPage() {
   const [, setLocation] = useLocation();
