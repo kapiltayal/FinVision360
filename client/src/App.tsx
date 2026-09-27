@@ -31,6 +31,16 @@ import ContactPage from "@/pages/contact";
 import GoalsPage from "@/pages/goals";
 import ResetPasswordPage from "@/pages/reset-password";
 
+function LegacyRetirement401kRedirect() {
+  const [, setLocation] = useLocation();
+
+  useEffect(() => {
+    setLocation("/calculators?tab=401k");
+  }, [setLocation]);
+
+  return null;
+}
+
 function AuthenticatedApp() {
   const [location] = useLocation();
   const showFooter = location !== "/home";
@@ -47,7 +57,7 @@ function AuthenticatedApp() {
           <Route path="/liabilities" component={NetWorthPage} />
           <Route path="/retirement" component={RetirementPage} />
           <Route path="/retirement/social-security" component={RetirementPage} />
-          <Route path="/retirement/401k" component={RetirementPage} />
+          <Route path="/retirement/401k" component={LegacyRetirement401kRedirect} />
           <Route path="/retirement/pension" component={RetirementPage} />
           <Route path="/income-expenses" component={IncomeExpensesTabsPage} />
           <Route path="/income-expenses/budgeting-plan" component={IncomeExpensesTabsPage} />

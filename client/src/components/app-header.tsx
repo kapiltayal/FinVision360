@@ -81,7 +81,6 @@ const baseNavItems: NavigationItem[] = [
       { title: "Retirement Planner", url: "/retirement" },
       { title: "Social Security", url: "/retirement/social-security" },
       { title: "Pension", url: "/retirement/pension" },
-      { title: "401k Calculator", url: "/retirement/401k" },
     ],
   },
   {
