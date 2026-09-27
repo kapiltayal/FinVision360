@@ -521,15 +521,23 @@ export default function HomeMortgageCalculator() {
                         width={72}
                       />
                       <Tooltip
-                        labelFormatter={(value) =>
-                          Number(value) === 0 ? "At start" : `${Number(value).toFixed(1)} years`
-                        }
-                        formatter={(value) => [formatCurrency(Number(value)), "Remaining balance"]}
-                        contentStyle={{
-                          backgroundColor: "hsl(var(--popover))",
-                          border: "1px solid hsl(var(--border))",
-                          borderRadius: "var(--radius)",
-                          color: "hsl(var(--popover-foreground))",
+                        content={({ active, payload, label }: any) => {
+                          if (active && payload?.length) {
+                            const year = Number(label);
+                            return (
+                              <div className="bg-popover border border-border rounded-md px-3 py-2 shadow-md text-xs space-y-1">
+                                <p className="font-semibold">
+                                  {year === 0 ? "At start" : `${year.toFixed(1)} years`}
+                                </p>
+                                {payload.map((point: any) => (
+                                  <p key={point.dataKey} style={{ color: point.color }}>
+                                    {point.name}: {formatCurrency(Number(point.value))}
+                                  </p>
+                                ))}
+                              </div>
+                            );
+                          }
+                          return null;
                         }}
                       />
                       <Area
