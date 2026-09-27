@@ -34,6 +34,15 @@ type YearlyAmortization = {
   endingBalance: number;
 };
 
+type MonthlyAmortization = {
+  month: number;
+  year: number;
+  payment: number;
+  principalPaid: number;
+  interestPaid: number;
+  endingBalance: number;
+};
+
 type BalancePoint = {
   month: number;
   year: number;
@@ -181,6 +190,8 @@ function ResultLine({
 
 export default function HomeMortgageCalculator() {
   const [inputs, setInputs] = useState(INITIAL_INPUTS);
+  const [amortizationView, setAmortizationView] = useState<"chart" | "table">("chart");
+  const [scheduleLevel, setScheduleLevel] = useState<"yearly" | "monthly">("yearly");
   const update = <K extends keyof MortgageInputs>(key: K, value: number) =>
     setInputs((current) => ({ ...current, [key]: value }));
 
@@ -198,6 +209,7 @@ export default function HomeMortgageCalculator() {
     const monthlyInsurance = inputs.annualInsurance / 12;
 
     const yearlyAmortization: YearlyAmortization[] = [];
+    const monthlyAmortization: MonthlyAmortization[] = [];
     const balanceChartData: BalancePoint[] = [
       { month: 0, year: 0, remainingBalance: loanAmount },
     ];
@@ -223,6 +235,14 @@ export default function HomeMortgageCalculator() {
       yearPrincipalPaid += principalPaid;
       yearInterestPaid += interestPaid;
       payoffMonths = month;
+      monthlyAmortization.push({
+        month,
+        year: Math.ceil(month / 12),
+        payment,
+        principalPaid,
+        interestPaid,
+        endingBalance: remainingBalance,
+      });
 
       if (month % 12 === 0 || remainingBalance === 0) {
         const year = Math.ceil(month / 12);
@@ -272,6 +292,7 @@ export default function HomeMortgageCalculator() {
       payoffMonths,
       monthsSaved: Math.max(0, scheduledMonths - payoffMonths),
       yearlyAmortization,
+      monthlyAmortization,
       balanceChartData,
     };
   }, [inputs]);
@@ -477,14 +498,49 @@ export default function HomeMortgageCalculator() {
           </Card>
         </div>
 
-        <div className="grid min-w-0 items-start gap-5 lg:grid-cols-2 xl:col-span-2">
-          <Card className="min-w-0 overflow-hidden shadow-sm">
-            <CardHeader className="border-b bg-muted/20 px-5 py-4 sm:px-6">
-              <CardTitle className="text-base">Amortization chart</CardTitle>
+        <Card className="min-w-0 overflow-hidden shadow-sm xl:col-span-2">
+          <CardHeader className="flex flex-col gap-3 border-b bg-muted/20 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+            <div className="space-y-1">
+              <CardTitle className="text-base">Amortization</CardTitle>
               <p className="text-sm text-muted-foreground">
-                Remaining mortgage balance over time
+                View the remaining balance chart or switch to the yearly or monthly schedule.
               </p>
-            </CardHeader>
+            </div>
+            <div
+              className="inline-flex h-10 items-center rounded-md bg-muted p-1 text-muted-foreground"
+              role="group"
+              aria-label="Amortization view"
+            >
+              <button
+                type="button"
+                aria-pressed={amortizationView === "chart"}
+                onClick={() => setAmortizationView("chart")}
+                className={`rounded-sm px-3 py-1.5 text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
+                  amortizationView === "chart"
+                    ? "bg-background text-foreground shadow-sm"
+                    : "hover:text-foreground"
+                }`}
+                data-testid="button-home-mortgage-chart-view"
+              >
+                Chart
+              </button>
+              <button
+                type="button"
+                aria-pressed={amortizationView === "table"}
+                onClick={() => setAmortizationView("table")}
+                className={`rounded-sm px-3 py-1.5 text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
+                  amortizationView === "table"
+                    ? "bg-background text-foreground shadow-sm"
+                    : "hover:text-foreground"
+                }`}
+                data-testid="button-home-mortgage-table-view"
+              >
+                Table
+              </button>
+            </div>
+          </CardHeader>
+
+          {amortizationView === "chart" ? (
             <CardContent className="p-5 sm:p-6">
               {estimate.loanAmount > 0 ? (
                 <div className="h-[320px]" data-testid="chart-home-mortgage-amortization">
@@ -566,33 +622,96 @@ export default function HomeMortgageCalculator() {
                   : "The chart assumes the scheduled principal-and-interest payment is made each month."}
               </p>
             </CardContent>
-          </Card>
+          ) : (
+            <>
+              <div className="flex flex-col gap-3 border-b bg-muted/10 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-sm text-muted-foreground">
+                  Choose yearly totals or a month-by-month payment breakdown.
+                </p>
+                <div
+                  className="inline-flex h-10 items-center rounded-md bg-muted p-1 text-muted-foreground"
+                  role="group"
+                  aria-label="Schedule detail level"
+                >
+                  <button
+                    type="button"
+                    aria-pressed={scheduleLevel === "yearly"}
+                    onClick={() => setScheduleLevel("yearly")}
+                    className={`rounded-sm px-3 py-1.5 text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
+                      scheduleLevel === "yearly"
+                        ? "bg-background text-foreground shadow-sm"
+                        : "hover:text-foreground"
+                    }`}
+                    data-testid="button-home-mortgage-yearly-schedule"
+                  >
+                    Yearly
+                  </button>
+                  <button
+                    type="button"
+                    aria-pressed={scheduleLevel === "monthly"}
+                    onClick={() => setScheduleLevel("monthly")}
+                    className={`rounded-sm px-3 py-1.5 text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
+                      scheduleLevel === "monthly"
+                        ? "bg-background text-foreground shadow-sm"
+                        : "hover:text-foreground"
+                    }`}
+                    data-testid="button-home-mortgage-monthly-schedule"
+                  >
+                    Monthly
+                  </button>
+                </div>
+              </div>
 
-          <Card className="min-w-0 overflow-hidden shadow-sm">
-            <CardHeader className="border-b bg-muted/20 px-5 py-4 sm:px-6">
-              <CardTitle className="text-base">Yearly amortization schedule</CardTitle>
-              <p className="text-sm text-muted-foreground">
-                Principal and interest paid each year, with the ending balance.
-              </p>
-            </CardHeader>
-            <CardContent className="p-0">
-              {estimate.yearlyAmortization.length > 0 ? (
+              {scheduleLevel === "yearly" ? (
+                estimate.yearlyAmortization.length > 0 ? (
+                  <div className="max-h-[420px] overflow-auto">
+                    <table className="w-full min-w-[38rem] text-sm" data-testid="table-home-mortgage-amortization">
+                      <thead className="sticky top-0 bg-muted/95 text-xs text-muted-foreground backdrop-blur">
+                        <tr>
+                          <th className="px-4 py-3 text-left font-medium">Year</th>
+                          <th className="px-4 py-3 text-right font-medium">Months</th>
+                          <th className="px-4 py-3 text-right font-medium">Principal paid</th>
+                          <th className="px-4 py-3 text-right font-medium">Interest paid</th>
+                          <th className="px-4 py-3 text-right font-medium">Ending balance</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {estimate.yearlyAmortization.map((row) => (
+                          <tr key={row.year} className="border-t">
+                            <td className="px-4 py-3 font-medium">Year {row.year}</td>
+                            <td className="px-4 py-3 text-right tabular-nums">{row.months}</td>
+                            <td className="px-4 py-3 text-right tabular-nums">{formatCurrency(row.principalPaid)}</td>
+                            <td className="px-4 py-3 text-right tabular-nums">{formatCurrency(row.interestPaid)}</td>
+                            <td className="px-4 py-3 text-right tabular-nums">{formatCurrency(row.endingBalance)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <p className="p-5 text-sm text-muted-foreground">
+                    A schedule appears when the down payment is less than the home price.
+                  </p>
+                )
+              ) : estimate.monthlyAmortization.length > 0 ? (
                 <div className="max-h-[420px] overflow-auto">
-                  <table className="w-full min-w-[38rem] text-sm" data-testid="table-home-mortgage-amortization">
+                  <table className="w-full min-w-[48rem] text-sm" data-testid="table-home-mortgage-amortization-monthly">
                     <thead className="sticky top-0 bg-muted/95 text-xs text-muted-foreground backdrop-blur">
                       <tr>
-                        <th className="px-4 py-3 text-left font-medium">Year</th>
-                        <th className="px-4 py-3 text-right font-medium">Months</th>
+                        <th className="px-4 py-3 text-left font-medium">Month</th>
+                        <th className="px-4 py-3 text-right font-medium">Year</th>
+                        <th className="px-4 py-3 text-right font-medium">Payment</th>
                         <th className="px-4 py-3 text-right font-medium">Principal paid</th>
                         <th className="px-4 py-3 text-right font-medium">Interest paid</th>
                         <th className="px-4 py-3 text-right font-medium">Ending balance</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {estimate.yearlyAmortization.map((row) => (
-                        <tr key={row.year} className="border-t">
-                          <td className="px-4 py-3 font-medium">Year {row.year}</td>
-                          <td className="px-4 py-3 text-right tabular-nums">{row.months}</td>
+                      {estimate.monthlyAmortization.map((row) => (
+                        <tr key={row.month} className="border-t">
+                          <td className="px-4 py-3 font-medium">{row.month}</td>
+                          <td className="px-4 py-3 text-right tabular-nums">{row.year}</td>
+                          <td className="px-4 py-3 text-right tabular-nums">{formatCurrency(row.payment)}</td>
                           <td className="px-4 py-3 text-right tabular-nums">{formatCurrency(row.principalPaid)}</td>
                           <td className="px-4 py-3 text-right tabular-nums">{formatCurrency(row.interestPaid)}</td>
                           <td className="px-4 py-3 text-right tabular-nums">{formatCurrency(row.endingBalance)}</td>
@@ -606,18 +725,19 @@ export default function HomeMortgageCalculator() {
                   A schedule appears when the down payment is less than the home price.
                 </p>
               )}
-              <div className="flex flex-wrap justify-between gap-3 border-t bg-muted/20 px-5 py-4 text-sm">
-                <span className="text-muted-foreground">Total loan payments</span>
-                <span className="font-semibold tabular-nums" data-testid="text-home-mortgage-total-paid">
-                  {formatCurrency(estimate.totalLoanPayments)}
-                </span>
-              </div>
-              <p className="px-5 pb-4 text-xs leading-relaxed text-muted-foreground">
-                Fixed-rate estimate. Excludes closing costs, mortgage insurance, and any lender fees.
-              </p>
-            </CardContent>
-          </Card>
-        </div>
+            </>
+          )}
+
+          <div className="flex flex-wrap justify-between gap-3 border-t bg-muted/20 px-5 py-4 text-sm">
+            <span className="text-muted-foreground">Total loan payments</span>
+            <span className="font-semibold tabular-nums" data-testid="text-home-mortgage-total-paid">
+              {formatCurrency(estimate.totalLoanPayments)}
+            </span>
+          </div>
+          <p className="px-5 pb-4 text-xs leading-relaxed text-muted-foreground">
+            Fixed-rate estimate. Excludes closing costs, mortgage insurance, and any lender fees.
+          </p>
+        </Card>
       </div>
     </div>
   );
