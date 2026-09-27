@@ -1,5 +1,5 @@
 import { useLocation, useSearch, Link } from "wouter";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   LayoutDashboard,
   Target,
@@ -142,6 +142,8 @@ export function AppHeader() {
   const search = useSearch();
   const [navOpen, setNavOpen] = useState(false);
   const [openNavSubmenu, setOpenNavSubmenu] = useState<string | null>(null);
+  const navHoverCloseTimer = useRef<number | null>(null);
+  const isNavHoverActive = useRef(false);
   const [userOpen, setUserOpen] = useState(false);
   const { user } = useAuth();
   const logout = useLogout();
@@ -179,6 +181,27 @@ export function AppHeader() {
   const currentAdminPage = adminNavItems.find(
     (item) => location === item.url || (item.url !== "/" && location.startsWith(item.url))
   );
+  const clearNavHoverCloseTimer = () => {
+    if (navHoverCloseTimer.current !== null) {
+      window.clearTimeout(navHoverCloseTimer.current);
+      navHoverCloseTimer.current = null;
+    }
+  };
+  const startNavSubmenuHover = (title: string) => {
+    clearNavHoverCloseTimer();
+    isNavHoverActive.current = true;
+    setOpenNavSubmenu(title);
+  };
+  const scheduleNavSubmenuClose = (title: string) => {
+    clearNavHoverCloseTimer();
+    navHoverCloseTimer.current = window.setTimeout(() => {
+      navHoverCloseTimer.current = null;
+      isNavHoverActive.current = false;
+      setOpenNavSubmenu((current) => (current === title ? null : current));
+    }, 250);
+  };
+
+  useEffect(() => () => clearNavHoverCloseTimer(), []);
 
   return (
     <header className="border-b bg-background/95 backdrop-blur sticky top-0 z-50">
@@ -194,7 +217,11 @@ export function AppHeader() {
           open={navOpen}
           onOpenChange={(open) => {
             setNavOpen(open);
-            if (!open) setOpenNavSubmenu(null);
+            if (!open) {
+              clearNavHoverCloseTimer();
+              isNavHoverActive.current = false;
+              setOpenNavSubmenu(null);
+            }
           }}
         >
           <DropdownMenuTrigger asChild>
@@ -228,13 +255,22 @@ export function AppHeader() {
                   <DropdownMenuSub
                     key={item.title}
                     open={openNavSubmenu === item.title}
-                    onOpenChange={(open) => setOpenNavSubmenu(open ? item.title : null)}
+                    onOpenChange={(open) => {
+                      if (open) {
+                        setOpenNavSubmenu(item.title);
+                      } else if (!isNavHoverActive.current) {
+                        setOpenNavSubmenu(null);
+                      }
+                    }}
                   >
                     <div
                       role="none"
                       className="relative"
                       onPointerEnter={(event) => {
-                        if (event.pointerType === "mouse") setOpenNavSubmenu(item.title);
+                        if (event.pointerType === "mouse") startNavSubmenuHover(item.title);
+                      }}
+                      onPointerLeave={(event) => {
+                        if (event.pointerType === "mouse") scheduleNavSubmenuClose(item.title);
                       }}
                     >
                       <DropdownMenuItem
@@ -258,7 +294,26 @@ export function AppHeader() {
                         data-testid={`${testId}-submenu`}
                       />
                     </div>
-                    <DropdownMenuSubContent className="max-h-[70vh] w-56 overflow-y-auto">
+                    <DropdownMenuSubContent
+                      className="max-h-[70vh] w-56 overflow-y-auto"
+                      onPointerEnter={(event) => {
+                        if (event.pointerType === "mouse") {
+                          clearNavHoverCloseTimer();
+                          isNavHoverActive.current = true;
+                        }
+                      }}
+                      onPointerLeave={(event) => {
+                        if (event.pointerType === "mouse") scheduleNavSubmenuClose(item.title);
+                      }}
+                      onFocusOutside={(event) => {
+                        if (isNavHoverActive.current) event.preventDefault();
+                      }}
+                      onKeyDown={(event) => {
+                        if (event.key === "ArrowLeft" || event.key === "Escape") {
+                          isNavHoverActive.current = false;
+                        }
+                      }}
+                    >
                       {item.tabs.map((tab) => (
                         <DropdownMenuItem
                           key={tab.title}
@@ -286,7 +341,11 @@ export function AppHeader() {
                   href={item.url}
                   onClick={() => setNavOpen(false)}
                   onPointerEnter={(event) => {
-                    if (event.pointerType === "mouse") setOpenNavSubmenu(null);
+                    if (event.pointerType === "mouse") {
+                      clearNavHoverCloseTimer();
+                      isNavHoverActive.current = false;
+                      setOpenNavSubmenu(null);
+                    }
                   }}
                   className="flex items-center gap-2 rounded px-2 py-2 text-sm hover:bg-accent"
                   data-testid={testId}
