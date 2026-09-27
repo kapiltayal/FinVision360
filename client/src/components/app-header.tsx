@@ -138,7 +138,7 @@ function firstTabUrl(item: NavigationItem): string {
 }
 
 export function AppHeader() {
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
   const search = useSearch();
   const [navOpen, setNavOpen] = useState(false);
   const [openNavSubmenu, setOpenNavSubmenu] = useState<string | null>(null);
@@ -273,26 +273,31 @@ export function AppHeader() {
                         if (event.pointerType === "mouse") scheduleNavSubmenuClose(item.title);
                       }}
                     >
-                      <DropdownMenuItem
-                        asChild
-                        className="pr-10"
-                        data-testid={testId}
-                      >
+                      <DropdownMenuSubTrigger asChild data-testid={testId} indicatorTestId={`${testId}-submenu`}>
                         <Link
                           href={firstTabUrl(item)}
-                          onClick={() => setNavOpen(false)}
-                          className="flex items-center gap-2"
+                          onClick={(event) => {
+                            event.preventDefault();
+                            const rect = event.currentTarget.getBoundingClientRect();
+                            const clickedChevron = event.detail !== 0 && event.clientX >= rect.right - 32;
+                            if (clickedChevron) {
+                              setOpenNavSubmenu(item.title);
+                              return;
+                            }
+
+                            clearNavHoverCloseTimer();
+                            isNavHoverActive.current = false;
+                            setOpenNavSubmenu(null);
+                            setNavOpen(false);
+                            setLocation(firstTabUrl(item));
+                          }}
+                          className="flex w-full items-center gap-2"
                         >
                           <item.icon className="h-4 w-4 shrink-0" />
                           <span className="flex-1">{item.title}</span>
                           {itemIsActive && <span className="text-primary">✓</span>}
                         </Link>
-                      </DropdownMenuItem>
-                      <DropdownMenuSubTrigger
-                        aria-label={`Open ${item.title} pages`}
-                        className="absolute right-1 top-1/2 h-7 w-7 -translate-y-1/2 justify-center rounded-sm p-0 focus:bg-accent"
-                        data-testid={`${testId}-submenu`}
-                      />
+                      </DropdownMenuSubTrigger>
                     </div>
                     <DropdownMenuSubContent
                       className="max-h-[70vh] w-56 overflow-y-auto"
