@@ -475,8 +475,10 @@ export default function HomeMortgageCalculator() {
               </p>
             </CardContent>
           </Card>
+        </div>
 
-          <Card className="overflow-hidden shadow-sm">
+        <div className="grid min-w-0 items-start gap-5 lg:grid-cols-2 xl:col-span-2">
+          <Card className="min-w-0 overflow-hidden shadow-sm">
             <CardHeader className="border-b bg-muted/20 px-5 py-4 sm:px-6">
               <CardTitle className="text-base">Amortization chart</CardTitle>
               <p className="text-sm text-muted-foreground">
@@ -558,7 +560,7 @@ export default function HomeMortgageCalculator() {
             </CardContent>
           </Card>
 
-          <Card className="overflow-hidden shadow-sm">
+          <Card className="min-w-0 overflow-hidden shadow-sm">
             <CardHeader className="border-b bg-muted/20 px-5 py-4 sm:px-6">
               <CardTitle className="text-base">Yearly amortization schedule</CardTitle>
               <p className="text-sm text-muted-foreground">
