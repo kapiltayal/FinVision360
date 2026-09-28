@@ -191,7 +191,7 @@ function ResultLine({
 export default function HomeMortgageCalculator() {
   const [inputs, setInputs] = useState(INITIAL_INPUTS);
   const [amortizationView, setAmortizationView] = useState<"chart" | "table">("chart");
-  const [scheduleLevel, setScheduleLevel] = useState<"yearly" | "monthly">("yearly");
+  const [amortizationPeriod, setAmortizationPeriod] = useState<"yearly" | "monthly">("yearly");
   const update = <K extends keyof MortgageInputs>(key: K, value: number) =>
     setInputs((current) => ({ ...current, [key]: value }));
 
@@ -211,6 +211,9 @@ export default function HomeMortgageCalculator() {
     const yearlyAmortization: YearlyAmortization[] = [];
     const monthlyAmortization: MonthlyAmortization[] = [];
     const balanceChartData: BalancePoint[] = [
+      { month: 0, year: 0, remainingBalance: loanAmount },
+    ];
+    const monthlyBalanceChartData: BalancePoint[] = [
       { month: 0, year: 0, remainingBalance: loanAmount },
     ];
     let remainingBalance = loanAmount;
@@ -242,6 +245,11 @@ export default function HomeMortgageCalculator() {
         principalPaid,
         interestPaid,
         endingBalance: remainingBalance,
+      });
+      monthlyBalanceChartData.push({
+        month,
+        year: month / 12,
+        remainingBalance,
       });
 
       if (month % 12 === 0 || remainingBalance === 0) {
@@ -294,6 +302,7 @@ export default function HomeMortgageCalculator() {
       yearlyAmortization,
       monthlyAmortization,
       balanceChartData,
+      monthlyBalanceChartData,
     };
   }, [inputs]);
 
