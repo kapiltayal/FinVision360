@@ -512,40 +512,74 @@ export default function HomeMortgageCalculator() {
             <div className="space-y-1">
               <CardTitle className="text-base">Amortization</CardTitle>
               <p className="text-sm text-muted-foreground">
-                View the remaining balance chart or switch to the yearly or monthly schedule.
+                Choose yearly or monthly detail, then view it as a chart or table.
               </p>
             </div>
-            <div
-              className="inline-flex h-10 items-center rounded-md bg-muted p-1 text-muted-foreground"
-              role="group"
-              aria-label="Amortization view"
-            >
-              <button
-                type="button"
-                aria-pressed={amortizationView === "chart"}
-                onClick={() => setAmortizationView("chart")}
-                className={`rounded-sm px-3 py-1.5 text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
-                  amortizationView === "chart"
-                    ? "bg-background text-foreground shadow-sm"
-                    : "hover:text-foreground"
-                }`}
-                data-testid="button-home-mortgage-chart-view"
+            <div className="flex flex-wrap items-center gap-2">
+              <div
+                className="inline-flex h-10 items-center rounded-md bg-muted p-1 text-muted-foreground"
+                role="group"
+                aria-label="Amortization period"
               >
-                Chart
-              </button>
-              <button
-                type="button"
-                aria-pressed={amortizationView === "table"}
-                onClick={() => setAmortizationView("table")}
-                className={`rounded-sm px-3 py-1.5 text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
-                  amortizationView === "table"
-                    ? "bg-background text-foreground shadow-sm"
-                    : "hover:text-foreground"
-                }`}
-                data-testid="button-home-mortgage-table-view"
+                <button
+                  type="button"
+                  aria-pressed={amortizationPeriod === "yearly"}
+                  onClick={() => setAmortizationPeriod("yearly")}
+                  className={`rounded-sm px-3 py-1.5 text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
+                    amortizationPeriod === "yearly"
+                      ? "bg-background text-foreground shadow-sm"
+                      : "hover:text-foreground"
+                  }`}
+                  data-testid="button-home-mortgage-yearly-schedule"
+                >
+                  Yearly
+                </button>
+                <button
+                  type="button"
+                  aria-pressed={amortizationPeriod === "monthly"}
+                  onClick={() => setAmortizationPeriod("monthly")}
+                  className={`rounded-sm px-3 py-1.5 text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
+                    amortizationPeriod === "monthly"
+                      ? "bg-background text-foreground shadow-sm"
+                      : "hover:text-foreground"
+                  }`}
+                  data-testid="button-home-mortgage-monthly-schedule"
+                >
+                  Monthly
+                </button>
+              </div>
+              <div
+                className="inline-flex h-10 items-center rounded-md bg-muted p-1 text-muted-foreground"
+                role="group"
+                aria-label="Amortization view"
               >
-                Table
-              </button>
+                <button
+                  type="button"
+                  aria-pressed={amortizationView === "chart"}
+                  onClick={() => setAmortizationView("chart")}
+                  className={`rounded-sm px-3 py-1.5 text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
+                    amortizationView === "chart"
+                      ? "bg-background text-foreground shadow-sm"
+                      : "hover:text-foreground"
+                  }`}
+                  data-testid="button-home-mortgage-chart-view"
+                >
+                  Chart
+                </button>
+                <button
+                  type="button"
+                  aria-pressed={amortizationView === "table"}
+                  onClick={() => setAmortizationView("table")}
+                  className={`rounded-sm px-3 py-1.5 text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
+                    amortizationView === "table"
+                      ? "bg-background text-foreground shadow-sm"
+                      : "hover:text-foreground"
+                  }`}
+                  data-testid="button-home-mortgage-table-view"
+                >
+                  Table
+                </button>
+              </div>
             </div>
           </CardHeader>
 
@@ -554,7 +588,10 @@ export default function HomeMortgageCalculator() {
               {estimate.loanAmount > 0 ? (
                 <div className="h-[320px]" data-testid="chart-home-mortgage-amortization">
                   <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={estimate.balanceChartData} margin={{ top: 8, right: 12, left: 4, bottom: 8 }}>
+                    <AreaChart
+                      data={amortizationPeriod === "yearly" ? estimate.balanceChartData : estimate.monthlyBalanceChartData}
+                      margin={{ top: 8, right: 12, left: 4, bottom: 8 }}
+                    >
                       <defs>
                         <linearGradient id="mortgage-balance-gradient" x1="0" y1="0" x2="0" y2="1">
                           <stop offset="5%" stopColor="hsl(var(--chart-1))" stopOpacity={0.3} />
@@ -563,15 +600,17 @@ export default function HomeMortgageCalculator() {
                       </defs>
                       <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                       <XAxis
-                        dataKey="year"
+                        dataKey={amortizationPeriod === "yearly" ? "year" : "month"}
                         type="number"
                         domain={[0, "dataMax"]}
                         tickCount={6}
-                        tickFormatter={(value) => `${Number(value)}y`}
+                        tickFormatter={(value) =>
+                          amortizationPeriod === "yearly" ? `${Number(value)}y` : `${Number(value)}m`
+                        }
                         tick={{ fontSize: 11 }}
                         stroke="hsl(var(--muted-foreground))"
                         label={{
-                          value: "Years into loan",
+                          value: amortizationPeriod === "yearly" ? "Years into loan" : "Months into loan",
                           position: "insideBottom",
                           offset: -4,
                           fontSize: 11,
@@ -588,11 +627,15 @@ export default function HomeMortgageCalculator() {
                       <Tooltip
                         content={({ active, payload, label }: any) => {
                           if (active && payload?.length) {
-                            const year = Number(label);
+                            const period = Number(label);
                             return (
                               <div className="bg-popover border border-border rounded-md px-3 py-2 shadow-md text-xs space-y-1">
                                 <p className="font-semibold">
-                                  {year === 0 ? "At start" : `${year.toFixed(1)} years`}
+                                  {period === 0
+                                    ? "At start"
+                                    : amortizationPeriod === "yearly"
+                                      ? `${period.toFixed(1)} years`
+                                      : `${period} ${period === 1 ? "month" : "months"}`}
                                 </p>
                                 {payload.map((point: any) => (
                                   <p key={point.dataKey} style={{ color: point.color }}>
@@ -633,45 +676,7 @@ export default function HomeMortgageCalculator() {
             </CardContent>
           ) : (
             <>
-              <div className="flex flex-col gap-3 border-b bg-muted/10 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-                <p className="text-sm text-muted-foreground">
-                  Choose yearly totals or a month-by-month payment breakdown.
-                </p>
-                <div
-                  className="inline-flex h-10 items-center rounded-md bg-muted p-1 text-muted-foreground"
-                  role="group"
-                  aria-label="Schedule detail level"
-                >
-                  <button
-                    type="button"
-                    aria-pressed={scheduleLevel === "yearly"}
-                    onClick={() => setScheduleLevel("yearly")}
-                    className={`rounded-sm px-3 py-1.5 text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
-                      scheduleLevel === "yearly"
-                        ? "bg-background text-foreground shadow-sm"
-                        : "hover:text-foreground"
-                    }`}
-                    data-testid="button-home-mortgage-yearly-schedule"
-                  >
-                    Yearly
-                  </button>
-                  <button
-                    type="button"
-                    aria-pressed={scheduleLevel === "monthly"}
-                    onClick={() => setScheduleLevel("monthly")}
-                    className={`rounded-sm px-3 py-1.5 text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
-                      scheduleLevel === "monthly"
-                        ? "bg-background text-foreground shadow-sm"
-                        : "hover:text-foreground"
-                    }`}
-                    data-testid="button-home-mortgage-monthly-schedule"
-                  >
-                    Monthly
-                  </button>
-                </div>
-              </div>
-
-              {scheduleLevel === "yearly" ? (
+              {amortizationPeriod === "yearly" ? (
                 estimate.yearlyAmortization.length > 0 ? (
                   <div className="max-h-[420px] overflow-auto">
                     <table className="w-full min-w-[38rem] text-sm" data-testid="table-home-mortgage-amortization">
