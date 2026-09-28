@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ChevronDown, Info, Pencil, Plus, RotateCcw, Trash2 } from "lucide-react";
+import { ChevronDown, Pencil, Plus, RotateCcw, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -332,7 +332,6 @@ function AssumptionsCallouts({ assumptions }: { assumptions: RetirementProjectio
       >
         <span className="flex min-w-0 items-center gap-2">
           <ChevronDown className={`h-4 w-4 shrink-0 transition-transform ${open ? "rotate-180" : ""}`} />
-          <Info className="h-4 w-4 shrink-0 text-amber-700 dark:text-amber-300" />
           <span className="font-semibold">Assumptions &amp; Callouts</span>
         </span>
         <span className="shrink-0 text-xs text-muted-foreground">
