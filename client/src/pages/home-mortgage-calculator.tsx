@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Calculator, CircleDollarSign, House, Wallet } from "lucide-react";
+import { Calculator, CircleDollarSign, House, Wallet, X } from "lucide-react";
 import {
   Area,
   AreaChart,
@@ -577,17 +577,16 @@ export default function HomeMortgageCalculator() {
         </div>
 
         <Card className="min-w-0 overflow-hidden shadow-sm xl:col-span-2">
-          <CardHeader className="flex flex-col gap-3 border-b bg-muted/20 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+          <CardHeader className="grid gap-3 border-b bg-muted/20 px-5 py-4 sm:px-6 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
             <div className="space-y-1">
               <CardTitle className="text-base">Amortization</CardTitle>
               <p className="text-sm text-muted-foreground">
-                Choose yearly or monthly detail, then view it as a chart or table. Add a start date to show
-                calendar dates.
+                Choose a period and view, with optional calendar dates from the mortgage start.
               </p>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="flex h-10 items-center gap-2 rounded-md border border-input bg-background px-2">
-                <Label htmlFor="home-mortgage-start-date" className="whitespace-nowrap text-xs text-muted-foreground">
+            <div className="flex flex-wrap items-center justify-end gap-2 lg:flex-nowrap lg:justify-self-end">
+              <div className="flex h-9 shrink-0 items-center gap-2 rounded-lg border border-border bg-background px-2.5 shadow-sm focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2">
+                <Label htmlFor="home-mortgage-start-date" className="whitespace-nowrap text-xs font-medium text-muted-foreground">
                   Start date
                 </Label>
                 <Input
@@ -595,23 +594,24 @@ export default function HomeMortgageCalculator() {
                   type="date"
                   value={mortgageStartDate}
                   onChange={(event) => setMortgageStartDate(event.target.value)}
-                  className="h-8 w-[9.5rem] border-0 bg-transparent px-0 text-xs shadow-none focus-visible:ring-0"
+                  className="h-7 w-[8.5rem] border-0 bg-transparent px-0 text-xs shadow-none focus-visible:ring-0"
                   data-testid="input-home-mortgage-start-date"
                 />
                 {mortgageStartDate && (
                   <button
                     type="button"
                     onClick={() => setMortgageStartDate("")}
-                    className="text-xs text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     aria-label="Clear mortgage start date"
+                    title="Clear start date"
                     data-testid="button-home-mortgage-clear-start-date"
                   >
-                    Clear
+                    <X className="h-3.5 w-3.5" aria-hidden="true" />
                   </button>
                 )}
               </div>
               <div
-                className="inline-flex h-10 items-center rounded-md bg-muted p-1 text-muted-foreground"
+                className="inline-flex h-9 shrink-0 items-center rounded-lg bg-muted/70 p-1 text-muted-foreground"
                 role="group"
                 aria-label="Amortization period"
               >
@@ -619,7 +619,7 @@ export default function HomeMortgageCalculator() {
                   type="button"
                   aria-pressed={amortizationPeriod === "yearly"}
                   onClick={() => setAmortizationPeriod("yearly")}
-                  className={`rounded-sm px-3 py-1.5 text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
+                  className={`h-7 rounded-md px-2.5 text-xs font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
                     amortizationPeriod === "yearly"
                       ? "bg-background text-foreground shadow-sm"
                       : "hover:text-foreground"
@@ -632,7 +632,7 @@ export default function HomeMortgageCalculator() {
                   type="button"
                   aria-pressed={amortizationPeriod === "monthly"}
                   onClick={() => setAmortizationPeriod("monthly")}
-                  className={`rounded-sm px-3 py-1.5 text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
+                  className={`h-7 rounded-md px-2.5 text-xs font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
                     amortizationPeriod === "monthly"
                       ? "bg-background text-foreground shadow-sm"
                       : "hover:text-foreground"
@@ -643,7 +643,7 @@ export default function HomeMortgageCalculator() {
                 </button>
               </div>
               <div
-                className="inline-flex h-10 items-center rounded-md bg-muted p-1 text-muted-foreground"
+                className="inline-flex h-9 shrink-0 items-center rounded-lg bg-muted/70 p-1 text-muted-foreground"
                 role="group"
                 aria-label="Amortization view"
               >
@@ -651,7 +651,7 @@ export default function HomeMortgageCalculator() {
                   type="button"
                   aria-pressed={amortizationView === "chart"}
                   onClick={() => setAmortizationView("chart")}
-                  className={`rounded-sm px-3 py-1.5 text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
+                  className={`h-7 rounded-md px-2.5 text-xs font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
                     amortizationView === "chart"
                       ? "bg-background text-foreground shadow-sm"
                       : "hover:text-foreground"
@@ -664,7 +664,7 @@ export default function HomeMortgageCalculator() {
                   type="button"
                   aria-pressed={amortizationView === "table"}
                   onClick={() => setAmortizationView("table")}
-                  className={`rounded-sm px-3 py-1.5 text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
+                  className={`h-7 rounded-md px-2.5 text-xs font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
                     amortizationView === "table"
                       ? "bg-background text-foreground shadow-sm"
                       : "hover:text-foreground"
