@@ -581,10 +581,35 @@ export default function HomeMortgageCalculator() {
             <div className="space-y-1">
               <CardTitle className="text-base">Amortization</CardTitle>
               <p className="text-sm text-muted-foreground">
-                Choose yearly or monthly detail, then view it as a chart or table.
+                Choose yearly or monthly detail, then view it as a chart or table. Add a start date to show
+                calendar dates.
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
+              <div className="flex h-10 items-center gap-2 rounded-md border border-input bg-background px-2">
+                <Label htmlFor="home-mortgage-start-date" className="whitespace-nowrap text-xs text-muted-foreground">
+                  Start date
+                </Label>
+                <Input
+                  id="home-mortgage-start-date"
+                  type="date"
+                  value={mortgageStartDate}
+                  onChange={(event) => setMortgageStartDate(event.target.value)}
+                  className="h-8 w-[9.5rem] border-0 bg-transparent px-0 text-xs shadow-none focus-visible:ring-0"
+                  data-testid="input-home-mortgage-start-date"
+                />
+                {mortgageStartDate && (
+                  <button
+                    type="button"
+                    onClick={() => setMortgageStartDate("")}
+                    className="text-xs text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    aria-label="Clear mortgage start date"
+                    data-testid="button-home-mortgage-clear-start-date"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
               <div
                 className="inline-flex h-10 items-center rounded-md bg-muted p-1 text-muted-foreground"
                 role="group"
@@ -658,7 +683,7 @@ export default function HomeMortgageCalculator() {
                 <div className="h-[320px]" data-testid="chart-home-mortgage-amortization">
                   <ResponsiveContainer width="100%" height="100%">
                     <AreaChart
-                      data={amortizationPeriod === "yearly" ? estimate.balanceChartData : estimate.monthlyBalanceChartData}
+                      data={amortizationChartData}
                       margin={{ top: 8, right: 12, left: 4, bottom: 8 }}
                     >
                       <defs>
@@ -669,17 +694,31 @@ export default function HomeMortgageCalculator() {
                       </defs>
                       <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                       <XAxis
-                        dataKey={amortizationPeriod === "yearly" ? "year" : "month"}
+                        dataKey={
+                          scheduleStartDate
+                            ? "dateTimestamp"
+                            : amortizationPeriod === "yearly"
+                              ? "year"
+                              : "month"
+                        }
                         type="number"
-                        domain={[0, "dataMax"]}
+                        domain={scheduleStartDate ? ["dataMin", "dataMax"] : [0, "dataMax"]}
                         tickCount={6}
                         tickFormatter={(value) =>
-                          amortizationPeriod === "yearly" ? `${Number(value)}y` : `${Number(value)}m`
+                          scheduleStartDate
+                            ? compactScheduleDateFormatter.format(new Date(Number(value)))
+                            : amortizationPeriod === "yearly"
+                              ? `${Number(value)}y`
+                              : `${Number(value)}m`
                         }
                         tick={{ fontSize: 11 }}
                         stroke="hsl(var(--muted-foreground))"
                         label={{
-                          value: amortizationPeriod === "yearly" ? "Years into loan" : "Months into loan",
+                          value: scheduleStartDate
+                            ? "Date"
+                            : amortizationPeriod === "yearly"
+                              ? "Years into loan"
+                              : "Months into loan",
                           position: "insideBottom",
                           offset: -4,
                           fontSize: 11,
@@ -700,11 +739,13 @@ export default function HomeMortgageCalculator() {
                             return (
                               <div className="bg-popover border border-border rounded-md px-3 py-2 shadow-md text-xs space-y-1">
                                 <p className="font-semibold">
-                                  {period === 0
-                                    ? "At start"
-                                    : amortizationPeriod === "yearly"
-                                      ? `${period.toFixed(1)} years`
-                                      : `${period} ${period === 1 ? "month" : "months"}`}
+                                  {scheduleStartDate
+                                    ? fullScheduleDateFormatter.format(new Date(period))
+                                    : period === 0
+                                      ? "At start"
+                                      : amortizationPeriod === "yearly"
+                                        ? `${period.toFixed(1)} years`
+                                        : `${period} ${period === 1 ? "month" : "months"}`}
                                 </p>
                                 {payload.map((point: any) => (
                                   <p key={point.dataKey} style={{ color: point.color }}>
@@ -751,7 +792,9 @@ export default function HomeMortgageCalculator() {
                     <table className="w-full min-w-[38rem] text-sm" data-testid="table-home-mortgage-amortization">
                       <thead className="sticky top-0 bg-muted/95 text-xs text-muted-foreground backdrop-blur">
                         <tr>
-                          <th className="px-4 py-3 text-left font-medium">Year</th>
+                          <th className="px-4 py-3 text-left font-medium">
+                            {scheduleStartDate ? "Period ending" : "Year"}
+                          </th>
                           <th className="px-4 py-3 text-right font-medium">Months</th>
                           <th className="px-4 py-3 text-right font-medium">Principal paid</th>
                           <th className="px-4 py-3 text-right font-medium">Interest paid</th>
@@ -761,7 +804,16 @@ export default function HomeMortgageCalculator() {
                       <tbody>
                         {estimate.yearlyAmortization.map((row) => (
                           <tr key={row.year} className="border-t">
-                            <td className="px-4 py-3 font-medium">Year {row.year}</td>
+                            <td className="px-4 py-3 font-medium">
+                              {scheduleStartDate
+                                ? fullScheduleDateFormatter.format(
+                                    addMonthsToDate(
+                                      scheduleStartDate,
+                                      (row.year - 1) * 12 + row.months,
+                                    ),
+                                  )
+                                : `Year ${row.year}`}
+                            </td>
                             <td className="px-4 py-3 text-right tabular-nums">{row.months}</td>
                             <td className="px-4 py-3 text-right tabular-nums">{formatCurrency(row.principalPaid)}</td>
                             <td className="px-4 py-3 text-right tabular-nums">{formatCurrency(row.interestPaid)}</td>
@@ -781,8 +833,12 @@ export default function HomeMortgageCalculator() {
                   <table className="w-full min-w-[48rem] text-sm" data-testid="table-home-mortgage-amortization-monthly">
                     <thead className="sticky top-0 bg-muted/95 text-xs text-muted-foreground backdrop-blur">
                       <tr>
-                        <th className="px-4 py-3 text-left font-medium">Month</th>
-                        <th className="px-4 py-3 text-right font-medium">Year</th>
+                        <th className="px-4 py-3 text-left font-medium">
+                          {scheduleStartDate ? "Payment date" : "Month"}
+                        </th>
+                        {!scheduleStartDate && (
+                          <th className="px-4 py-3 text-right font-medium">Year</th>
+                        )}
                         <th className="px-4 py-3 text-right font-medium">Payment</th>
                         <th className="px-4 py-3 text-right font-medium">Principal paid</th>
                         <th className="px-4 py-3 text-right font-medium">Interest paid</th>
@@ -792,8 +848,14 @@ export default function HomeMortgageCalculator() {
                     <tbody>
                       {estimate.monthlyAmortization.map((row) => (
                         <tr key={row.month} className="border-t">
-                          <td className="px-4 py-3 font-medium">{row.month}</td>
-                          <td className="px-4 py-3 text-right tabular-nums">{row.year}</td>
+                          <td className="px-4 py-3 font-medium">
+                            {scheduleStartDate
+                              ? fullScheduleDateFormatter.format(addMonthsToDate(scheduleStartDate, row.month))
+                              : row.month}
+                          </td>
+                          {!scheduleStartDate && (
+                            <td className="px-4 py-3 text-right tabular-nums">{row.year}</td>
+                          )}
                           <td className="px-4 py-3 text-right tabular-nums">{formatCurrency(row.payment)}</td>
                           <td className="px-4 py-3 text-right tabular-nums">{formatCurrency(row.principalPaid)}</td>
                           <td className="px-4 py-3 text-right tabular-nums">{formatCurrency(row.interestPaid)}</td>
