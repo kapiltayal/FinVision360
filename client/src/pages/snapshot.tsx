@@ -512,9 +512,15 @@ export default function SnapshotPage() {
           <div className="space-y-2 pt-3 border-t border-slate-100 dark:border-slate-800">
             <StatRow label="Savings & Cash Assets" value={formatCurrency(emergencyFunds)} />
             {totalMonthlyExpenses > 0 && (
-              <p className="text-[11px] text-muted-foreground leading-relaxed">
-                Based on your <span className="font-semibold tabular-nums">{formatCurrency(totalMonthlyExpenses)}</span>/mo in expenses
-              </p>
+              <>
+                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                  Based on your <span className="font-semibold tabular-nums">{formatCurrency(totalMonthlyExpenses)}</span>/mo in expenses
+                </p>
+                <p className="text-[11px] text-muted-foreground leading-relaxed" data-testid="text-snapshot-emergency-funds-target">
+                  A 6-month savings target requires{" "}
+                  <span className="font-semibold tabular-nums">{formatCurrency(totalMonthlyExpenses * 6)}</span>.
+                </p>
+              </>
             )}
           </div>
         </SnapshotCard>
