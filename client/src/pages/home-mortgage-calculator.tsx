@@ -11,6 +11,7 @@ import {
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FormattedNumberInput } from "@/components/ui/formatted-number-input";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { formatCurrency } from "@/lib/format";
@@ -47,6 +48,7 @@ type BalancePoint = {
   month: number;
   year: number;
   remainingBalance: number;
+  dateTimestamp?: number;
 };
 
 const INITIAL_INPUTS: MortgageInputs = {
@@ -66,6 +68,53 @@ const compactCurrency = new Intl.NumberFormat("en-US", {
   notation: "compact",
   maximumFractionDigits: 1,
 });
+
+const fullScheduleDateFormatter = new Intl.DateTimeFormat("en-US", {
+  month: "short",
+  day: "numeric",
+  year: "numeric",
+});
+
+const compactScheduleDateFormatter = new Intl.DateTimeFormat("en-US", {
+  month: "short",
+  year: "2-digit",
+});
+
+function parseDateInput(value: string): Date | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return null;
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const date = new Date(year, month - 1, day);
+  if (
+    date.getFullYear() !== year ||
+    date.getMonth() !== month - 1 ||
+    date.getDate() !== day
+  ) {
+    return null;
+  }
+  return date;
+}
+
+function addMonthsToDate(startDate: Date, months: number): Date {
+  const targetMonth = new Date(startDate.getFullYear(), startDate.getMonth() + months, 1);
+  const lastDayOfTargetMonth = new Date(
+    targetMonth.getFullYear(),
+    targetMonth.getMonth() + 1,
+    0,
+  ).getDate();
+  const lastDayOfStartMonth = new Date(
+    startDate.getFullYear(),
+    startDate.getMonth() + 1,
+    0,
+  ).getDate();
+  const day = startDate.getDate() === lastDayOfStartMonth
+    ? lastDayOfTargetMonth
+    : Math.min(startDate.getDate(), lastDayOfTargetMonth);
+  return new Date(targetMonth.getFullYear(), targetMonth.getMonth(), day);
+}
 
 function formatRangeValue(value: number, suffix?: string): string {
   if (suffix === "years") {
@@ -192,6 +241,7 @@ export default function HomeMortgageCalculator() {
   const [inputs, setInputs] = useState(INITIAL_INPUTS);
   const [amortizationView, setAmortizationView] = useState<"chart" | "table">("chart");
   const [amortizationPeriod, setAmortizationPeriod] = useState<"yearly" | "monthly">("yearly");
+  const [mortgageStartDate, setMortgageStartDate] = useState("");
   const update = <K extends keyof MortgageInputs>(key: K, value: number) =>
     setInputs((current) => ({ ...current, [key]: value }));
 
@@ -305,6 +355,25 @@ export default function HomeMortgageCalculator() {
       monthlyBalanceChartData,
     };
   }, [inputs]);
+
+  const scheduleStartDate = parseDateInput(mortgageStartDate);
+  const amortizationChartData = useMemo(() => {
+    const points = amortizationPeriod === "yearly"
+      ? estimate.balanceChartData
+      : estimate.monthlyBalanceChartData;
+    const startDate = parseDateInput(mortgageStartDate);
+    if (!startDate) return points;
+
+    return points.map((point) => ({
+      ...point,
+      dateTimestamp: addMonthsToDate(startDate, point.month).getTime(),
+    }));
+  }, [
+    amortizationPeriod,
+    estimate.balanceChartData,
+    estimate.monthlyBalanceChartData,
+    mortgageStartDate,
+  ]);
 
   return (
     <div className="space-y-5">
