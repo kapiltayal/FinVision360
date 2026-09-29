@@ -60,13 +60,14 @@ const RETIREMENT_ACCOUNT_CATEGORIES = new Set([
 ]);
 
 type Priority = "high" | "medium" | "low";
-type RecommendationGroup = "earn" | "save" | "other";
+type RecommendationCategory = "earn" | "save" | "others";
 interface Rec {
   priority: Priority;
   title: string;
   description: string;
   color: string;
-  group: RecommendationGroup;
+  category: RecommendationCategory;
+  // Estimated dollar impact per month; bucket totals sum these values.
   monthlyPotential: number;
 }
 
@@ -270,7 +271,7 @@ export default function SnapshotPage() {
         title: "Build Your Emergency Fund",
         description: `You have ${formatCurrency(savingsBalance)} saved. Target at least ${formatCurrency(emergencyTarget)} — 3 months of expenses — to weather unexpected events.`,
         color: "#ef4444",
-        group: "save",
+        category: "save",
         monthlyPotential: Math.max(emergencyTarget - savingsBalance, 0) / 12,
       });
     }
@@ -285,7 +286,7 @@ export default function SnapshotPage() {
           title: "Eliminate High-Interest Debt",
           description: `${formatCurrency(ccTotal)} in credit card debt at ~${avgRate.toFixed(1)}% APR is costly. Use the avalanche method to pay off the highest-rate cards first.`,
           color: "#f97316",
-          group: "save",
+          category: "save",
           monthlyPotential: (ccTotal * (avgRate / 100)) / 12,
         });
       }
@@ -297,7 +298,7 @@ export default function SnapshotPage() {
         title: "Increase Your Savings Rate",
         description: `Your savings rate is ${savingsRate.toFixed(1)}%. Increasing to 20% or more accelerates wealth building — try trimming discretionary spending first.`,
         color: "#eab308",
-        group: "save",
+        category: "save",
         monthlyPotential: Math.max(totalMonthlyIncome * (0.2 - savingsRate / 100), 0),
       });
     }
@@ -309,7 +310,7 @@ export default function SnapshotPage() {
         title: "Fill Insurance Gaps",
         description: `You appear to be missing ${missingCritical.join(" and ")} insurance. These are foundational protections — review your coverage needs.`,
         color: "#8b5cf6",
-        group: "other",
+        category: "others",
         monthlyPotential: 0,
       });
     }
@@ -320,7 +321,7 @@ export default function SnapshotPage() {
         title: "Start Saving for Retirement",
         description: "No retirement assets detected. Contributing even a small amount today takes advantage of compounding — start with your employer's 401k match.",
         color: "#1C91D4",
-        group: "save",
+        category: "save",
         monthlyPotential: 0,
       });
     }
@@ -331,7 +332,7 @@ export default function SnapshotPage() {
         title: "Great Financial Health!",
         description: "Your finances look strong. Stay consistent with contributions, review your insurance annually, and keep your emergency fund topped up.",
         color: "#22c55e",
-        group: "other",
+        category: "others",
         monthlyPotential: 0,
       });
     }
@@ -340,7 +341,7 @@ export default function SnapshotPage() {
   }, [assets, liabilities, totalMonthlyExpenses, totalMonthlyIncome, savingsRate, coverageMap, retirementAssets, k401Balance]);
 
   const recommendationGroups: {
-    key: RecommendationGroup;
+    key: RecommendationCategory;
     label: string;
     description: string;
     accent: string;
@@ -348,7 +349,7 @@ export default function SnapshotPage() {
   }[] = [
     { key: "earn", label: "Earn", description: "Ways to grow your income", accent: "#0ea5e9", Icon: TrendingUp },
     { key: "save", label: "Save", description: "Ways to keep more of your money", accent: "#10b981", Icon: PiggyBank },
-    { key: "other", label: "Other", description: "Protection and planning priorities", accent: "#8b5cf6", Icon: Landmark },
+    { key: "others", label: "Others", description: "Protection and planning priorities", accent: "#8b5cf6", Icon: Landmark },
   ];
 
   if (isLoading) {
@@ -723,7 +724,7 @@ export default function SnapshotPage() {
         <SnapshotCard title="Financial Opportunities" accent="#6366f1" icon={Lightbulb} className="md:col-span-3">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {recommendationGroups.map((group) => {
-              const groupRecommendations = recommendations.filter((rec) => rec.group === group.key);
+              const groupRecommendations = recommendations.filter((rec) => rec.category === group.key);
               const totalPotential = groupRecommendations.reduce((sum, rec) => sum + rec.monthlyPotential, 0);
               const GroupIcon = group.Icon;
 
@@ -746,7 +747,7 @@ export default function SnapshotPage() {
                     </div>
                   </div>
 
-                  {group.key !== "other" && (
+                  {group.key !== "others" && (
                     <div
                       className="rounded-xl px-3 py-2.5 mb-3 border"
                       style={{
