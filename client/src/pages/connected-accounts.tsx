@@ -1,8 +1,7 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { usePlaidLink } from "react-plaid-link";
-import { queryClient } from "@/lib/queryClient";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient, type ApiRequestError } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -119,6 +118,81 @@ function PlaidLinkButton({ onSuccess }: { onSuccess: () => void }) {
   );
 }
 
+function PlaidReconnectButton({
+  itemId,
+  onReconnected,
+}: {
+  itemId: number;
+  onReconnected: () => void;
+}) {
+  const { toast } = useToast();
+  const [linkToken, setLinkToken] = useState<string | null>(null);
+  const [isPreparing, setIsPreparing] = useState(false);
+  const shouldOpenLink = useRef(false);
+
+  const { open, ready } = usePlaidLink({
+    token: linkToken,
+    onSuccess: () => {
+      shouldOpenLink.current = false;
+      setIsPreparing(false);
+      toast({ title: "Connection restored", description: "Refreshing account balances…" });
+      onReconnected();
+    },
+    onExit: (error) => {
+      shouldOpenLink.current = false;
+      setIsPreparing(false);
+      setLinkToken(null);
+      if (error) {
+        toast({
+          title: "Reconnect could not be completed",
+          description: error.display_message || error.error_message || "Please try again.",
+          variant: "destructive",
+        });
+      }
+    },
+  });
+
+  useEffect(() => {
+    if (!shouldOpenLink.current || !ready) return;
+    shouldOpenLink.current = false;
+    open();
+  }, [open, ready]);
+
+  const handleReconnect = async () => {
+    setIsPreparing(true);
+    try {
+      const response = await apiRequest("POST", `/api/plaid/items/${itemId}/update-link-token`, {});
+      const tokenResponse = await response.json() as { link_token?: string };
+      if (!tokenResponse.link_token) throw new Error("Plaid did not return a reconnect link.");
+      shouldOpenLink.current = true;
+      setLinkToken(tokenResponse.link_token);
+    } catch (error) {
+      shouldOpenLink.current = false;
+      setIsPreparing(false);
+      toast({
+        title: "Could not start reconnect",
+        description: error instanceof Error ? error.message : "Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  return (
+    <Button
+      variant="outline"
+      size="sm"
+      onClick={handleReconnect}
+      disabled={isPreparing}
+      data-testid={`button-reconnect-${itemId}`}
+    >
+      {isPreparing
+        ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+        : <Link2 className="h-4 w-4 mr-1.5" />}
+      {isPreparing ? "Connecting…" : "Reconnect"}
+    </Button>
+  );
+}
+
 export default function ConnectedAccountsPage() {
   useSEO({
     title: "Connected Accounts — FinVision360",
@@ -128,6 +202,7 @@ export default function ConnectedAccountsPage() {
 
   const { toast } = useToast();
   const [syncingId, setSyncingId] = useState<number | null>(null);
+  const [itemsNeedingReconnect, setItemsNeedingReconnect] = useState<Set<number>>(new Set());
   const [expandedItems, setExpandedItems] = useState<Set<number>>(new Set());
 
   const toggleExpanded = (itemId: number) => {
@@ -147,16 +222,36 @@ export default function ConnectedAccountsPage() {
 
   const syncMutation = useMutation({
     mutationFn: (itemId: number) => apiRequest("POST", `/api/plaid/sync/${itemId}`, {}),
-    onSuccess: () => {
+    onSuccess: (_response, itemId) => {
+      setItemsNeedingReconnect((current) => {
+        if (!current.has(itemId)) return current;
+        const next = new Set(current);
+        next.delete(itemId);
+        return next;
+      });
       queryClient.invalidateQueries({ queryKey: ["/api/plaid/accounts"] });
       queryClient.invalidateQueries({ queryKey: ["/api/assets"] });
       queryClient.invalidateQueries({ queryKey: ["/api/liabilities"] });
       toast({ title: "Synced!", description: "Balances have been updated." });
       setSyncingId(null);
     },
-    onError: () => {
-      toast({ title: "Sync failed", description: "Could not refresh balances.", variant: "destructive" });
+    onError: (error, itemId) => {
       setSyncingId(null);
+      if ((error as ApiRequestError).code === "ITEM_LOGIN_REQUIRED") {
+        setItemsNeedingReconnect((current) => new Set(current).add(itemId));
+        const institutionName = items.find((item) => item.id === itemId)?.institutionName ?? "This institution";
+        toast({
+          title: `${institutionName} needs to reconnect`,
+          description: "Plaid needs you to sign in again. Choose Reconnect to restore this connection.",
+          variant: "destructive",
+        });
+        return;
+      }
+      toast({
+        title: "Sync failed",
+        description: error.message || "Could not refresh balances.",
+        variant: "destructive",
+      });
     },
   });
 
@@ -250,6 +345,12 @@ export default function ConnectedAccountsPage() {
                         ? `Last synced ${new Date(item.lastSynced).toLocaleString()}`
                         : "Never synced"}
                     </CardDescription>
+                            {itemsNeedingReconnect.has(item.id) && (
+                              <p className="mt-1 flex items-center gap-1 text-xs text-destructive">
+                                <AlertCircle className="h-3 w-3" />
+                                Sign in again to restore this connection.
+                              </p>
+                            )}
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
@@ -263,6 +364,12 @@ export default function ConnectedAccountsPage() {
                     <RefreshCw className={`h-4 w-4 mr-1.5 ${isSyncing ? "animate-spin" : ""}`} />
                     {isSyncing ? "Syncing…" : "Sync Now"}
                   </Button>
+                    {itemsNeedingReconnect.has(item.id) && (
+                      <PlaidReconnectButton
+                        itemId={item.id}
+                        onReconnected={() => handleSync(item.id)}
+                      />
+                    )}
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
                       <Button

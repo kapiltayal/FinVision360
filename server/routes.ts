@@ -1724,6 +1724,33 @@ Include a year-by-year overview, useful milestones, a conservative/base/optimist
     res.json({ accounts, items: safeItems });
   });
 
+  app.post("/api/plaid/items/:id/update-link-token", requireAuth, async (req, res) => {
+    try {
+      const userId = (req.user as any).id;
+      const itemId = Number(req.params.id);
+      if (!Number.isSafeInteger(itemId) || itemId < 1) {
+        return res.status(400).json({ message: "Invalid connected institution" });
+      }
+
+      const items = await storage.getPlaidItems(userId);
+      const item = items.find((connectedItem) => connectedItem.id === itemId);
+      if (!item) return res.status(404).json({ message: "Connected institution not found" });
+
+      const plaid = getPlaidClient();
+      const response = await plaid.linkTokenCreate({
+        user: { client_user_id: userId },
+        client_name: "FinVision360",
+        country_codes: [CountryCode.Us],
+        language: "en",
+        access_token: item.accessToken,
+      });
+      res.json({ link_token: response.data.link_token });
+    } catch (err: any) {
+      console.error("[plaid] create-update-link-token error:", err?.response?.data || err.message);
+      res.status(500).json({ message: "Failed to prepare account reconnect" });
+    }
+  });
+
   app.post("/api/plaid/sync/:itemId", requireAuth, async (req, res) => {
     try {
       const userId = (req.user as any).id;
@@ -1755,6 +1782,12 @@ Include a year-by-year overview, useful milestones, a conservative/base/optimist
       res.json({ accounts, lastSynced: new Date() });
     } catch (err: any) {
       console.error("[plaid] sync error:", err?.response?.data || err.message);
+      if (err?.response?.data?.error_code === "ITEM_LOGIN_REQUIRED") {
+        return res.status(409).json({
+          code: "ITEM_LOGIN_REQUIRED",
+          message: "This connection needs you to sign in again with Plaid.",
+        });
+      }
       res.status(500).json({ message: "Failed to sync accounts" });
     }
   });

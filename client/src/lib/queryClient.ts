@@ -1,16 +1,27 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 import { getAccessToken } from "./supabase";
 
+export type ApiRequestError = Error & {
+  status: number;
+  code?: string;
+};
+
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
     const text = (await res.text()) || res.statusText;
     let message = text;
+    let code: string | undefined;
     try {
       const body = JSON.parse(text);
       if (typeof body.message === "string") message = body.message;
       else if (typeof body.error === "string") message = body.error;
+      if (typeof body.code === "string") code = body.code;
+      else if (typeof body.errorCode === "string") code = body.errorCode;
     } catch {}
-    throw new Error(message);
+    const error = new Error(message) as ApiRequestError;
+    error.status = res.status;
+    error.code = code;
+    throw error;
   }
 }
 

@@ -2,7 +2,7 @@
 ---
 - [Supabase client init](supabase-client-init.md) — use synchronous singleton with hardcoded anon keys; never fetch /api/config (causes HMR race conditions)
 - [Application database schema](application-database-schema.md) — the app database can differ from the workspace SQL target; verify schema changes through the app connection.
-- [Plaid book imports](plaid-book-imports.md) — users choose which connected accounts enter their book; background sync updates only already-linked entries.
+- [Plaid book imports](plaid-book-imports.md) — users choose imported accounts; sync only updates linked entries, and expired authorization uses Link update mode.
 - [Native AI integration provisioning](native-ai-integration.md) — Replit-managed AI uses Agent provisioning, not the third-party connector inventory or a personal provider key.
 - [Financial ingestion AI trust boundary](financial-ingestion-ai-trust.md) — AI assigns categories only; source values and server-owned row identities remain authoritative.
 - [Additive schema changes](additive-schema-changes.md) — avoid broad schema pushes when unrelated drift triggers destructive prompts; use narrowly scoped additive dev DDL.

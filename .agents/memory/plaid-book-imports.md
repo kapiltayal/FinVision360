@@ -8,3 +8,9 @@ description: Ownership model for bringing connected accounts into Assets and Lia
 **Why:** Automatic mirroring made the explicit import choice redundant and could race an import request, producing duplicate financial records. Explicit selection also lets users keep a connected account out of their net-worth book.
 
 **How to apply:** Any future Plaid sync or relink path should refresh account metadata and existing linked book records only. Route new book-entry creation through the transaction-safe account-claim import path.
+
+**Reauthentication:** Repair `ITEM_LOGIN_REQUIRED` with Plaid Link update mode for the existing Item. Do not exchange a new public token or replace the Item.
+
+**Why:** Plaid keeps the existing access token after update mode succeeds. Replacing the Item can create duplicates, and disconnecting this app's Item deletes its linked book entries.
+
+**How to apply:** Create an update-mode Link token with the existing access token; after Link succeeds, retry the normal account sync.
