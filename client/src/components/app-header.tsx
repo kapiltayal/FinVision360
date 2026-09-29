@@ -1,5 +1,6 @@
 import { useLocation, useSearch, Link } from "wouter";
 import { useEffect, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   LayoutDashboard,
   Target,
@@ -20,6 +21,7 @@ import {
 } from "lucide-react";
 import logoPath from "@assets/FinVision360_Logo_H_(transparent)_1776714495394.png";
 import { Button } from "@/components/ui/button";
+import { apiRequest } from "@/lib/queryClient";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -38,6 +40,7 @@ type NavigationTab = {
   url: string;
   matches?: string[];
   default?: boolean;
+  testId?: string;
 };
 
 type NavigationItem = {
@@ -111,7 +114,7 @@ const baseNavItems: NavigationItem[] = [
     url: "/ai-advisor",
     icon: Brain,
     tabs: [
-      { title: "Ask AI Advisor", url: "/ai-advisor?tab=scenario", default: true },
+      { title: "Ask AI Advisor", url: "/ai-advisor?tab=scenario", default: true, testId: "ask-ai-advisor" },
       { title: "Debt Strategy", url: "/ai-advisor?tab=debt" },
       { title: "AI Archives", url: "/ai-advisor?tab=history" },
     ],
@@ -149,6 +152,23 @@ export function AppHeader() {
   const logout = useLogout();
   const isAdmin = (user as any)?.isAdmin;
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const { data: advisorSettings } = useQuery<{ aiAdvisorName?: string }>({
+    queryKey: ["/api/recommendation-settings"],
+    queryFn: () => apiRequest("GET", "/api/recommendation-settings").then((response) => response.json()),
+    enabled: !!user?.id,
+  });
+  const savedAdvisorName = advisorSettings?.aiAdvisorName?.trim();
+  const advisorName = savedAdvisorName || "Whizzy";
+  const navItems = baseNavItems.map((item) =>
+    item.title !== "AI Lab"
+      ? item
+      : {
+          ...item,
+          tabs: item.tabs.map((tab) =>
+            tab.default ? { ...tab, title: `Ask ${advisorName}` } : tab,
+          ),
+        },
+  );
 
   useEffect(() => {
     const syncAvatar = () => {
@@ -246,7 +266,7 @@ export function AppHeader() {
           <DropdownMenuContent align="end" className="w-56">
             <div className="px-2 py-1.5 text-sm font-semibold">Navigation</div>
             <div className="h-px bg-border my-1" />
-            {baseNavItems.map((item) => {
+            {navItems.map((item) => {
               const testId = `nav-${item.title.toLowerCase().replace(/\s/g, "-")}`;
               const itemIsActive = isNavItemActive(item);
 
@@ -328,7 +348,7 @@ export function AppHeader() {
                         <DropdownMenuItem
                           key={tab.title}
                           asChild
-                          data-testid={`${testId}-${tab.title.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`}
+                          data-testid={`${testId}-${tab.testId ?? tab.title.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`}
                         >
                           <Link
                             href={tab.url}
