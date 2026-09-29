@@ -722,7 +722,7 @@ export default function LandingPage() {
             <div className="flex flex-col items-center gap-1">
               <div className="flex items-center gap-3">
                 {[
-                  { name: "Facebook",  href: "https://www.facebook.com",                        icon: "/Images/Social Media Icons/SocialMedia Facebook transparent.png" },
+                  { name: "Facebook",  href: "https://www.facebook.com/profile.php?id=61594699360092", icon: "/Images/Social Media Icons/SocialMedia Facebook transparent.png" },
                   { name: "Instagram", href: "https://www.instagram.com",                       icon: "/Images/Social Media Icons/SocialMedia Instagram transparent.png" },
                   { name: "LinkedIn",  href: "https://www.linkedin.com/company/finvision360",   icon: "/Images/Social Media Icons/SocialMedia Linkedin transparent.png" },
                   { name: "X",         href: "https://www.x.com",                               icon: "/Images/Social Media Icons/SocialMedia X transparent.png" },

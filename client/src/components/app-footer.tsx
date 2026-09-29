@@ -3,7 +3,7 @@ import { Link } from "wouter";
 const SOCIAL_LINKS = [
   {
     name: "Facebook",
-    href: "https://www.facebook.com",
+    href: "https://www.facebook.com/profile.php?id=61594699360092",
     icon: "/Images/Social Media Icons/SocialMedia Facebook transparent.png",
   },
   {
