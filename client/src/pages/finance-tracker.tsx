@@ -1114,7 +1114,7 @@ export default function FinanceTrackerPage() {
                 <BarChart3 className="h-4 w-4 text-blue-500" />Income vs Expenses Trend
               </CardTitle>
               <div className="flex items-center gap-2.5 flex-wrap justify-end">
-                <div className="flex items-center gap-1.5 rounded-lg bg-muted/40 p-1">
+                <div className="flex items-center gap-1.5 rounded-lg border border-border bg-muted/40 p-1">
                   <span className="px-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Chart type</span>
                   <div className="flex gap-1" aria-label="Chart type">
                     {(["bar", "line"] as const).map(chartType => (
@@ -1125,7 +1125,7 @@ export default function FinanceTrackerPage() {
                     ))}
                   </div>
                 </div>
-                <div className="flex items-center gap-1.5 rounded-lg bg-muted/40 p-1">
+                <div className="flex items-center gap-1.5 rounded-lg border border-border bg-muted/40 p-1">
                   <span className="px-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Time granularity</span>
                   <div className="flex gap-1" aria-label="Time granularity">
                     {["day","week","month","year"].map(g => (
