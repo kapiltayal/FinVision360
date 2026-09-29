@@ -271,7 +271,7 @@ export default function SnapshotPage() {
         title: "Build Your Emergency Fund",
         description: `You have ${formatCurrency(savingsBalance)} saved. Target at least ${formatCurrency(emergencyTarget)} — 3 months of expenses — to weather unexpected events.`,
         color: "#ef4444",
-        category: "save",
+        category: "others",
         monthlyPotential: Math.max(emergencyTarget - savingsBalance, 0) / 12,
       });
     }
@@ -298,7 +298,7 @@ export default function SnapshotPage() {
         title: "Increase Your Savings Rate",
         description: `Your savings rate is ${savingsRate.toFixed(1)}%. Increasing to 20% or more accelerates wealth building — try trimming discretionary spending first.`,
         color: "#eab308",
-        category: "save",
+        category: "earn",
         monthlyPotential: Math.max(totalMonthlyIncome * (0.2 - savingsRate / 100), 0),
       });
     }
@@ -321,7 +321,7 @@ export default function SnapshotPage() {
         title: "Start Saving for Retirement",
         description: "No retirement assets detected. Contributing even a small amount today takes advantage of compounding — start with your employer's 401k match.",
         color: "#1C91D4",
-        category: "save",
+        category: "others",
         monthlyPotential: 0,
       });
     }
