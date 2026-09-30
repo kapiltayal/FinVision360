@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { BookEntryFileReview, type PreviewEntry, type ReviewEntry, type ReviewField, type ReviewCategory } from "./book-entry-file-review";
 
 export type BookEntryKind = "asset" | "liability";
 
@@ -54,25 +55,49 @@ export function BookEntryCsvImportPanel({
   const { toast } = useToast();
   const fileRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
+  const [entries, setEntries] = useState<ReviewEntry[] | null>(null);
+  const [ignoredBlankRows, setIgnoredBlankRows] = useState(0);
   const [result, setResult] = useState<ImportResponse | null>(null);
+  const { data: categories = [], isLoading: categoriesLoading, isError: categoriesError } = useQuery<ReviewCategory[]>({
+    queryKey: [kind === "asset" ? "/api/assets/categories" : "/api/liabilities/categories"],
+  });
 
-  const importMutation = useMutation({
+  const previewMutation = useMutation({
     mutationFn: (selectedFile: File) => {
       const data = new FormData();
       data.append("file", selectedFile);
-      const endpoint = kind === "asset" ? "/api/assets/ingest" : "/api/liabilities/ingest";
-      return apiRequest("POST", endpoint, data).then((response) => response.json() as Promise<ImportResponse>);
+      const endpoint = kind === "asset" ? "/api/assets/ingest/preview" : "/api/liabilities/ingest/preview";
+      return apiRequest("POST", endpoint, data).then((response) => response.json() as Promise<{ entries: PreviewEntry[]; ignoredBlankRows: number }>);
+    },
+    onSuccess: (data) => {
+      setEntries(data.entries.map((entry, index) => ({ ...entry, id: index + 1 })));
+      setIgnoredBlankRows(data.ignoredBlankRows);
+    },
+    onError: (error: Error) => {
+      setFile(null);
+      toast({ title: "Could not preview file", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const saveMutation = useMutation({
+    mutationFn: (reviewedEntries: ReviewEntry[]) => {
+      const endpoint = kind === "asset" ? "/api/assets/import" : "/api/liabilities/import";
+      const payload = reviewedEntries.map(({ id, sourceCategory, ...entry }) => entry);
+      return apiRequest("POST", endpoint, { entries: payload }).then((response) => response.json() as Promise<ImportResponse>);
     },
     onSuccess: (data) => {
       setResult(data);
-      onImported();
+      setEntries(null);
+      setFile(null);
+      if (data.inserted) onImported();
       toast({
-        title: `${kind === "asset" ? "Assets" : "Liabilities"} imported`,
+        title: data.inserted ? `${kind === "asset" ? "Assets" : "Liabilities"} saved` : "No entries saved",
         description: `${data.inserted} added${data.skipped ? ` · ${data.skipped} skipped` : ""}`,
+        ...(data.inserted ? {} : { variant: "destructive" as const }),
       });
     },
     onError: (error: Error) => toast({
-      title: "File import failed",
+      title: "Could not save reviewed entries",
       description: error.message,
       variant: "destructive",
     }),
@@ -91,41 +116,70 @@ export function BookEntryCsvImportPanel({
       return;
     }
     setFile(file);
+    setEntries(null);
+    setIgnoredBlankRows(0);
     setResult(null);
     event.target.value = "";
+    previewMutation.mutate(file);
   };
+
+  if (entries !== null) {
+    return (
+      <BookEntryFileReview
+        kind={kind}
+        fileName={file?.name ?? "Uploaded file"}
+        entries={entries}
+        ignoredBlankRows={ignoredBlankRows}
+        categories={categories}
+        categoriesLoading={categoriesLoading}
+        categoriesError={categoriesError}
+        saving={saveMutation.isPending}
+        onChange={(id: number, field: ReviewField, value: string) => setEntries((current) =>
+          current?.map((entry) => entry.id === id ? { ...entry, [field]: value } : entry) ?? null)}
+        onRemove={(id: number) => setEntries((current) => current?.filter((entry) => entry.id !== id) ?? null)}
+        onDiscard={() => { setEntries(null); setFile(null); setResult(null); }}
+        onSave={() => saveMutation.mutate(entries)}
+      />
+    );
+  }
 
   return (
     <div className="space-y-4">
       <div
         className="cursor-pointer rounded-xl border-2 border-dashed border-slate-200 p-7 text-center transition-colors hover:border-blue-400 dark:border-slate-700"
-        onClick={() => fileRef.current?.click()}
+        onClick={() => { if (!previewMutation.isPending) fileRef.current?.click(); }}
         role="button"
         tabIndex={0}
         onKeyDown={(event) => {
-          if (event.key === "Enter" || event.key === " ") fileRef.current?.click();
+          if (!previewMutation.isPending && (event.key === "Enter" || event.key === " ")) fileRef.current?.click();
         }}
       >
         <FileSpreadsheet className="mx-auto mb-2 h-8 w-8 text-blue-500" />
-        <p className="text-sm font-medium">Click to upload a file</p>
+        <p className="text-sm font-medium">Step 1 of 2 · Choose a file to preview</p>
         <p className="mt-1 text-xs text-muted-foreground">
           Upload CSV, TSV, TXT, XLS, or XLSX (maximum 5 MiB). Include account names and values or balances.
         </p>
-        <input ref={fileRef} type="file" accept=".csv,.tsv,.txt,.xls,.xlsx" className="hidden" onChange={handleFile} />
+        <input ref={fileRef} type="file" accept=".csv,.tsv,.txt,.xls,.xlsx" className="hidden" onChange={handleFile} disabled={previewMutation.isPending} />
       </div>
+      {previewMutation.isPending && (
+        <p className="flex items-center gap-2 text-sm text-muted-foreground" role="status">
+          <Loader2 className="h-4 w-4 animate-spin" /> Reading {file?.name}… Nothing has been saved yet.
+        </p>
+      )}
 
       <div className="rounded-lg border border-blue-200 bg-blue-50/60 p-3 text-xs leading-relaxed text-slate-700 dark:border-blue-900 dark:bg-blue-950/20 dark:text-slate-200">
         <p className="font-semibold text-blue-900 dark:text-blue-200">
           What to include in your {kind === "asset" ? "asset" : "liability"} file
         </p>
         <p className="mt-1">
-          <strong>Required:</strong> one name column (Name, Account, Account Name, Description, or Item)
-          and one amount column (Value, Amount, Balance, Current Value, or Current Balance). The amount is
-          the asset&apos;s value or the liability&apos;s balance.
+          <strong>Required before saving:</strong> a name, category, and {kind === "asset" ? "value" : "balance"}
+          for each entry. If a file omits a field, you can fill it in during review. Recognized name columns:
+          Name, Account, Account Name, Description, or Item. Recognized amount columns: Value, Amount,
+          Balance, Current Value, or Current Balance.
         </p>
         <p className="mt-1">
-          <strong>Category:</strong> optional. Add a Category column to guide assignment; the importer maps
-          it to a valid category in the app if possible.
+          <strong>Category:</strong> optional in the file. Add a Category column to guide assignment;
+          review or choose a valid category before saving.
         </p>
         <p className="mt-1">
           <strong>Optional fields:</strong> Interest Rate (Interest Rate, Rate, APR), Institution (Institution,
@@ -144,26 +198,6 @@ export function BookEntryCsvImportPanel({
           Limit 500 entries per file; a rate alone is not an account balance.
         </p>
       </div>
-
-      {file && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-sm font-medium text-emerald-600">{file.name}</p>
-            <Button type="button" variant="ghost" size="sm" onClick={() => fileRef.current?.click()}>
-              <Upload className="mr-1.5 h-3.5 w-3.5" /> Choose another file
-            </Button>
-          </div>
-          <Button
-            type="button"
-            className="w-full"
-            disabled={importMutation.isPending}
-            onClick={() => importMutation.mutate(file)}
-          >
-            {importMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
-            {importMutation.isPending ? "Importing…" : "Import file"}
-          </Button>
-        </div>
-      )}
 
       {result && (
         <div className="rounded-lg border border-emerald-200 bg-emerald-50/60 p-3 text-sm dark:border-emerald-900 dark:bg-emerald-950/20">

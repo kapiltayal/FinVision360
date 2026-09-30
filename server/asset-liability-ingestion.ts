@@ -54,12 +54,12 @@ function parseDelimited(text: string, preferredDelimiter?: string): RawRow[] | n
       delimiter,
       relax_column_count: false,
       relax_quotes: false,
-      skip_empty_lines: false,
+      skip_empty_lines: true,
       trim: true,
       max_record_size: 20_000,
       to_line: MAX_ROWS + 2,
     }) as string[][];
-    if (records.length < 2 || records.slice(1, 11).some((row) => row.every((cell) => !cell.trim()))) return null;
+    if (records.length < 2) return null;
     const headers = records[0].map((header) => header.toLowerCase().replace(/[^a-z0-9]/g, ""));
     if (!headers.some(Boolean)) return null;
     return records.slice(1, MAX_ROWS + 2).map((cells) =>
@@ -131,8 +131,8 @@ export function parseUpload(file: Express.Multer.File): RawRow[] | null {
     const delimited = parseDelimited(text, extension === "tsv" ? "\t" : undefined);
     if (delimited) return delimited;
     if (extension !== "txt") return null;
-    const lines = trimmedLines(text);
-    if (!lines.length || lines.slice(0, 10).some((line) => !line.trim())) return null;
+    const lines = trimmedLines(text).filter((line) => line.trim());
+    if (!lines.length) return null;
     return lines.slice(0, MAX_ROWS + 1).map((line) => ({ text: line.trim() }));
   } catch {
     return null;
@@ -154,15 +154,19 @@ export function extractJsonRows(value: unknown): RawRow[] | null {
   return rows.slice(0, MAX_ROWS + 1).filter((row): row is RawRow => !!row && typeof row === "object" && !Array.isArray(row));
 }
 
-function normalizedRow(row: RawRow, category: string): RawRow {
+export function normalizeBookRow(row: RawRow, category: string): RawRow {
   const find = (...keys: string[]) => {
-    const entry = Object.entries(row).find(([key]) => keys.includes(key.toLowerCase().replace(/[^a-z0-9]/g, "")));
-    return clean(entry?.[1]);
+    const normalized = Object.entries(row).map(([key, value]) => [key.toLowerCase().replace(/[^a-z0-9]/g, ""), value] as const);
+    for (const key of keys) {
+      const value = clean(normalized.find(([candidate]) => candidate === key)?.[1]);
+      if (value) return value;
+    }
+    return "";
   };
   const rawText = find("text", "rawtext", "transaction");
-  const suppliedAmount = find("value", "amount", "balance", "currentvalue", "currentbalance");
   const textFinancials = extractTextFinancials(rawText);
-  const amount = normalizeNumber(suppliedAmount || textFinancials.primary);
+  const value = normalizeNumber(find("value", "currentvalue", "amount", "balance", "currentbalance") || textFinancials.primary);
+  const balance = normalizeNumber(find("balance", "currentbalance", "amount", "value", "currentvalue") || textFinancials.primary);
   const name = find("name", "account", "accountname", "description", "item")
     || rawText
       .replace(/(?:[$£€]\s*)?\(?-?\d[\d,\s]*(?:\.\d{1,2})?\)?%?/g, " ")
@@ -172,8 +176,8 @@ function normalizedRow(row: RawRow, category: string): RawRow {
   return {
     name,
     category,
-    value: amount,
-    balance: amount,
+    value,
+    balance,
     interestRate: normalizeNumber(find("interestrate", "rate", "apr") || textFinancials.interestRate),
     minimumPayment: normalizeNumber(
       find("minimumpayment", "payment", "monthlypayment") || textFinancials.minimumPayment,
@@ -244,16 +248,38 @@ function score(text: string, category: Category): number {
     total + part.toLowerCase().split(/[^a-z0-9]+/).filter((word) => word.length > 2 && haystack.includes(word)).length, 0);
 }
 
+function suggestedCategory(row: RawRow, categories: Category[]): string {
+  const text = Object.values(row).map(clean).join(" ");
+  const direct = categories.find((item) => item.category.toLowerCase() === clean(row.category).toLowerCase());
+  const scored = categories.map((item) => ({ item, score: score(text, item) }))
+    .sort((a, b) => b.score - a.score || a.item.category.localeCompare(b.item.category));
+  const generic = categories.find((item) => /\b(other|miscellaneous)\b/i.test(item.category));
+  return (direct ?? (scored[0]?.score > 0 ? scored[0].item : generic))?.category ?? "";
+}
+
+export type ClassifiedSelection = { sourceIndex: number; category: string };
+
+export function previewClassifiedRows(
+  rows: RawRow[],
+  categories: Category[],
+  selections: ClassifiedSelection[] = [],
+): RawRow[] {
+  const validCategories = new Set(categories.map((item) => item.category));
+  const suggestedByIndex = new Map(selections
+    .filter((item) => validCategories.has(item.category))
+    .map((item) => [item.sourceIndex, item.category]));
+  return rows.map((row, index) => {
+    const explicit = categories.find((item) => item.category.toLowerCase() === clean(row.category).toLowerCase());
+    return {
+      ...normalizeBookRow(row, explicit?.category ?? suggestedByIndex.get(index) ?? suggestedCategory(row, categories)),
+      sourceCategory: clean(row.category),
+    };
+  });
+}
+
 export function deterministicClassify(rows: RawRow[], categories: Category[]): RawRow[] {
-  return rows.map((row) => {
-    const text = Object.values(row).map(clean).join(" ");
-    const direct = categories.find((item) => item.category.toLowerCase() === clean(row.category).toLowerCase());
-    const scored = categories.map((item) => ({ item, score: score(text, item) }))
-      .sort((a, b) => b.score - a.score || a.item.category.localeCompare(b.item.category));
-    const generic = categories.find((item) => /\b(other|miscellaneous)\b/i.test(item.category));
-    const best = direct ?? (scored[0]?.score > 0 ? scored[0].item : generic);
-    return normalizedRow(row, best?.category ?? "");
-  }).filter((row) => clean(row.category));
+  return rows.map((row) => normalizeBookRow(row, suggestedCategory(row, categories)))
+    .filter((row) => clean(row.category));
 }
 
 export async function aiClassify(
@@ -262,7 +288,17 @@ export async function aiClassify(
   categories: Category[],
   timeoutMs = 12_000,
 ): Promise<RawRow[]> {
-  const classified: RawRow[] = [];
+  const selections = await aiClassifySelections(kind, rows, categories, timeoutMs);
+  return selections.map(({ sourceIndex, category }) => normalizeBookRow(rows[sourceIndex], category));
+}
+
+export async function aiClassifySelections(
+  kind: IngestionKind,
+  rows: RawRow[],
+  categories: Category[],
+  timeoutMs = 12_000,
+): Promise<ClassifiedSelection[]> {
+  const classified: ClassifiedSelection[] = [];
   const safeCategories = categories.map((category) => ({
     parentCategory: category.parentCategory.slice(0, 200),
     category: category.category.slice(0, 200),
@@ -302,7 +338,7 @@ export async function aiClassify(
           throw new Error("invalid model output");
         }
         seen.add(requestedIndex);
-        return normalizedRow(batch[requestedIndex], clean(row.category));
+        return { sourceIndex: offset + requestedIndex, category: clean(row.category) };
       }));
     } finally {
       clearTimeout(timer);
@@ -314,6 +350,14 @@ export async function aiClassify(
 
 export function isEmptySample(rows: RawRow[]): boolean {
   return !rows.length || rows.slice(0, 10).every((row) => Object.values(row).every((value) => !clean(value)));
+}
+
+export function hasPreviewableStructure(rows: RawRow[]): boolean {
+  const keys = new Set(rows.slice(0, 10).flatMap((row) =>
+    Object.keys(row).map((key) => key.toLowerCase().replace(/[^a-z0-9]/g, ""))));
+  return ["name", "account", "accountname", "description", "item", "value", "amount", "balance", "currentvalue", "currentbalance"]
+    .some((key) => keys.has(key))
+    || (keys.has("text") && rows.slice(0, 10).some((row) => /[a-z]{2,}/i.test(clean(row.text))));
 }
 
 export function hasRecognizableStructure(kind: IngestionKind, rows: RawRow[]): boolean {

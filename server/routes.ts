@@ -27,8 +27,9 @@ import { Products, CountryCode } from "plaid";
 import { getPlaidClient } from "./plaid";
 import multer from "multer";
 import {
-  aiClassify, deterministicClassify, extractJsonRows, isEmptySample, parseUpload,
-  hasRecognizableStructure, type Category, type IngestionKind, type RawRow,
+  aiClassify, aiClassifySelections, deterministicClassify, extractJsonRows, isEmptySample, parseUpload,
+  hasPreviewableStructure, hasRecognizableStructure, previewClassifiedRows,
+  type Category, type IngestionKind, type RawRow,
 } from "./asset-liability-ingestion";
 import { buildRetirementNetWorthProjection } from "./retirement-projection";
 import { buildRetirementIncomeExpenseProjection, isPretaxRetirementAccountCategory } from "./retirement-income-expense-projection";
@@ -313,13 +314,10 @@ export async function registerRoutes(
   }
 
   async function ingestBookEntries(req: any, res: any, kind: IngestionKind) {
-    let rows: RawRow[] | null;
     if (req.file) {
-      if (!isSupportedUpload(req.file)) return res.status(400).json({ message: INVALID_FILE_TYPE });
-      rows = parseUpload(req.file);
-    } else {
-      rows = extractJsonRows(req.body);
+      return res.status(409).json({ message: "File imports require preview and explicit review before saving." });
     }
+    const rows = extractJsonRows(req.body);
     if (!rows) return res.status(400).json({ message: CORRUPT_FILE });
     if (isEmptySample(rows)) return res.status(400).json({ message: EMPTY_FILE });
     if (!hasRecognizableStructure(kind, rows)) {
@@ -349,6 +347,44 @@ export async function registerRoutes(
     await importBookEntries(req, res, kind);
   }
 
+  async function previewBookEntries(req: any, res: any, kind: IngestionKind) {
+    if (!req.file) return res.status(400).json({ message: "Choose a file to preview." });
+    if (!isSupportedUpload(req.file)) return res.status(400).json({ message: INVALID_FILE_TYPE });
+    const parsed = parseUpload(req.file);
+    if (!parsed) return res.status(400).json({ message: CORRUPT_FILE });
+    const rows = parsed.filter((row) => !isEmptySample([row]));
+    if (!rows.length) return res.status(400).json({ message: EMPTY_FILE });
+    if (rows.length > 500) return res.status(400).json({ message: "Imports are limited to 500 entries at a time" });
+    if (!hasPreviewableStructure(rows)) {
+      return res.status(400).json({
+        message: "This file was read, but it has no recognizable account names or balances to review.",
+      });
+    }
+
+    const categories = await categoriesFor(kind);
+    let selections: Awaited<ReturnType<typeof aiClassifySelections>> = [];
+    if (hasRecognizableStructure(kind, rows)) {
+      try {
+        selections = await aiClassifySelections(kind, rows, categories);
+      } catch {
+        // Review remains available when categorization is unavailable or incomplete.
+      }
+    }
+    const entries = previewClassifiedRows(rows, categories, selections).map((row) => ({
+      name: String(row.name ?? ""),
+      category: String(row.category ?? ""),
+      sourceCategory: String(row.sourceCategory ?? ""),
+      value: String(row.value ?? ""),
+      balance: String(row.balance ?? ""),
+      interestRate: String(row.interestRate ?? ""),
+      minimumPayment: String(row.minimumPayment ?? ""),
+      maturityDate: String(row.maturityDate ?? ""),
+      institution: String(row.institution ?? ""),
+      notes: String(row.notes ?? ""),
+    }));
+    res.json({ entries, ignoredBlankRows: parsed.length - rows.length });
+  }
+
   async function importBookEntries(req: any, res: any, kind: "asset" | "liability") {
     const entries = req.body?.entries;
     if (!Array.isArray(entries) || entries.length === 0) {
@@ -360,13 +396,10 @@ export async function registerRoutes(
 
     const userId = (req.user as any).id;
     const validCategories = new Set((await categoriesFor(kind)).map((item) => item.category));
-    const skippedReasons: Record<string, number> = {};
-    const addSkipped = (reason: string) => {
-      skippedReasons[reason] = (skippedReasons[reason] ?? 0) + 1;
-    };
-    let inserted = 0;
-
-    for (const entry of entries) {
+    const assetEntries: Array<typeof assets.$inferInsert> = [];
+    const liabilityEntries: Array<typeof liabilities.$inferInsert> = [];
+    for (let index = 0; index < entries.length; index++) {
+      const entry = entries[index];
       const name = typeof entry?.name === "string" ? entry.name.trim() : "";
       const category = typeof entry?.category === "string" ? entry.category.trim() : "";
       const rawAmount = kind === "asset" ? entry?.value : entry?.balance;
@@ -378,72 +411,42 @@ export async function registerRoutes(
       const minimumPayment = entry?.minimumPayment === undefined || entry?.minimumPayment === "" ? 0 : Number(entry.minimumPayment);
       const maturityDate = optionalIsoDate(entry?.maturityDate);
 
-      if (!name || !category) {
-        addSkipped("missing name or category");
-        continue;
-      }
-      if (!validCategories.has(category)) {
-        addSkipped("invalid category");
-        continue;
-      }
-      if (!Number.isFinite(amount) || (kind === "asset" && amount < 0)) {
-        addSkipped(kind === "asset" ? "invalid value" : "invalid balance");
-        continue;
-      }
-      if (!Number.isFinite(interestRate) || interestRate < 0) {
-        addSkipped("invalid interest rate");
-        continue;
-      }
-      if (kind === "liability" && (!Number.isFinite(minimumPayment) || minimumPayment < 0)) {
-        addSkipped("invalid minimum payment");
-        continue;
-      }
-      if (kind === "liability" && maturityDate.error) {
-        addSkipped("invalid maturity date");
-        continue;
-      }
+      const invalid = !name ? "missing name" :
+        !validCategories.has(category) ? "invalid or missing category" :
+        !Number.isFinite(amount) || (kind === "asset" && amount < 0) ? `invalid ${kind === "asset" ? "value" : "balance"}` :
+        !Number.isFinite(interestRate) || interestRate < 0 ? "invalid interest rate" :
+        kind === "liability" && (!Number.isFinite(minimumPayment) || minimumPayment < 0) ? "invalid minimum payment" :
+        kind === "liability" && maturityDate.error ? "invalid maturity date" : null;
+      if (invalid) return res.status(422).json({ message: `Entry ${index + 1}: ${invalid}. Nothing was saved.` });
 
       const institution = typeof entry?.institution === "string" && entry.institution.trim() ? entry.institution.trim() : null;
       const notes = typeof entry?.notes === "string" && entry.notes.trim() ? entry.notes.trim() : null;
       const normalizedAmount = kind === "liability" ? Math.abs(amount) : amount;
 
-      try {
-        if (kind === "asset") {
-          await storage.createAsset({
-            userId,
-            name,
-            category,
-            value: normalizedAmount.toFixed(2),
-            interestRate: interestRate.toFixed(2),
-            institution,
-            notes,
-          });
-        } else {
-          await storage.createLiability({
-            userId,
-            name,
-            category,
-            balance: normalizedAmount.toFixed(2),
-            interestRate: interestRate.toFixed(2),
-            minimumPayment: minimumPayment.toFixed(2),
-            maturityDate: maturityDate.value ?? null,
-            institution,
-            notes,
-          });
-        }
-        inserted++;
-      } catch (error) {
-        console.error(`[${kind} import] entry failed`, error);
-        addSkipped("could not be saved");
+      if (kind === "asset") {
+        assetEntries.push({
+          userId, name, category, value: normalizedAmount.toFixed(2),
+          interestRate: interestRate.toFixed(2), institution, notes,
+        });
+      } else {
+        liabilityEntries.push({
+          userId, name, category, balance: normalizedAmount.toFixed(2),
+          interestRate: interestRate.toFixed(2), minimumPayment: minimumPayment.toFixed(2),
+          maturityDate: maturityDate.value ?? null, institution, notes,
+        });
       }
     }
 
-    res.status(201).json({
-      inserted,
-      updated: 0,
-      skipped: Object.values(skippedReasons).reduce((total, count) => total + count, 0),
-      skippedReasons,
-    });
+    try {
+      await db.transaction(async (tx) => {
+        if (kind === "asset") await tx.insert(assets).values(assetEntries);
+        else await tx.insert(liabilities).values(liabilityEntries);
+      });
+    } catch (error) {
+      console.error(`[${kind} import] transaction failed`, error);
+      return res.status(500).json({ message: "Nothing was saved. Please try again." });
+    }
+    res.status(201).json({ inserted: entries.length, updated: 0, skipped: 0, skippedReasons: {} });
   }
 
   app.get("/api/assets", requireAuth, async (req, res) => {
@@ -478,6 +481,9 @@ export async function registerRoutes(
 
   app.post("/api/assets/ingest", requireAuth, ingestionUploadFile, async (req, res) => {
     await ingestBookEntries(req, res, "asset");
+  });
+  app.post("/api/assets/ingest/preview", requireAuth, ingestionUploadFile, async (req, res) => {
+    await previewBookEntries(req, res, "asset");
   });
 
   app.patch("/api/assets/:id", requireAuth, async (req, res) => {
@@ -536,6 +542,9 @@ export async function registerRoutes(
 
   app.post("/api/liabilities/ingest", requireAuth, ingestionUploadFile, async (req, res) => {
     await ingestBookEntries(req, res, "liability");
+  });
+  app.post("/api/liabilities/ingest/preview", requireAuth, ingestionUploadFile, async (req, res) => {
+    await previewBookEntries(req, res, "liability");
   });
 
   app.patch("/api/liabilities/:id", requireAuth, async (req, res) => {
