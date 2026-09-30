@@ -119,13 +119,28 @@ export function BookEntryCsvImportPanel({
           What to include in your {kind === "asset" ? "asset" : "liability"} file
         </p>
         <p className="mt-1">
-          CSV, TSV, and Excel files need a header row with a name column (Name, Account, or Description)
-          and a monetary amount column (Value, Amount, or Balance). Columns can be in any order.
-          For TXT files, put one entry per line with a name and amount.
+          <strong>Required:</strong> one name column (Name, Account, Account Name, Description, or Item)
+          and one amount column (Value, Amount, Balance, Current Value, or Current Balance). The amount is
+          the asset&apos;s value or the liability&apos;s balance.
         </p>
         <p className="mt-1">
-          Example: {kind === "asset" ? "Savings Account — value $2,500" : "Auto Loan — balance $12,000"}.
-          {" "}Institution and interest rate{kind === "liability" ? ", minimum payment, and maturity date" : ""} are optional.
+          <strong>Category:</strong> optional. Add a Category column to guide assignment; the importer maps
+          it to a valid category in the app if possible.
+        </p>
+        <p className="mt-1">
+          <strong>Optional fields:</strong> Interest Rate (Interest Rate, Rate, APR), Institution (Institution,
+          Bank, Provider, Company), and Notes (Notes, Memo).
+          {kind === "liability" && (
+            <> Liabilities also accept Minimum Payment (Minimum Payment, Payment, Monthly Payment) and
+              Maturity Date (Maturity Date, Payoff Date, End Date; use YYYY-MM-DD).</>
+          )}
+        </p>
+        <p className="mt-1">
+          CSV, TSV, XLS, and XLSX files need a header row; columns can be in any order. For TXT, put one
+          entry per line with a name and amount; labeled interest rate/APR and (for liabilities) minimum
+          payment can also be included. Use columns for category, institution, notes, and maturity date.
+          Example:{" "}
+          {kind === "asset" ? "Savings Account — value $2,500" : "Auto Loan — balance $12,000"}.
           Limit 500 entries per file; a rate alone is not an account balance.
         </p>
       </div>
