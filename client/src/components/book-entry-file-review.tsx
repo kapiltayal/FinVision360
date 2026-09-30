@@ -185,7 +185,9 @@ export function BookEntryFileReview({
         <Button type="button" variant="outline" onClick={onDiscard} disabled={saving}>Discard review & choose another file</Button>
         <Button type="button" onClick={onSave} disabled={saving || categoriesLoading || categoriesError || !categories.length || !entries.length || invalidCount > 0} data-testid="button-save-reviewed-file">
           {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-          {saving ? "Saving…" : `Save ${entries.length} ${entries.length === 1 ? kind : kind === "liability" ? "liabilities" : "assets"}`}
+          {saving ? "Saving…" : `Save ${entries.length} ${kind === "asset"
+            ? entries.length === 1 ? "Asset" : "Assets"
+            : entries.length === 1 ? "Liability" : "Liabilities"}`}
         </Button>
       </div>
     </div>
