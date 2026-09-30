@@ -266,6 +266,7 @@ export default function LiabilitiesPage() {
     mutationFn: (id: number) => apiRequest("DELETE", `/api/liabilities/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/liabilities"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/plaid/accounts"] });
       queryClient.invalidateQueries({ queryKey: ["/api/retirement/income-expense-projection"] });
       toast({ title: "Liability deleted" });
       markUpdated();

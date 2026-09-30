@@ -169,7 +169,12 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteAsset(id: number, userId: string): Promise<void> {
-    await db.delete(assets).where(and(eq(assets.id, id), eq(assets.userId, userId)));
+    await db.transaction(async (tx) => {
+      await tx.update(plaidAccounts)
+        .set({ linkedAssetId: null })
+        .where(and(eq(plaidAccounts.linkedAssetId, id), eq(plaidAccounts.userId, userId)));
+      await tx.delete(assets).where(and(eq(assets.id, id), eq(assets.userId, userId)));
+    });
   }
 
   async getLiabilities(userId: string): Promise<Liability[]> {
@@ -192,7 +197,12 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteLiability(id: number, userId: string): Promise<void> {
-    await db.delete(liabilities).where(and(eq(liabilities.id, id), eq(liabilities.userId, userId)));
+    await db.transaction(async (tx) => {
+      await tx.update(plaidAccounts)
+        .set({ linkedLiabilityId: null })
+        .where(and(eq(plaidAccounts.linkedLiabilityId, id), eq(plaidAccounts.userId, userId)));
+      await tx.delete(liabilities).where(and(eq(liabilities.id, id), eq(liabilities.userId, userId)));
+    });
   }
 
   async getAssetCategories(): Promise<Array<{ parentCategory: string; category: string; description: string }>> {
@@ -385,7 +395,22 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getPlaidAccounts(userId: string): Promise<PlaidAccount[]> {
-    return db.select().from(plaidAccounts).where(eq(plaidAccounts.userId, userId));
+    const rows = await db.select({
+      account: plaidAccounts,
+      existingAssetId: assets.id,
+      existingLiabilityId: liabilities.id,
+    })
+      .from(plaidAccounts)
+      .leftJoin(assets, and(eq(assets.id, plaidAccounts.linkedAssetId), eq(assets.userId, plaidAccounts.userId)))
+      .leftJoin(liabilities, and(eq(liabilities.id, plaidAccounts.linkedLiabilityId), eq(liabilities.userId, plaidAccounts.userId)))
+      .where(eq(plaidAccounts.userId, userId));
+
+    // Treat links left behind by older deletions as available for re-import.
+    return rows.map(({ account, existingAssetId, existingLiabilityId }) => ({
+      ...account,
+      linkedAssetId: existingAssetId,
+      linkedLiabilityId: existingLiabilityId,
+    }));
   }
 
   async getPlaidAccountsByItem(plaidItemId: number): Promise<PlaidAccount[]> {

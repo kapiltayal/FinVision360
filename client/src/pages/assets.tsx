@@ -230,6 +230,7 @@ export default function AssetsPage() {
     mutationFn: (id: number) => apiRequest("DELETE", `/api/assets/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/assets"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/plaid/accounts"] });
       queryClient.invalidateQueries({ queryKey: ["/api/retirement/income-expense-projection"] });
       toast({ title: "Asset deleted" });
       markUpdated();

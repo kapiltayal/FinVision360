@@ -1544,13 +1544,17 @@ Include a year-by-year overview, useful milestones, a conservative/base/optimist
            plaid_accounts.type,
            plaid_accounts.subtype,
            plaid_accounts.current_balance AS "currentBalance",
-           plaid_accounts.linked_asset_id AS "linkedAssetId",
-           plaid_accounts.linked_liability_id AS "linkedLiabilityId",
+           linked_asset.id AS "linkedAssetId",
+           linked_liability.id AS "linkedLiabilityId",
            plaid_items.institution_name AS "institutionName"
          FROM plaid_accounts
          INNER JOIN plaid_items ON plaid_items.id = plaid_accounts.plaid_item_id
+         LEFT JOIN assets AS linked_asset
+           ON linked_asset.id = plaid_accounts.linked_asset_id AND linked_asset.user_id = plaid_accounts.user_id
+         LEFT JOIN liabilities AS linked_liability
+           ON linked_liability.id = plaid_accounts.linked_liability_id AND linked_liability.user_id = plaid_accounts.user_id
          WHERE plaid_accounts.id = $1 AND plaid_accounts.user_id = $2
-         FOR UPDATE`,
+         FOR UPDATE OF plaid_accounts`,
         [accountId, userId],
       );
       const account = source.rows[0];
@@ -1582,8 +1586,8 @@ Include a year-by-year overview, useful milestones, a conservative/base/optimist
           [userId, account.name, mapping.category, balance, account.institutionName],
         );
         await client.query(
-          `UPDATE plaid_accounts SET linked_asset_id = $1, last_updated = CURRENT_TIMESTAMP WHERE id = $2`,
-          [created.rows[0].id, account.id],
+           `UPDATE plaid_accounts SET linked_asset_id = $1, linked_liability_id = $2, last_updated = CURRENT_TIMESTAMP WHERE id = $3`,
+           [created.rows[0].id, account.linkedLiabilityId, account.id],
         );
       } else {
         const created = await client.query<{ id: number }>(
@@ -1593,8 +1597,8 @@ Include a year-by-year overview, useful milestones, a conservative/base/optimist
           [userId, account.name, mapping.category, balance, account.institutionName],
         );
         await client.query(
-          `UPDATE plaid_accounts SET linked_liability_id = $1, last_updated = CURRENT_TIMESTAMP WHERE id = $2`,
-          [created.rows[0].id, account.id],
+           `UPDATE plaid_accounts SET linked_asset_id = $1, linked_liability_id = $2, last_updated = CURRENT_TIMESTAMP WHERE id = $3`,
+           [account.linkedAssetId, created.rows[0].id, account.id],
         );
       }
       await client.query("COMMIT");
