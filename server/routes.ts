@@ -37,7 +37,7 @@ const MAX_PENSION_AMOUNT = 9_999_999_999_999.99;
 const MAX_SOCIAL_SECURITY_MONTHLY_BENEFIT = 99_999_999.99;
 const ingestionUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024, files: 1 } });
 const BANK_RATE_IMPORT_MAX_ROWS = 5000;
-const INVALID_FILE_TYPE = "Invalid file type. Please upload a valid CSV or JSON file.";
+const INVALID_FILE_TYPE = "Unsupported file type. Please upload a CSV, TSV, TXT, XLS, or XLSX file.";
 const CORRUPT_FILE = "File content could not be read or appears corrupted.";
 const NO_DETECTIONS = "Could not detect any valid assets or liabilities in this file.";
 const ingestionUploadFile = (req: any, res: any, next: any) => {

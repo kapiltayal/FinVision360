@@ -82,7 +82,7 @@ export function BookEntryCsvImportPanel({
     if (!file) return;
     const extension = file.name.split(".").pop()?.toLowerCase();
     if (!extension || !["csv", "tsv", "txt", "xls", "xlsx"].includes(extension)) {
-      toast({ title: "Invalid file type", description: "Invalid file type. Please upload a valid CSV or JSON file.", variant: "destructive" });
+      toast({ title: "Invalid file type", description: "Unsupported file type. Please upload a CSV, TSV, TXT, XLS, or XLSX file.", variant: "destructive" });
       return;
     }
     if (file.size > 5 * 1024 * 1024) {
