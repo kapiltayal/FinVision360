@@ -94,12 +94,21 @@ export function BookEntryCsvImportPanel({
       setEntries(null);
       setFile(null);
       onReviewingChange(false);
-      if (data.inserted) onImported();
-      toast({
-        title: data.inserted ? `${kind === "asset" ? "Assets" : "Liabilities"} saved` : "No entries saved",
-        description: `${data.inserted} added${data.skipped ? ` · ${data.skipped} skipped` : ""}`,
-        ...(data.inserted ? {} : { variant: "destructive" as const }),
-      });
+      if (data.inserted) {
+        toast({
+          title: "Import complete",
+          description: `${data.inserted} ${kind === "asset"
+            ? data.inserted === 1 ? "asset" : "assets"
+            : data.inserted === 1 ? "liability" : "liabilities"} saved successfully.`,
+        });
+        onImported();
+      } else {
+        toast({
+          title: "No entries saved",
+          description: `${data.skipped ? `${data.skipped} skipped` : "The server did not save any entries."}`,
+          variant: "destructive",
+        });
+      }
     },
     onError: (error: Error) => toast({
       title: "Could not save reviewed entries",
@@ -419,7 +428,16 @@ export function BookEntryDialog({
               <TabsTrigger value="connected"><Landmark className="mr-1.5 h-3.5 w-3.5" />Connected Accounts</TabsTrigger>
             </TabsList>
             <TabsContent value="manual" className="mt-4">{manualContent}</TabsContent>
-            <TabsContent value="csv" className="mt-4"><BookEntryCsvImportPanel kind={kind} onImported={onImported} onReviewingChange={setWideFileReview} /></TabsContent>
+            <TabsContent value="csv" className="mt-4">
+              <BookEntryCsvImportPanel
+                kind={kind}
+                onImported={() => {
+                  onImported();
+                  onOpenChange(false);
+                }}
+                onReviewingChange={setWideFileReview}
+              />
+            </TabsContent>
             <TabsContent value="connected" className="mt-4"><BookEntryConnectedAccountsPanel kind={kind} onImported={onImported} /></TabsContent>
           </Tabs>
         )}
