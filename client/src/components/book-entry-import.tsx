@@ -60,7 +60,8 @@ export function BookEntryCsvImportPanel({
     mutationFn: (selectedFile: File) => {
       const data = new FormData();
       data.append("file", selectedFile);
-      return apiRequest("POST", `/api/${kind}s/ingest`, data).then((response) => response.json() as Promise<ImportResponse>);
+      const endpoint = kind === "asset" ? "/api/assets/ingest" : "/api/liabilities/ingest";
+      return apiRequest("POST", endpoint, data).then((response) => response.json() as Promise<ImportResponse>);
     },
     onSuccess: (data) => {
       setResult(data);
@@ -111,6 +112,22 @@ export function BookEntryCsvImportPanel({
           Upload CSV, TSV, TXT, XLS, or XLSX (maximum 5 MiB). Include account names and values or balances.
         </p>
         <input ref={fileRef} type="file" accept=".csv,.tsv,.txt,.xls,.xlsx" className="hidden" onChange={handleFile} />
+      </div>
+
+      <div className="rounded-lg border border-blue-200 bg-blue-50/60 p-3 text-xs leading-relaxed text-slate-700 dark:border-blue-900 dark:bg-blue-950/20 dark:text-slate-200">
+        <p className="font-semibold text-blue-900 dark:text-blue-200">
+          What to include in your {kind === "asset" ? "asset" : "liability"} file
+        </p>
+        <p className="mt-1">
+          CSV, TSV, and Excel files need a header row with a name column (Name, Account, or Description)
+          and a monetary amount column (Value, Amount, or Balance). Columns can be in any order.
+          For TXT files, put one entry per line with a name and amount.
+        </p>
+        <p className="mt-1">
+          Example: {kind === "asset" ? "Savings Account — value $2,500" : "Auto Loan — balance $12,000"}.
+          {" "}Institution and interest rate{kind === "liability" ? ", minimum payment, and maturity date" : ""} are optional.
+          Limit 500 entries per file; a rate alone is not an account balance.
+        </p>
       </div>
 
       {file && (

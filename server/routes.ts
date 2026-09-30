@@ -324,7 +324,7 @@ export async function registerRoutes(
     if (isEmptySample(rows)) return res.status(400).json({ message: EMPTY_FILE });
     if (!hasRecognizableStructure(kind, rows)) {
       return res.status(400).json({
-        message: `This file was read, but it does not contain recognizable ${kind}s. Include a Name, Account, or Description column and a Value, Amount, or Balance column, or use text entries with amounts.`,
+        message: `This file was read, but it does not contain recognizable ${kind === "asset" ? "assets" : "liabilities"}. Include a Name, Account, or Description column and a Value, Amount, or Balance column, or use text entries with amounts.`,
       });
     }
     if (rows.length > 500) return res.status(400).json({ message: "Imports are limited to 500 entries at a time" });
