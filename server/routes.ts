@@ -39,6 +39,7 @@ const ingestionUpload = multer({ storage: multer.memoryStorage(), limits: { file
 const BANK_RATE_IMPORT_MAX_ROWS = 5000;
 const INVALID_FILE_TYPE = "Unsupported file type. Please upload a CSV, TSV, TXT, XLS, or XLSX file.";
 const CORRUPT_FILE = "File content could not be read or appears corrupted.";
+const EMPTY_FILE = "The file has no readable asset or liability entries.";
 const NO_DETECTIONS = "Could not detect any valid assets or liabilities in this file.";
 const ingestionUploadFile = (req: any, res: any, next: any) => {
   ingestionUpload.single("file")(req, res, (error: unknown) => {
@@ -319,8 +320,12 @@ export async function registerRoutes(
     } else {
       rows = extractJsonRows(req.body);
     }
-    if (!rows || isEmptySample(rows) || !hasRecognizableStructure(kind, rows)) {
-      return res.status(400).json({ message: CORRUPT_FILE });
+    if (!rows) return res.status(400).json({ message: CORRUPT_FILE });
+    if (isEmptySample(rows)) return res.status(400).json({ message: EMPTY_FILE });
+    if (!hasRecognizableStructure(kind, rows)) {
+      return res.status(400).json({
+        message: `This file was read, but it does not contain recognizable ${kind}s. Include a Name, Account, or Description column and a Value, Amount, or Balance column, or use text entries with amounts.`,
+      });
     }
     if (rows.length > 500) return res.status(400).json({ message: "Imports are limited to 500 entries at a time" });
 

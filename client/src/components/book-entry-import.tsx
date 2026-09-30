@@ -108,7 +108,7 @@ export function BookEntryCsvImportPanel({
         <FileSpreadsheet className="mx-auto mb-2 h-8 w-8 text-blue-500" />
         <p className="text-sm font-medium">Click to upload a file</p>
         <p className="mt-1 text-xs text-muted-foreground">
-          Upload CSV, TSV, TXT, XLS, or XLSX (maximum 5 MiB). The server will map your data.
+          Upload CSV, TSV, TXT, XLS, or XLSX (maximum 5 MiB). Include account names and values or balances.
         </p>
         <input ref={fileRef} type="file" accept=".csv,.tsv,.txt,.xls,.xlsx" className="hidden" onChange={handleFile} />
       </div>
