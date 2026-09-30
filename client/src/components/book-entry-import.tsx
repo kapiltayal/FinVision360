@@ -242,7 +242,12 @@ export function BookEntryConnectedAccountsPanel({
         <p className="text-sm font-medium">Import from connected accounts</p>
         <p className="mt-1 text-xs text-muted-foreground">Select accounts to add. Accounts already linked to this page are kept up to date and will not be duplicated.</p>
       </div>
-      <div className="space-y-2">
+      <div
+        role="region"
+        aria-label="Connected account list"
+        tabIndex={0}
+        className="max-h-[55vh] space-y-2 overflow-y-auto overscroll-contain pr-2"
+      >
         {eligibleAccounts.map((account) => {
           const linked = kind === "asset" ? account.linkedAssetId || account.linkedLiabilityId : account.linkedAssetId || account.linkedLiabilityId;
           const available = !linked;
@@ -317,7 +322,7 @@ export function BookEntryDialog({
       if (!value) setTab("manual");
       onOpenChange(value);
     }}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
         <DialogHeader><DialogTitle>{title}</DialogTitle></DialogHeader>
         {isEdit ? manualContent : (
           <Tabs value={tab} onValueChange={setTab}>
