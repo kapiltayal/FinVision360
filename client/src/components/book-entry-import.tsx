@@ -273,7 +273,16 @@ export function BookEntryConnectedAccountsPanel({
                 </div>
                 <div className="text-right">
                   <p className="text-sm font-semibold">{new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(Math.abs(parseFloat(account.currentBalance || "0") || 0))}</p>
-                  {available ? <Badge variant="outline" className="mt-1 text-[10px]">Available</Badge> : <Badge variant="secondary" className="mt-1 text-[10px]">Already imported</Badge>}
+                  {available ? (
+                    <Badge
+                      variant="outline"
+                      className="mt-1 border-green-200 bg-green-50 text-[10px] text-green-800 hover:bg-green-50 dark:border-green-900 dark:bg-green-950/40 dark:text-green-300"
+                    >
+                      Available
+                    </Badge>
+                  ) : (
+                    <Badge variant="secondary" className="mt-1 text-[10px]">Already imported</Badge>
+                  )}
                 </div>
               </CardContent>
             </Card>
