@@ -1,7 +1,6 @@
 import { AlertCircle, Loader2, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import type { BookEntryKind } from "./book-entry-import";
 
 export type PreviewEntry = {
@@ -86,81 +85,100 @@ export function BookEntryFileReview({
         </p>
       )}
 
-      <div className="max-h-[55vh] space-y-3 overflow-y-auto overscroll-contain pr-1" aria-label="Editable file preview">
+      <div className="max-h-[55vh] overflow-auto overscroll-contain rounded-lg border" aria-label="Editable file preview">
+        <table className={`w-full text-left text-xs ${kind === "liability" ? "min-w-[1280px]" : "min-w-[1000px]"}`}>
+          <caption className="sr-only">Editable preview of {entries.length} {kind} entries from {fileName}</caption>
+          <thead className="sticky top-0 z-10 bg-muted">
+            <tr>
+              <th scope="col" className="sticky left-0 z-20 w-12 min-w-12 border-b bg-muted px-2 py-2 text-center font-medium">#</th>
+              <th scope="col" className="min-w-40 border-b px-2 py-2 font-medium">Name *</th>
+              <th scope="col" className="min-w-48 border-b px-2 py-2 font-medium">Category *</th>
+              <th scope="col" className="min-w-28 border-b px-2 py-2 font-medium">{kind === "asset" ? "Value *" : "Balance *"}</th>
+              <th scope="col" className="min-w-28 border-b px-2 py-2 font-medium">Rate (%)</th>
+              {kind === "liability" && (
+                <>
+                  <th scope="col" className="min-w-28 border-b px-2 py-2 font-medium">Min. payment</th>
+                  <th scope="col" className="min-w-36 border-b px-2 py-2 font-medium">Maturity date</th>
+                </>
+              )}
+              <th scope="col" className="min-w-36 border-b px-2 py-2 font-medium">Institution</th>
+              <th scope="col" className="min-w-40 border-b px-2 py-2 font-medium">Notes</th>
+              <th scope="col" className="sticky right-0 z-20 w-10 min-w-10 border-b bg-muted px-1 py-2"><span className="sr-only">Remove</span></th>
+            </tr>
+          </thead>
+          <tbody>
         {entries.map((entry, index) => {
           const error = errors[index];
-          const input = (field: ReviewField, label: string, placeholder = "", inputMode?: "decimal") => (
-            <div className="space-y-1">
-              <label htmlFor={`review-${entry.id}-${field}`} className="text-xs font-medium">{label}</label>
+          const input = (field: ReviewField, placeholder = "", inputMode?: "decimal") => (
+            <td className="border-b px-2 py-1.5 align-top">
               <Input
                 id={`review-${entry.id}-${field}`}
+                aria-label={`${entry.name || `Entry ${index + 1}`} ${field === amountField ? kind === "asset" ? "value" : "balance" : field}`}
                 value={entry[field]}
                 onChange={(event) => onChange(entry.id, field, event.target.value)}
                 placeholder={placeholder}
                 inputMode={inputMode}
                 aria-invalid={!!error[field]}
-                className={error[field] ? "border-destructive" : ""}
+                className={`h-8 px-2 text-xs ${error[field] ? "border-destructive" : ""}`}
               />
-              {error[field] && <p className="text-xs text-destructive">{error[field]}</p>}
-            </div>
+              {error[field] && <p className="mt-1 max-w-40 text-[10px] leading-tight text-destructive">{error[field]}</p>}
+            </td>
           );
           return (
-            <div key={entry.id} className="rounded-lg border bg-card" data-testid={`review-row-${entry.id}`}>
-              <div className="px-3 py-3 text-sm">
-                <span className="flex items-center justify-between gap-2">
-                  <span className="min-w-0 truncate font-medium">{index + 1}. {entry.name || "Unnamed entry"}</span>
-                  <span className="shrink-0 text-xs text-muted-foreground">
-                    {error && Object.keys(error).length ? "Needs review" : entry[amountField] || "No amount"}
-                  </span>
-                </span>
-              </div>
-              <div className="space-y-3 border-t p-3">
-                <div className="grid gap-3 sm:grid-cols-2">
-                  {input("name", "Name *", "Account name")}
-                  <div className="space-y-1">
-                    <label htmlFor={`review-${entry.id}-category`} className="text-xs font-medium">Category *</label>
-                    <select
-                      id={`review-${entry.id}-category`}
-                      value={entry.category}
-                      onChange={(event) => onChange(entry.id, "category", event.target.value)}
-                      aria-invalid={!!error.category}
-                      className={`flex h-9 w-full rounded-md border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring ${error.category ? "border-destructive" : "border-input"}`}
-                    >
-                      <option value="">Choose category</option>
-                      {categories.map((item) => <option key={item.category} value={item.category}>{item.parentCategory} · {item.category}</option>)}
-                    </select>
-                    {entry.sourceCategory && entry.sourceCategory !== entry.category && (
-                      <p className="text-xs text-muted-foreground">File category: {entry.sourceCategory}. Check the suggested category before saving.</p>
-                    )}
-                    {error.category && <p className="text-xs text-destructive">{error.category}</p>}
-                  </div>
-                  {input(amountField, kind === "asset" ? "Value *" : "Balance *", "0.00", "decimal")}
-                  {input("interestRate", "Interest rate (%)", "0.00", "decimal")}
-                  {kind === "liability" && (
-                    <>
-                      {input("minimumPayment", "Minimum payment", "0.00", "decimal")}
-                      {input("maturityDate", "Maturity date", "YYYY-MM-DD")}
-                    </>
-                  )}
-                  {input("institution", "Institution", "Optional")}
-                </div>
-                <div className="space-y-1">
-                  <label htmlFor={`review-${entry.id}-notes`} className="text-xs font-medium">Notes</label>
-                  <Textarea
-                    id={`review-${entry.id}-notes`}
-                    value={entry.notes}
-                    onChange={(event) => onChange(entry.id, "notes", event.target.value)}
-                    rows={2}
-                    placeholder="Optional"
-                  />
-                </div>
-                <Button type="button" size="sm" variant="ghost" className="text-destructive" onClick={() => onRemove(entry.id)} disabled={saving}>
-                  <Trash2 className="mr-1.5 h-4 w-4" /> Remove entry
+            <tr key={entry.id} data-testid={`review-row-${entry.id}`} className={error && Object.keys(error).length ? "bg-amber-50/40 dark:bg-amber-950/10" : ""}>
+              <th scope="row" className="sticky left-0 z-[1] border-b bg-background px-2 py-1.5 text-center font-normal">
+                <span className="block text-muted-foreground">{index + 1}</span>
+                {error && Object.keys(error).length > 0 && <AlertCircle className="mx-auto mt-1 h-3.5 w-3.5 text-amber-600" aria-label="Needs review" />}
+              </th>
+              {input("name", "Account name")}
+              <td className="border-b px-2 py-1.5 align-top">
+                <select
+                  id={`review-${entry.id}-category`}
+                  value={entry.category}
+                  onChange={(event) => onChange(entry.id, "category", event.target.value)}
+                  aria-label={`${entry.name || `Entry ${index + 1}`} category`}
+                  aria-invalid={!!error.category}
+                  className={`h-8 w-full min-w-44 rounded-md border bg-background px-2 text-xs focus:outline-none focus:ring-2 focus:ring-ring ${error.category ? "border-destructive" : "border-input"}`}
+                >
+                  <option value="">Choose category</option>
+                  {categories.map((item) => <option key={item.category} value={item.category}>{item.parentCategory} · {item.category}</option>)}
+                </select>
+                {entry.sourceCategory && entry.sourceCategory !== entry.category && (
+                  <p className="mt-1 max-w-48 truncate text-[10px] text-muted-foreground" title={`File category: ${entry.sourceCategory}`}>
+                    File: {entry.sourceCategory}
+                  </p>
+                )}
+                {error.category && <p className="mt-1 text-[10px] leading-tight text-destructive">{error.category}</p>}
+              </td>
+              {input(amountField, "0.00", "decimal")}
+              {input("interestRate", "0.00", "decimal")}
+              {kind === "liability" && (
+                <>
+                  {input("minimumPayment", "0.00", "decimal")}
+                  {input("maturityDate", "YYYY-MM-DD")}
+                </>
+              )}
+              {input("institution", "Institution")}
+              {input("notes", "Notes")}
+              <td className="sticky right-0 border-b bg-background px-1 py-1.5 align-top">
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="ghost"
+                  className="h-8 w-8 text-destructive"
+                  aria-label={`Remove entry ${index + 1}`}
+                  title="Remove entry"
+                  onClick={() => onRemove(entry.id)}
+                  disabled={saving}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
                 </Button>
-              </div>
-            </div>
+              </td>
+            </tr>
           );
         })}
+          </tbody>
+        </table>
       </div>
       {!entries.length && <p className="text-sm text-muted-foreground">No entries remain. Choose another file to continue.</p>}
       <div className="flex flex-wrap items-center justify-between gap-2 border-t pt-3">
