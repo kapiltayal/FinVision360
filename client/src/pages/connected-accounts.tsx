@@ -299,6 +299,18 @@ export default function ConnectedAccountsPage() {
         </CardContent>
       </Card>
 
+      <Card className="border-amber-200 dark:border-amber-900 bg-amber-50/60 dark:bg-amber-950/20">
+        <CardContent className="flex items-start gap-3 py-4">
+          <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-amber-700 dark:text-amber-400" />
+          <div className="text-sm text-amber-950 dark:text-amber-200">
+            <p className="font-semibold">Connected accounts are not automatically included in your financial totals.</p>
+            <p className="mt-1">
+              These accounts are only available to import. Add balances from the Assets or Liabilities pages to include them in your net worth, and import transactions from the Transactions page to include activity in expense views. Until then, connected accounts are not counted or used elsewhere in FinVision360.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Loading */}
       {isLoading && (
         <div className="flex items-center justify-center py-16 text-muted-foreground gap-2">
