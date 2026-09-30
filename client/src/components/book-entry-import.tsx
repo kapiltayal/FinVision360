@@ -48,9 +48,11 @@ function skippedDescription(skippedReasons: Record<string, number>) {
 export function BookEntryCsvImportPanel({
   kind,
   onImported,
+  onReviewingChange,
 }: {
   kind: BookEntryKind;
   onImported: () => void;
+  onReviewingChange: (reviewing: boolean) => void;
 }) {
   const { toast } = useToast();
   const fileRef = useRef<HTMLInputElement>(null);
@@ -72,9 +74,11 @@ export function BookEntryCsvImportPanel({
     onSuccess: (data) => {
       setEntries(data.entries.map((entry, index) => ({ ...entry, id: index + 1 })));
       setIgnoredBlankRows(data.ignoredBlankRows);
+      onReviewingChange(true);
     },
     onError: (error: Error) => {
       setFile(null);
+      onReviewingChange(false);
       toast({ title: "Could not preview file", description: error.message, variant: "destructive" });
     },
   });
@@ -89,6 +93,7 @@ export function BookEntryCsvImportPanel({
       setResult(data);
       setEntries(null);
       setFile(null);
+      onReviewingChange(false);
       if (data.inserted) onImported();
       toast({
         title: data.inserted ? `${kind === "asset" ? "Assets" : "Liabilities"} saved` : "No entries saved",
@@ -137,7 +142,7 @@ export function BookEntryCsvImportPanel({
         onChange={(id: number, field: ReviewField, value: string) => setEntries((current) =>
           current?.map((entry) => entry.id === id ? { ...entry, [field]: value } : entry) ?? null)}
         onRemove={(id: number) => setEntries((current) => current?.filter((entry) => entry.id !== id) ?? null)}
-        onDiscard={() => { setEntries(null); setFile(null); setResult(null); }}
+        onDiscard={() => { setEntries(null); setFile(null); setResult(null); onReviewingChange(false); }}
         onSave={() => saveMutation.mutate(entries)}
       />
     );
@@ -390,24 +395,31 @@ export function BookEntryDialog({
   onImported: () => void;
 }) {
   const [tab, setTab] = useState("manual");
+  const [wideFileReview, setWideFileReview] = useState(false);
   const isEdit = title.startsWith("Edit");
 
   return (
     <Dialog open={open} onOpenChange={(value) => {
-      if (!value) setTab("manual");
+      if (!value) {
+        setTab("manual");
+        setWideFileReview(false);
+      }
       onOpenChange(value);
     }}>
-      <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
+      <DialogContent className={`max-h-[90vh] w-[calc(100vw-2rem)] overflow-y-auto ${wideFileReview ? "max-w-[1500px]" : "max-w-2xl"}`}>
         <DialogHeader><DialogTitle>{title}</DialogTitle></DialogHeader>
         {isEdit ? manualContent : (
-          <Tabs value={tab} onValueChange={setTab}>
+          <Tabs value={tab} onValueChange={(value) => {
+            setTab(value);
+            if (value !== "csv") setWideFileReview(false);
+          }}>
             <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="manual"><Wallet className="mr-1.5 h-3.5 w-3.5" />Manual</TabsTrigger>
               <TabsTrigger value="csv"><FileSpreadsheet className="mr-1.5 h-3.5 w-3.5" />Import File</TabsTrigger>
               <TabsTrigger value="connected"><Landmark className="mr-1.5 h-3.5 w-3.5" />Connected Accounts</TabsTrigger>
             </TabsList>
             <TabsContent value="manual" className="mt-4">{manualContent}</TabsContent>
-            <TabsContent value="csv" className="mt-4"><BookEntryCsvImportPanel kind={kind} onImported={onImported} /></TabsContent>
+            <TabsContent value="csv" className="mt-4"><BookEntryCsvImportPanel kind={kind} onImported={onImported} onReviewingChange={setWideFileReview} /></TabsContent>
             <TabsContent value="connected" className="mt-4"><BookEntryConnectedAccountsPanel kind={kind} onImported={onImported} /></TabsContent>
           </Tabs>
         )}
