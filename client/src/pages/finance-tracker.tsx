@@ -634,7 +634,7 @@ export default function FinanceTrackerPage() {
   const [customStart, setCustomStart] = useState("");
   const [customEnd, setCustomEnd] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
-  const [accountFilter, setAccountFilter] = useState("all");
+  const [transactionFilter, setTransactionFilter] = useState("all");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
@@ -669,7 +669,12 @@ export default function FinanceTrackerPage() {
   const trendQK = ["/api/transactions/trend", start, end, groupBy];
   const catQK = ["/api/transactions/categories", start, end, catChartType];
   const insightsQK = ["/api/transactions/insights", start, end];
-  const txnQK = ["/api/transactions", start, end, typeFilter, search, accountFilter];
+  const txnQK = ["/api/transactions", start, end, typeFilter, search, transactionFilter];
+  const transactionFilterParams = transactionFilter.startsWith("account:")
+    ? { plaidAccountId: transactionFilter.slice("account:".length) }
+    : transactionFilter.startsWith("source:")
+      ? { source: transactionFilter.slice("source:".length) }
+      : {};
   const insightParams = new URLSearchParams();
   if (start) insightParams.set("startDate", start);
   if (end) insightParams.set("endDate", end);
@@ -680,7 +685,7 @@ export default function FinanceTrackerPage() {
   });
   const { data: transactionsRaw, isLoading: txnL } = useQuery<Transaction[]>({
     queryKey: txnQK,
-    queryFn: () => apiRequest("GET", `/api/transactions${buildQS(accountFilter === "all" ? {} : { plaidAccountId: accountFilter })}`).then(r => r.json()).catch(() => []),
+    queryFn: () => apiRequest("GET", `/api/transactions${buildQS(transactionFilterParams)}`).then(r => r.json()).catch(() => []),
   });
   const transactions: Transaction[] = Array.isArray(transactionsRaw) ? transactionsRaw : [];
   const { data: transactionAccountsRaw } = useQuery<TransactionAccount[]>({
@@ -1190,14 +1195,16 @@ export default function FinanceTrackerPage() {
                 </Select>
               </div>
               {/* Account filter */}
-              <Select value={accountFilter} onValueChange={value => { setAccountFilter(value); setPage(1); }}>
-                <SelectTrigger className="h-8 w-[170px] text-xs" aria-label="Filter transactions by account">
-                  <SelectValue placeholder="All Accounts" />
+              <Select value={transactionFilter} onValueChange={value => { setTransactionFilter(value); setPage(1); }}>
+                <SelectTrigger className="h-8 w-[170px] text-xs" aria-label="Filter transactions by source or account">
+                  <SelectValue placeholder="All Transactions" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Accounts</SelectItem>
+                  <SelectItem value="all">All Transactions</SelectItem>
+                  <SelectItem value="source:upload">File Uploads</SelectItem>
+                  <SelectItem value="source:manual">Manual Entry</SelectItem>
                   {transactionAccounts.map(account => (
-                    <SelectItem key={account.plaid_account_id} value={account.plaid_account_id}>
+                    <SelectItem key={account.plaid_account_id} value={`account:${account.plaid_account_id}`}>
                       {[account.plaid_institution_name, account.plaid_account_name].filter(Boolean).join(" · ") || "Connected Account"}
                     </SelectItem>
                   ))}
