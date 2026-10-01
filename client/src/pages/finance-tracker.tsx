@@ -451,6 +451,24 @@ function TransactionFileUploadPanel({
         <p className="text-xs text-muted-foreground mt-1">Supported formats: CSV, TSV, TXT, XLS, and XLSX. Maximum size: 5 MiB.</p>
         <input ref={fileRef} type="file" accept=".csv,.tsv,.txt,.xls,.xlsx" className="hidden" onChange={handleFile} />
       </div>
+      <div className="rounded-lg border border-blue-200 bg-blue-50/60 p-3 text-xs leading-relaxed text-slate-700 dark:border-blue-900 dark:bg-blue-950/20 dark:text-slate-200">
+        <p className="font-semibold text-blue-900 dark:text-blue-200">What to include in your transaction file</p>
+        <p className="mt-1">
+          <strong>Required for each transaction:</strong> a date, description, and non-zero amount.
+          Recognized date columns: Date, Transaction Date, or Posted Date. Description columns: Description,
+          Merchant, Name, Memo, or Text. Amount columns: Amount, Value, Debit, or Credit. Dates can use
+          YYYY-MM-DD, YYYY/MM/DD, or MM/DD/YYYY.
+        </p>
+        <p className="mt-1">
+          <strong>Optional fields:</strong> Type or Transaction Type (Income or Expense), Category or Subcategory,
+          Parent Category, and Notes or Memo. A Credit column indicates income; other transactions default to
+          expenses unless categorization identifies them as income. Categories are assigned automatically when
+          possible; unmatched transactions can be categorized later.
+        </p>
+        <p className="mt-1">
+          Include a header row; columns can be in any order. Use one transaction per row, up to 500 rows.
+        </p>
+      </div>
       {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
       {file && <p className="text-sm text-emerald-600">Ready to upload: {file.name} ({(file.size / 1024).toFixed(1)} KiB)</p>}
       <Button disabled={!file || importing} onClick={() => file && onImport(file)} className="w-full">
