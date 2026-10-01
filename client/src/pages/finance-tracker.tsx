@@ -1201,13 +1201,13 @@ export default function FinanceTrackerPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Transactions</SelectItem>
-                  <SelectItem value="source:upload">File Uploads</SelectItem>
-                  <SelectItem value="source:manual">Manual Entry</SelectItem>
                   {transactionAccounts.map(account => (
                     <SelectItem key={account.plaid_account_id} value={`account:${account.plaid_account_id}`}>
                       {[account.plaid_institution_name, account.plaid_account_name].filter(Boolean).join(" · ") || "Connected Account"}
                     </SelectItem>
                   ))}
+                  <SelectItem value="source:upload">File Uploads</SelectItem>
+                  <SelectItem value="source:manual">Manual Entry</SelectItem>
                 </SelectContent>
               </Select>
               {/* Type filter */}
