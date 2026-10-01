@@ -629,11 +629,35 @@ export function registerFinanceTrackerRoutes(app: Express) {
     }
   });
 
+  // GET /api/transactions/accounts — linked accounts represented in this user's transaction history
+  app.get("/api/transactions/accounts", requireAuth, async (req, res) => {
+    try {
+      const userId = (req.user as any).id;
+      const { rows } = await pool.query(
+        `SELECT
+           plaid_account_id,
+           MAX(NULLIF(BTRIM(plaid_account_name), '')) AS plaid_account_name,
+           MAX(NULLIF(BTRIM(plaid_institution_name), '')) AS plaid_institution_name
+         FROM transactions
+         WHERE user_id = $1 AND NULLIF(BTRIM(plaid_account_id), '') IS NOT NULL
+         GROUP BY plaid_account_id
+         ORDER BY
+           MAX(NULLIF(BTRIM(plaid_institution_name), '')) NULLS LAST,
+           MAX(NULLIF(BTRIM(plaid_account_name), '')) NULLS LAST`,
+        [userId],
+      );
+      res.json(rows);
+    } catch (e) {
+      console.error(e);
+      res.status(500).json({ message: "Failed to fetch transaction accounts" });
+    }
+  });
+
   // GET /api/transactions — list with optional filters
   app.get("/api/transactions", requireAuth, async (req, res) => {
     try {
       const userId = (req.user as any).id;
-      const { startDate, endDate, type, subcategory, source, recurring, search } = req.query as Record<string, string>;
+      const { startDate, endDate, type, subcategory, source, recurring, search, plaidAccountId } = req.query as Record<string, string>;
 
       let sql = `SELECT * FROM transactions WHERE user_id = $1`;
       const params: any[] = [userId];
@@ -646,6 +670,7 @@ export function registerFinanceTrackerRoutes(app: Express) {
       if (source) { sql += ` AND source = $${idx++}`; params.push(source); }
       if (recurring === "true") sql += ` AND is_recurring = TRUE`;
       if (search) { sql += ` AND description ILIKE $${idx++}`; params.push(`%${search}%`); }
+      if (plaidAccountId) { sql += ` AND plaid_account_id = $${idx++}`; params.push(plaidAccountId); }
 
       sql += ` ORDER BY date DESC, created_at DESC`;
 
