@@ -12,7 +12,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { ConnectedAccountsImportPanel } from "@/components/finance-tracker/connected-accounts-import";
+import { TransactionFileImportPanel } from "@/components/finance-tracker/transaction-file-import";
 import { FinancialChartTooltip } from "@/components/financial-chart-tooltip";
+import type { TransactionImportResult } from "@shared/transaction-import";
 import {
   TrendingUp, TrendingDown, Wallet, Plus, Upload, RefreshCw, Pencil, Trash2,
   AlertCircle, ArrowDownCircle, ArrowUpCircle, Repeat2, Tag, Search, X,
@@ -55,12 +57,7 @@ type Stats = {
   min_date: string | null;
   max_date: string | null;
 };
-type ImportResult = {
-  inserted: number;
-  uncategorized: number;
-  skipped: number;
-  skippedReasons: Record<string, number>;
-};
+type ImportResult = TransactionImportResult;
 type CanonicalCategory = {
   type: string;
   parentCategory: string;
@@ -407,77 +404,6 @@ function TransactionDialog({
   );
 }
 
-// ── Transaction File Upload Panel ─────────────────────────────────────────────
-function TransactionFileUploadPanel({
-  onImport,
-  importing,
-}: {
-  onImport: (file: File) => void;
-  importing: boolean;
-}) {
-  const fileRef = useRef<HTMLInputElement>(null);
-  const [file, setFile] = useState<File | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const maximumSize = 5 * 1024 * 1024;
-  const allowedExtensions = [".csv", ".tsv", ".txt", ".xls", ".xlsx"];
-
-  function handleFile(event: React.ChangeEvent<HTMLInputElement>) {
-    const selectedFile = event.target.files?.[0];
-    if (!selectedFile) return;
-
-    const extension = `.${selectedFile.name.split(".").pop()?.toLowerCase() ?? ""}`;
-    if (!allowedExtensions.includes(extension)) {
-      setFile(null);
-      setError("Unsupported file type. Upload a CSV, TSV, TXT, XLS, or XLSX transaction file.");
-      return;
-    }
-    if (selectedFile.size > maximumSize) {
-      setFile(null);
-      setError("This transaction file is larger than 5 MiB. Choose a file at or below 5 MiB.");
-      return;
-    }
-    setError(null);
-    setFile(selectedFile);
-  }
-
-  return (
-    <div className="space-y-4">
-      <div
-        className="border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl p-8 text-center cursor-pointer hover:border-blue-400 transition-colors"
-        onClick={() => fileRef.current?.click()}
-      >
-        <Upload className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
-        <p className="text-sm font-medium">Click to upload a transaction file</p>
-        <p className="text-xs text-muted-foreground mt-1">Supported formats: CSV, TSV, TXT, XLS, and XLSX. Maximum size: 5 MiB.</p>
-        <input ref={fileRef} type="file" accept=".csv,.tsv,.txt,.xls,.xlsx" className="hidden" onChange={handleFile} />
-      </div>
-      <div className="rounded-lg border border-blue-200 bg-blue-50/60 p-3 text-xs leading-relaxed text-slate-700 dark:border-blue-900 dark:bg-blue-950/20 dark:text-slate-200">
-        <p className="font-semibold text-blue-900 dark:text-blue-200">What to include in your transaction file</p>
-        <p className="mt-1">
-          <strong>Required for each transaction:</strong> a date, description, and non-zero amount.
-          Recognized date columns: Date, Transaction Date, or Posted Date. Description columns: Description,
-          Merchant, Name, Memo, or Text. Amount columns: Amount, Value, Debit, or Credit. Dates can use
-          YYYY-MM-DD, YYYY/MM/DD, or MM/DD/YYYY.
-        </p>
-        <p className="mt-1">
-          <strong>Optional fields:</strong> Type or Transaction Type (Income or Expense), Category or Subcategory,
-          Parent Category, and Notes or Memo. A Credit column indicates income; other transactions default to
-          expenses unless categorization identifies them as income. Categories are assigned automatically when
-          possible; unmatched transactions can be categorized later.
-        </p>
-        <p className="mt-1">
-          Include a header row; columns can be in any order. Use one transaction per row, up to 500 rows.
-        </p>
-      </div>
-      {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
-      {file && <p className="text-sm text-emerald-600">Ready to upload: {file.name} ({(file.size / 1024).toFixed(1)} KiB)</p>}
-      <Button disabled={!file || importing} onClick={() => file && onImport(file)} className="w-full">
-        {importing ? "Uploading…" : "Upload transaction file"}
-      </Button>
-    </div>
-  );
-}
-
 // ── Spending Insight Carousel ────────────────────────────────────────────────
 function SpendingInsightCarousel({
   categoryData,
@@ -710,6 +636,10 @@ export default function FinanceTrackerPage() {
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   const [dataIntakeOpen, setDataIntakeOpen] = useState(false);
   const [lastImportResult, setLastImportResult] = useState<ImportResult | null>(null);
+  const [intakeTab, setIntakeTab] = useState("manual");
+  const [reviewingTransactions, setReviewingTransactions] = useState(false);
+  const [intakeBusy, setIntakeBusy] = useState(false);
+  const [transactionImportPanelKey, setTransactionImportPanelKey] = useState(0);
   const [addOpen, setAddOpen] = useState(false);
   const [editTxn, setEditTxn] = useState<Transaction | null>(null);
   const [pendingMerchantUpdate, setPendingMerchantUpdate] = useState<PendingMerchantUpdate | null>(null);
@@ -791,9 +721,42 @@ export default function FinanceTrackerPage() {
     queryClient.invalidateQueries({ queryKey: ["/api/transactions/insights"] });
   }
 
+  function handleReviewedImport(result: TransactionImportResult) {
+    invalidateAll();
+    setPeriod("all");
+    setCustomStart("");
+    setCustomEnd("");
+    setPage(1);
+    setDataIntakeOpen(false);
+    setIntakeTab("manual");
+    setReviewingTransactions(false);
+    setIntakeBusy(false);
+    setLastImportResult(result);
+    toast({
+      title: result.uncategorized > 0 ? "Import complete — categories missing" : "Transaction file import complete",
+      description: [
+        `${result.inserted} imported · ${result.skipped} not imported.`,
+        result.uncategorized > 0
+          ? `${result.uncategorized} imported transaction${result.uncategorized === 1 ? " needs" : "s need"} category review.`
+          : "",
+        "Showing All Time so imported dates are visible.",
+        result.recurringMarked ? `${result.recurringMarked} marked as recurring` : "",
+      ].filter(Boolean).join(" "),
+    });
+  }
+
   const createMut = useMutation({
     mutationFn: (data: any) => apiRequest("POST", "/api/transactions", data),
-    onSuccess: () => { invalidateAll(); setAddOpen(false); setDataIntakeOpen(false); toast({ title: "Transaction added" }); },
+    onSuccess: () => {
+      invalidateAll();
+      setAddOpen(false);
+      setDataIntakeOpen(false);
+      setIntakeTab("manual");
+      setReviewingTransactions(false);
+      setIntakeBusy(false);
+      setTransactionImportPanelKey(key => key + 1);
+      toast({ title: "Transaction added" });
+    },
     onError: (error: Error) => toast({ title: "Failed to add", description: error.message, variant: "destructive" }),
   });
   const updateMut = useMutation({
@@ -814,40 +777,6 @@ export default function FinanceTrackerPage() {
     mutationFn: (id: number) => apiRequest("DELETE", `/api/transactions/${id}`),
     onSuccess: () => { invalidateAll(); toast({ title: "Deleted" }); },
     onError: () => toast({ title: "Failed to delete", variant: "destructive" }),
-  });
-  const bulkMut = useMutation({
-    mutationFn: (file: File) => {
-      const formData = new FormData();
-      formData.append("file", file);
-      return apiRequest("POST", "/api/transactions/ingest", formData);
-    },
-    onSuccess: (res: any) => res.json().then((d: any) => {
-      const importResult: ImportResult = {
-        inserted: Number(d.inserted ?? 0),
-        uncategorized: Number(d.uncategorized ?? 0),
-        skipped: Number(d.skipped ?? 0),
-        skippedReasons: d.skippedReasons ?? {},
-      };
-      invalidateAll();
-      setPeriod("all");
-      setCustomStart("");
-      setCustomEnd("");
-      setPage(1);
-      setDataIntakeOpen(false);
-      setLastImportResult(importResult);
-      toast({
-        title: importResult.uncategorized > 0 ? "Upload complete — categories missing" : "Transaction file upload complete",
-        description: [
-          `${importResult.inserted} uploaded · ${importResult.skipped} not uploaded.`,
-          importResult.uncategorized > 0
-            ? `${importResult.uncategorized} uploaded transaction${importResult.uncategorized === 1 ? " needs" : "s need"} category review.`
-            : "",
-          "Showing All Time so uploaded dates are visible.",
-          d.recurringMarked ? `${d.recurringMarked} marked as recurring` : "",
-        ].filter(Boolean).join(" "),
-      });
-    }),
-    onError: (error: Error) => toast({ title: "Import failed", description: error.message, variant: "destructive" }),
   });
   const recurringMut = useMutation({
     mutationFn: () => apiRequest("POST", "/api/transactions/detect-recurring"),
@@ -983,8 +912,17 @@ export default function FinanceTrackerPage() {
       </div>
 
       {/* ── Data Intake ── */}
-      <Dialog open={dataIntakeOpen} onOpenChange={setDataIntakeOpen}>
-        <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
+      <Dialog open={dataIntakeOpen} onOpenChange={open => {
+        if (!open && intakeBusy) return;
+        setDataIntakeOpen(open);
+        if (!open) {
+          setIntakeTab("manual");
+          setReviewingTransactions(false);
+          setIntakeBusy(false);
+          setTransactionImportPanelKey(key => key + 1);
+        }
+      }}>
+        <DialogContent className={`max-h-[90vh] w-[calc(100vw-2rem)] overflow-y-auto ${reviewingTransactions ? "max-w-[1500px]" : "max-w-2xl"}`}>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Database className="h-4 w-4 text-blue-500" />
@@ -994,12 +932,24 @@ export default function FinanceTrackerPage() {
               Enter a transaction, upload a file, or import activity from a connected account.
             </DialogDescription>
           </DialogHeader>
-            <Tabs defaultValue="manual">
+            <Tabs value={intakeTab} onValueChange={value => {
+              if (intakeBusy) return;
+              setIntakeTab(value);
+              if (value !== "upload") {
+                setReviewingTransactions(false);
+                setTransactionImportPanelKey(key => key + 1);
+              }
+            }}>
               <TabsList className="grid grid-cols-3 w-full max-w-xl">
-                <TabsTrigger value="manual"><Plus className="h-3.5 w-3.5 mr-1.5" />Manual</TabsTrigger>
-                <TabsTrigger value="upload"><Upload className="h-3.5 w-3.5 mr-1.5" />Upload File</TabsTrigger>
-                <TabsTrigger value="import"><Landmark className="h-3.5 w-3.5 mr-1.5" />Connected</TabsTrigger>
+                <TabsTrigger value="manual" disabled={intakeBusy}><Plus className="h-3.5 w-3.5 mr-1.5" />Manual</TabsTrigger>
+                <TabsTrigger value="upload" disabled={intakeBusy}><Upload className="h-3.5 w-3.5 mr-1.5" />Upload File</TabsTrigger>
+                <TabsTrigger value="import" disabled={intakeBusy}><Landmark className="h-3.5 w-3.5 mr-1.5" />Connected</TabsTrigger>
               </TabsList>
+              {intakeBusy && (
+                <p className="mt-3 flex items-center gap-2 text-sm text-muted-foreground" role="status">
+                  <RefreshCw className="h-4 w-4 animate-spin" /> Transaction file request in progress. Keep this window open until it finishes.
+                </p>
+              )}
               <TabsContent value="manual" className="mt-4">
                 <p className="text-sm text-muted-foreground mb-3">Enter one transaction manually with the full transaction form.</p>
                 <Button onClick={() => setAddOpen(true)} className="w-full sm:w-auto">
@@ -1007,7 +957,12 @@ export default function FinanceTrackerPage() {
                 </Button>
               </TabsContent>
               <TabsContent value="upload" className="mt-4">
-                <TransactionFileUploadPanel onImport={file => bulkMut.mutate(file)} importing={bulkMut.isPending} />
+                <TransactionFileImportPanel
+                  key={transactionImportPanelKey}
+                  onImported={handleReviewedImport}
+                  onReviewingChange={setReviewingTransactions}
+                  onBusyChange={setIntakeBusy}
+                />
               </TabsContent>
               <TabsContent value="import" className="mt-4">
                 <ConnectedAccountsImportPanel onImported={invalidateAll} />

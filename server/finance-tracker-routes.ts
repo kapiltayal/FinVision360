@@ -5,8 +5,17 @@ import type { Transaction as PlaidTransaction } from "plaid";
 import { getPlaidClient } from "./plaid";
 import { storage } from "./storage";
 import multer from "multer";
-import { parseUpload, isEmptySample, type RawRow } from "./asset-liability-ingestion";
+import { parseUpload, parseTransactionUpload, isEmptySample, type RawRow } from "./asset-liability-ingestion";
 import { completeIngestionClassification } from "./ai/provider";
+import type { TransactionImportPreview, TransactionImportResult } from "../shared/transaction-import";
+import {
+  applyImportCategorySuggestion,
+  hasSuppliedNeedWant,
+  isBlankTransactionSourceRow,
+  saveReviewedTransactionBatch,
+  transactionEntryFromSource,
+  validateReviewedTransactionEntries,
+} from "./transaction-import";
 
 const transactionUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024, files: 1 } });
 const CORRUPT_TRANSACTION_FILE = "File content could not be read or appears corrupted.";
@@ -1092,6 +1101,104 @@ export function registerFinanceTrackerRoutes(app: Express) {
 
   // Multipart counterpart to the JSON bulk endpoint. Parsing, archive bounds,
   // UTF-8 checks, and spreadsheet handling are shared with the other imports.
+  app.post("/api/transactions/ingest/preview", requireAuth, transactionUploadFile, async (req: any, res) => {
+    try {
+      if (!req.file || !supportedTransactionFile(req.file)) {
+        return res.status(400).json({ message: INVALID_TRANSACTION_FILE_TYPE });
+      }
+      const parsed = await parseTransactionUpload(req.file);
+      if (!parsed) {
+        return res.status(400).json({ message: CORRUPT_TRANSACTION_FILE });
+      }
+      if (parsed.overflow) return res.status(400).json({ message: "Imports are limited to 500 entries at a time" });
+      const rows = parsed.rows;
+      const sourceRows = rows.filter((row) => !isBlankTransactionSourceRow(row));
+      if (sourceRows.length > 500) return res.status(400).json({ message: "Imports are limited to 500 entries at a time" });
+      if (!sourceRows.length) return res.status(400).json({ message: CORRUPT_TRANSACTION_FILE });
+      const userId = (req.user as any).id;
+      const categories = await canonicalTransactionCategories();
+      const preferences = await userMerchantCategoryPreferences(userId, categories);
+      const entries = sourceRows.map((row, index) => transactionEntryFromSource(row, index + 1));
+      const assignments = new Map<number, CanonicalTransactionCategory>();
+      const unknownIndexes: number[] = [];
+
+      entries.forEach((entry, index) => {
+        // Preserve the import contract order: explicit merchant preference,
+        // source category, AI suggestion, then an empty category for review.
+        const merchantMatch = categoryFromMerchantPreference(preferences, entry);
+        const suppliedMatch = entry.sourceCategory
+          ? categoryForInput(categories, entry.type, entry.sourceCategory, field(sourceRows[index], "parentcategory"))
+          : undefined;
+        const selected = merchantMatch || suppliedMatch;
+        if (selected) assignments.set(index, selected);
+        else unknownIndexes.push(index);
+      });
+
+      const aiMatches = await aiTransactionCategories(unknownIndexes.map((index) => sourceRows[index]), categories);
+      for (const [sourceIndex, selected] of Array.from((aiMatches || new Map()).entries())) {
+        const targetIndex = unknownIndexes[sourceIndex];
+        if (targetIndex !== undefined) assignments.set(targetIndex, selected);
+      }
+
+      const preview: TransactionImportPreview = {
+        entries: entries.map((entry, index) => {
+          const selected = assignments.get(index);
+          return selected
+            ? applyImportCategorySuggestion(entry, selected, !hasSuppliedNeedWant(sourceRows[index]))
+            : entry;
+        }),
+        ignoredBlankRows: parsed.ignoredBlankRows,
+      };
+      return res.json(preview);
+    } catch (error) {
+      console.error("[POST /api/transactions/ingest/preview] error:", error);
+      return res.status(500).json({ message: "Failed to preview transaction import" });
+    }
+  });
+
+  // Save a user-reviewed file import atomically. Validation completes before
+  // acquiring a transaction connection, so a rejected review remains intact.
+  app.post("/api/transactions/import-reviewed", requireAuth, async (req, res) => {
+    let importClient: any;
+    try {
+      const entries = req.body?.entries;
+      if (!Array.isArray(entries) || entries.length === 0 || entries.length > 500) {
+        return res.status(400).json({ message: "Provide between 1 and 500 reviewed transactions" });
+      }
+      const categories = await canonicalTransactionCategories();
+      const validation = validateReviewedTransactionEntries(entries, categories);
+      if (validation.errors.length) {
+        return res.status(422).json({
+          message: "Please correct invalid transactions before saving",
+          errors: validation.errors,
+        });
+      }
+
+      importClient = await pool.connect();
+      const saved = await saveReviewedTransactionBatch(importClient, (req.user as any).id, validation.transactions);
+      const result: TransactionImportResult = {
+        inserted: saved.inserted,
+        uncategorized: saved.uncategorized,
+        skipped: 0,
+        skippedReasons: {},
+        recurringMarked: saved.recurringMarked,
+      };
+      return res.json(result);
+    } catch (error) {
+      console.error("[POST /api/transactions/import-reviewed] error:", error);
+      return res.status(500).json({ message: "Failed to save reviewed transactions" });
+    } finally {
+      if (importClient) {
+        try {
+          importClient.release();
+        } catch {
+          // A release failure after a successful commit must not turn the
+          // completed save into an apparent failed import.
+        }
+      }
+    }
+  });
+
   app.post("/api/transactions/ingest", requireAuth, transactionUploadFile, async (req: any, res) => {
     let ingestionClient: any;
     try {

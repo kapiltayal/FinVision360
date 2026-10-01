@@ -1,10 +1,17 @@
 import * as XLSX from "xlsx";
 import { parse as parseCsv } from "csv-parse/sync";
+import { parse as parseCsvStream } from "csv-parse";
+import { Readable } from "node:stream";
 import { completeIngestionClassification } from "./ai/provider";
 
 export type Category = { parentCategory: string; category: string; description: string };
 export type RawRow = Record<string, unknown>;
 export type IngestionKind = "asset" | "liability";
+export type TransactionUploadParseResult = {
+  rows: RawRow[];
+  ignoredBlankRows: number;
+  overflow: boolean;
+};
 
 const MAX_ROWS = 500;
 const AI_BATCH_SIZE = 40;
@@ -134,6 +141,145 @@ export function parseUpload(file: Express.Multer.File): RawRow[] | null {
     const lines = trimmedLines(text).filter((line) => line.trim());
     if (!lines.length) return null;
     return lines.slice(0, MAX_ROWS + 1).map((line) => ({ text: line.trim() }));
+  } catch {
+    return null;
+  }
+}
+
+function isBlankRecord(cells: unknown[]): boolean {
+  return cells.every((cell) => !clean(cell));
+}
+
+function parseTransactionWorkbook(file: Express.Multer.File): TransactionUploadParseResult | null {
+  const extension = file.originalname.toLowerCase().match(/\.([a-z0-9]+)$/)?.[1];
+  if (extension !== "xls" && extension !== "xlsx") return null;
+  if (extension === "xlsx" && !isBoundedXlsxArchive(file.buffer)) return null;
+
+  try {
+    // XLSX archives have a 40 MiB uncompressed limit above. Scan sparse cell
+    // coordinates instead of expanding the worksheet's declared range, which
+    // may contain arbitrarily many blank rows.
+    const workbook = XLSX.read(file.buffer, { type: "buffer", WTF: true });
+    for (const sheetName of workbook.SheetNames) {
+      const sheet = workbook.Sheets[sheetName];
+      const cellRows = new Map<number, Map<number, string>>();
+      for (const address of Object.keys(sheet)) {
+        if (address.startsWith("!") || !/^[A-Z]+[1-9]\d*$/.test(address)) continue;
+        const cell = sheet[address] as XLSX.CellObject;
+        const value = clean(cell.w ?? cell.v);
+        if (!value) continue;
+        const { r, c } = XLSX.utils.decode_cell(address);
+        let row = cellRows.get(r);
+        if (!row) {
+          row = new Map<number, string>();
+          cellRows.set(r, row);
+        }
+        row.set(c, value);
+      }
+      const rowNumbers = Array.from(cellRows.keys()).sort((left, right) => left - right);
+      if (rowNumbers.length < 2) continue;
+      const headerRowNumber = rowNumbers[0];
+      const headerCells = cellRows.get(headerRowNumber)!;
+      const minColumn = Math.min(...Array.from(headerCells.keys()));
+      const maxColumn = Math.max(...Array.from(cellRows.values()).flatMap((row) => Array.from(row.keys())));
+      const headers = Array.from({ length: maxColumn - minColumn + 1 }, (_, offset) => {
+        const header = headerCells.get(minColumn + offset) ?? "";
+        return header.toLowerCase().replace(/[^a-z0-9]/g, "") || `column${offset + 1}`;
+      });
+      if (!headers.some(Boolean)) continue;
+
+      const dataRowNumbers = rowNumbers.filter((rowNumber) => rowNumber > headerRowNumber);
+      if (!dataRowNumbers.length) continue;
+      const rows: RawRow[] = [];
+      let nonblankRows = 0;
+      let ignoredBlankRows = 0;
+      let previousDataRowNumber = headerRowNumber;
+      for (const rowNumber of dataRowNumbers) {
+        ignoredBlankRows += Math.max(0, rowNumber - previousDataRowNumber - 1);
+        previousDataRowNumber = rowNumber;
+        const sourceCells = cellRows.get(rowNumber)!;
+        if (isBlankRecord(Array.from(sourceCells.values()))) continue;
+        nonblankRows++;
+        if (nonblankRows > 500) {
+          return { rows, ignoredBlankRows, overflow: true };
+        }
+        rows.push(Object.fromEntries(headers.map((header, offset) => [
+          header,
+          sourceCells.get(minColumn + offset) ?? "",
+        ])));
+      }
+      return { rows, ignoredBlankRows, overflow: false };
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+export async function parseTransactionUpload(
+  file: Express.Multer.File,
+): Promise<TransactionUploadParseResult | null> {
+  const extension = file.originalname.toLowerCase().match(/\.([a-z0-9]+)$/)?.[1];
+  if (extension === "xls" || extension === "xlsx") return parseTransactionWorkbook(file);
+  if (!extension || !["csv", "tsv", "txt"].includes(extension)) return null;
+
+  let text: string;
+  try {
+    text = new TextDecoder("utf-8", { fatal: true }).decode(file.buffer);
+  } catch {
+    return null;
+  }
+  if (!text.trim() || text.includes("\0") || hasSuspiciousControlCharacters(text)) return null;
+
+  const firstLine = text.replace(/^\uFEFF/, "").split(/\r?\n/, 1)[0] ?? "";
+  const delimiter = extension === "tsv" ? "\t" : firstLine.includes("\t") ? "\t" : firstLine.includes(",") ? "," : null;
+  if (!delimiter) {
+    if (extension !== "txt") return null;
+    const rows: RawRow[] = [];
+    let ignoredBlankRows = 0;
+    let lineStart = 0;
+    for (let index = 0; index <= text.length; index++) {
+      if (index !== text.length && text[index] !== "\n") continue;
+      const line = text.slice(lineStart, index).replace(/\r$/, "").replace(/^\uFEFF/, "");
+      lineStart = index + 1;
+      if (!line.trim()) {
+        ignoredBlankRows++;
+      } else {
+        if (rows.length === 500) return { rows, ignoredBlankRows, overflow: true };
+        rows.push({ text: line.trim() });
+      }
+    }
+    return { rows, ignoredBlankRows, overflow: false };
+  }
+
+  try {
+    const parser = parseCsvStream({
+      bom: true,
+      delimiter,
+      relax_column_count: true,
+      relax_quotes: false,
+      skip_empty_lines: false,
+      trim: true,
+      max_record_size: 20_000,
+    });
+    let headers: string[] | null = null;
+    const rows: RawRow[] = [];
+    let ignoredBlankRows = 0;
+    for await (const rawRecord of Readable.from([text]).pipe(parser)) {
+      const cells = rawRecord as string[];
+      if (isBlankRecord(cells)) {
+        ignoredBlankRows++;
+        continue;
+      }
+      if (!headers) {
+        headers = cells.map((header, index) =>
+          header.toLowerCase().replace(/[^a-z0-9]/g, "") || `column${index + 1}`);
+        continue;
+      }
+      if (rows.length === 500) return { rows, ignoredBlankRows, overflow: true };
+      rows.push(Object.fromEntries(headers.map((header, index) => [header, cells[index] ?? ""])));
+    }
+    return headers ? { rows, ignoredBlankRows, overflow: false } : null;
   } catch {
     return null;
   }

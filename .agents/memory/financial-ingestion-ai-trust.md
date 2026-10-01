@@ -15,11 +15,11 @@ User corrections to transaction parent category, category, need/want, or recurri
 
 **How to apply:** Preserve that four-stage order for file and API ingestion. Treat category audit history and manual entries as explicit user merchant choices; do not infer category preference from a flag that may only reflect recurrence or Need/Want edits. Keep source rows authoritative, validate AI output against the live lookup table, count and surface unassigned imports, and exclude user-modified fields from automated overwrite paths.
 
-For reviewed asset and liability file imports, show every nonblank source row even if category recognition fails or a required field is missing. Make an unmatched source category visible alongside any suggestion so the reviewer can correct it.
+For reviewed financial file imports (assets, liabilities, and transactions), show every nonblank source row even if category recognition fails or a required field is missing. Make an unmatched source category visible alongside any suggestion so the reviewer can correct it. Transaction categories remain optional: unresolved rows may save as unassigned.
 
 **Why:** Omitting sparse rows or hiding an uploaded category behind an automatic guess can turn a fixable import into silent data loss or incorrect categorization.
 
-**How to apply:** Treat suggestions as editable, not authoritative. Only the reviewer may remove a row; require valid fields before saving.
+**How to apply:** Treat suggestions as editable, not authoritative. Only the reviewer may remove a row; require valid fields before saving. Reject oversized files rather than presenting a truncated preview.
 
 Save a reviewed financial file all-or-nothing and keep the review intact if saving fails.
 
