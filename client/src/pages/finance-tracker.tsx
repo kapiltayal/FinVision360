@@ -975,22 +975,25 @@ export default function FinanceTrackerPage() {
           <Button size="sm" variant="outline" onClick={() => recurringMut.mutate()} disabled={recurringMut.isPending}>
             <RefreshCw className="h-3.5 w-3.5 mr-1.5" />Detect Recurring
           </Button>
-          <Button size="sm" onClick={() => setDataIntakeOpen(value => !value)}>
-            {dataIntakeOpen ? <X className="h-3.5 w-3.5 mr-1.5" /> : <Plus className="h-3.5 w-3.5 mr-1.5" />}
-            {dataIntakeOpen ? "Close Add Transactions" : "Add Transaction"}
+          <Button size="sm" onClick={() => setDataIntakeOpen(true)}>
+            <Plus className="h-3.5 w-3.5 mr-1.5" />
+            Add Transaction
           </Button>
         </div>
       </div>
 
       {/* ── Data Intake ── */}
-      {dataIntakeOpen && (
-        <Card className="border-blue-200 dark:border-blue-900/60 shadow-sm">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base flex items-center gap-2">
-              <Database className="h-4 w-4 text-blue-500" />Add Transactions
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
+      <Dialog open={dataIntakeOpen} onOpenChange={setDataIntakeOpen}>
+        <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Database className="h-4 w-4 text-blue-500" />
+              Add Transactions
+            </DialogTitle>
+            <DialogDescription>
+              Enter a transaction, upload a file, or import activity from a connected account.
+            </DialogDescription>
+          </DialogHeader>
             <Tabs defaultValue="manual">
               <TabsList className="grid grid-cols-3 w-full max-w-xl">
                 <TabsTrigger value="manual"><Plus className="h-3.5 w-3.5 mr-1.5" />Manual</TabsTrigger>
@@ -1010,9 +1013,8 @@ export default function FinanceTrackerPage() {
                 <ConnectedAccountsImportPanel onImported={invalidateAll} />
               </TabsContent>
             </Tabs>
-          </CardContent>
-        </Card>
-      )}
+        </DialogContent>
+      </Dialog>
       {lastImportResult && (
         <div
           className={`flex items-start justify-between gap-3 rounded-lg border p-3 ${
