@@ -913,8 +913,8 @@ export default function FinanceTrackerPage() {
       {/* ── Header ── */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 page-header-gradient">
         <div>
-          <h1 className="text-2xl font-bold">Finance Tracker</h1>
-          <p className="text-muted-foreground text-sm">Track, categorize and analyze your income &amp; expenses</p>
+          <h1 className="text-2xl font-bold">Understand Your Spending in Seconds</h1>
+          <p className="text-muted-foreground text-sm">See every transaction clearly categorized, analyzed, and transformed into actionable financial insights.</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <Button size="sm" variant="outline" onClick={() => recurringMut.mutate()} disabled={recurringMut.isPending}>
