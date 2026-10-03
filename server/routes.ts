@@ -961,7 +961,12 @@ ${JSON.stringify({
 
 Question: ${scenario}
 
-Use markdown sections for key observations, recommendations, projected impact, and risks. Be concise and use numbers only when the supplied data supports them.`,
+Use exactly these four markdown headings, in this order:
+## Key observations
+## Recommendations
+## Projected Impact
+## Risks
+Put each point under the matching heading. If a section has no useful content, say so briefly instead of omitting it. Be concise and use numbers only when the supplied data supports them.`,
       },
     ], "scenario", response => saveAdvisorHistory(userId, "scenario", scenario, response));
   });

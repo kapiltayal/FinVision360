@@ -16,6 +16,7 @@ import { getAccessToken } from "@/lib/supabase";
 import { queryClient } from "@/lib/queryClient";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { SCENARIO_SECTIONS, splitScenarioResponse, type ScenarioSection } from "@/lib/advisor-response";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -61,17 +62,20 @@ function MarkdownRenderer({ content }: { content: string }) {
 function StreamingResponse({
   endpoint,
   body,
+  sectioned = false,
   onStart,
   onComplete,
 }: {
   endpoint: string;
   body: any;
+  sectioned?: boolean;
   onStart?: () => void;
   onComplete?: () => void;
 }) {
   const [response, setResponse] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState("");
+  const [activeResponseSection, setActiveResponseSection] = useState<ScenarioSection>("observations");
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -152,10 +156,10 @@ function StreamingResponse({
   }, [endpoint, JSON.stringify(body)]);
 
   useEffect(() => {
-    if (containerRef.current) {
+    if (!sectioned && containerRef.current) {
       containerRef.current.scrollTop = 0;
     }
-  }, [response]);
+  }, [response, sectioned]);
 
   if (error) {
     return (
@@ -167,22 +171,77 @@ function StreamingResponse({
     );
   }
 
+  const scenarioSections = sectioned ? splitScenarioResponse(response) : null;
+
   return (
     <Card>
       <CardContent className="p-6">
-        <div
-          ref={containerRef}
-          className={response && !isStreaming ? "max-h-[500px] overflow-y-auto" : "max-h-[500px] overflow-hidden"}
-        >
-          {response ? (
-            <MarkdownRenderer content={response} />
-          ) : (
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              <span className="text-sm">Analyzing your finances...</span>
-            </div>
-          )}
-        </div>
+        {sectioned ? (
+          <Tabs
+            value={activeResponseSection}
+            onValueChange={(value) => setActiveResponseSection(value as ScenarioSection)}
+            aria-label="Scenario answer sections"
+            className="space-y-4"
+          >
+            <TabsList className="grid h-auto w-full grid-cols-2 gap-1 rounded-lg border bg-muted/50 p-1 sm:grid-cols-4">
+              {SCENARIO_SECTIONS.map((section) => (
+                <TabsTrigger
+                  key={section.value}
+                  value={section.value}
+                  className="min-h-9 whitespace-normal rounded-md px-2 py-2 text-xs leading-tight text-muted-foreground transition-colors data-[state=active]:bg-background data-[state=active]:font-semibold data-[state=active]:text-foreground data-[state=active]:shadow-sm sm:text-sm"
+                >
+                  {section.label}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+            {SCENARIO_SECTIONS.map((section) => {
+              const sectionContent = scenarioSections?.[section.value] ?? "";
+              return (
+                <TabsContent
+                  key={section.value}
+                  value={section.value}
+                  className="mt-0 rounded-lg border bg-card/60 p-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <div
+                    ref={section.value === activeResponseSection ? containerRef : undefined}
+                    aria-live="polite"
+                    aria-busy={isStreaming}
+                    className="max-h-[500px] overflow-y-auto"
+                  >
+                    {sectionContent.trim() ? (
+                      <MarkdownRenderer content={sectionContent} />
+                    ) : !response ? (
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <span className="text-sm">Analyzing your finances...</span>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">
+                        {isStreaming
+                          ? "This section will appear as the response develops."
+                          : "No details were included for this section."}
+                      </p>
+                    )}
+                  </div>
+                </TabsContent>
+              );
+            })}
+          </Tabs>
+        ) : (
+          <div
+            ref={containerRef}
+            className={response && !isStreaming ? "max-h-[500px] overflow-y-auto" : "max-h-[500px] overflow-hidden"}
+          >
+            {response ? (
+              <MarkdownRenderer content={response} />
+            ) : (
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span className="text-sm">Analyzing your finances...</span>
+              </div>
+            )}
+          </div>
+        )}
         {isStreaming && (
           <div className="mt-3 flex items-center gap-2 text-muted-foreground">
             <Loader2 className="h-3 w-3 animate-spin" />
@@ -401,6 +460,7 @@ export default function AIAdvisorPage() {
               key={JSON.stringify(scenarioSubmitted)}
               endpoint="/api/ai/scenario"
               body={scenarioSubmitted}
+              sectioned
               onComplete={refreshHistory}
             />
           )}
