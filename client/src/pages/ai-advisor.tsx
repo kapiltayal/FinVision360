@@ -59,6 +59,55 @@ function MarkdownRenderer({ content }: { content: string }) {
   );
 }
 
+function AdvisorResponseTabs({ content, isStreaming = false }: { content: string; isStreaming?: boolean }) {
+  const [activeSection, setActiveSection] = useState<ScenarioSection>("observations");
+  const sections = splitScenarioResponse(content);
+
+  return (
+    <Tabs
+      value={activeSection}
+      onValueChange={(value) => setActiveSection(value as ScenarioSection)}
+      className="space-y-4"
+    >
+      <TabsList aria-label="Answer sections" className="grid h-auto w-full grid-cols-2 gap-1 rounded-lg border bg-muted/50 p-1 sm:grid-cols-4">
+        {SCENARIO_SECTIONS.map((section) => (
+          <TabsTrigger
+            key={section.value}
+            value={section.value}
+            className="min-h-9 whitespace-normal rounded-md px-2 py-2 text-xs leading-tight text-muted-foreground transition-colors data-[state=active]:bg-background data-[state=active]:font-semibold data-[state=active]:text-foreground data-[state=active]:shadow-sm sm:text-sm"
+          >
+            {section.label}
+          </TabsTrigger>
+        ))}
+      </TabsList>
+      {SCENARIO_SECTIONS.map((section) => (
+        <TabsContent
+          key={section.value}
+          value={section.value}
+          className="mt-0 rounded-lg border bg-card/60 p-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <div aria-live={isStreaming ? "polite" : undefined} aria-busy={isStreaming} className="max-h-[500px] overflow-y-auto">
+            {sections[section.value].trim() ? (
+              <MarkdownRenderer content={sections[section.value]} />
+            ) : isStreaming && !content ? (
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span className="text-sm">Analyzing your finances...</span>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                {isStreaming
+                  ? "This section will appear as the response develops."
+                  : "No details were included for this section."}
+              </p>
+            )}
+          </div>
+        </TabsContent>
+      ))}
+    </Tabs>
+  );
+}
+
 function StreamingResponse({
   endpoint,
   body,
@@ -75,7 +124,6 @@ function StreamingResponse({
   const [response, setResponse] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState("");
-  const [activeResponseSection, setActiveResponseSection] = useState<ScenarioSection>("observations");
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -171,62 +219,11 @@ function StreamingResponse({
     );
   }
 
-  const scenarioSections = sectioned ? splitScenarioResponse(response) : null;
-
   return (
     <Card>
       <CardContent className="p-6">
         {sectioned ? (
-          <Tabs
-            value={activeResponseSection}
-            onValueChange={(value) => setActiveResponseSection(value as ScenarioSection)}
-            aria-label="Scenario answer sections"
-            className="space-y-4"
-          >
-            <TabsList className="grid h-auto w-full grid-cols-2 gap-1 rounded-lg border bg-muted/50 p-1 sm:grid-cols-4">
-              {SCENARIO_SECTIONS.map((section) => (
-                <TabsTrigger
-                  key={section.value}
-                  value={section.value}
-                  className="min-h-9 whitespace-normal rounded-md px-2 py-2 text-xs leading-tight text-muted-foreground transition-colors data-[state=active]:bg-background data-[state=active]:font-semibold data-[state=active]:text-foreground data-[state=active]:shadow-sm sm:text-sm"
-                >
-                  {section.label}
-                </TabsTrigger>
-              ))}
-            </TabsList>
-            {SCENARIO_SECTIONS.map((section) => {
-              const sectionContent = scenarioSections?.[section.value] ?? "";
-              return (
-                <TabsContent
-                  key={section.value}
-                  value={section.value}
-                  className="mt-0 rounded-lg border bg-card/60 p-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                >
-                  <div
-                    ref={section.value === activeResponseSection ? containerRef : undefined}
-                    aria-live="polite"
-                    aria-busy={isStreaming}
-                    className="max-h-[500px] overflow-y-auto"
-                  >
-                    {sectionContent.trim() ? (
-                      <MarkdownRenderer content={sectionContent} />
-                    ) : !response ? (
-                      <div className="flex items-center gap-2 text-muted-foreground">
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        <span className="text-sm">Analyzing your finances...</span>
-                      </div>
-                    ) : (
-                      <p className="text-sm text-muted-foreground">
-                        {isStreaming
-                          ? "This section will appear as the response develops."
-                          : "No details were included for this section."}
-                      </p>
-                    )}
-                  </div>
-                </TabsContent>
-              );
-            })}
-          </Tabs>
+          <AdvisorResponseTabs content={response} isStreaming={isStreaming} />
         ) : (
           <div
             ref={containerRef}
@@ -614,8 +611,8 @@ export default function AIAdvisorPage() {
                         </div>
                         <p className="mt-2 text-xs text-muted-foreground group-open:hidden">Select to view response</p>
                       </summary>
-                      <div className="mt-4 rounded-lg border bg-muted/20 p-4">
-                        <MarkdownRenderer content={entry.responseText} />
+                      <div className="mt-4">
+                        <AdvisorResponseTabs content={entry.responseText} />
                       </div>
                     </details>
                   ))}
