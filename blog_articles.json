@@ -1,0 +1,65 @@
+[
+  {
+    "slug": "five-small-money-habits",
+    "title": "Five small money habits that make a big difference",
+    "excerpt": "You don't need a complete financial overhaul to get started. Build a clearer picture of your money with five simple, repeatable habits.",
+    "publishedAt": "2026-10-03",
+    "category": "Money habits",
+    "author": "FinVision360",
+    "readingTimeMinutes": 4,
+    "thumbnail": "/Images/blog/money-habits.svg",
+    "thumbnailAlt": "Illustration of a financial notebook, savings jar, and growing plant",
+    "isSample": true,
+    "sections": [
+      {
+        "heading": "Start small. Stay consistent.",
+        "paragraphs": [
+          "This is a sample article created to introduce the FinVision360 blog. Its examples are illustrative and are not personalized financial advice.",
+          "Financial clarity often starts with a small routine, not a dramatic change. Knowing where your money goes, what you owe, and what you are working toward gives you a better starting point for everyday decisions."
+        ]
+      },
+      {
+        "heading": "1. Give your transactions a weekly check-in",
+        "paragraphs": [
+          "Set aside a few minutes each week to review your recent transactions. Look for unfamiliar charges, duplicate subscriptions, and purchases that surprised you.",
+          "Group expenses into useful categories and notice patterns rather than judging every purchase. A weekly check-in can make an end-of-month review feel more manageable."
+        ]
+      },
+      {
+        "heading": "2. Choose one savings goal",
+        "paragraphs": [
+          "Pick a goal with a clear purpose, such as a small emergency cushion or an upcoming planned expense. Decide on an amount that fits your current situation.",
+          "If an automatic transfer is suitable for you, schedule it around payday and leave enough in your spending account for bills. Review the amount when your income or expenses change."
+        ]
+      },
+      {
+        "heading": "3. Know the cost of your debt",
+        "paragraphs": [
+          "Make a simple list of balances, interest rates, minimum payments, and due dates. This helps you understand which obligations cost the most and which payments must come first.",
+          "Before choosing an extra-payment strategy, consider your cash reserve, account terms, and any penalties. A qualified professional can help you evaluate a complex situation."
+        ]
+      },
+      {
+        "heading": "4. Review recurring expenses",
+        "paragraphs": [
+          "Recurring expenses are easy to overlook because they happen in the background. Check subscriptions, memberships, and service plans against what you actually use.",
+          "Cancel or adjust a service only after checking its terms and whether you still need it. Small changes can free up room in your budget, but the amount will depend on your circumstances."
+        ]
+      },
+      {
+        "heading": "5. Look at the whole picture",
+        "paragraphs": [
+          "Your bank balance is one part of your financial life. Looking at assets, liabilities, spending, and long-term goals together can reveal trade-offs that an individual account does not show.",
+          "Start with information you can verify and revisit it regularly. Consistency and realistic expectations matter more than getting everything perfect on the first day."
+        ]
+      },
+      {
+        "heading": "Your next step",
+        "paragraphs": [
+          "Choose just one habit from this list and give it a regular place in your week. Once it feels manageable, add another.",
+          "This article is for educational purposes only. It does not guarantee financial outcomes or replace financial, investment, tax, or legal advice."
+        ]
+      }
+    ]
+  }
+]

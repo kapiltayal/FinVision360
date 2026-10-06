@@ -30,6 +30,8 @@ import FAQPage from "@/pages/faq";
 import ContactPage from "@/pages/contact";
 import GoalsPage from "@/pages/goals";
 import ResetPasswordPage from "@/pages/reset-password";
+import BlogPage from "@/pages/blog";
+import BlogArticlePage from "@/pages/blog-article";
 
 function LegacyRetirement401kRedirect() {
   const [, setLocation] = useLocation();
@@ -113,6 +115,8 @@ function AppRouter() {
       <Route path="/terms" component={TermsPage} />
       <Route path="/faq" component={FAQPage} />
       <Route path="/contact" component={ContactPage} />
+      <Route path="/blog/:slug" component={BlogArticlePage} />
+      <Route path="/blog" component={BlogPage} />
       <Route>
         {user ? <AuthenticatedApp /> : <LandingPage />}
       </Route>

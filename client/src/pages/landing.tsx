@@ -413,11 +413,12 @@ export default function LandingPage() {
       {/* Header */}
       {!user && (
       <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur">
-        <div className="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between gap-4">
-          <img src={logoPath} alt="FinVision360" className="h-11 w-auto" />
-          <nav className="hidden md:flex items-center gap-6 text-sm text-muted-foreground">
+        <div className="max-w-6xl mx-auto px-4 min-h-14 py-2 flex flex-wrap items-center justify-between gap-3">
+          <img src={logoPath} alt="FinVision360" className="h-8 sm:h-11 w-auto" />
+          <nav aria-label="Public navigation" className="order-last md:order-none w-full md:w-auto flex items-center justify-center gap-6 text-sm text-muted-foreground">
             <a href="#features" className="hover-elevate rounded-sm px-1">Features</a>
             <a href="#how-it-works" className="hover-elevate rounded-sm px-1">How It Works</a>
+            <Link href="/blog" className="hover-elevate rounded-sm px-1">Blog</Link>
           </nav>
           <div className="flex items-center gap-2">
             <Button size="icon" variant="ghost" onClick={toggleTheme} data-testid="button-theme-toggle">
@@ -699,6 +700,7 @@ export default function LandingPage() {
                 <div className="space-y-1.5">
                   <div><Link href="/about" className="text-xs text-muted-foreground hover:text-foreground transition-colors">About Us</Link></div>
                   <div><Link href="/faq" className="text-xs text-muted-foreground hover:text-foreground transition-colors">FAQ</Link></div>
+                  <div><Link href="/blog" className="text-xs text-muted-foreground hover:text-foreground transition-colors">Blog</Link></div>
                 </div>
               </div>
               <div className="space-y-2">

@@ -670,7 +670,7 @@ export default function FinanceTrackerPage() {
   const catQK = ["/api/transactions/categories", start, end, catChartType];
   const insightsQK = ["/api/transactions/insights", start, end];
   const txnQK = ["/api/transactions", start, end, typeFilter, search, transactionFilter];
-  const transactionFilterParams = transactionFilter.startsWith("account:")
+  const transactionFilterParams: Record<string, string> = transactionFilter.startsWith("account:")
     ? { plaidAccountId: transactionFilter.slice("account:".length) }
     : transactionFilter.startsWith("source:")
       ? { source: transactionFilter.slice("source:".length) }

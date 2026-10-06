@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 600" role="img" aria-labelledby="title desc">
+  <title id="title">Small money habits</title>
+  <desc id="desc">A warm editorial illustration of a financial notebook, a savings jar, and a growing plant.</desc>
+  <defs>
+    <linearGradient id="paper" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#eff4e9"/>
+      <stop offset="1" stop-color="#dcebe1"/>
+    </linearGradient>
+    <linearGradient id="jar" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#b6d9cd" stop-opacity=".88"/>
+      <stop offset="1" stop-color="#75aa9c" stop-opacity=".72"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="150%">
+      <feDropShadow dx="0" dy="14" stdDeviation="15" flood-color="#315a4d" flood-opacity=".12"/>
+    </filter>
+  </defs>
+  <rect width="1200" height="600" fill="url(#paper)"/>
+  <circle cx="1015" cy="70" r="225" fill="#f4e6c6" opacity=".62"/>
+  <circle cx="105" cy="522" r="205" fill="#bdd8cc" opacity=".4"/>
+  <path d="M0 450c199-48 372-45 541 5 191 57 382 31 659-60v205H0z" fill="#cbded2" opacity=".5"/>
+  <g filter="url(#shadow)" transform="rotate(-7 475 318)">
+    <rect x="236" y="135" width="410" height="345" rx="19" fill="#426f63"/>
+    <rect x="254" y="125" width="385" height="345" rx="17" fill="#fffaf0"/>
+    <path d="M288 125v345" stroke="#d3a57c" stroke-width="3"/>
+    <g fill="#75a89b">
+      <circle cx="270" cy="174" r="4"/><circle cx="270" cy="222" r="4"/><circle cx="270" cy="270" r="4"/>
+      <circle cx="270" cy="318" r="4"/><circle cx="270" cy="366" r="4"/><circle cx="270" cy="414" r="4"/>
+    </g>
+    <text x="318" y="195" fill="#315d52" font-family="Georgia,serif" font-size="27" font-style="italic">A little more clarity</text>
+    <text x="318" y="226" fill="#879b8c" font-family="Arial,sans-serif" font-size="12" letter-spacing="3">WEEKLY MONEY NOTES</text>
+    <path d="M318 254h274M318 299h274M318 344h274M318 389h274" stroke="#d8e1d8" stroke-width="2"/>
+    <circle cx="327" cy="277" r="7" fill="none" stroke="#72a89a" stroke-width="2"/>
+    <path d="m323 277 3 3 6-7" fill="none" stroke="#72a89a" stroke-width="2"/>
+    <path d="M343 277h162" stroke="#9ab3a6" stroke-width="3" stroke-linecap="round"/>
+    <circle cx="327" cy="322" r="7" fill="none" stroke="#72a89a" stroke-width="2"/>
+    <path d="M343 322h121" stroke="#c6d2c8" stroke-width="3" stroke-linecap="round"/>
+    <circle cx="327" cy="367" r="7" fill="none" stroke="#72a89a" stroke-width="2"/>
+    <path d="M343 367h180" stroke="#c6d2c8" stroke-width="3" stroke-linecap="round"/>
+    <path d="M557 152v23m-11-11h22" stroke="#c98a61" stroke-width="2" stroke-linecap="round"/>
+  </g>
+  <g filter="url(#shadow)" transform="rotate(5 785 372)">
+    <path d="M719 303h176l-13 202q-2 26-27 26h-96q-25 0-27-26z" fill="url(#jar)" stroke="#548c7b" stroke-width="4"/>
+    <path d="M714 294q0-11 12-11h162q12 0 12 11v17q0 9-12 9H726q-12 0-12-9z" fill="#6f9f91"/>
+    <path d="M740 371c38-19 88-20 133 0" fill="none" stroke="#e9f3e8" stroke-width="4" opacity=".65"/>
+    <path d="M756 405c31-10 69-9 105 2" fill="none" stroke="#e9f3e8" stroke-width="3" opacity=".5"/>
+    <path d="M770 459c12-7 33-7 48 1m-53 17c30-9 67-8 98 2" fill="none" stroke="#e9f3e8" stroke-width="3" opacity=".48"/>
+    <text x="761" y="354" fill="#f5fcf4" font-family="Georgia,serif" font-size="19" font-style="italic">little by little</text>
+  </g>
+  <g filter="url(#shadow)">
+    <path d="M942 427h177l-17 81q-2 11-15 11H974q-12 0-15-11z" fill="#c47e5b"/>
+    <path d="M932 421q0-12 12-12h174q12 0 12 12v13H932z" fill="#d7926e"/>
+    <path d="M1020 412c-1-77 10-143 49-205" fill="none" stroke="#567f62" stroke-width="8" stroke-linecap="round"/>
+    <path d="M1037 341c-62-2-83-34-76-69 43-2 69 22 76 69z" fill="#83a982"/>
+    <path d="M1049 306c-2-45 23-78 63-82 13 37-12 73-63 82z" fill="#719571"/>
+    <path d="M1059 265c-3-46 19-72 52-91 19 34-2 71-52 91z" fill="#91b18b"/>
+    <path d="M1024 381c35-16 62-17 92-12" fill="none" stroke="#567f62" stroke-width="5" stroke-linecap="round"/>
+    <path d="M1048 366c-10-36-33-54-65-57-4 30 22 54 65 57z" fill="#a3bd94"/>
+  </g>
+  <g fill="#fffaf0" opacity=".85">
+    <circle cx="677" cy="166" r="4"/><circle cx="940" cy="147" r="3"/><circle cx="672" cy="493" r="3"/>
+  </g>
+</svg>
