@@ -61,7 +61,7 @@ export default function BlogArticlePage() {
           </div>
         </header>
 
-        <figure className="overflow-hidden rounded-2xl bg-[#e6f0ea] dark:bg-[#1b302c]">
+        <figure className="overflow-hidden rounded-2xl bg-primary/[0.07]">
           <img src={article.thumbnail} alt={article.thumbnailAlt} className="aspect-[16/8] w-full object-cover" />
         </figure>
 

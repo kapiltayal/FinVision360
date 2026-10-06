@@ -13,24 +13,24 @@ export default function BlogPage() {
   return (
     <PublicPageLayout>
       <div className="mx-auto max-w-5xl">
-        <section className="relative overflow-hidden rounded-[2rem] border border-cyan-900/10 bg-[#eaf5f2] px-6 py-10 text-[#173c3d] dark:border-cyan-200/10 dark:bg-[#183332] dark:text-[#e4f2eb] sm:px-10 sm:py-14">
-          <div aria-hidden="true" className="pointer-events-none absolute -right-12 -top-20 h-64 w-64 rounded-full border border-[#639d90]/20 sm:h-80 sm:w-80" />
-          <div aria-hidden="true" className="pointer-events-none absolute -right-1 top-1/2 h-40 w-40 -translate-y-1/2 rounded-full border border-[#639d90]/20 sm:right-8" />
+        <section className="relative overflow-hidden rounded-[2rem] border border-primary/15 bg-primary/[0.07] px-6 py-10 text-foreground dark:border-primary/25 dark:bg-primary/[0.12] sm:px-10 sm:py-14">
+          <div aria-hidden="true" className="pointer-events-none absolute -right-12 -top-20 h-64 w-64 rounded-full border border-primary/10 sm:h-80 sm:w-80" />
+          <div aria-hidden="true" className="pointer-events-none absolute -right-1 top-1/2 h-40 w-40 -translate-y-1/2 rounded-full border border-primary/10 sm:right-8" />
           <div className="relative max-w-2xl">
-            <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-[#498577]/20 bg-white/55 px-3 py-1.5 text-xs font-semibold tracking-[0.12em] text-[#387467] dark:border-[#9acbb9]/20 dark:bg-white/5 dark:text-[#b3dbcb]">
+            <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-background/70 px-3 py-1.5 text-xs font-semibold tracking-[0.12em] text-primary dark:bg-background/45">
               <Sparkles aria-hidden="true" className="h-3.5 w-3.5" />
               THE FINVISION360 JOURNAL
             </div>
             <h1 className="font-serif text-4xl leading-[1.04] tracking-[-0.045em] sm:text-6xl">
               A clearer view of
               <br />
-              <span className="italic text-[#478477] dark:text-[#a1d0bf]">your money.</span>
+              <span className="italic text-primary">your money.</span>
             </h1>
-            <p className="mt-5 max-w-lg text-base leading-7 text-[#456665] dark:text-[#c0d7ce] sm:text-lg">
+            <p className="mt-5 max-w-lg text-base leading-7 text-muted-foreground sm:text-lg">
               Small, thoughtful ways to make sense of the whole picture—and feel more at home in your finances.
             </p>
-            <div className="mt-8 flex items-center gap-3 text-sm text-[#587774] dark:text-[#a8c4b9]">
-              <span className="h-px w-10 bg-[#72a99b]" />
+            <div className="mt-8 flex items-center gap-3 text-sm text-muted-foreground">
+              <span className="h-px w-10 bg-primary/45" />
               A little clarity goes a long way
             </div>
           </div>
@@ -52,7 +52,7 @@ export default function BlogPage() {
             <div className="grid gap-5 sm:grid-cols-2">
               {blogArticles.map(article => (
                 <article key={article.slug} className="group flex h-full flex-col overflow-hidden rounded-2xl border border-border/80 bg-card transition-transform duration-300 hover:-translate-y-1">
-                  <div className="relative aspect-[16/9] overflow-hidden bg-[#e6f0ea] dark:bg-[#1b302c]">
+                  <div className="relative aspect-[16/9] overflow-hidden bg-primary/[0.07]">
                     <img src={article.thumbnail} alt={article.thumbnailAlt} className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]" />
                     {article.isSample && <span className="absolute left-3 top-3 rounded-full bg-[#f6e9c9] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-[#785b26]">Sample article</span>}
                   </div>
