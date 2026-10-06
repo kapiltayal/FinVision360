@@ -696,11 +696,12 @@ export default function LandingPage() {
             </div>
             <div className="flex flex-wrap gap-x-8 gap-y-4 text-sm">
               <div className="space-y-2">
-                <p className="font-medium text-xs uppercase tracking-wide text-muted-foreground">Company</p>
+                <p className="font-medium text-xs uppercase tracking-wide text-muted-foreground">Quick links</p>
                 <div className="space-y-1.5">
                   <div><Link href="/about" className="text-xs text-muted-foreground hover:text-foreground transition-colors">About Us</Link></div>
                   <div><Link href="/faq" className="text-xs text-muted-foreground hover:text-foreground transition-colors">FAQ</Link></div>
                   <div><Link href="/blog" className="text-xs text-muted-foreground hover:text-foreground transition-colors">Blog</Link></div>
+                  <div><Link href="/contact" className="text-xs text-muted-foreground hover:text-foreground transition-colors">Contact Us</Link></div>
                 </div>
               </div>
               <div className="space-y-2">
@@ -708,13 +709,6 @@ export default function LandingPage() {
                 <div className="space-y-1.5">
                   <div><Link href="/privacy" className="text-xs text-muted-foreground hover:text-foreground transition-colors">Privacy Policy</Link></div>
                   <div><Link href="/terms" className="text-xs text-muted-foreground hover:text-foreground transition-colors">Terms & Conditions</Link></div>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <p className="font-medium text-xs uppercase tracking-wide text-muted-foreground">Contact</p>
-                <div className="space-y-1.5">
-                  <div><Link href="/contact" className="text-xs text-muted-foreground hover:text-foreground transition-colors">Contact Us</Link></div>
-                  <div><a href="mailto:contactus@finvision360.com" className="text-xs text-muted-foreground hover:text-foreground transition-colors">contactus@finvision360.com</a></div>
                 </div>
               </div>
             </div>
