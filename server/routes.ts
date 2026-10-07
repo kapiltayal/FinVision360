@@ -4,6 +4,7 @@ import { and, eq, sql } from "drizzle-orm";
 import { storage } from "./storage";
 import { setupAuth, requireAuth, requireAdmin, authenticateSupabase } from "./auth";
 import { db, pool } from "./db";
+import { snapshotUserGoals } from "./goal-history";
 import { registerFinanceTrackerRoutes } from "./finance-tracker-routes";
 import {
   assets,
@@ -1915,7 +1916,7 @@ Include a year-by-year overview, useful milestones, a conservative/base/optimist
     }
   });
 
-  // ── Monthly Net Worth Backup (cron-triggered) ───────────────────────────
+  // ── Monthly Net Worth and Goals Backup (cron-triggered) ─────────────────
   app.post("/api/tasks/monthly-backup", async (req, res) => {
     const token = req.headers["x-cron-token"];
     if (!token || token !== process.env.CRON_TOKEN) {
@@ -1963,6 +1964,10 @@ Include a year-by-year overview, useful milestones, a conservative/base/optimist
         console.log(`[monthly-backup] inserted ${liabilityRows.length} liability snapshot(s)`);
       }
 
+      // Snapshot goals and prune their history atomically.
+      const goalBackup = await db.transaction((tx) => snapshotUserGoals(tx));
+      console.log(`[monthly-backup] inserted ${goalBackup.goalsSnapshotted} goal snapshot(s) and pruned ${goalBackup.goalsDeleted} old goal record(s)`);
+
       // Cleanup: delete records older than 24 months
       const cutoff = new Date();
       cutoff.setMonth(cutoff.getMonth() - 24);
@@ -1984,6 +1989,7 @@ Include a year-by-year overview, useful milestones, a conservative/base/optimist
         liabilitiesSnapshotted: liabilityRows.length,
         assetsDeleted: deletedAssets ?? 0,
         liabilitiesDeleted: deletedLiabilities ?? 0,
+        ...goalBackup,
       });
     } catch (err) {
       console.error("[monthly-backup] database error:", err);

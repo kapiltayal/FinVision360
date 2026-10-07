@@ -658,6 +658,28 @@ export const userGoals = pgTable("user_goals", {
 export type UserGoal = typeof userGoals.$inferSelect;
 export type InsertUserGoal = typeof userGoals.$inferInsert;
 
+export const userGoalsHistory = pgTable("user_goals_history", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  // Keep snapshots even after the source goal is deleted.
+  goalId: integer("goal_id").notNull(),
+  title: varchar("title", { length: 200 }).notNull(),
+  category: varchar("category", { length: 50 }).notNull().default("custom"),
+  targetAmount: numeric("target_amount", { precision: 12, scale: 2 }).notNull(),
+  currentAmount: numeric("current_amount", { precision: 12, scale: 2 }).notNull().default("0"),
+  targetDate: date("target_date"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").notNull(),
+  updatedAt: timestamp("updated_at").notNull(),
+  // Null means no requirement can be calculated (an unfinished goal without a deadline).
+  monthlySavingsNeeded: numeric("monthly_savings_needed", { precision: 12, scale: 2 }),
+  snapshotAt: timestamp("snapshot_at").defaultNow().notNull(),
+}, (table) => [
+  index("user_goals_history_snapshot_at_idx").on(table.snapshotAt),
+]);
+
+export type UserGoalHistory = typeof userGoalsHistory.$inferSelect;
+
 // ── Monthly Budget Plans ─────────────────────────────────────────────────────
 
 export const budgetPlans = pgTable("budget_plans", {
