@@ -29,6 +29,7 @@ import {
 } from "recharts";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { formatCurrency } from "@/lib/format";
+import { budgetPlanSubtotal, budgetPlanVariance, effectiveBudgetPlanAmount } from "@/lib/budget-plan-amounts";
 import { FinancialChartTooltip } from "@/components/financial-chart-tooltip";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
@@ -248,6 +249,7 @@ function PlanAmountInput({
 
   function commit() {
     if (draft.trim() === "") {
+      setDraft("0");
       if (value !== undefined && value !== 0) onSave(0);
       return;
     }
@@ -414,7 +416,7 @@ function StatementSection({
   footer?: ReactNode;
 }) {
   const [isOpen, setIsOpen] = useState(false);
-  const plannedTotal = rows.reduce((sum, row) => sum + (row.planned ?? 0), 0);
+  const plannedTotal = budgetPlanSubtotal(rows);
   const actualTotal = rows.reduce((sum, row) => sum + row.actual, 0);
 
   return (
@@ -469,12 +471,8 @@ function StatementSection({
           </TableHeader>
           <TableBody>
             {rows.map((row) => {
-              const variance =
-                row.planned === undefined
-                  ? null
-                  : tone === "income"
-                    ? row.actual - row.planned
-                    : row.planned - row.actual;
+              const planned = effectiveBudgetPlanAmount(row);
+              const variance = budgetPlanVariance(row, tone);
               return (
                 <TableRow key={row.key} className="h-11">
                   <TableCell className="py-1.5 font-medium">{row.label}</TableCell>
@@ -501,7 +499,7 @@ function StatementSection({
                   )}
                   <TableCell className="py-1.5 text-right">
                     <PlanAmountInput
-                      value={row.planned}
+                      value={planned}
                       suggested={row.average}
                       suggestedLabel="the 12-month average"
                       saving={savingKey === row.key}
@@ -513,14 +511,12 @@ function StatementSection({
                   </TableCell>
                   <TableCell
                     className={`py-1.5 text-right text-sm font-medium tabular-nums ${
-                      variance === null
-                        ? "text-muted-foreground"
-                        : variance >= 0
+                      variance >= 0
                           ? "text-emerald-600 dark:text-emerald-400"
                           : "text-rose-600 dark:text-rose-400"
                     }`}
                   >
-                    {variance === null ? "—" : `${variance >= 0 ? "+" : ""}${formatCurrency(variance)}`}
+                    {`${variance >= 0 ? "+" : ""}${formatCurrency(variance)}`}
                   </TableCell>
                   {onRemove && (
                     <TableCell>
@@ -736,11 +732,8 @@ export default function BudgetingPlanPage() {
   const actualExpenses = (data?.actuals ?? [])
     .filter((line) => line.type === "expense")
     .reduce((sum, line) => sum + line.amount, 0);
-  const plannedIncome = incomeRows.reduce((sum, row) => sum + (row.planned ?? 0), 0);
-  const plannedLivingExpenses = expenseRows.reduce(
-    (sum, row) => sum + (row.planned ?? 0),
-    0,
-  );
+  const plannedIncome = budgetPlanSubtotal(incomeRows);
+  const plannedLivingExpenses = budgetPlanSubtotal(expenseRows);
   const plannedDebtPayments = (data?.liabilities ?? []).reduce(
     (sum, liability) =>
       sum + (planMap.get(`debt:${liability.id}`) ?? liability.minimumPayment),

@@ -13,3 +13,4 @@
 - [Inline TypeScript verification scripts](inline-tsx-verification.md) — wrap async tsx -e work in an IIFE and avoid newer runtime APIs not supported by the project Node version.
 - [Calculator slider controls](home-affordability-inputs.md) — use a slider with a live value readout, not a duplicate numeric input.
 - [Radix submenu placement](radix-submenu-placement.md) — use a full-row trigger anchor; narrow arrow anchors overlap the root when Radix flips submenus left.
+- [Budget plan defaults](budget-plan-defaults.md) — displayed suggestions count toward the plan; saved zero overrides them, and viewing a month must not silently save defaults.
