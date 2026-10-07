@@ -794,12 +794,12 @@ export default function BudgetingPlanPage() {
             <div
               role="group"
               aria-label="Month navigation"
-              className="flex items-center gap-1 rounded-xl border border-border/80 bg-background/80 p-1 shadow-sm shadow-slate-900/5"
+              className="flex h-9 items-center gap-0.5 rounded-xl border border-border/80 bg-background/80 px-1 py-0 shadow-sm shadow-slate-900/5"
             >
               <Button
                 size="icon"
                 variant="ghost"
-                className="h-8 w-8 rounded-lg text-muted-foreground hover:bg-muted/70 hover:text-foreground"
+                className="h-7 w-7 rounded-md text-muted-foreground hover:bg-muted/70 hover:text-foreground"
                 disabled={month <= firstPlanMonth}
                 onClick={() =>
                   setMonth((value) => {
@@ -827,13 +827,13 @@ export default function BudgetingPlanPage() {
                         : value,
                   );
                 }}
-                className="h-9 w-44 border-0 bg-transparent px-2 text-sm font-semibold shadow-none focus-visible:ring-2 focus-visible:ring-primary/25 focus-visible:ring-offset-0"
+                className="h-8 w-40 border-0 bg-transparent px-2 text-sm font-semibold shadow-none focus-visible:ring-2 focus-visible:ring-primary/25 focus-visible:ring-offset-0"
                 aria-label="Budget month"
               />
               <Button
                 size="icon"
                 variant="ghost"
-                className="h-8 w-8 rounded-lg text-muted-foreground hover:bg-muted/70 hover:text-foreground"
+                className="h-7 w-7 rounded-md text-muted-foreground hover:bg-muted/70 hover:text-foreground"
                 disabled={month >= lastPlanMonth}
                 onClick={() =>
                   setMonth((value) => {
