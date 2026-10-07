@@ -826,6 +826,19 @@ export default function BudgetingPlanPage() {
             >
               <ArrowRight className="h-4 w-4" />
             </Button>
+            {month !== currentMonth && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="gap-1.5 px-2.5"
+                onClick={() => setMonth(currentMonth)}
+                aria-label="Go to current month"
+              >
+                <CalendarDays className="h-4 w-4 sm:hidden" />
+                <span className="hidden sm:inline">This month</span>
+                <span className="sm:hidden">Today</span>
+              </Button>
+            )}
           </div>
         </div>
       </div>
