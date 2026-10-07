@@ -30,6 +30,7 @@ import {
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { formatCurrency } from "@/lib/format";
 import { budgetPlanSubtotal, budgetPlanVariance, effectiveBudgetPlanAmount } from "@/lib/budget-plan-amounts";
+import { budgetMonthlyGoalRequirement } from "@/lib/goal-monthly-savings";
 import { FinancialChartTooltip } from "@/components/financial-chart-tooltip";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
@@ -212,20 +213,6 @@ function categoryLabel(value: string): string {
   return value
     .replace(/_/g, " ")
     .replace(/\b\w/g, (character) => character.toUpperCase());
-}
-
-function monthlyGoalRequirement(goal: GoalLine, planMonth: string): number {
-  const remaining = Math.max(0, goal.targetAmount - goal.currentAmount);
-  if (!remaining || !goal.targetDate) return 0;
-  const target = new Date(`${goal.targetDate}T12:00:00`);
-  const [year, month] = planMonth.split("-").map(Number);
-  const statementMonth = new Date(year, month - 1, 1);
-  const months =
-    (target.getFullYear() - statementMonth.getFullYear()) * 12 +
-    target.getMonth() -
-    statementMonth.getMonth() +
-    1;
-  return remaining / Math.max(1, months);
 }
 
 function PlanAmountInput({
@@ -741,7 +728,7 @@ export default function BudgetingPlanPage() {
   );
   const plannedGoals = (data?.goals ?? []).reduce(
     (sum, goal) =>
-      sum + (planMap.get(`goal:${goal.id}`) ?? monthlyGoalRequirement(goal, month)),
+      sum + (planMap.get(`goal:${goal.id}`) ?? budgetMonthlyGoalRequirement(goal, month)),
     0,
   );
   const plannedOutflows = plannedLivingExpenses + plannedDebtPayments + plannedGoals;
@@ -1100,7 +1087,7 @@ export default function BudgetingPlanPage() {
                         goal.targetAmount > 0
                           ? Math.min(100, (goal.currentAmount / goal.targetAmount) * 100)
                           : 0;
-                      const required = monthlyGoalRequirement(goal, month);
+                      const required = budgetMonthlyGoalRequirement(goal, month);
                       return (
                         <TableRow key={goal.id} className="h-12">
                           <TableCell className="py-1.5">

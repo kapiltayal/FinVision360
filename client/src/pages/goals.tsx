@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { formatCurrency } from "@/lib/format";
+import { monthlySavingsRequired } from "@/lib/goal-monthly-savings";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -112,22 +113,6 @@ function formatDaysRemaining(days: number | null): string {
   if (days < 30) return `${days}d left`;
   if (days < 365) return `${Math.round(days / 30)}mo left`;
   return `${(days / 365).toFixed(1)}yr left`;
-}
-
-function monthlySavingsRequired(
-  targetAmount: number,
-  currentAmount: number,
-  targetDate: string | null,
-): number | null {
-  const remaining = Math.max(0, targetAmount - currentAmount);
-  if (remaining === 0) return 0;
-  const days = daysRemaining(targetDate);
-  if (days === null) return null;
-
-  // Treat any partial month as a full monthly contribution so the goal is
-  // fully funded by its deadline, including goals that are already overdue.
-  const months = Math.max(1, Math.ceil(days / 30.4375));
-  return remaining / months;
 }
 
 // ── Empty form ────────────────────────────────────────────────────────────────
