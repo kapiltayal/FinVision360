@@ -778,67 +778,74 @@ export default function BudgetingPlanPage() {
               Debt minimums and goal requirements are pulled from your account data.
             </p>
           </div>
-          <div className="flex items-center gap-2">
-            <Button
-              size="icon"
-              variant="outline"
-              disabled={month <= firstPlanMonth}
-              onClick={() =>
-                setMonth((value) => {
-                  const previous = shiftMonth(value, -1);
-                  return previous < firstPlanMonth ? firstPlanMonth : previous;
-                })
-              }
-              aria-label="Previous month"
-            >
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
-            <Input
-              type="month"
-              value={month}
-              min={firstPlanMonth}
-              max={lastPlanMonth}
-              onChange={(event) => {
-                const value = event.target.value;
-                if (!value) return;
-                setMonth(
-                  value < firstPlanMonth
-                    ? firstPlanMonth
-                    : value > lastPlanMonth
-                      ? lastPlanMonth
-                      : value,
-                );
-              }}
-              className="w-44 bg-background"
-              aria-label="Budget month"
-            />
-            <Button
-              size="icon"
-              variant="outline"
-              disabled={month >= lastPlanMonth}
-              onClick={() =>
-                setMonth((value) => {
-                  const next = shiftMonth(value, 1);
-                  return next > lastPlanMonth ? lastPlanMonth : next;
-                })
-              }
-              aria-label="Next month"
-            >
-              <ArrowRight className="h-4 w-4" />
-            </Button>
+          <div className="flex flex-wrap items-center justify-end gap-2">
             {month !== currentMonth && (
               <Button
                 size="sm"
                 variant="outline"
-                className="gap-1.5 px-2.5"
+                className="h-9 gap-1.5 rounded-lg border-primary/20 bg-primary/5 px-3 font-medium text-primary shadow-sm hover:bg-primary/10 hover:text-primary"
                 onClick={() => setMonth(currentMonth)}
                 aria-label="Go to current month"
               >
-                <CalendarDays className="h-4 w-4 sm:hidden" />
-                <span className="hidden sm:inline">This month</span>
-                <span className="sm:hidden">Today</span>
+                <CalendarDays className="h-4 w-4" />
+                <span>This month</span>
               </Button>
             )}
+            <div
+              role="group"
+              aria-label="Month navigation"
+              className="flex items-center gap-1 rounded-xl border border-border/80 bg-background/80 p-1 shadow-sm shadow-slate-900/5"
+            >
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-8 w-8 rounded-lg text-muted-foreground hover:bg-muted/70 hover:text-foreground"
+                disabled={month <= firstPlanMonth}
+                onClick={() =>
+                  setMonth((value) => {
+                    const previous = shiftMonth(value, -1);
+                    return previous < firstPlanMonth ? firstPlanMonth : previous;
+                  })
+                }
+                aria-label="Previous month"
+              >
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+              <Input
+                type="month"
+                value={month}
+                min={firstPlanMonth}
+                max={lastPlanMonth}
+                onChange={(event) => {
+                  const value = event.target.value;
+                  if (!value) return;
+                  setMonth(
+                    value < firstPlanMonth
+                      ? firstPlanMonth
+                      : value > lastPlanMonth
+                        ? lastPlanMonth
+                        : value,
+                  );
+                }}
+                className="h-9 w-44 border-0 bg-transparent px-2 text-sm font-semibold shadow-none focus-visible:ring-2 focus-visible:ring-primary/25 focus-visible:ring-offset-0"
+                aria-label="Budget month"
+              />
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-8 w-8 rounded-lg text-muted-foreground hover:bg-muted/70 hover:text-foreground"
+                disabled={month >= lastPlanMonth}
+                onClick={() =>
+                  setMonth((value) => {
+                    const next = shiftMonth(value, 1);
+                    return next > lastPlanMonth ? lastPlanMonth : next;
+                  })
+                }
+                aria-label="Next month"
+              >
+                <ArrowRight className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
         </div>
       </div>
