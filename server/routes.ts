@@ -4,7 +4,7 @@ import { and, eq, sql } from "drizzle-orm";
 import { storage } from "./storage";
 import { setupAuth, requireAuth, requireAdmin, authenticateSupabase } from "./auth";
 import { db, pool } from "./db";
-import { snapshotUserGoals } from "./goal-history";
+import { CloseWindowError, runMonthlyBackup } from "./monthly-backup";
 import { registerFinanceTrackerRoutes } from "./finance-tracker-routes";
 import {
   assets,
@@ -1925,73 +1925,11 @@ Include a year-by-year overview, useful milestones, a conservative/base/optimist
 
     try {
       console.log("[monthly-backup] starting snapshot...");
-
-      // Snapshot assets
-      const assetRows = await db.select().from(assets);
-      if (assetRows.length > 0) {
-        await db.insert(assetHistory).values(
-          assetRows.map((a) => ({
-            userId: a.userId,
-            assetId: a.id,
-            name: a.name,
-            category: a.category,
-            value: a.value,
-            interestRate: a.interestRate ?? "0",
-            institution: a.institution,
-            notes: a.notes,
-          }))
-        );
-        console.log(`[monthly-backup] inserted ${assetRows.length} asset snapshot(s)`);
-      }
-
-      // Snapshot liabilities
-      const liabilityRows = await db.select().from(liabilities);
-      if (liabilityRows.length > 0) {
-        await db.insert(liabilityHistory).values(
-          liabilityRows.map((l) => ({
-            userId: l.userId,
-            liabilityId: l.id,
-            name: l.name,
-            category: l.category,
-            balance: l.balance,
-            interestRate: l.interestRate ?? "0",
-            minimumPayment: l.minimumPayment ?? "0",
-            maturityDate: l.maturityDate,
-            institution: l.institution,
-            notes: l.notes,
-          }))
-        );
-        console.log(`[monthly-backup] inserted ${liabilityRows.length} liability snapshot(s)`);
-      }
-
-      // Snapshot goals and prune their history atomically.
-      const goalBackup = await db.transaction((tx) => snapshotUserGoals(tx));
-      console.log(`[monthly-backup] inserted ${goalBackup.goalsSnapshotted} goal snapshot(s) and pruned ${goalBackup.goalsDeleted} old goal record(s)`);
-
-      // Cleanup: delete records older than 24 months
-      const cutoff = new Date();
-      cutoff.setMonth(cutoff.getMonth() - 24);
-
-      const { rowCount: deletedAssets } = await pool.query(
-        "DELETE FROM asset_history WHERE snapshot_at < $1",
-        [cutoff]
-      );
-      const { rowCount: deletedLiabilities } = await pool.query(
-        "DELETE FROM liability_history WHERE snapshot_at < $1",
-        [cutoff]
-      );
-      console.log(`[monthly-backup] pruned ${deletedAssets ?? 0} old asset record(s) and ${deletedLiabilities ?? 0} old liability record(s)`);
-
+      const result = await runMonthlyBackup(pool);
       console.log("[monthly-backup] completed successfully");
-      return res.json({
-        message: "Monthly backup completed",
-        assetsSnapshotted: assetRows.length,
-        liabilitiesSnapshotted: liabilityRows.length,
-        assetsDeleted: deletedAssets ?? 0,
-        liabilitiesDeleted: deletedLiabilities ?? 0,
-        ...goalBackup,
-      });
+      return res.json(result);
     } catch (err) {
+      if (err instanceof CloseWindowError) return res.status(409).json({ message: err.message });
       console.error("[monthly-backup] database error:", err);
       return res.status(500).json({ message: "Database error during monthly backup" });
     }

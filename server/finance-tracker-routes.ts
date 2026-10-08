@@ -4,6 +4,8 @@ import type { Express } from "express";
 import type { Transaction as PlaidTransaction } from "plaid";
 import { getPlaidClient } from "./plaid";
 import { storage } from "./storage";
+import { isHistoricalBudgetMonth } from "../shared/budget-period";
+import { budgetEntityMetadata, preserveSavedEntityRows, type BudgetSnapshot } from "./budget-history";
 import multer from "multer";
 import { parseUpload, parseTransactionUpload, isEmptySample, type RawRow } from "./asset-liability-ingestion";
 import { completeIngestionClassification } from "./ai/provider";
@@ -453,11 +455,9 @@ export function registerFinanceTrackerRoutes(app: Express) {
       const [
         { rows: planRows },
         { rows: actualRows },
-        { rows: liabilityRows },
-        { rows: goalRows },
       ] = await Promise.all([
         pool.query(
-          `SELECT plan_key, planned_amount
+          `SELECT plan_key, planned_amount, entity_metadata
            FROM budget_plans
            WHERE user_id = $1 AND month = $2::date
            ORDER BY plan_key`,
@@ -472,6 +472,28 @@ export function registerFinanceTrackerRoutes(app: Express) {
            ORDER BY type, subcategory`,
           [userId, startDate, endDate],
         ),
+      ]);
+      const plans = planRows.map((row) => ({
+        planKey: row.plan_key, plannedAmount: Number(row.planned_amount), entityMetadata: row.entity_metadata,
+      }));
+      const actuals = actualRows.map((row) => ({
+        type: row.type, category: row.subcategory, amount: Number(row.actual_amount),
+      }));
+      if (isHistoricalBudgetMonth(month)) {
+        const { rows: closes } = await pool.query(
+          "SELECT snapshot_at, payload FROM budget_month_closes WHERE user_id=$1 AND period_month=$2::date",
+          [userId, startDate],
+        );
+        const close = closes[0];
+        const historical = preserveSavedEntityRows(close
+          ? close.payload as BudgetSnapshot
+          : { plans, liabilities: [], goals: [] });
+        return res.json({
+          month, readOnly: true, ...historical, actuals,
+          snapshot: { status: close ? "complete" : "unavailable", periodMonth: month, capturedAt: close?.snapshot_at ?? null },
+        });
+      }
+      const [{ rows: liabilityRows }, { rows: goalRows }] = await Promise.all([
         pool.query(
           `SELECT id, name, category, balance, minimum_payment
            FROM liabilities
@@ -490,6 +512,8 @@ export function registerFinanceTrackerRoutes(app: Express) {
 
       return res.json({
         month,
+        readOnly: false,
+        snapshot: null,
         plans: planRows.map((row) => ({
           planKey: row.plan_key,
           plannedAmount: Number(row.planned_amount),
@@ -529,6 +553,7 @@ export function registerFinanceTrackerRoutes(app: Express) {
       if (!isAllowedBudgetPlanMonth(month)) {
         return res.status(400).json({ message: "Budget month must be within the previous 12 months or next 11 months" });
       }
+      if (isHistoricalBudgetMonth(month)) return res.status(403).json({ message: "Historical budget plans are read-only" });
       if (!Array.isArray(plans) || plans.length === 0 || plans.length > 100) {
         return res.status(400).json({ message: "Provide between 1 and 100 plan lines" });
       }
@@ -549,16 +574,20 @@ export function registerFinanceTrackerRoutes(app: Express) {
       if (hasInvalidPlan || keys.size !== normalizedPlans.length) {
         return res.status(400).json({ message: "Every plan line must have a unique valid category and non-negative amount" });
       }
+      const withMetadata = await Promise.all(normalizedPlans.map(async (plan) => ({
+        ...plan, entity_metadata: await budgetEntityMetadata(pool, userId, plan.plan_key),
+      })));
 
       const { rows } = await pool.query(
-        `INSERT INTO budget_plans (user_id, month, plan_key, planned_amount)
-         SELECT $1, $2::date, item.plan_key, item.planned_amount
+        `INSERT INTO budget_plans (user_id, month, plan_key, planned_amount, entity_metadata)
+         SELECT $1, $2::date, item.plan_key, item.planned_amount, item.entity_metadata
          FROM jsonb_to_recordset($3::jsonb)
-           AS item(plan_key text, planned_amount numeric)
+           AS item(plan_key text, planned_amount numeric, entity_metadata jsonb)
          ON CONFLICT (user_id, month, plan_key)
-         DO UPDATE SET planned_amount = EXCLUDED.planned_amount, updated_at = NOW()
+         DO UPDATE SET planned_amount = EXCLUDED.planned_amount,
+           entity_metadata = COALESCE(EXCLUDED.entity_metadata, budget_plans.entity_metadata), updated_at = NOW()
          RETURNING plan_key, planned_amount`,
-        [userId, `${month}-01`, JSON.stringify(normalizedPlans)],
+        [userId, `${month}-01`, JSON.stringify(withMetadata)],
       );
 
       return res.json({
@@ -581,6 +610,7 @@ export function registerFinanceTrackerRoutes(app: Express) {
       if (!isAllowedBudgetPlanMonth(month)) {
         return res.status(400).json({ message: "Budget month must be within the previous 12 months or next 11 months" });
       }
+      if (isHistoricalBudgetMonth(month)) return res.status(403).json({ message: "Historical budget plans are read-only" });
       const normalizedKey = typeof planKey === "string" ? planKey.trim() : "";
       const amount = Number(plannedAmount);
       if (!normalizedKey || normalizedKey.length > 250) {
@@ -591,12 +621,13 @@ export function registerFinanceTrackerRoutes(app: Express) {
       }
 
       const { rows } = await pool.query(
-        `INSERT INTO budget_plans (user_id, month, plan_key, planned_amount)
-         VALUES ($1, $2::date, $3, $4)
+        `INSERT INTO budget_plans (user_id, month, plan_key, planned_amount, entity_metadata)
+         VALUES ($1, $2::date, $3, $4, $5::jsonb)
          ON CONFLICT (user_id, month, plan_key)
-         DO UPDATE SET planned_amount = EXCLUDED.planned_amount, updated_at = NOW()
+         DO UPDATE SET planned_amount = EXCLUDED.planned_amount,
+           entity_metadata = COALESCE(EXCLUDED.entity_metadata, budget_plans.entity_metadata), updated_at = NOW()
          RETURNING plan_key, planned_amount`,
-        [userId, `${month}-01`, normalizedKey, amount.toFixed(2)],
+        [userId, `${month}-01`, normalizedKey, amount.toFixed(2), JSON.stringify(await budgetEntityMetadata(pool, userId, normalizedKey))],
       );
 
       return res.json({
@@ -617,6 +648,7 @@ export function registerFinanceTrackerRoutes(app: Express) {
       if (!isAllowedBudgetPlanMonth(month) || typeof planKey !== "string" || !planKey.trim()) {
         return res.status(400).json({ message: "A valid budget month and planKey are required" });
       }
+      if (isHistoricalBudgetMonth(month)) return res.status(403).json({ message: "Historical budget plans are read-only" });
       await pool.query(
         `DELETE FROM budget_plans
          WHERE user_id = $1 AND month = $2::date AND plan_key = $3`,

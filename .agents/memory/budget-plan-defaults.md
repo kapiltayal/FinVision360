@@ -3,7 +3,7 @@ name: Budget plan defaults
 description: Product expectations for suggested amounts versus explicitly saved monthly budget values.
 ---
 
-Treat suggested monthly amounts as the effective starting budget until the user saves an override. Inputs, section subtotals, summary cards, and variances must agree. A saved zero is intentional, not a missing amount.
+For current and future months, treat suggested monthly amounts as the effective starting budget until the user saves an override. Inputs, section subtotals, summary cards, and variances must agree. A saved zero is intentional, not a missing amount. Historical months instead require preserved period values; never apply today's suggestions to fill archive gaps.
 
 **Why:** The user reported populated income and living-expense amounts alongside $0 Plan subtotals. Displaying a suggestion as the monthly plan while excluding it from totals misrepresents the budget.
 

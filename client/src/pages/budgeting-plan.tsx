@@ -32,6 +32,7 @@ import { formatCurrency } from "@/lib/format";
 import { formatBudgetPlanInput, isValidBudgetPlanDraft } from "@/lib/budget-plan-input";
 import { budgetPlanSubtotal, budgetPlanVariance, effectiveBudgetPlanAmount } from "@/lib/budget-plan-amounts";
 import { budgetMonthlyGoalRequirement } from "@/lib/goal-monthly-savings";
+import { INCOME_CATEGORIES, EXPENSE_CATEGORIES } from "@shared/budget-period";
 import { FinancialChartTooltip } from "@/components/financial-chart-tooltip";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
@@ -49,38 +50,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-const INCOME_CATEGORIES = [
-  "salary",
-  "bonus",
-  "freelance",
-  "business",
-  "dividend",
-  "interest",
-  "rental",
-  "refund",
-  "other_income",
-];
-
-const EXPENSE_CATEGORIES = [
-  "housing",
-  "utilities",
-  "groceries",
-  "transportation",
-  "healthcare",
-  "insurance",
-  "education",
-  "dining_out",
-  "shopping",
-  "subscriptions",
-  "personal_care",
-  "entertainment",
-  "travel",
-  "taxes",
-  "investment",
-  "other_expense",
-  "unassigned",
-];
-
 type PlanLine = {
   planKey: string;
   plannedAmount: number;
@@ -96,17 +65,20 @@ type LiabilityLine = {
   id: number;
   name: string;
   category: string;
-  balance: number;
-  minimumPayment: number;
+  balance: number | null;
+  minimumPayment: number | null;
+  detailsUnavailable?: boolean;
 };
 
 type GoalLine = {
   id: number;
   title: string;
   category: string;
-  targetAmount: number;
-  currentAmount: number;
+  targetAmount: number | null;
+  currentAmount: number | null;
   targetDate: string | null;
+  monthlySavingsNeeded?: number | null;
+  detailsUnavailable?: boolean;
 };
 
 type BudgetPlanData = {
@@ -115,6 +87,8 @@ type BudgetPlanData = {
   actuals: ActualLine[];
   liabilities: LiabilityLine[];
   goals: GoalLine[];
+  readOnly: boolean;
+  snapshot: { status: "complete" | "unavailable"; periodMonth: string; capturedAt: string | null } | null;
 };
 
 type CategoryHistoryPoint = {
@@ -216,18 +190,20 @@ function categoryLabel(value: string): string {
     .replace(/\b\w/g, (character) => character.toUpperCase());
 }
 
-function PlanAmountInput({
+export function PlanAmountInput({
   value,
   suggested,
   suggestedLabel,
   saving,
   onSave,
+  readOnly = false,
 }: {
   value?: number;
   suggested?: number;
   suggestedLabel?: string;
   saving: boolean;
   onSave: (amount: number) => void;
+  readOnly?: boolean;
 }) {
   const [draft, setDraft] = useState(value === undefined ? "" : String(value));
   const [isEditing, setIsEditing] = useState(false);
@@ -235,6 +211,15 @@ function PlanAmountInput({
   useEffect(() => {
     setDraft(value === undefined ? "" : String(value));
   }, [value]);
+
+  if (readOnly) {
+    return (
+      <div className="ml-auto w-28 rounded-md border bg-muted/40 px-2.5 py-1 text-right text-sm font-medium tabular-nums"
+        aria-label="Historical planned monthly amount" title="Historical plan — read-only">
+        {value === undefined ? "—" : `$${formatBudgetPlanInput(value)}`}
+      </div>
+    );
+  }
 
   function commit() {
     setIsEditing(false);
@@ -350,12 +335,14 @@ function SummaryCard({
   actual,
   icon: Icon,
   tone,
+  knownPlanned,
 }: {
   title: string;
-  planned: number;
+  planned: number | null;
   actual: number;
   icon: typeof TrendingUp;
   tone: "income" | "expense" | "net";
+  knownPlanned?: number;
 }) {
   const positive = tone === "net" ? actual >= 0 : true;
   const iconClass =
@@ -377,8 +364,11 @@ function SummaryCard({
               {formatCurrency(actual)}
             </p>
             <p className="mt-1 text-xs text-muted-foreground">
-              Plan: {formatCurrency(planned)}
+              Plan: {planned === null ? "Unavailable" : formatCurrency(planned)}
             </p>
+            {planned === null && knownPlanned !== undefined && <p className="mt-1 text-xs text-muted-foreground">
+              Saved amounts only: {formatCurrency(knownPlanned)}
+            </p>}
           </div>
           <div className={`flex h-10 w-10 items-center justify-center rounded-md ${iconClass}`}>
             <Icon className="h-5 w-5" />
@@ -389,7 +379,7 @@ function SummaryCard({
   );
 }
 
-function StatementSection({
+export function StatementSection({
   title,
   subtitle,
   icon: Icon,
@@ -400,6 +390,8 @@ function StatementSection({
   onRemove,
   onCopy,
   footer,
+  readOnly = false,
+  defaultOpen = false,
 }: {
   title: string;
   subtitle: string;
@@ -411,9 +403,13 @@ function StatementSection({
   onRemove?: (key: string) => void;
   onCopy?: (key: string, amount: number) => void;
   footer?: ReactNode;
+  readOnly?: boolean;
+  defaultOpen?: boolean;
 }) {
-  const [isOpen, setIsOpen] = useState(false);
-  const plannedTotal = budgetPlanSubtotal(rows);
+  const [isOpen, setIsOpen] = useState(defaultOpen);
+  const plannedTotal = readOnly ? rows.reduce((sum, row) => sum + (row.planned ?? 0), 0) : budgetPlanSubtotal(rows);
+  const incomplete = readOnly && rows.some((row) => row.planned === undefined);
+  const hasKnownPlan = rows.some((row) => row.planned !== undefined);
   const actualTotal = rows.reduce((sum, row) => sum + row.actual, 0);
 
   return (
@@ -442,7 +438,8 @@ function StatementSection({
           <div className="flex gap-4 text-sm sm:text-right">
             <div>
               <p className="font-medium text-muted-foreground">Plan</p>
-              <p className="text-base font-semibold">{formatCurrency(plannedTotal)}</p>
+              <p className="text-base font-semibold">{readOnly && !hasKnownPlan ? "Unavailable" : formatCurrency(plannedTotal)}</p>
+              {incomplete && hasKnownPlan && <p className="text-xs text-muted-foreground">Saved amounts only</p>}
             </div>
             <div>
               <p className="font-medium text-muted-foreground">Actual</p>
@@ -463,25 +460,25 @@ function StatementSection({
               <TableHead className="h-9 text-right font-semibold text-foreground">Monthly plan</TableHead>
               <TableHead className="h-9 text-right font-semibold text-foreground">Actual</TableHead>
               <TableHead className="h-9 text-right font-semibold text-foreground">Variance</TableHead>
-              {onRemove && <TableHead className="h-9 w-12" />}
+              {onRemove && !readOnly && <TableHead className="h-9 w-12" />}
             </TableRow>
           </TableHeader>
           <TableBody>
             {rows.map((row) => {
-              const planned = effectiveBudgetPlanAmount(row);
-              const variance = budgetPlanVariance(row, tone);
+              const planned = readOnly ? row.planned : effectiveBudgetPlanAmount(row);
+              const variance = planned === undefined ? null : budgetPlanVariance({ ...row, planned }, tone);
               return (
                 <TableRow key={row.key} className="h-11">
                   <TableCell className="py-1.5 font-medium">{row.label}</TableCell>
                   <TableCell className="px-1 py-1">
-                    <TrendSparkline data={row.history} tone={tone} />
+                    {!readOnly && <TrendSparkline data={row.history} tone={tone} />}
                   </TableCell>
                   <TableCell className="px-1 py-1.5 text-right text-sm font-medium tabular-nums">
-                    {formatCurrency(row.average)}
+                    {!readOnly && formatCurrency(row.average)}
                   </TableCell>
                   {onCopy && (
                     <TableCell className="border-l border-border/60 px-3 py-1 text-center">
-                      <Button
+                      {!readOnly && <Button
                         type="button"
                         size="icon"
                         variant="ghost"
@@ -491,13 +488,14 @@ function StatementSection({
                         aria-label={`Copy ${formatCurrency(row.average)} monthly average to ${row.label} plan`}
                       >
                         <Copy className="h-3.5 w-3.5" />
-                      </Button>
+                      </Button>}
                     </TableCell>
                   )}
                   <TableCell className="py-1.5 text-right">
                     <PlanAmountInput
                       value={planned}
-                      suggested={row.average}
+                      readOnly={readOnly}
+                      suggested={readOnly ? undefined : row.average}
                       suggestedLabel="the 12-month average"
                       saving={savingKey === row.key}
                       onSave={(amount) => onSave(row.key, amount)}
@@ -508,14 +506,14 @@ function StatementSection({
                   </TableCell>
                   <TableCell
                     className={`py-1.5 text-right text-sm font-medium tabular-nums ${
-                      variance >= 0
+                      variance === null ? "text-muted-foreground" : variance >= 0
                           ? "text-emerald-600 dark:text-emerald-400"
                           : "text-rose-600 dark:text-rose-400"
                     }`}
                   >
-                    {`${variance >= 0 ? "+" : ""}${formatCurrency(variance)}`}
+                    {variance === null ? "—" : `${variance >= 0 ? "+" : ""}${formatCurrency(variance)}`}
                   </TableCell>
-                  {onRemove && (
+                  {onRemove && !readOnly && (
                     <TableCell>
                       {row.removable && (
                         <Button
@@ -535,7 +533,7 @@ function StatementSection({
             })}
           </TableBody>
         </Table>
-        {footer}
+        {!readOnly && footer}
       </CardContent>}
     </Card>
   );
@@ -554,15 +552,18 @@ export default function BudgetingPlanPage() {
   const [goalsOpen, setGoalsOpen] = useState(false);
   const queryKey = `/api/budget-plan?month=${month}`;
 
-  const { data, isLoading } = useQuery<BudgetPlanData>({
+  const { data, isLoading, isError, error } = useQuery<BudgetPlanData>({
     queryKey: [queryKey],
     staleTime: 0,
     refetchOnMount: "always",
   });
+  const readOnly = month < currentMonth || data?.readOnly === true;
+  const closeComplete = data?.snapshot?.status === "complete";
   const { data: historySummary } = useQuery<CashFlowSummary>({
     queryKey: ["/api/transactions/monthly-averages"],
     staleTime: 0,
     refetchOnMount: "always",
+    enabled: !readOnly,
   });
 
   const saveMutation = useMutation({
@@ -651,13 +652,13 @@ export default function BudgetingPlanPage() {
       return {
         key,
         label: categoryLabel(category),
-        planned: planMap.get(key),
+        planned: planMap.get(key) ?? (readOnly && closeComplete ? 0 : undefined),
         actual: actualMap.get(key) ?? 0,
-        average: historyMap.get(key)?.average ?? 0,
-        history: historyFor(key),
+        average: readOnly ? 0 : historyMap.get(key)?.average ?? 0,
+        history: readOnly ? [] : historyFor(key),
       };
     });
-  }, [actualMap, data?.actuals, data?.plans, historyMap, historyMonths, planMap]);
+  }, [actualMap, data?.actuals, data?.plans, historyMap, historyMonths, planMap, readOnly, closeComplete]);
 
   const expenseRows = useMemo<StatementRow[]>(() => {
     const categories = new Set(EXPENSE_CATEGORIES);
@@ -679,14 +680,14 @@ export default function BudgetingPlanPage() {
       return {
         key,
         label: categoryLabel(category),
-        planned: planMap.get(key),
+        planned: planMap.get(key) ?? (readOnly && closeComplete ? 0 : undefined),
         actual: actualMap.get(key) ?? 0,
-        average: historyMap.get(key)?.average ?? 0,
-        history: historyFor(key),
+        average: readOnly ? 0 : historyMap.get(key)?.average ?? 0,
+        history: readOnly ? [] : historyFor(key),
         removable: !isDefault && !hasActual,
       };
     });
-  }, [actualMap, data?.actuals, data?.plans, historyMap, historyMonths, planMap]);
+  }, [actualMap, data?.actuals, data?.plans, historyMap, historyMonths, planMap, readOnly, closeComplete]);
 
   const copyAllMutation = useMutation({
     mutationFn: async ({
@@ -731,14 +732,19 @@ export default function BudgetingPlanPage() {
     .reduce((sum, line) => sum + line.amount, 0);
   const plannedIncome = budgetPlanSubtotal(incomeRows);
   const plannedLivingExpenses = budgetPlanSubtotal(expenseRows);
+  function goalRequired(goal: GoalLine): number | null {
+    return readOnly ? goal.monthlySavingsNeeded ?? null : budgetMonthlyGoalRequirement({
+      ...goal, targetAmount: goal.targetAmount ?? 0, currentAmount: goal.currentAmount ?? 0,
+    }, month);
+  }
   const plannedDebtPayments = (data?.liabilities ?? []).reduce(
     (sum, liability) =>
-      sum + (planMap.get(`debt:${liability.id}`) ?? liability.minimumPayment),
+      sum + (planMap.get(`debt:${liability.id}`) ?? (readOnly ? 0 : liability.minimumPayment ?? 0)),
     0,
   );
   const plannedGoals = (data?.goals ?? []).reduce(
     (sum, goal) =>
-      sum + (planMap.get(`goal:${goal.id}`) ?? budgetMonthlyGoalRequirement(goal, month)),
+      sum + (planMap.get(`goal:${goal.id}`) ?? (readOnly ? 0 : goalRequired(goal) ?? 0)),
     0,
   );
   const plannedOutflows = plannedLivingExpenses + plannedDebtPayments + plannedGoals;
@@ -746,10 +752,12 @@ export default function BudgetingPlanPage() {
   const actualNet = actualIncome - actualExpenses;
 
   function savePlanLine(planKey: string, amount: number) {
+    if (readOnly) return;
     saveMutation.mutate({ planKey, amount });
   }
 
   function addExpenseCategory() {
+    if (readOnly) return;
     const normalized = newCategory
       .trim()
       .toLowerCase()
@@ -785,7 +793,7 @@ export default function BudgetingPlanPage() {
             </p>
             <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
               <CalendarDays className="h-3.5 w-3.5" />
-              Debt minimums and goal requirements are pulled from your account data.
+              {readOnly ? "Historical plans are read-only; debt and goal details use the period’s close snapshot." : "Debt minimums and goal requirements are pulled from your account data."}
             </p>
           </div>
           <div className="flex flex-wrap items-center justify-end gap-2">
@@ -871,26 +879,33 @@ export default function BudgetingPlanPage() {
             <Skeleton key={item} className="h-72" />
           ))}
         </div>
+      ) : isError ? (
+        <Card><CardContent className="p-6 text-sm text-destructive" role="alert">
+          Could not load this budget plan. {error.message}
+        </CardContent></Card>
       ) : (
         <>
           <div className="grid gap-4 md:grid-cols-3">
             <SummaryCard
               title="Monthly income"
-              planned={plannedIncome}
+              planned={readOnly && !closeComplete ? null : plannedIncome}
+              knownPlanned={readOnly && !closeComplete && data?.plans.some((line) => line.planKey.startsWith("income:")) ? plannedIncome : undefined}
               actual={actualIncome}
               icon={TrendingUp}
               tone="income"
             />
             <SummaryCard
               title="Monthly outflows"
-              planned={plannedOutflows}
+              planned={readOnly && !closeComplete ? null : plannedOutflows}
+              knownPlanned={readOnly && !closeComplete && data?.plans.some((line) => /^(expense|debt|goal):/.test(line.planKey)) ? plannedOutflows : undefined}
               actual={actualExpenses}
               icon={TrendingDown}
               tone="expense"
             />
             <SummaryCard
               title={actualNet >= 0 ? "Net cash flow" : "Monthly shortfall"}
-              planned={plannedNet}
+              planned={readOnly && !closeComplete ? null : plannedNet}
+              knownPlanned={readOnly && !closeComplete && data?.plans.length ? plannedNet : undefined}
               actual={actualNet}
               icon={actualNet >= 0 ? ArrowUpRight : ArrowDownRight}
               tone="net"
@@ -903,9 +918,9 @@ export default function BudgetingPlanPage() {
                 Monthly plan statement · {formatMonth(month)}
               </p>
               <p className="text-sm text-muted-foreground">
-                Enter plan amounts below. Changes save automatically when you leave a field.
+                {readOnly ? "Completed months cannot be edited." : "Enter plan amounts below. Changes save automatically when you leave a field."}
               </p>
-              <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+              {!readOnly && <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
                 <span className="inline-flex items-center gap-1.5">
                   <span className="h-3 w-3 rounded-sm border border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/45" />
                   Pre-populated / suggested
@@ -914,10 +929,15 @@ export default function BudgetingPlanPage() {
                   <span className="h-3 w-3 rounded-sm border border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-950/45" />
                   Changed by you
                 </span>
-              </div>
+              </div>}
+              {readOnly && <p className="mt-2 text-sm text-muted-foreground" role="status">
+                {closeComplete
+                  ? `Close snapshot for ${formatMonth(month)} · captured ${new Date(data!.snapshot!.capturedAt!).toLocaleString()}`
+                  : "Close snapshot unavailable. Saved plan amounts are retained and included in section totals; missing details and uncaptured defaults are unavailable, not zero."}
+              </p>}
             </div>
             <div className="flex flex-wrap items-center justify-end gap-3">
-              <Button
+              {!readOnly && <Button
                 type="button"
                 size="sm"
                 variant="outline"
@@ -935,7 +955,7 @@ export default function BudgetingPlanPage() {
                   <Copy className="mr-2 h-4 w-4" />
                 )}
                 Copy all averages to plan
-              </Button>
+              </Button>}
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
               {savingKey || copyAllMutation.isPending ? (
                 <>
@@ -945,7 +965,7 @@ export default function BudgetingPlanPage() {
               ) : (
                 <>
                   <Check className="h-4 w-4" />
-                  Plan saved
+                  {readOnly ? "Read-only" : "Plan saved"}
                 </>
               )}
               </div>
@@ -961,6 +981,7 @@ export default function BudgetingPlanPage() {
             savingKey={savingKey}
             onSave={savePlanLine}
             onCopy={savePlanLine}
+            readOnly={readOnly}
           />
 
           <StatementSection
@@ -972,9 +993,10 @@ export default function BudgetingPlanPage() {
               savingKey={savingKey}
               onSave={savePlanLine}
               onCopy={savePlanLine}
-              onRemove={(key) => removeMutation.mutate(key)}
+              readOnly={readOnly}
+              onRemove={readOnly ? undefined : (key) => removeMutation.mutate(key)}
               footer={
-                <div className="flex flex-col gap-2 border-t bg-muted/20 p-3 sm:flex-row">
+                !readOnly ? <div className="flex flex-col gap-2 border-t bg-muted/20 p-3 sm:flex-row">
                 <Input
                   value={newCategory}
                   onChange={(event) => setNewCategory(event.target.value)}
@@ -993,7 +1015,7 @@ export default function BudgetingPlanPage() {
                   <Plus className="mr-2 h-4 w-4" />
                   Add category
                 </Button>
-                </div>
+                </div> : undefined
               }
             />
 
@@ -1010,13 +1032,14 @@ export default function BudgetingPlanPage() {
                     Debt payments
                   </CardTitle>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    Plan by debt using Liabilities data; actual debt payments cannot be assigned reliably
+                    {readOnly ? "Debt details from the month-close snapshot; actual payments cannot be assigned reliably" : "Plan by debt using Liabilities data; actual debt payments cannot be assigned reliably"}
                   </p>
                 </div>
                 <div className="flex gap-4 text-sm">
                   <div>
                     <p className="font-medium text-muted-foreground">Planned</p>
-                    <p className="text-base font-semibold">{formatCurrency(plannedDebtPayments)}</p>
+                    <p className="text-base font-semibold">{readOnly && !closeComplete && !data?.liabilities.length ? "Unavailable" : formatCurrency(plannedDebtPayments)}</p>
+                    {readOnly && !closeComplete && !!data?.liabilities.length && <p className="text-xs text-muted-foreground">Saved amounts only</p>}
                   </div>
                 </div>
                 </div>
@@ -1025,7 +1048,7 @@ export default function BudgetingPlanPage() {
             {debtOpen && <CardContent className="p-0">
               {(data?.liabilities ?? []).length === 0 ? (
                 <p className="p-8 text-center text-sm text-muted-foreground">
-                  No liabilities are available. Add them on the Liabilities page.
+                  {readOnly ? (closeComplete ? "No debts recorded at this month’s close." : "Historical debt snapshot unavailable.") : "No liabilities are available. Add them on the Liabilities page."}
                 </p>
               ) : (
                 <Table>
@@ -1045,17 +1068,19 @@ export default function BudgetingPlanPage() {
                           <TableCell className="py-1.5">
                             <p className="font-medium">{liability.name}</p>
                             <p className="text-xs text-muted-foreground">{liability.category}</p>
+                            {liability.detailsUnavailable && <p className="text-xs text-muted-foreground">Historical details unavailable</p>}
                           </TableCell>
                           <TableCell className="py-1.5 text-right text-sm tabular-nums">
-                            {formatCurrency(liability.balance)}
+                            {liability.balance === null ? "—" : formatCurrency(liability.balance)}
                           </TableCell>
                           <TableCell className="py-1.5 text-right text-sm tabular-nums">
-                            {formatCurrency(liability.minimumPayment)}
+                            {liability.minimumPayment === null ? "—" : formatCurrency(liability.minimumPayment)}
                           </TableCell>
                           <TableCell className="py-1.5">
                             <PlanAmountInput
-                              value={planMap.get(key) ?? liability.minimumPayment}
-                              suggested={liability.minimumPayment}
+                              value={planMap.get(key) ?? (readOnly ? undefined : liability.minimumPayment ?? 0)}
+                              readOnly={readOnly}
+                              suggested={readOnly ? undefined : liability.minimumPayment ?? 0}
                               suggestedLabel="the minimum payment"
                               saving={savingKey === key}
                               onSave={(amount) => savePlanLine(key, amount)}
@@ -1083,13 +1108,14 @@ export default function BudgetingPlanPage() {
                     Goals & planned contributions
                   </CardTitle>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    Plan by goal using current goal data; actual contributions cannot be assigned reliably
+                    {readOnly ? "Goal details and requirements from the month-close snapshot; actual contributions cannot be assigned reliably" : "Plan by goal using current goal data; actual contributions cannot be assigned reliably"}
                   </p>
                 </div>
                 <div className="flex gap-4 text-sm">
                   <div>
                     <p className="font-medium text-muted-foreground">Planned</p>
-                    <p className="text-base font-semibold">{formatCurrency(plannedGoals)}</p>
+                    <p className="text-base font-semibold">{readOnly && !closeComplete && !data?.goals.length ? "Unavailable" : formatCurrency(plannedGoals)}</p>
+                    {readOnly && !closeComplete && !!data?.goals.length && <p className="text-xs text-muted-foreground">Saved amounts only</p>}
                   </div>
                 </div>
                 </div>
@@ -1098,7 +1124,7 @@ export default function BudgetingPlanPage() {
             {goalsOpen && <CardContent className="p-0">
               {(data?.goals ?? []).length === 0 ? (
                 <p className="p-8 text-center text-sm text-muted-foreground">
-                  No goals are available. Add a goal on the Goals & Tracking page.
+                  {readOnly ? (closeComplete ? "No goals recorded at this month’s close." : "Historical goal snapshot unavailable.") : "No goals are available. Add a goal on the Goals & Tracking page."}
                 </p>
               ) : (
                 <Table>
@@ -1114,10 +1140,10 @@ export default function BudgetingPlanPage() {
                     {data?.goals.map((goal) => {
                       const key = `goal:${goal.id}`;
                       const progress =
-                        goal.targetAmount > 0
+                        goal.targetAmount !== null && goal.currentAmount !== null && goal.targetAmount > 0
                           ? Math.min(100, (goal.currentAmount / goal.targetAmount) * 100)
                           : 0;
-                      const required = budgetMonthlyGoalRequirement(goal, month);
+                      const required = goalRequired(goal);
                       return (
                         <TableRow key={goal.id} className="h-12">
                           <TableCell className="py-1.5">
@@ -1128,20 +1154,21 @@ export default function BudgetingPlanPage() {
                             </p>
                           </TableCell>
                           <TableCell className="py-1.5">
-                            <div className="space-y-1.5">
+                            {goal.detailsUnavailable ? <span className="text-xs text-muted-foreground">Historical details unavailable</span> : <div className="space-y-1.5">
                               <Progress value={progress} className="h-2" />
                               <p className="text-xs text-muted-foreground">
-                                {formatCurrency(goal.currentAmount)} of {formatCurrency(goal.targetAmount)}
+                                {formatCurrency(goal.currentAmount ?? 0)} of {formatCurrency(goal.targetAmount ?? 0)}
                               </p>
-                            </div>
+                            </div>}
                           </TableCell>
                           <TableCell className="py-1.5 text-right text-sm tabular-nums">
-                            {required > 0 ? formatCurrency(required) : "—"}
+                            {required !== null && required > 0 ? formatCurrency(required) : "—"}
                           </TableCell>
                           <TableCell className="py-1.5">
                             <PlanAmountInput
-                              value={planMap.get(key) ?? required}
-                              suggested={required}
+                              value={planMap.get(key) ?? (readOnly ? undefined : required ?? 0)}
+                              readOnly={readOnly}
+                              suggested={readOnly ? undefined : required ?? 0}
                               suggestedLabel="the required monthly contribution"
                               saving={savingKey === key}
                               onSave={(amount) => savePlanLine(key, amount)}

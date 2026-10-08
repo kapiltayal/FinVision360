@@ -8,6 +8,7 @@
     "build": "tsx script/build.ts",
     "start": "NODE_ENV=production node dist/index.cjs",
     "check": "tsc",
+    "test:budget": "tsx script/test-budget.ts",
     "db:push": "drizzle-kit push",
     "db:seed-types": "tsx scripts/seed-asset-liability-types.ts"
   },

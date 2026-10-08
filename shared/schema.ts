@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, serial, integer, numeric, timestamp, boolean, date, uniqueIndex, index, check } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, serial, integer, numeric, timestamp, boolean, date, uniqueIndex, index, check, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -688,6 +688,7 @@ export const budgetPlans = pgTable("budget_plans", {
   month: date("month").notNull(),
   planKey: varchar("plan_key", { length: 250 }).notNull(),
   plannedAmount: numeric("planned_amount", { precision: 12, scale: 2 }).notNull().default("0"),
+  entityMetadata: jsonb("entity_metadata").$type<{ name: string; category: string }>(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -704,6 +705,23 @@ export const budgetPlans = pgTable("budget_plans", {
 
 export type BudgetPlan = typeof budgetPlans.$inferSelect;
 export type InsertBudgetPlan = typeof budgetPlans.$inferInsert;
+
+// Immutable, explicitly period-tagged closes; no foreign keys to live debts/goals.
+export const budgetCloseRuns = pgTable("budget_close_runs", {
+  periodMonth: date("period_month").primaryKey(),
+  snapshotAt: timestamp("snapshot_at", { withTimezone: true }).defaultNow().notNull(),
+  result: jsonb("result").notNull(),
+});
+
+export const budgetMonthCloses = pgTable("budget_month_closes", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  periodMonth: date("period_month").notNull(),
+  snapshotAt: timestamp("snapshot_at", { withTimezone: true }).defaultNow().notNull(),
+  payload: jsonb("payload").notNull(),
+}, (table) => [
+  uniqueIndex("budget_month_closes_user_period_unique").on(table.userId, table.periodMonth),
+]);
 
 // ── Estate Contact Roles ─────────────────────────────────────────────────────
 
