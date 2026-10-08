@@ -29,6 +29,7 @@ import {
 } from "recharts";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { formatCurrency } from "@/lib/format";
+import { formatBudgetPlanInput, isValidBudgetPlanDraft } from "@/lib/budget-plan-input";
 import { budgetPlanSubtotal, budgetPlanVariance, effectiveBudgetPlanAmount } from "@/lib/budget-plan-amounts";
 import { budgetMonthlyGoalRequirement } from "@/lib/goal-monthly-savings";
 import { FinancialChartTooltip } from "@/components/financial-chart-tooltip";
@@ -229,12 +230,14 @@ function PlanAmountInput({
   onSave: (amount: number) => void;
 }) {
   const [draft, setDraft] = useState(value === undefined ? "" : String(value));
+  const [isEditing, setIsEditing] = useState(false);
 
   useEffect(() => {
     setDraft(value === undefined ? "" : String(value));
   }, [value]);
 
   function commit() {
+    setIsEditing(false);
     if (draft.trim() === "") {
       setDraft("0");
       if (value !== undefined && value !== 0) onSave(0);
@@ -256,6 +259,7 @@ function PlanAmountInput({
   }
 
   const draftAmount = draft.trim() === "" ? undefined : Number(draft);
+  const displayedAmount = draftAmount !== undefined && Number.isFinite(draftAmount) ? draftAmount : value;
   const matchesSuggested =
     draftAmount !== undefined &&
     Number.isFinite(draftAmount) &&
@@ -290,16 +294,22 @@ function PlanAmountInput({
         $
       </span>
       <Input
-        type="number"
-        min="0"
-        step="1"
-        value={draft}
-        onChange={(event) => setDraft(event.target.value)}
+        type="text"
+        inputMode="decimal"
+        value={isEditing ? draft : formatBudgetPlanInput(displayedAmount)}
+        onFocus={() => {
+          setIsEditing(true);
+          setDraft(value === undefined ? "" : String(value));
+        }}
+        onChange={(event) => {
+          const nextDraft = event.target.value;
+          if (isValidBudgetPlanDraft(nextDraft)) setDraft(nextDraft);
+        }}
         onBlur={commit}
         onKeyDown={(event) => {
           if (event.key === "Enter") event.currentTarget.blur();
         }}
-        placeholder={suggested ? `${Math.round(suggested).toLocaleString()}` : "0"}
+        placeholder={suggested ? formatBudgetPlanInput(suggested) : "0"}
         className={`h-7 appearance-none rounded-md pl-6 pr-8 text-right text-sm font-medium tabular-nums shadow-none transition-colors focus-visible:ring-2 focus-visible:ring-primary/15 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none ${stateClass}`}
         aria-label="Planned monthly amount"
         aria-description={stateDescription}
