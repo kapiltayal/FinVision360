@@ -88,7 +88,7 @@ type BudgetPlanData = {
   liabilities: LiabilityLine[];
   goals: GoalLine[];
   readOnly: boolean;
-  snapshot: { status: "complete" | "unavailable"; periodMonth: string; capturedAt: string | null } | null;
+  snapshot: { status: "complete" | "legacy" | "unavailable"; periodMonth: string; capturedAt: string | null } | null;
 };
 
 type CategoryHistoryPoint = {
@@ -558,7 +558,7 @@ export default function BudgetingPlanPage() {
     refetchOnMount: "always",
   });
   const readOnly = month < currentMonth || data?.readOnly === true;
-  const closeComplete = data?.snapshot?.status === "complete";
+  const closeComplete = data?.snapshot?.status === "complete" || data?.snapshot?.status === "legacy";
   const { data: historySummary } = useQuery<CashFlowSummary>({
     queryKey: ["/api/transactions/monthly-averages"],
     staleTime: 0,
@@ -931,8 +931,10 @@ export default function BudgetingPlanPage() {
                 </span>
               </div>}
               {readOnly && <p className="mt-2 text-sm text-muted-foreground" role="status">
-                {closeComplete
-                  ? `Close snapshot for ${formatMonth(month)} · captured ${new Date(data!.snapshot!.capturedAt!).toLocaleString()}`
+                {data?.snapshot?.status === "legacy"
+                  ? `Using the matching ${new Date(data.snapshot.capturedAt!).toLocaleDateString()} debt and goal archive for ${formatMonth(month)}. Plan suggestions are derived from the prior 12 complete transaction months; saved amounts take precedence.`
+                  : closeComplete
+                    ? `Recorded close snapshot for ${formatMonth(month)} · captured ${new Date(data!.snapshot!.capturedAt!).toLocaleString()}`
                   : "Close snapshot unavailable. Saved plan amounts are retained and included in section totals; missing details and uncaptured defaults are unavailable, not zero."}
               </p>}
             </div>
@@ -1032,7 +1034,7 @@ export default function BudgetingPlanPage() {
                     Debt payments
                   </CardTitle>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    {readOnly ? "Debt details from the month-close snapshot; actual payments cannot be assigned reliably" : "Plan by debt using Liabilities data; actual debt payments cannot be assigned reliably"}
+                    {readOnly ? "Debt details from the archived month-close data; actual payments cannot be assigned reliably" : "Plan by debt using Liabilities data; actual debt payments cannot be assigned reliably"}
                   </p>
                 </div>
                 <div className="flex gap-4 text-sm">
@@ -1108,7 +1110,7 @@ export default function BudgetingPlanPage() {
                     Goals & planned contributions
                   </CardTitle>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    {readOnly ? "Goal details and requirements from the month-close snapshot; actual contributions cannot be assigned reliably" : "Plan by goal using current goal data; actual contributions cannot be assigned reliably"}
+                    {readOnly ? "Goal details and requirements from the archived month-close data; actual contributions cannot be assigned reliably" : "Plan by goal using current goal data; actual contributions cannot be assigned reliably"}
                   </p>
                 </div>
                 <div className="flex gap-4 text-sm">

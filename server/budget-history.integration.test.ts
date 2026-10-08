@@ -29,6 +29,9 @@ test("month close, historical API, orphan values and current/future editing", {
   const user = randomUUID();
   const emptyUser = randomUUID();
   const missingUser = randomUUID();
+  const legacyTimestamp = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1, 14, 31, 46, 145));
+  const legacyPeriod = previousBudgetMonth(legacyTimestamp);
+  const legacySnapshotAt = legacyTimestamp.toISOString().slice(0, 23).replace("T", " ");
   async function invoke(method: string, id: string, body: any = {}, query: any = {}) {
     const res: any = {
       code: 200, body: null,
@@ -75,6 +78,39 @@ test("month close, historical API, orphan values and current/future editing", {
        ($1,$2,'Old transaction',1,'expense','utilities'),($1,$3,'Recent transaction',120,'expense','utilities')`,
       [emptyUser, old, before],
     );
+    const [legacyYear, legacyMonth] = legacyPeriod.split("-").map(Number);
+    const legacyEarliestMonth = new Date(Date.UTC(legacyYear, legacyMonth - 13, 1)).toISOString().slice(0, 10);
+    await client.query(
+      "INSERT INTO transactions(user_id,date,description,amount,type,subcategory) VALUES ($1,$2,'First eligible month',1,'expense','utilities')",
+      [emptyUser, legacyEarliestMonth],
+    );
+    await client.query(
+      `INSERT INTO transactions(user_id,date,description,amount,type,subcategory) VALUES
+       ($1,$2,'Dining title case',2,'expense','Dining Out'),
+       ($1,$2,'Dining slug case',3,'expense','dining_out'),
+       ($1,$2,'Debt payment is planned separately',120,'expense','Debt Payment'),
+       ($1,$2,'Savings transfer is not spending',60,'expense','Savings Transfer'),
+       ($1,$3,'Groceries title case',3,'expense','Groceries'),
+       ($1,$4,'Groceries lower case',4,'expense','groceries')`,
+      [emptyUser, legacyEarliestMonth, `${legacyPeriod}-10`, `${legacyPeriod}-11`],
+    );
+    const { rows: legacyDebt } = await client.query(
+      `INSERT INTO liability_history(user_id,liability_id,name,category,balance,minimum_payment,snapshot_at)
+       VALUES($1,91001,'Archived test loan','Loan',8000,55,$2::timestamp) RETURNING id`,
+      [emptyUser, legacySnapshotAt],
+    );
+    await client.query(
+      `INSERT INTO user_goals_history(user_id,goal_id,title,category,target_amount,current_amount,target_date,
+       created_at,updated_at,monthly_savings_needed,snapshot_at)
+       VALUES($1,91002,'Archived test goal','Savings',12000,1000,$2,NOW(),NOW(),88.88,$3::timestamp)`,
+      [emptyUser, target, legacySnapshotAt],
+    );
+    await client.query(
+      `INSERT INTO budget_plans(user_id,month,plan_key,planned_amount) VALUES
+       ($1,$2,'income:salary',0),($1,$2,'debt:91001',77.77),($1,$2,'goal:91002',0),
+       ($1,$2,'expense:Groceries',10),($1,$2,'expense:groceries',20)`,
+      [emptyUser, `${legacyPeriod}-01`],
+    );
     const result = await monthlyBackupTransaction(client, captured);
     assert.equal(result.periodMonth, period);
     assert.equal((await client.query("SELECT id FROM liability_history WHERE id=$1", [retention[0].id])).rows.length, 0);
@@ -112,6 +148,23 @@ test("month close, historical API, orphan values and current/future editing", {
     const empty = await invoke("get", emptyUser, {}, { month: period });
     assert.equal(empty.body.snapshot.status, "complete");
     assert.equal(empty.body.goals.length, 0, "valid empty close is distinct from missing close");
+    const legacy = await invoke("get", emptyUser, {}, { month: legacyPeriod });
+    const legacyPlan = new Map(legacy.body.plans.map((row: any) => [row.planKey, row.plannedAmount]));
+    assert.equal(legacy.body.snapshot.status, "legacy");
+    assert.equal(legacy.body.snapshot.periodMonth, legacyPeriod);
+    assert.equal(new Date(legacy.body.snapshot.capturedAt).toISOString(), legacyTimestamp.toISOString());
+    assert.equal(legacy.body.liabilities[0].balance, 8000);
+    assert.equal(legacy.body.goals[0].monthlySavingsNeeded, 88.88);
+    assert.equal(legacyPlan.get("income:salary"), 0, "archived saved zero beats the rebuilt default");
+    assert.equal(legacyPlan.get("debt:91001"), 77.77, "saved debt amount beats the archived minimum");
+    assert.equal(legacyPlan.get("goal:91002"), 0, "saved goal zero remains intentional");
+    assert.equal(legacyPlan.get("expense:utilities"), 10.08, "plan suggestion uses only the preceding 12 complete months");
+    assert.equal(legacyPlan.get("expense:dining_out"), 0.42, "case and separator variants share one historical category average");
+    assert.equal(legacyPlan.has("expense:debt_payment"), false, "debt payments are not counted again as living expenses");
+    assert.equal(legacyPlan.has("expense:savings_transfer"), false, "savings transfers are not counted as living expenses");
+    assert.equal(legacyPlan.get("expense:groceries"), 30, "duplicate saved case variants are combined without losing overrides");
+    assert.equal(legacy.body.actuals.find((row: any) => row.type === "expense" && row.category === "groceries").amount, 7,
+      "period actuals aggregate under the same normalized category key");
     // A user without a close keeps saved rows even with no live entities.
     await client.query("INSERT INTO users(id) VALUES ($1)", [missingUser]);
     await client.query("INSERT INTO liabilities(user_id,name,category,balance,minimum_payment) VALUES ($1,'Wrong live debt','Loan',999999,9999)", [missingUser]);

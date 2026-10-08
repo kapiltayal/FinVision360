@@ -4,8 +4,8 @@ import type { Express } from "express";
 import type { Transaction as PlaidTransaction } from "plaid";
 import { getPlaidClient } from "./plaid";
 import { storage } from "./storage";
-import { isHistoricalBudgetMonth } from "../shared/budget-period";
-import { budgetEntityMetadata, preserveSavedEntityRows, type BudgetSnapshot } from "./budget-history";
+import { isHistoricalBudgetMonth, normalizeBudgetCategory } from "../shared/budget-period";
+import { budgetEntityMetadata, legacyBudgetClose, preserveSavedEntityRows, type BudgetSnapshot } from "./budget-history";
 import multer from "multer";
 import { parseUpload, parseTransactionUpload, isEmptySample, type RawRow } from "./asset-liability-ingestion";
 import { completeIngestionClassification } from "./ai/provider";
@@ -476,23 +476,53 @@ export function registerFinanceTrackerRoutes(app: Express) {
       const plans = planRows.map((row) => ({
         planKey: row.plan_key, plannedAmount: Number(row.planned_amount), entityMetadata: row.entity_metadata,
       }));
-      const actuals = actualRows.map((row) => ({
-        type: row.type, category: row.subcategory, amount: Number(row.actual_amount),
-      }));
       if (isHistoricalBudgetMonth(month)) {
+        const actualsByKey = new Map<string, { type: string; category: string; amount: number }>();
+        for (const row of actualRows) {
+          const category = normalizeBudgetCategory(row.subcategory);
+          const key = `${row.type}:${category}`;
+          const previous = actualsByKey.get(key);
+          actualsByKey.set(key, {
+            type: row.type, category, amount: (previous?.amount ?? 0) + Number(row.actual_amount),
+          });
+        }
+        const actuals = Array.from(actualsByKey.values());
+        const normalizedSavedPlans = new Map<string, (typeof plans)[number]>();
+        for (const row of plans) {
+          const key = row.planKey.startsWith("income:") || row.planKey.startsWith("expense:")
+            ? `${row.planKey.slice(0, row.planKey.indexOf(":"))}:${normalizeBudgetCategory(row.planKey.slice(row.planKey.indexOf(":") + 1))}`
+            : row.planKey;
+          const previous = normalizedSavedPlans.get(key);
+          normalizedSavedPlans.set(key, {
+            planKey: key,
+            plannedAmount: (previous?.plannedAmount ?? 0) + row.plannedAmount,
+            entityMetadata: row.entityMetadata,
+          });
+        }
+        const historicalPlans = Array.from(normalizedSavedPlans.values());
         const { rows: closes } = await pool.query(
           "SELECT snapshot_at, payload FROM budget_month_closes WHERE user_id=$1 AND period_month=$2::date",
           [userId, startDate],
         );
         const close = closes[0];
-        const historical = preserveSavedEntityRows(close
-          ? close.payload as BudgetSnapshot
-          : { plans, liabilities: [], goals: [] });
+        const legacy = close ? null : await legacyBudgetClose(pool, userId, month);
+        const historical = close
+          ? preserveSavedEntityRows(close.payload as BudgetSnapshot)
+          : legacy?.payload ?? preserveSavedEntityRows({ plans: historicalPlans, liabilities: [], goals: [] });
         return res.json({
           month, readOnly: true, ...historical, actuals,
-          snapshot: { status: close ? "complete" : "unavailable", periodMonth: month, capturedAt: close?.snapshot_at ?? null },
+          snapshot: {
+            status: close
+              ? close.payload?.source === "legacy_reconstructed" ? "legacy" : "complete"
+              : legacy ? "legacy" : "unavailable",
+            periodMonth: month,
+            capturedAt: close?.snapshot_at ?? legacy?.capturedAt ?? null,
+          },
         });
       }
+      const actuals = actualRows.map((row) => ({
+        type: row.type, category: row.subcategory, amount: Number(row.actual_amount),
+      }));
       const [{ rows: liabilityRows }, { rows: goalRows }] = await Promise.all([
         pool.query(
           `SELECT id, name, category, balance, minimum_payment

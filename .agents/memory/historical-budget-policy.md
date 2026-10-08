@@ -9,11 +9,11 @@ Budget periods before the current month are read-only. Historical income and liv
 
 **How to apply:** Protect both the interface and server writes. Keep monthly navigation usable and leave current/future editing unchanged.
 
-Use the designated close's explicit budget period, not a nearest timestamp, to associate archived data with a month. Disclose the actual capture time: post-close capture is not a retroactive reconstruction of exact month-end state.
+Prefer a new period-tagged close. For older monthly backups, accept a legacy month only when exactly one shared debt-and-goal backup timestamp exists on the first UTC calendar day immediately following that period; never choose a merely nearby snapshot. Rebuild unsaved income/expense defaults from the preceding 12 complete transaction months and let explicit saved rows override them. Disclose that these plan defaults are reconstructed, plus the archive capture time.
 
-**Why:** Monthly runs can happen after month-end, and the user questioned what happens when a run is missed. Late live data cannot reliably recreate a prior state.
+**Why:** The development database has paired legacy backups and period-dated transactions, but no original per-month snapshots of unsaved plan defaults. The user expects the following month's scheduled backup to represent the completed period.
 
-**How to apply:** Do not silently replace missing closes with live records, older snapshots, or zero. Verified historical sources may later be associated explicitly; do not fabricate them from late live-table retries.
+**How to apply:** This narrowly defined legacy match can power a read-only reconstructed view; do not use live debts/goals, current rolling averages, older archives, or zero to fill gaps. If the paired first-day archive is absent or ambiguous, keep missing details unavailable.
 
 Keep deliberately saved monthly amounts visible and counted even when the matching debt/goal snapshot is missing or the live entity has been deleted. Distinguish known saved subtotals from unavailable complete totals.
 
