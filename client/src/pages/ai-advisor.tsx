@@ -422,7 +422,7 @@ export default function AIAdvisorPage() {
                   </Button>
                 ))}
               </div>
-              <div className="flex gap-2">
+              <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] gap-x-2 gap-y-1">
                 <Textarea
                   value={scenarioQuery}
                   onChange={(e) => setScenarioQuery(e.target.value)}
@@ -435,29 +435,30 @@ export default function AIAdvisorPage() {
                   placeholder="Describe a financial scenario or ask a question..."
                   rows={2}
                   maxLength={MAX_SCENARIO_QUERY_CHARACTERS}
-                  className="flex-1"
+                  className="col-start-1 row-start-1"
                   data-testid="input-scenario-query"
                 />
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={clearScenario}
-                  disabled={!scenarioQuery && !scenarioSubmitted}
-                  className="self-end"
-                  data-testid="button-clear-scenario"
+                <div className="col-start-2 row-start-1 flex items-end gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={clearScenario}
+                    disabled={!scenarioQuery && !scenarioSubmitted}
+                    data-testid="button-clear-scenario"
+                  >
+                    <RotateCcw className="mr-2 h-4 w-4" /> Clear
+                  </Button>
+                  <Button type="button" onClick={handleScenarioSubmit} data-testid="button-analyze-scenario">
+                    <Send className="h-4 w-4" />
+                  </Button>
+                </div>
+                <p
+                  className="col-start-1 row-start-2 text-right text-xs tabular-nums text-muted-foreground"
+                  data-testid="text-scenario-query-character-count"
                 >
-                  <RotateCcw className="mr-2 h-4 w-4" /> Clear
-                </Button>
-                <Button type="button" onClick={handleScenarioSubmit} className="self-end" data-testid="button-analyze-scenario">
-                  <Send className="h-4 w-4" />
-                </Button>
+                  {scenarioQuery.length.toLocaleString()} / {MAX_SCENARIO_QUERY_CHARACTERS.toLocaleString()} characters
+                </p>
               </div>
-              <p
-                className="text-right text-xs tabular-nums text-muted-foreground"
-                data-testid="text-scenario-query-character-count"
-              >
-                {scenarioQuery.length.toLocaleString()} / {MAX_SCENARIO_QUERY_CHARACTERS.toLocaleString()} characters
-              </p>
             </CardContent>
           </Card>
           {scenarioSubmitted && (
