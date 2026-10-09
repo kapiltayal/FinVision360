@@ -7,4 +7,10 @@ When a broad schema push detects unrelated drift and offers to truncate existing
 
 **Why:** The installed schema tool can surface unrelated destructive prompts, while its table-filter option cannot be combined with the project config. Auto-approval would risk unrelated application data.
 
-**How to apply:** Use `ADD COLUMN IF NOT EXISTS` or an equally narrow additive statement in development, verify through the application database connection, and rely on Replit's Publish flow to diff and apply the development schema to production.
+**How to apply:** Use `ADD COLUMN IF NOT EXISTS` or an equally narrow additive statement in development, verify through the application database connection, and verify the actual deployment migration path. Do not assume publishing alone synchronizes this application's database.
+
+New required finance schema must be included in the application's established database bootstrap or an explicitly configured deployment migration, not only a standalone manually run script.
+
+**Why:** A feature can work against an already migrated development database while every preview/save fails after publishing against an older database.
+
+**How to apply:** Keep changes additive and idempotent, serialize concurrent startup migrations, and apply them before serving dependent routes. This is not a workaround for querying the wrong workspace SQL target; verify the app connection first.

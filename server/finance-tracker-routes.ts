@@ -7,21 +7,20 @@ import { storage } from "./storage";
 import { isHistoricalBudgetMonth, normalizeBudgetCategory } from "../shared/budget-period";
 import { budgetEntityMetadata, legacyBudgetClose, preserveSavedEntityRows, type BudgetSnapshot } from "./budget-history";
 import multer from "multer";
-import { parseUpload, parseTransactionUpload, isEmptySample, type RawRow } from "./asset-liability-ingestion";
+import { parseTransactionUpload, type RawRow } from "./asset-liability-ingestion";
 import { completeIngestionClassification } from "./ai/provider";
 import type { TransactionImportPreview, TransactionImportResult } from "../shared/transaction-import";
 import {
   applyImportCategorySuggestion,
   hasSuppliedNeedWant,
   isBlankTransactionSourceRow,
-  saveReviewedTransactionBatch,
   transactionEntryFromSource,
   validateReviewedTransactionEntries,
 } from "./transaction-import";
+import { checkUserTransactionDuplicates, ImportConflict, saveDuplicateSafeImport, validDuplicateReview } from "./transaction-duplicates";
 
 const transactionUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024, files: 1 } });
 const CORRUPT_TRANSACTION_FILE = "File content could not be read or appears corrupted.";
-const NO_TRANSACTION_DETECTIONS = "Could not detect any valid transactions in this file.";
 const INVALID_TRANSACTION_FILE_TYPE = "File type is not supported or does not match its contents.";
 const UNASSIGNED_TRANSACTION_CATEGORY = "unassigned";
 type CanonicalTransactionCategory = {
@@ -1046,6 +1045,9 @@ export function registerFinanceTrackerRoutes(app: Express) {
     try {
       const userId = (req.user as any).id;
       const { date, description, amount, type, subcategory, category, parentCategory, needsWant, isRecurring, recurringType, notes, source = "manual" } = req.body;
+      if (source === "upload") return res.status(409).json({
+        code: "REVIEW_REQUIRED", message: "File imports must use the preview and reviewed-save workflow.",
+      });
 
       if (!date || !description || amount === undefined || !type)
         return res.status(400).json({ message: "date, description, amount, type are required" });
@@ -1077,131 +1079,42 @@ export function registerFinanceTrackerRoutes(app: Express) {
     }
   });
 
-  // POST /api/transactions/bulk — CSV import
-  app.post("/api/transactions/bulk", requireAuth, async (req, res) => {
-    let importClient: any;
-    try {
-      const userId = (req.user as any).id;
-      const { transactions, rejected: clientRejected = {} } = req.body;
-
-      if (!Array.isArray(transactions))
-        return res.status(400).json({ message: "transactions array required" });
-      if (transactions.length > 500) return res.status(400).json({ message: "Imports are limited to 500 entries at a time" });
-      for (const transaction of transactions) {
-        if (transaction && typeof transaction === "object") {
-          transaction.date = normalizeTransactionDate(transaction.date) || transaction.date;
-        }
-      }
-
-      const categories = await canonicalTransactionCategories();
-      const preferences = await userMerchantCategoryPreferences(userId, categories);
-      const assignments = new Map<number, CanonicalTransactionCategory>();
-      const unmapped: Array<{ t: any; index: number }> = [];
-      transactions.forEach((t, index) => {
-        if (t?.type !== "income" && t?.type !== "expense") return;
-        // Classification order: user's merchant preference, supplied canonical
-        // category fields, AI, then unassigned during persistence.
-        const merchantMatch = categoryFromMerchantPreference(preferences, t);
-        const supplied = t.subcategory ?? t.category;
-        const suppliedMatch = supplied !== undefined
-          ? categoryForInput(categories, t.type, supplied, t.parentCategory)
-          : undefined;
-        const selected = merchantMatch || suppliedMatch;
-        if (selected) assignments.set(index, selected);
-        else unmapped.push({ t, index });
-      });
-      const aiMatches = await aiTransactionCategories(unmapped.map(({ t }) => t), categories);
-      for (const [sourceIndex, selected] of Array.from((aiMatches || new Map()).entries())) {
-        const target = unmapped[sourceIndex];
-        if (target) {
-          assignments.set(target.index, selected);
-          target.t.type = selected.type.toLowerCase();
-        }
-      }
-      importClient = await pool.connect();
-      await importClient.query("BEGIN");
-      let inserted = 0;
-      let uncategorized = 0;
-      const skippedReasons: Record<string, number> = {};
-      const addSkipped = (reason: string) => {
-        skippedReasons[reason] = (skippedReasons[reason] ?? 0) + 1;
-      };
-
-      if (clientRejected && typeof clientRejected === "object") {
-        for (const [reason, count] of Object.entries(clientRejected)) {
-          const numericCount = Number(count);
-          if (numericCount > 0) skippedReasons[reason] = numericCount;
-        }
-      }
-
-      for (const [index, t] of transactions.entries()) {
-        if (!t.date || !isValidIsoDate(t.date)) { addSkipped("Missing or invalid date"); continue; }
-        if (!t.description) { addSkipped("Missing description"); continue; }
-        if (t.amount === undefined || t.amount === null || !Number.isFinite(Number(t.amount)) || Number(t.amount) === 0) {
-          addSkipped("Missing or invalid amount");
-          continue;
-        }
-        if (t.type !== "income" && t.type !== "expense") {
-          addSkipped("Invalid transaction type");
-          continue;
-        }
-
-        try {
-          const selected = assignments.get(index);
-          const finalCategory = selected?.storedCategory ?? UNASSIGNED_TRANSACTION_CATEGORY;
-          const finalParentCategory = selected?.storedParentCategory ?? null;
-          const finalNW = selected?.needVsWant?.toLowerCase() ?? "na";
-          if (!selected) uncategorized++;
-
-          await importClient.query(
-            `INSERT INTO transactions (user_id, date, description, merchant, amount, type, parent_category, subcategory, needs_want, source, notes)
-             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'upload',$10)`,
-            [userId, t.date, t.description, t.merchant || t.description, Math.abs(parseFloat(t.amount)), t.type, finalParentCategory, finalCategory, finalNW, t.notes || null]
-          );
-          inserted++;
-        } catch (error) {
-          throw error;
-        }
-      }
-
-       if (!inserted) {
-         await importClient.query("ROLLBACK");
-         importClient.release();
-         importClient = null;
-         return res.status(400).json({ message: NO_TRANSACTION_DETECTIONS });
-       }
-      const skipped = Object.values(skippedReasons).reduce((total, count) => total + count, 0);
-      await importClient.query("COMMIT");
-      importClient.release();
-      importClient = null;
-      const recurringMarked = await detectAndMarkRecurring(userId);
-      res.json({ inserted, uncategorized, skipped, skippedReasons, recurringMarked });
-    } catch (e) {
-      if (importClient) {
-        await importClient.query("ROLLBACK").catch(() => undefined);
-        importClient.release();
-      }
-      console.error(e);
-      res.status(500).json({ message: "Failed to import transactions" });
-    }
+  // Legacy CSV/JSON direct imports now require the same editable review.
+  app.post("/api/transactions/bulk", requireAuth, (_req, res) => {
+    res.status(409).json({ code: "REVIEW_REQUIRED",
+      message: "Preview the file and confirm its reviewed transactions before saving." });
   });
 
-  // Multipart counterpart to the JSON bulk endpoint. Parsing, archive bounds,
+  // No-write multipart preview. Parsing, archive bounds,
   // UTF-8 checks, and spreadsheet handling are shared with the other imports.
   app.post("/api/transactions/ingest/preview", requireAuth, transactionUploadFile, async (req: any, res) => {
+    const streaming = req.query.progress === "1";
+    if (streaming) {
+      res.setHeader("Content-Type", "application/x-ndjson");
+      res.setHeader("Cache-Control", "no-cache, no-transform");
+      res.setHeader("X-Accel-Buffering", "no");
+      res.flushHeaders();
+    }
+    const event = (value: unknown) => { if (streaming && !res.writableEnded) res.write(JSON.stringify(value) + "\n"); };
+    const fail = (status: number, message: string) => {
+      if (streaming) { event({ error: message }); return res.end(); }
+      return res.status(status).json({ message });
+    };
     try {
+      event({ stage: "validation" });
       if (!req.file || !supportedTransactionFile(req.file)) {
-        return res.status(400).json({ message: INVALID_TRANSACTION_FILE_TYPE });
+        return fail(400, INVALID_TRANSACTION_FILE_TYPE);
       }
+      event({ stage: "processing" });
       const parsed = await parseTransactionUpload(req.file);
       if (!parsed) {
-        return res.status(400).json({ message: CORRUPT_TRANSACTION_FILE });
+        return fail(400, CORRUPT_TRANSACTION_FILE);
       }
-      if (parsed.overflow) return res.status(400).json({ message: "Imports are limited to 500 entries at a time" });
+      if (parsed.overflow) return fail(400, "Imports are limited to 500 entries at a time");
       const rows = parsed.rows;
       const sourceRows = rows.filter((row) => !isBlankTransactionSourceRow(row));
-      if (sourceRows.length > 500) return res.status(400).json({ message: "Imports are limited to 500 entries at a time" });
-      if (!sourceRows.length) return res.status(400).json({ message: CORRUPT_TRANSACTION_FILE });
+      if (sourceRows.length > 500) return fail(400, "Imports are limited to 500 entries at a time");
+      if (!sourceRows.length) return fail(400, CORRUPT_TRANSACTION_FILE);
       const userId = (req.user as any).id;
       const categories = await canonicalTransactionCategories();
       const preferences = await userMerchantCategoryPreferences(userId, categories);
@@ -1236,10 +1149,30 @@ export function registerFinanceTrackerRoutes(app: Express) {
         }),
         ignoredBlankRows: parsed.ignoredBlankRows,
       };
+      event({ stage: "duplicates" });
+      preview.entries = await checkUserTransactionDuplicates(pool, userId, preview.entries);
+      if (streaming) {
+        event({ preview });
+        event({ stage: "review" });
+        return res.end();
+      }
       return res.json(preview);
     } catch (error) {
       console.error("[POST /api/transactions/ingest/preview] error:", error);
-      return res.status(500).json({ message: "Failed to preview transaction import" });
+      return fail(500, "Failed to preview transaction import");
+    }
+  });
+
+  app.post("/api/transactions/import-reviewed/check", requireAuth, async (req, res) => {
+    if (!validDuplicateReview(req.body?.entries)) {
+      return res.status(400).json({ message: "Provide at most 500 valid review rows with unique row IDs" });
+    }
+    try {
+      const entries = await checkUserTransactionDuplicates(pool, (req.user as any).id, req.body.entries);
+      return res.json({ entries });
+    } catch (error) {
+      console.error("Transaction duplicate review failed:", error);
+      return res.status(500).json({ message: "Could not check duplicates. Your review has not been saved." });
     }
   });
 
@@ -1249,11 +1182,17 @@ export function registerFinanceTrackerRoutes(app: Express) {
     let importClient: any;
     try {
       const entries = req.body?.entries;
-      if (!Array.isArray(entries) || entries.length === 0 || entries.length > 500) {
+      if (!validDuplicateReview(entries) || entries.length === 0) {
         return res.status(400).json({ message: "Provide between 1 and 500 reviewed transactions" });
       }
+      const requestId = req.body.requestId;
+      if (typeof requestId !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(requestId)) {
+        return res.status(400).json({ message: "A valid unique save request ID is required" });
+      }
+      const selected = entries.filter(entry => entry.include !== false);
+      if (!selected.length) return res.status(400).json({ message: "Select at least one transaction to save" });
       const categories = await canonicalTransactionCategories();
-      const validation = validateReviewedTransactionEntries(entries, categories);
+      const validation = validateReviewedTransactionEntries(selected, categories);
       if (validation.errors.length) {
         return res.status(422).json({
           message: "Please correct invalid transactions before saving",
@@ -1262,16 +1201,10 @@ export function registerFinanceTrackerRoutes(app: Express) {
       }
 
       importClient = await pool.connect();
-      const saved = await saveReviewedTransactionBatch(importClient, (req.user as any).id, validation.transactions);
-      const result: TransactionImportResult = {
-        inserted: saved.inserted,
-        uncategorized: saved.uncategorized,
-        skipped: 0,
-        skippedReasons: {},
-        recurringMarked: saved.recurringMarked,
-      };
+      const result = await saveDuplicateSafeImport(importClient, (req.user as any).id, requestId, entries, validation.transactions);
       return res.json(result);
     } catch (error) {
+      if (error instanceof ImportConflict) return res.status(409).json({ message: error.message, code: error.code });
       console.error("[POST /api/transactions/import-reviewed] error:", error);
       return res.status(500).json({ message: "Failed to save reviewed transactions" });
     } finally {
@@ -1286,103 +1219,10 @@ export function registerFinanceTrackerRoutes(app: Express) {
     }
   });
 
-  app.post("/api/transactions/ingest", requireAuth, transactionUploadFile, async (req: any, res) => {
-    let ingestionClient: any;
-    try {
-      if (!req.file || !supportedTransactionFile(req.file)) {
-        return res.status(400).json({ message: INVALID_TRANSACTION_FILE_TYPE });
-      }
-      const rows = parseUpload(req.file);
-      const inspect = rows?.slice(0, 10) ?? [];
-      const recognizable = inspect.some((row) => {
-        const date = field(row, "date", "transactiondate", "posteddate");
-        const description = field(row, "description", "merchant", "name", "memo", "text");
-        const amount = field(row, "amount", "value", "debit", "credit");
-        return !!description && (!!amount || (Boolean(date) && Object.keys(row).length >= 2));
-      });
-      if (!rows || isEmptySample(rows) || !recognizable) {
-        return res.status(400).json({ message: CORRUPT_TRANSACTION_FILE });
-      }
-      if (rows.length > 500) return res.status(400).json({ message: "Imports are limited to 500 entries at a time" });
-      const userId = (req.user as any).id;
-      const categories = await canonicalTransactionCategories();
-      const preferences = await userMerchantCategoryPreferences(userId, categories);
-      const normalized = rows.map((row) => {
-        const parseMoney = (value: string) => Number(value.replace(/[$,\s]/g, "").replace(/^\((.*)\)$/, "-$1"));
-        const rawAmount = field(row, "amount", "value");
-        const rawDebit = field(row, "debit");
-        const rawCredit = field(row, "credit");
-        const amount = parseMoney(rawAmount || rawDebit || rawCredit);
-        const explicitType = field(row, "type", "transactiontype").toLowerCase();
-        return {
-          date: normalizeTransactionDate(field(row, "date", "transactiondate", "posteddate")) || "",
-          description: field(row, "description", "merchant", "name", "memo", "text"),
-          merchant: field(row, "merchant", "description", "name"),
-          amount,
-          type: (explicitType === "income" || explicitType === "credit" || (!rawAmount && !!rawCredit)
-            ? "income" : "expense") as "income" | "expense",
-          subcategory: field(row, "subcategory", "category"),
-          parentCategory: field(row, "parentcategory"),
-          notes: field(row, "notes", "memo"),
-        };
-      });
-      const assignments = new Map<number, CanonicalTransactionCategory>();
-      const unknownIndexes: number[] = [];
-      normalized.forEach((row, index) => {
-        // Classification order: user's merchant preference, supplied canonical
-        // category fields, AI, then unassigned during persistence.
-        const merchantMatch = categoryFromMerchantPreference(preferences, row);
-        const suppliedMatch = row.subcategory
-          ? categoryForInput(categories, row.type, row.subcategory, row.parentCategory)
-          : undefined;
-        const selected = merchantMatch || suppliedMatch;
-        if (selected) assignments.set(index, selected);
-        else unknownIndexes.push(index);
-      });
-      const ai = await aiTransactionCategories(unknownIndexes.map((index) => rows[index]), categories);
-      unknownIndexes.forEach((index, sourceIndex) => {
-        const category = ai?.get(sourceIndex);
-        if (category) {
-          assignments.set(index, category);
-          normalized[index].type = category.type.toLowerCase() as "income" | "expense";
-        }
-      });
-      req.body = { transactions: normalized };
-      // The handler is deliberately implemented in-line by dispatching to the
-      // same route logic would recurse, so persist the validated rows here.
-      ingestionClient = await pool.connect();
-      await ingestionClient.query("BEGIN");
-      let inserted = 0; let uncategorized = 0; const skippedReasons: Record<string, number> = {};
-      for (const [index, t] of normalized.entries()) {
-        if (!isValidIsoDate(t.date) || !t.description || !Number.isFinite(t.amount) || t.amount === 0) { skippedReasons["Invalid transaction"] = (skippedReasons["Invalid transaction"] || 0) + 1; continue; }
-        const selected = assignments.get(index);
-        const finalCategory = selected?.storedCategory ?? UNASSIGNED_TRANSACTION_CATEGORY;
-        const finalParentCategory = selected?.storedParentCategory ?? null;
-        const finalNeedWant = selected?.needVsWant?.toLowerCase() || "na";
-        if (!selected) uncategorized++;
-        await ingestionClient.query(`INSERT INTO transactions (user_id,date,description,merchant,amount,type,parent_category,subcategory,needs_want,source,notes)
-          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'upload',$10)`,
-          [userId, t.date, t.description, t.merchant || t.description, Math.abs(t.amount), t.type, finalParentCategory, finalCategory, finalNeedWant, t.notes || null]);
-        inserted++;
-      }
-      if (!inserted) {
-        await ingestionClient.query("ROLLBACK");
-        ingestionClient.release();
-        ingestionClient = null;
-        return res.status(400).json({ message: NO_TRANSACTION_DETECTIONS });
-      }
-      await ingestionClient.query("COMMIT");
-      ingestionClient.release();
-      ingestionClient = null;
-      res.json({ inserted, uncategorized, skipped: Object.values(skippedReasons).reduce((a, b) => a + b, 0), skippedReasons, recurringMarked: await detectAndMarkRecurring(userId) });
-    } catch (error) {
-      if (ingestionClient) {
-        await ingestionClient.query("ROLLBACK").catch(() => undefined);
-        ingestionClient.release();
-      }
-      console.error(error);
-      res.status(500).json({ message: "Failed to import transactions" });
-    }
+  // Retired direct-write file API: review and duplicate protection cannot be bypassed.
+  app.post("/api/transactions/ingest", requireAuth, (_req, res) => {
+    res.status(409).json({ code: "REVIEW_REQUIRED",
+      message: "Preview the file and confirm its reviewed transactions before saving." });
   });
 
   // POST /api/transactions/import-from-plaid — import a date range from connected accounts

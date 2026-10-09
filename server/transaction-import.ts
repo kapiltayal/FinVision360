@@ -1,4 +1,6 @@
 import type { TransactionImportEntry } from "../shared/transaction-import";
+import { createHash } from "node:crypto";
+import { stableSourceKey } from "../shared/transaction-duplicates";
 import type { RawRow } from "./asset-liability-ingestion";
 
 export interface ImportCategory {
@@ -22,6 +24,8 @@ export interface PreparedReviewedTransaction {
   isRecurring: boolean;
   recurringType: string | null;
   notes: string | null;
+  sourceTransactionId?: string;
+  sourceAccount?: string;
 }
 
 export interface ReviewedImportValidation {
@@ -185,6 +189,8 @@ export function transactionEntryFromSource(row: RawRow, id: number): Transaction
     isRecurring,
     recurringType: isRecurring ? sourceRecurrenceType : "",
     notes: sourceField(row, "notes", "memo"),
+    sourceTransactionId: sourceField(row, "transactionid", "banktransactionid", "fitid") || undefined,
+    sourceAccount: sourceField(row, "accountid", "accountnumber", "accountname", "account") || undefined,
     ...(sourceCategory ? { sourceCategory } : {}),
   };
 }
@@ -297,6 +303,11 @@ export function validateReviewedTransactionEntries(
     }
     if (typeof entry.merchant !== "string") addError("merchant", "Merchant must be text");
     if (typeof entry.notes !== "string") addError("notes", "Notes must be text");
+    for (const key of ["sourceTransactionId", "sourceAccount"] as const) {
+      if (entry[key] !== undefined && (typeof entry[key] !== "string" || entry[key].length > 256)) {
+        addError(key, "Source identity must be text of at most 256 characters");
+      }
+    }
 
     if (
       date && description && amount && (entry.type === "income" || entry.type === "expense") &&
@@ -324,6 +335,8 @@ export function validateReviewedTransactionEntries(
         isRecurring: entry.isRecurring,
         recurringType: entry.isRecurring && recurringType ? recurringType : null,
         notes: entry.notes.trim() || null,
+        ...(entry.sourceTransactionId ? { sourceTransactionId: entry.sourceTransactionId.trim() } : {}),
+        ...(entry.sourceAccount ? { sourceAccount: entry.sourceAccount.trim() } : {}),
       });
     }
   });
@@ -334,18 +347,20 @@ export async function saveReviewedTransactionBatch(
   client: { query: (sql: string, values?: unknown[]) => Promise<unknown> },
   userId: string,
   transactions: PreparedReviewedTransaction[],
+  manageTransaction = true,
 ): Promise<{ inserted: number; uncategorized: number; recurringMarked: number }> {
   let inserted = 0;
   let uncategorized = 0;
   let recurringMarked = 0;
   try {
-    await client.query("BEGIN");
+    if (manageTransaction) await client.query("BEGIN");
     for (const transaction of transactions) {
       await client.query(
         `INSERT INTO transactions
            (user_id, date, description, merchant, amount, type, parent_category, subcategory,
-            needs_want, is_recurring, recurring_type, source, notes)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'upload',$12)`,
+            needs_want, is_recurring, recurring_type, source, notes,
+            upload_source_id, upload_source_account, upload_identity)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'upload',$12,$13,$14,$15)`,
         [
           userId,
           transaction.date,
@@ -359,16 +374,19 @@ export async function saveReviewedTransactionBatch(
           transaction.isRecurring,
           transaction.recurringType,
           transaction.notes,
+          transaction.sourceTransactionId || null,
+          transaction.sourceAccount || null,
+          stableSourceKey(transaction) ? createHash("sha256").update(stableSourceKey(transaction)!).digest("hex") : null,
         ],
       );
       inserted++;
       if (transaction.subcategory === "unassigned") uncategorized++;
       if (transaction.isRecurring) recurringMarked++;
     }
-    await client.query("COMMIT");
+    if (manageTransaction) await client.query("COMMIT");
     return { inserted, uncategorized, recurringMarked };
   } catch (error) {
-    await client.query("ROLLBACK").catch(() => undefined);
+    if (manageTransaction) await client.query("ROLLBACK").catch(() => undefined);
     throw error;
   }
 }

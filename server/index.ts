@@ -3,6 +3,7 @@ import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
 import { pool } from "./db";
+import { ensureTransactionImportSchema } from "./transaction-import-schema";
 
 const app = express();
 const httpServer = createServer(app);
@@ -122,6 +123,10 @@ app.use((req, res, next) => {
       ON transactions(user_id, plaid_transaction_id)
       WHERE plaid_transaction_id IS NOT NULL;
   `);
+
+  // Both npm run dev and the published dist/index.cjs enter this bootstrap.
+  // Apply additive import schema before registering endpoints that require it.
+  await ensureTransactionImportSchema(pool);
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS estate_beneficiaries (

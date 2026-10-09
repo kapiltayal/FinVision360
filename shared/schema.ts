@@ -142,6 +142,9 @@ export const transactions = pgTable("transactions", {
   plaidAccountId: text("plaid_account_id"),
   plaidAccountName: text("plaid_account_name"),
   plaidInstitutionName: text("plaid_institution_name"),
+  uploadSourceId: text("upload_source_id"),
+  uploadSourceAccount: text("upload_source_account"),
+  uploadIdentity: text("upload_identity"),
   notes: text("notes"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
@@ -152,10 +155,24 @@ export const transactions = pgTable("transactions", {
   plaidUnique: uniqueIndex("idx_transactions_plaid_unique")
     .on(table.userId, table.plaidTransactionId)
     .where(sql`${table.plaidTransactionId} IS NOT NULL`),
+  uploadUnique: uniqueIndex("idx_transactions_upload_unique")
+    .on(table.userId, table.uploadIdentity)
+    .where(sql`${table.uploadIdentity} IS NOT NULL`),
   typeCheck: check("transactions_type_check", sql`${table.type} IN ('income', 'expense')`),
   needsWantCheck: check("transactions_needs_want_check", sql`${table.needsWant} IN ('need', 'want', 'na')`),
   recurringTypeCheck: check("transactions_recurring_type_check", sql`${table.recurringType} IN ('subscription', 'recurring_bill')`),
   sourceCheck: check("transactions_source_check", sql`${table.source} IN ('manual', 'plaid', 'upload', 'import')`),
+}));
+
+export const transactionImportReceipts = pgTable("transaction_import_receipts", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull(),
+  requestId: varchar("request_id", { length: 36 }).notNull(),
+  payloadHash: text("payload_hash").notNull(),
+  result: jsonb("result").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  requestUnique: uniqueIndex("idx_transaction_import_receipt_unique").on(table.userId, table.requestId),
 }));
 
 export const transactionChangeHistory = pgTable("transaction_change_history", {

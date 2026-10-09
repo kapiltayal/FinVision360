@@ -1,6 +1,6 @@
 # Financial Transaction Ingestion and Processing
 
-*Implementation guide, verified against the application code on October 8, 2026.*
+*Implementation guide, updated October 9, 2026.*
 
 This guide covers the two transaction sources exposed in the Finance Tracker: user-uploaded files and transactions imported on request from Plaid-connected accounts. It follows each path from the user's selection through parsing, quality checks, categorization, preview or confirmation, and database persistence.
 
@@ -8,8 +8,8 @@ This guide covers the two transaction sources exposed in the Finance Tracker: us
 
 ```text
 File upload
-Choose file → server parses and suggests fields/categories → editable review
-→ server validates every reviewed row → one database transaction → import summary
+Choose file → validation → processing/categorization → duplicate check
+→ editable review → final validation and duplicate recheck → atomic save → complete
 
 Plaid
 Choose institution/account and dates → server fetches Plaid pages
@@ -17,7 +17,7 @@ Choose institution/account and dates → server fetches Plaid pages
 → recurring detection → import summary
 ```
 
-The key user-facing difference is that **file uploads are previewed and edited before saving**, while **Plaid rows are written immediately after the user clicks Import**. Plaid provides an ID for reliable re-import matching; uploaded files do not have a comparable duplicate key.
+The key user-facing difference is that **file uploads are previewed and edited before saving**, while **Plaid rows are written immediately after the user clicks Import**. Files use source IDs when available and conservative content matching otherwise; Plaid retains its existing ID-based upsert behavior.
 
 ## Common transaction record
 
@@ -32,9 +32,10 @@ Both flows write to the `transactions` table. The signed-in user's ID is assigne
 | `is_recurring`, `recurring_type` | Recurrence flag and, when set, `subscription` or `recurring_bill`. |
 | `source` | `upload` for file imports or `plaid` for connected-account imports. Manual transactions use a separate source. |
 | Plaid metadata | Plaid transaction ID, account ID/name, and institution name; populated only for Plaid rows. |
+| Upload identity | Source transaction ID and account context, when supplied by the file; `upload_identity` is a hash of that account context plus source ID. |
 | `notes`, timestamps | Optional notes and database-managed creation/update timestamps. |
 
-The database constrains transaction type, Need/Want value, recurring type, and source. Amount is stored as `NUMERIC(12,2)`. The database has a partial unique index on `(user_id, plaid_transaction_id)` when the Plaid ID is present; it does **not** impose a comparable uniqueness rule on file uploads.
+The database constrains transaction type, Need/Want value, recurring type, and source. Amount is stored as `NUMERIC(12,2)`. Partial unique indexes protect `(user_id, plaid_transaction_id)` and `(user_id, upload_identity)` when those identities are present. Content-based similarities are deliberately not database uniqueness constraints: identical-looking charges can be legitimate.
 
 # File uploads
 
@@ -65,6 +66,7 @@ Each nonblank source row becomes an editable transaction draft. The importer nor
 - **Amount and type:** Currency symbols and grouping commas are accepted for parsing. Parentheses and minus signs are recognized as negative source notation, but the stored amount is a positive magnitude; income versus expense is a separate field. Type comes from an explicit type column or debit/credit layout when available, and otherwise defaults to expense. Type labels such as credit/deposit and debit/withdrawal are recognized.
 - **Need/Want and recurrence:** Recognized values are normalized. Missing Need/Want becomes `na`; recurrence can be reviewed as false/true and, when true, assigned a supported recurrence type.
 - **Source category:** An uploaded category is retained separately in the preview so the reviewer can compare it with the selected canonical category. The raw source category is not a transaction-table column.
+- **Source identity:** `Transaction ID`, `Bank Transaction ID`, or `FITID` is recognized as a transaction identifier. A generic `ID`, row number, or `Reference` is not treated as reliable. Account context comes from `Account ID`, `Account Number`, `Account Name`, or `Account`; absent context uses the user's unqualified source-ID namespace. Temporary review row numbers are never financial duplicate keys.
 
 The preview drafts receive temporary row numbers for editing. These numbers are not database transaction IDs.
 
@@ -83,7 +85,22 @@ If the AI service is unavailable, returns malformed output, or cannot identify a
 
 Because the classifier receives the complete source row for unresolved categories, that row can include uploaded fields such as descriptions, amounts, notes, or other columns. Rows already matched by user preference or source category are not sent for AI categorization. Plaid transaction imports use Plaid categories and deterministic rules instead; they do not call this AI classifier.
 
-## 5. User reviews the preview
+## 5. Duplicate identification, after categorization
+
+The server compares normalized, categorized drafts with earlier included rows in the file and existing transactions owned by the signed-in user. Other users' records are never candidates.
+
+| Finding | Rule | Default and user action |
+|---|---|---|
+| Stable source ID | Same source transaction ID and normalized account context, even if date/amount/text changed | Excluded; cannot be kept or saved a second time |
+| Exact-looking content | Same date, amount to the cent, type, and full normalized description | Excluded by default; explicitly **Keep anyway** only for a separate real transaction |
+| Possible content match | Same amount/type and matching normalized merchant or description, on the same date or within two days | Excluded by default; inspect and explicitly keep a legitimate repeat |
+
+Text comparison normalizes case and punctuation, not an aggressive fuzzy match. When both files provide different account contexts, they are not matched to one another. Missing account context does not prove that records belong to different accounts. Source IDs should be stable across exports; account identifiers help avoid ambiguity.
+Different reliable IDs in the same account namespace identify separate transactions even when the dates, amounts and descriptions are identical.
+
+Warnings explain the matching rule and identify a stored transaction or earlier review row. Checks never delete, merge, or alter existing transactions.
+
+## 6. User reviews the preview
 
 The browser receives the draft rows and displays an editable table. Nothing has been written to `transactions` yet. The user can:
 
@@ -91,12 +108,15 @@ The browser receives the draft rows and displays an editable table. Nothing has 
 - See the original source category separately when it differs from the current category choice.
 - Remove unwanted rows or add a new row.
 - Discard the review and choose another file.
+- Include/exclude rows and explicitly keep legitimate content-based repeats. Reliable-ID repeats remain locked out.
 
-Completely blank rows are reported as excluded. Invalid nonblank rows remain in the table and show field-level errors. Category is optional: the user can choose a canonical category or leave the transaction unassigned.
+Completely blank rows are reported as excluded. Invalid nonblank rows remain in the table and show field-level errors. Only selected rows must pass validation to save; an excluded invalid row does not block the batch. Category is optional: the user can choose a canonical category or leave the transaction unassigned.
 
-## 6. Server validates the reviewed batch
+Editing a matching field resets its duplicate override and triggers a version-guarded recheck through `POST /api/transactions/import-reviewed/check`. This endpoint writes nothing. A failed recheck preserves the editable review and blocks saving until the check is retried.
 
-When the user clicks **Save**, the browser posts the edited rows to `POST /api/transactions/import-reviewed`. The server does not trust browser validation; it checks the whole batch again before opening a database connection:
+## 7. Server validates the reviewed batch
+
+When the user clicks **Save**, the browser posts all review rows and a UUID `requestId` to `POST /api/transactions/import-reviewed`. The server checks row shape/IDs and validates every selected row before opening a database connection:
 
 - Batch must contain 1–500 entries.
 - Date must be a real calendar date.
@@ -107,28 +127,32 @@ When the user clicks **Save**, the browser posts the edited rows to `POST /api/t
 - Need/Want must be `need`, `want`, or `na`.
 - Recurring status must be boolean. A recurring row must have type `subscription` or `recurring_bill`; a non-recurring row must not have a recurring type.
 
-If any row fails, the server returns field-specific validation errors (`422`) for the batch. No rows are written, and the review remains available so the user can correct it. A category-list loading error also disables the UI's save button.
+If any selected row fails, the server returns field-specific validation errors (`422`). No rows are written; the review remains available. Source identities must be text of at most 256 characters. Each review row must have a unique integer ID. A category-list loading error also disables saving.
 
-## 7. File rows are committed atomically
+## 8. File rows are committed atomically
 
-After the entire batch validates, the server begins a PostgreSQL transaction and inserts every reviewed row with `source='upload'`. Canonical category values are stored; a category-less row is stored with `subcategory='unassigned'` and no parent category. The database generates the permanent row ID and timestamps.
+After selected rows validate, the server begins a PostgreSQL transaction and obtains a user-scoped advisory lock. It rechecks selected rows against the current ledger and one another. Stable-ID duplicates always fail; new content matches require explicit keep confirmation. A conflict returns `409 / DUPLICATES_CHANGED`, rolls back, and refreshes duplicate warnings without discarding edits.
+
+Selected rows are inserted with `source='upload'`. Canonical category values are stored; a category-less row uses `subcategory='unassigned'` and no parent category. The database generates permanent row IDs and timestamps.
 
 - If every insert succeeds, the server commits the batch.
 - If any insert fails, it rolls back the entire batch; the user does not get a partially saved reviewed import.
 - The original upload is not retained. Only the reviewed transaction fields are saved.
 - The reviewed path does not run automatic recurring detection; it saves recurrence values selected in the review.
 
-On success, the result reports inserted and uncategorized counts. The reviewed path returns `skipped=0`: rows are either removed by the user before saving or the validated batch is saved in full. The Finance Tracker shows the result and any unassigned categories, then refreshes the list so the imported dates are visible.
+Successful saves write selected rows plus a durable receipt in `transaction_import_receipts` in the same transaction. The receipt records the signed-in user, request UUID, canonical payload hash, and result. Retrying an unchanged request returns the previous result instead of inserting again—even if the first response was lost after commit, or retries arrive concurrently. Reusing a committed UUID with changed data fails with `REQUEST_ID_REUSED`. Changed review payloads get new UUIDs; failed transactions leave no receipt.
 
-## File-upload duplicate behavior
+Results report inserted, uncategorized, recurring-selected and excluded/skipped counts. Removed rows and completely blank rows are handled separately in review. The Finance Tracker displays the result and refreshes the transaction list.
 
-The current reviewed file flow does not compare transactions with one another or with existing database rows by date, description, merchant, or amount. Uploading the same file twice—or including the same source row twice—can create duplicate transaction rows. File rows have no Plaid ID and no file-import fingerprint.
+## Event-driven progress and failures
 
-### Additional immediate-save API
+The interface shows **Validate file → Process & categorize → Check duplicates → Review rows → Save selected → Complete**. Preview requests add `?progress=1` and receive newline-delimited JSON stage events, a preview, or an error. Categorization is a normal JSON model call; progress events are not model-token streaming. Non-streaming clients can still request the JSON preview.
 
-The server also exposes authenticated `POST /api/transactions/ingest`. The current Finance Tracker file-upload UI does **not** call this endpoint; it uses the two-step preview and `import-reviewed` flow above.
+Completed, active, upcoming and failed stages reflect actual work; there are no invented percentage timers. Finalization starts when submitting the save; completion follows a committed result/receipt. Parse, duplicate-check and save errors preserve the file or editable review as appropriate. Retry an uncertain save unchanged before assuming nothing was written.
 
-The direct endpoint parses, categorizes, and saves without the editable preview. It skips invalid rows and commits the remaining valid rows as one database transaction; if no valid row can be inserted, it rolls back and returns an error. It does not deduplicate file rows. It also runs recurring detection after a successful save. New interactive file-import clients should use the explicit preview/review path.
+### Retired immediate-save APIs
+
+`POST /api/transactions/ingest` and legacy CSV/JSON `POST /api/transactions/bulk` now return `409 / REVIEW_REQUIRED` without writing. The single-transaction endpoint rejects `source='upload'`. File-import clients must use preview and reviewed save; manual and Plaid imports retain their existing behavior.
 
 # Plaid-connected transactions
 
@@ -186,10 +210,11 @@ The UI shows counts for **New**, **Updated**, **Skipped**, and **Unavailable**, 
 
 | Import path | Re-import behavior |
 |---|---|
-| Reviewed file upload | Inserts every reviewed row. No matching or duplicate check is performed; re-uploading may create duplicate rows. |
-| Direct file-ingest API | Inserts valid rows immediately; no matching or duplicate check is performed. |
+| Reviewed file upload | Checks file/ledger duplicates; source-ID duplicates blocked, content matches need explicit keep; unchanged retries return receipts. |
+| Direct file-ingest / legacy bulk APIs | Refuse writes with `REVIEW_REQUIRED`; clients must use the reviewed workflow. |
 | Plaid date-range import | Matches on `(user_id, plaid_transaction_id)` and updates the existing row; overlapping imports of the same Plaid ID do not create duplicates. |
-| File vs. Plaid | No cross-source matching is performed. A transaction present in both sources may appear twice. |
+| File uploaded after Plaid/manual entry | Compares against existing records across all sources using content rules; similar records require review. |
+| Plaid imported after a file | Plaid remains ID-based and does not merge file rows. Import order can still matter; existing duplicates are not cleaned up. |
 
 ## Main code references
 
@@ -199,10 +224,14 @@ The UI shows counts for **New**, **Updated**, **Skipped**, and **Unavailable**, 
 - `client/src/pages/finance-tracker.tsx` — import dialogs, success messages, and transaction-list refresh.
 - `server/asset-liability-ingestion.ts` — CSV/TSV/TXT and spreadsheet parsing.
 - `server/transaction-import.ts` — file-field normalization, server validation, and atomic reviewed-batch inserts.
+- `shared/transaction-duplicates.ts` — conservative matching rules and duplicate explanations.
+- `server/transaction-duplicates.ts` — owner-scoped checks, locking, receipts, and retry-safe finalization.
 - `server/finance-tracker-routes.ts` — preview, direct import, Plaid retrieval, category mapping, deduplication, and recurring detection.
 - `server/ai/provider.ts` — shared model provider used for file-category classification.
 - `shared/transaction-import.ts` — preview and result contracts.
-- `shared/schema.ts` — transaction fields, constraints, and Plaid unique index.
+- `shared/schema.ts` — transaction fields, receipt table, and unique indexes.
+- `server/transaction-import-schema.ts` — narrow, additive migration called by the existing application schema bootstrap before routes start. Both `npm run dev` and the published `dist/index.cjs` apply it; concurrent cold starts are serialized, failures stop startup, and no existing transaction data is changed.
+- `scripts/transaction-import-schema.ts` — optional standalone runner for the same migration (`npx tsx scripts/transaction-import-schema.ts`); normal application/deployment startup does not depend on running it manually.
 
 ## Related documentation
 

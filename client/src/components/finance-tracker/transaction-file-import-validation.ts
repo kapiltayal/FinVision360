@@ -8,7 +8,10 @@ export type TransactionImportCategory = {
 };
 
 export type TransactionImportReviewField =
-  Exclude<keyof TransactionImportEntry, "id" | "sourceCategory" | "parentCategory">;
+  Exclude<
+    keyof TransactionImportEntry,
+    "id" | "sourceCategory" | "parentCategory" | "sourceTransactionId" | "sourceAccount" | "duplicate"
+  >;
 export type TransactionImportRowErrors = Partial<Record<TransactionImportReviewField, string>>;
 
 export function createBlankTransactionImportEntry(id: number): TransactionImportEntry {
@@ -26,6 +29,7 @@ export function createBlankTransactionImportEntry(id: number): TransactionImport
     recurringType: "",
     notes: "",
     sourceCategory: "",
+    include: true,
   };
 }
 

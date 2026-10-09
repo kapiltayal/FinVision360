@@ -5,6 +5,7 @@
 - [Plaid book imports](plaid-book-imports.md) — explicit imports, linked-only sync, deletion releases claims for re-import, and expired authorization uses Link update mode.
 - [Native AI integration provisioning](native-ai-integration.md) — Replit-managed AI uses Agent provisioning, not the third-party connector inventory or a personal provider key.
 - [Financial ingestion AI trust boundary](financial-ingestion-ai-trust.md) — AI assigns categories only; source values and server-owned row identities remain authoritative.
+- [Financial import duplicate policy](financial-import-duplicate-policy.md) — uncertain matches require user review; legitimate repeats remain possible, and uncertain-save retries keep their identity.
 - [Additive schema changes](additive-schema-changes.md) — avoid broad schema pushes when unrelated drift triggers destructive prompts; use narrowly scoped additive dev DDL.
 - [Recommendation thresholds](recommendation-thresholds.md) — recommendation settings use three aggregate savings thresholds instead of account or policy subtypes.
 - [Retirement net-worth projections](retirement-net-worth-projections.md) — use category fallback returns and conservative debt carry-forward rules when inputs are incomplete.
