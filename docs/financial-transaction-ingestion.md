@@ -165,8 +165,8 @@ The server compares normalized, categorized drafts with earlier included rows in
 | Finding | Rule | Default and user action |
 |---|---|---|
 | Stable source ID | Same source transaction ID and normalized account context, even if date/amount/text changed | Excluded; cannot be kept or saved a second time |
-| Exact-looking content | Same date, amount to the cent, type, and full normalized description | Excluded by default; explicitly **Keep anyway** only for a separate real transaction |
-| Possible content match | Same amount/type and matching normalized merchant or description, on the same date or within two days | Excluded by default; inspect and explicitly keep a legitimate repeat |
+| Exact-looking content | Same date, amount to the cent, type, and full normalized description | Unchecked/excluded by default; select its **Save** checkbox only if it is a separate real transaction |
+| Possible content match | Same amount/type and matching normalized merchant or description, on the same date or within two days | Unchecked/excluded by default; inspect the match details and select its **Save** checkbox only for a legitimate repeat |
 
 Text comparison normalizes case and punctuation, not an aggressive fuzzy match. When both files provide different account contexts, they are not matched to one another. Missing account context does not prove that records belong to different accounts. Source IDs should be stable across exports; account identifiers help avoid ambiguity.
 Different reliable IDs in the same account namespace identify separate transactions even when the dates, amounts and descriptions are identical.
@@ -181,7 +181,7 @@ The browser receives the draft rows and displays an editable table. Nothing has 
 - See the original source category separately when it differs from the current category choice.
 - Remove unwanted rows or add a new row.
 - Discard the review and choose another file.
-- Include/exclude rows and explicitly keep legitimate content-based repeats. Reliable-ID repeats remain locked out.
+- Include/exclude rows with the **Save** checkbox. A checked possible-match row is the explicit confirmation to save a legitimate repeat; reliable-ID repeats remain locked out.
 
 Completely blank rows are reported as excluded. Invalid nonblank rows remain in the table and show field-level errors. Only selected rows must pass validation to save; an excluded invalid row does not block the batch. Category is optional: the user can choose a canonical category or leave the transaction unassigned.
 

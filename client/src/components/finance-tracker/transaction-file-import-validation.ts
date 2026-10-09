@@ -10,7 +10,7 @@ export type TransactionImportCategory = {
 export type TransactionImportReviewField =
   Exclude<
     keyof TransactionImportEntry,
-    "id" | "sourceCategory" | "parentCategory" | "sourceTransactionId" | "sourceAccount" | "duplicate"
+    "id" | "sourceCategory" | "parentCategory" | "sourceTransactionId" | "sourceAccount" | "duplicate" | "keepDuplicate"
   >;
 export type TransactionImportRowErrors = Partial<Record<TransactionImportReviewField, string>>;
 

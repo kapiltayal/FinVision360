@@ -7,7 +7,7 @@ Treat content-based financial matches as uncertain, not proof that a transaction
 
 **Why:** Two real purchases can have the same merchant, date and amount. Preventing duplicate uploads must not remove legitimate spending from the user's ledger.
 
-**How to apply:** Preserve an editable review and a final confirmation before any file-import ledger writes. Identify duplicates after processing/categorization. Keep raw source-account context separate from verified Plaid account identity; missing or differently formatted account metadata is not proof of a separate account.
+**How to apply:** Preserve an editable review and a final confirmation before any file-import ledger writes. Identify duplicates after processing/categorization. Keep raw source-account context separate from verified Plaid account identity; missing or differently formatted account metadata is not proof of a separate account. Possible content matches start unchecked; checking the row's Save checkbox is the explicit opt-in to keep it. Do not add a separate “keep anyway” action.
 
 For uncertain saves, preserve the unchanged request's identity across retries rather than silently creating a new import attempt.
 

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
-  AlertCircle, Check, CheckCircle2, FileCheck2, FileUp, Loader2,
+  AlertCircle, CheckCircle2, FileCheck2, FileUp, Loader2,
   Plus, RefreshCw, ShieldAlert, Trash2, Upload, X,
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
@@ -181,23 +181,16 @@ function TransactionFileReview({
                       <input type="checkbox" checked={included} disabled={decisionDisabled || stable}
                         onChange={event => onChange(entry.id, "include", event.target.checked)}
                         aria-label={`Include transaction ${index + 1} in import`} className="mt-0.5 h-4 w-4 accent-primary" />
-                      <span><span className="block font-semibold">{stable ? "Blocked" : included ? "Selected" : "Excluded"}</span>
-                        <span className="text-[10px] text-muted-foreground">
-                          {stable
-                            ? "Certain match"
-                            : entry.duplicate && !included
-                              ? "Currently excluded. Select to save this record."
-                              : "Choose whether to save"}
-                        </span></span>
+                      <span>
+                        {included && <span className="block font-semibold">Selected</span>}
+                        {stable && <span className="block font-semibold">Already imported</span>}
+                        {stable ? (
+                          <span className="block text-[10px] text-muted-foreground">Cannot be saved again.</span>
+                        ) : entry.duplicate && !included ? (
+                          <span className="block text-[10px] text-muted-foreground">Currently excluded. Select to save this record.</span>
+                        ) : null}
+                      </span>
                     </label>
-                    {!stable && entry.duplicate && (
-                      <Button type="button" variant={entry.keepDuplicate ? "default" : "outline"} size="sm"
-                        className="mt-2 h-7 whitespace-nowrap px-2 text-[10px]"
-                        disabled={decisionDisabled} onClick={() => onChange(entry.id, "keepDuplicate", !entry.keepDuplicate)}>
-                        {entry.keepDuplicate ? <Check className="mr-1 h-3 w-3" /> : null}
-                        {entry.keepDuplicate ? "Keep confirmed" : "Keep anyway"}
-                      </Button>
-                    )}
                     {entry.sourceTransactionId && <p className="mt-1 max-w-32 truncate text-[10px] text-muted-foreground" title={`Source transaction ID: ${entry.sourceTransactionId}`}>Source ID: {entry.sourceTransactionId}</p>}
                   </td>
                   <td className="border-b px-2 py-1.5 align-top">{entry.duplicate ? <DuplicateNotice entry={entry} /> : <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-1 font-medium text-primary"><CheckCircle2 className="h-3 w-3" /> No match found</span>}</td>
@@ -458,7 +451,7 @@ export function TransactionFileImportPanel({
   }
 
   function changeEntry(id: number, field: ReviewField, value: string | boolean) {
-    const relevant = ["date", "description", "merchant", "amount", "type", "sourceTransactionId", "sourceAccount", "include", "keepDuplicate"].includes(field);
+    const relevant = ["date", "description", "merchant", "amount", "type", "sourceTransactionId", "sourceAccount", "include"].includes(field);
     setEntries(current => {
       if (!current) return null;
       return current.map(entry => {
@@ -473,14 +466,6 @@ export function TransactionFileImportPanel({
           return { ...entry, subcategory, parentCategory: selected?.parentCategory ?? "" };
         }
         if (field === "isRecurring" && value === false) return { ...entry, isRecurring: false, recurringType: "" };
-        if (field === "keepDuplicate") {
-          const keepDuplicate = value === true && entry.duplicate?.kind !== "stable";
-          return {
-            ...entry,
-            keepDuplicate,
-            include: keepDuplicate ? true : entry.duplicate ? false : entry.include,
-          };
-        }
         if (field === "include") {
           if (entry.duplicate?.kind === "stable") return entry;
           const include = value === true;
