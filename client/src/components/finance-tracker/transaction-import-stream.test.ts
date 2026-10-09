@@ -63,6 +63,8 @@ test("progress exposes completed/current/upcoming/failed states and waits for sa
   assert.match(failed, /Failed/);
   assert.equal((failed.match(/Completed/g) || []).length, 2);
   const complete = renderToStaticMarkup(React.createElement(TransactionImportProgress, { current: "complete" }));
-  assert.equal((complete.match(/Completed/g) || []).length, 6);
+  assert.equal((complete.match(/Completed/g) || []).length, 5);
+  assert.equal((complete.match(/<li/g) || []).length, 5);
+  assert.equal(complete.includes("Save &amp; complete"), true);
   assert.equal(complete.includes("animate-spin"), false);
 });

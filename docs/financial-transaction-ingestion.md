@@ -219,7 +219,7 @@ Results report inserted, uncategorized, recurring-selected and excluded/skipped 
 
 ## Event-driven progress and failures
 
-The interface shows **Validate file → Process & categorize → Check duplicates → Review rows → Save selected → Complete**. Preview requests add `?progress=1` and receive newline-delimited JSON stage events, a preview, or an error. Categorization is a normal JSON model call; progress events are not model-token streaming. Non-streaming clients can still request the JSON preview.
+The interface shows **Validate file → Process & categorize → Check duplicates → Review rows → Save & complete**. The final visible step is active while the save is being committed and becomes completed only after the server confirms the transaction and receipt are committed. Reviewing alone does not write transaction rows. Preview requests add `?progress=1` and receive newline-delimited JSON stage events, a preview, or an error. Categorization is a normal JSON model call; progress events are not model-token streaming. Non-streaming clients can still request the JSON preview.
 
 Completed, active, upcoming and failed stages reflect actual work; there are no invented percentage timers. Finalization starts when submitting the save; completion follows a committed result/receipt. Parse, duplicate-check and save errors preserve the file or editable review as appropriate. Retry an uncertain save unchanged before assuming nothing was written.
 

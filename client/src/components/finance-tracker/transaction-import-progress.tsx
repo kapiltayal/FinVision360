@@ -9,7 +9,6 @@ const stages: TransactionImportStage[] = [
   "duplicates",
   "review",
   "finalization",
-  "complete",
 ];
 
 const stageLabels: Record<TransactionImportStage, string> = {
@@ -17,8 +16,8 @@ const stageLabels: Record<TransactionImportStage, string> = {
   processing: "Process & categorize",
   duplicates: "Check duplicates",
   review: "Review rows",
-  finalization: "Save selected",
-  complete: "Complete",
+  finalization: "Save & complete",
+  complete: "Save & complete",
 };
 
 export function transactionImportStageLabel(stage: TransactionImportStage) {
@@ -32,18 +31,19 @@ export function TransactionImportProgress({
   current: ImportProgressStage;
   failedAt?: TransactionImportStage;
 }) {
-  const currentIndex = stages.indexOf(current as TransactionImportStage);
+  const visibleCurrent = current === "complete" ? "finalization" : current;
+  const currentIndex = stages.indexOf(visibleCurrent as TransactionImportStage);
   const statusIndex = current === "failed"
     ? stages.indexOf(failedAt ?? "validation")
     : currentIndex;
   return (
     <nav aria-label="Import progress" className="rounded-xl border border-border/80 bg-card px-3 py-4 sm:px-5">
-      <ol className="grid grid-cols-3 gap-x-2 gap-y-4 sm:grid-cols-6">
+      <ol className="grid grid-cols-3 gap-x-2 gap-y-4 sm:grid-cols-5">
         {stages.map((stage, index) => {
           const failed = current === "failed" && stage === failedAt;
           const complete = index < statusIndex || (current === "complete" && index === currentIndex);
-          const active = current === stage;
-          const isWorking = active && ["validation", "processing", "duplicates", "finalization"].includes(stage);
+          const active = current === stage || (current === "complete" && stage === "finalization");
+          const isWorking = active && current !== "complete" && ["validation", "processing", "duplicates", "finalization"].includes(stage);
           const Icon = complete ? CheckCircle2 : failed ? AlertCircle : isWorking ? Loader2 : Circle;
           return (
             <li
