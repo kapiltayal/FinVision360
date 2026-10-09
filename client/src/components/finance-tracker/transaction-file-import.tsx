@@ -8,6 +8,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type {
   TransactionImportEntry,
   TransactionImportPreview,
@@ -31,15 +32,32 @@ function DuplicateNotice({ entry }: { entry: TransactionImportEntry }) {
   const duplicate = entry.duplicate;
   if (!duplicate) return null;
   const stable = duplicate.kind === "stable";
+  const label = stable ? "Already imported" : "Possible duplicate";
+  const detailHeading = stable
+    ? "Already imported · locked"
+    : duplicate.kind === "exact" ? "Possible exact duplicate" : "Possible duplicate";
   return (
-    <div className={`flex min-w-60 items-start gap-2 rounded-md border px-2.5 py-2 ${stable ? "border-destructive/30 bg-destructive/5 text-destructive" : "border-amber-500/30 bg-amber-500/5 text-amber-900 dark:text-amber-200"}`}>
-      {stable ? <ShieldAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" /> : <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />}
-      <div className="min-w-0">
-        <p className="font-semibold">{stable ? "Already imported · locked" : duplicate.kind === "exact" ? "Possible exact duplicate" : "Possible duplicate"}</p>
-        <p className="mt-0.5 whitespace-normal text-[10px] leading-snug opacity-90">{duplicate.reason}</p>
-        {entry.sourceAccount && <p className="mt-1 truncate text-[10px] opacity-75" title={entry.sourceAccount}>Account: {entry.sourceAccount}</p>}
-      </div>
-    </div>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span
+          tabIndex={0}
+          aria-label={`${label}. Hover or focus for match details.`}
+          className={`inline-flex cursor-help items-center gap-1 rounded-full px-2 py-1 font-medium ring-1 ring-inset ${
+            stable
+              ? "bg-destructive/10 text-destructive ring-destructive/20"
+              : "bg-amber-500/10 text-amber-800 ring-amber-500/20 dark:text-amber-300"
+          }`}
+        >
+          {stable ? <ShieldAlert className="h-3 w-3 shrink-0" /> : <AlertCircle className="h-3 w-3 shrink-0" />}
+          {label}
+        </span>
+      </TooltipTrigger>
+      <TooltipContent side="top" align="start" className="max-w-72 whitespace-normal text-xs leading-relaxed">
+        <p className="font-semibold">{detailHeading}</p>
+        <p className="mt-1">{duplicate.reason}</p>
+        {entry.sourceAccount && <p className="mt-1">Account: {entry.sourceAccount}</p>}
+      </TooltipContent>
+    </Tooltip>
   );
 }
 
