@@ -32,6 +32,7 @@ type AdvisorHistoryEntry = {
 
 type AdvisorTab = "scenario" | "debt" | "history";
 const ADVISOR_TABS: AdvisorTab[] = ["scenario", "debt", "history"];
+const MAX_SCENARIO_QUERY_CHARACTERS = 2_000;
 
 function escapeHtml(text: string): string {
   return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -433,6 +434,7 @@ export default function AIAdvisorPage() {
                   }}
                   placeholder="Describe a financial scenario or ask a question..."
                   rows={2}
+                  maxLength={MAX_SCENARIO_QUERY_CHARACTERS}
                   className="flex-1"
                   data-testid="input-scenario-query"
                 />
@@ -450,6 +452,12 @@ export default function AIAdvisorPage() {
                   <Send className="h-4 w-4" />
                 </Button>
               </div>
+              <p
+                className="text-right text-xs tabular-nums text-muted-foreground"
+                data-testid="text-scenario-query-character-count"
+              >
+                {scenarioQuery.length.toLocaleString()} / {MAX_SCENARIO_QUERY_CHARACTERS.toLocaleString()} characters
+              </p>
             </CardContent>
           </Card>
           {scenarioSubmitted && (
