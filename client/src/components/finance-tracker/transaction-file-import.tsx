@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
-  AlertCircle, CheckCircle2, ChevronDown, FileCheck2, FileUp, Loader2,
+  AlertCircle, CheckCircle2, FileCheck2, FileUp, Loader2,
   Plus, RefreshCw, ShieldAlert, Trash2, Upload, X,
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
@@ -93,27 +93,25 @@ function TransactionFileReview({
   const excludedCount = entries.filter(entry => entry.include === false || entry.duplicate?.kind === "stable").length;
   const allCategories = categories;
   const decisionDisabled = saving || checking;
-  const [expandedDetails, setExpandedDetails] = useState<Set<number>>(() => new Set());
 
   return (
-    <div className="min-w-0 space-y-4" data-testid="transaction-file-review">
+    <div className="space-y-4" data-testid="transaction-file-review">
       <TransactionImportProgress current={stage} failedAt={failedAt} />
-      <div className="w-fit max-w-full rounded-lg border bg-card px-3 py-2.5">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-          <div className="min-w-0">
-            <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-primary">Review before recording</p>
-              <p className="max-w-full truncate text-xs text-muted-foreground" title={fileName}>{fileName}</p>
-            </div>
-            <h2 className="mt-1 text-sm font-semibold tracking-tight">Nothing is saved yet</h2>
-            <p className="mt-0.5 max-w-prose text-xs leading-relaxed text-muted-foreground">Similar charges start excluded. Select one only when it is a separate real transaction.</p>
+      <div className="relative overflow-hidden rounded-xl border border-primary/10 bg-[linear-gradient(120deg,hsl(var(--card)),hsl(var(--muted)))] p-4 sm:p-5">
+        <div className="absolute right-0 top-0 h-24 w-24 -translate-y-1/3 translate-x-1/3 rounded-full border-[18px] border-primary/5" aria-hidden />
+        <div className="relative flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.13em] text-primary">Review before recording</p>
+            <h2 className="mt-1 text-lg font-semibold tracking-tight">Nothing is saved yet</h2>
+            <p className="mt-1 max-w-2xl break-all text-xs text-muted-foreground">{fileName}</p>
+            <p className="mt-2 max-w-2xl text-xs leading-relaxed text-muted-foreground">Check every movement before it enters your cash flow. Similar charges start excluded; keep one only when you recognize it as a separate real transaction.</p>
           </div>
-          <div className="flex shrink-0 gap-1.5 text-center">
-            <div className="min-w-14 rounded-md border bg-background px-2 py-1"><strong className="block text-sm tabular-nums">{entries.length}</strong><span className="text-[10px] text-muted-foreground">rows</span></div>
-            <div className="min-w-14 rounded-md border bg-background px-2 py-1"><strong className="block text-sm tabular-nums">{selectedIndexes.length}</strong><span className="text-[10px] text-muted-foreground">selected</span></div>
+          <div className="flex gap-2 text-center">
+            <div className="rounded-lg border bg-background/75 px-3 py-2"><strong className="block text-lg tabular-nums">{entries.length}</strong><span className="text-[10px] text-muted-foreground">rows</span></div>
+            <div className="rounded-lg border bg-background/75 px-3 py-2"><strong className="block text-lg tabular-nums">{selectedIndexes.length}</strong><span className="text-[10px] text-muted-foreground">selected</span></div>
           </div>
         </div>
-        {ignoredBlankRows > 0 && <p className="mt-2 text-xs text-amber-800 dark:text-amber-300">{ignoredBlankRows} completely blank {ignoredBlankRows === 1 ? "row was" : "rows were"} left out.</p>}
+        {ignoredBlankRows > 0 && <p className="relative mt-3 text-xs text-amber-800 dark:text-amber-300">{ignoredBlankRows} completely blank {ignoredBlankRows === 1 ? "row was" : "rows were"} left out.</p>}
       </div>
 
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border bg-muted/30 px-3 py-2.5 text-xs" aria-label="Duplicate summary">
@@ -134,125 +132,97 @@ function TransactionFileReview({
       {checkError && <p className="text-sm text-destructive" role="alert">{checkError} Recheck before saving.</p>}
       {stage === "failed" && <div role="alert" className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /><div><p className="font-semibold">Import paused{failedAt ? ` during ${transactionImportStageLabel(failedAt).toLowerCase()}` : ""}</p><p className="mt-0.5">{errorMessage}</p><p className="mt-1 text-xs">Your review is still here. Correct the issue or retry when ready.</p></div></div>}
 
-      <div role="list" aria-label="Editable transaction preview" className="min-w-0 space-y-2.5">
-        {entries.map((entry, index) => {
-          const error = errors[index];
-          const stable = entry.duplicate?.kind === "stable";
-          const included = entry.include !== false && !stable;
-          const matchingCategories = allCategories.filter(item => item.type.toLowerCase() === entry.type);
-          const selectedCategory = matchingCategories.find(item => item.category === entry.subcategory);
-          const detailsOpen = expandedDetails.has(entry.id);
-          const detailCount = [entry.isRecurring, entry.recurringType, entry.notes?.trim(), entry.sourceCategory].filter(Boolean).length;
-          const input = (field: "date" | "description" | "merchant" | "amount" | "notes", placeholder = "") => {
-            const label = field === "date" ? "Date *" : field === "description" ? "Description *" : field === "amount" ? "Amount *" : field === "merchant" ? "Merchant" : "Notes";
-            return (
-              <label className="block min-w-0">
-                <span className="mb-1 block text-[11px] font-medium text-muted-foreground">{label}</span>
-                <Input type="text" inputMode={field === "date" ? "text" : field === "amount" ? "decimal" : undefined}
-                  value={entry[field]} onChange={event => onChange(entry.id, field, event.target.value)}
-                  placeholder={placeholder} aria-label={`Transaction ${index + 1} ${field}`} aria-invalid={!!error[field]}
-                  disabled={saving} className={`h-9 w-full min-w-0 px-2 text-xs ${error[field] ? "border-destructive" : ""}`} />
-                {error[field] && <p className="mt-1 text-[10px] leading-tight text-destructive">{error[field]}</p>}
-              </label>
-            );
-          };
-          return (
-            <article key={entry.id} role="listitem" className={`min-w-0 overflow-hidden rounded-lg border bg-card shadow-sm ${stable ? "border-destructive/20" : ""} ${Object.keys(error).length && included ? "ring-1 ring-inset ring-amber-500/30" : ""}`}>
-              <div className="flex min-w-0 flex-col gap-2 border-b bg-muted/30 px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
-                  <span className="font-mono text-[11px] text-muted-foreground">#{index + 1}</span>
-                  {Object.keys(error).length > 0 && included && <AlertCircle className="h-3.5 w-3.5 text-amber-600" aria-label="Needs review" />}
-                  <label className={`flex min-w-0 items-start gap-2 ${stable ? "cursor-not-allowed opacity-70" : "cursor-pointer"}`}>
-                    <input type="checkbox" checked={included} disabled={decisionDisabled || stable}
-                      onChange={event => onChange(entry.id, "include", event.target.checked)}
-                      aria-label={`Include transaction ${index + 1} in import`} className="mt-0.5 h-4 w-4 shrink-0 accent-primary" />
-                    <span className="min-w-0 text-xs leading-tight">
-                      {included && <span className="block font-semibold">Selected</span>}
-                      {stable && <span className="block font-semibold">Already imported</span>}
-                      {stable ? (
-                        <span className="mt-0.5 block text-[11px] text-muted-foreground">Cannot be saved again.</span>
-                      ) : !included ? (
-                        <span className="mt-0.5 block max-w-56 text-[11px] text-muted-foreground">Currently excluded. Select to save this record.</span>
-                      ) : null}
-                      {entry.sourceTransactionId && <span className="mt-0.5 block max-w-48 truncate text-[10px] text-muted-foreground" title={`Source transaction ID: ${entry.sourceTransactionId}`}>Source ID: {entry.sourceTransactionId}</span>}
-                    </span>
-                  </label>
-                  <span className="shrink-0 text-xs">{entry.duplicate ? <DuplicateNotice entry={entry} /> : <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-1 font-medium text-primary"><CheckCircle2 className="h-3 w-3" /> No match found</span>}</span>
-                </div>
-                <div className="flex shrink-0 items-center gap-1 self-end sm:self-auto">
-                  <Button type="button" size="icon" variant="ghost" className="h-8 w-8 text-destructive" aria-label={`Remove transaction ${index + 1}`} onClick={() => onRemove(entry.id)} disabled={saving}><Trash2 className="h-3.5 w-3.5" /></Button>
-                </div>
-              </div>
-
-              <div className="grid min-w-0 grid-cols-1 gap-x-3 gap-y-2.5 px-3 py-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
-                {input("date", "YYYY-MM-DD")}
-                {input("description", "Description")}
-                {input("merchant", "Merchant")}
-                {input("amount", "0.00")}
-                <label className="block min-w-0">
-                  <span className="mb-1 block text-[11px] font-medium text-muted-foreground">Type *</span>
-                  <select value={entry.type} onChange={event => onChange(entry.id, "type", event.target.value)} aria-label={`Transaction ${index + 1} type`} disabled={saving} className="h-9 w-full min-w-0 rounded-md border border-input bg-background px-2 text-xs">
-                    <option value="expense">Expense</option><option value="income">Income</option>
-                  </select>
-                  {error.type && <p className="mt-1 text-[10px] leading-tight text-destructive">{error.type}</p>}
-                </label>
-                <label className="block min-w-0">
-                  <span className="mb-1 block text-[11px] font-medium text-muted-foreground">Category</span>
-                  <select value={entry.subcategory} onChange={event => onChange(entry.id, "subcategory", event.target.value)} aria-label={`Transaction ${index + 1} category`} aria-invalid={!!error.subcategory} disabled={saving} className={`h-9 w-full min-w-0 rounded-md border bg-background px-2 text-xs ${error.subcategory ? "border-destructive" : "border-input"}`}>
-                    <option value="">Unassigned (optional)</option>
-                    {matchingCategories.map(category => <option key={`${category.parentCategory}-${category.category}`} value={category.category}>{category.parentCategory} · {category.category}</option>)}
-                  </select>
-                  {selectedCategory && <p className="mt-1 max-w-full truncate text-[10px] text-muted-foreground" title={`Parent category: ${selectedCategory.parentCategory}`}>Parent: {selectedCategory.parentCategory}</p>}
-                  {error.subcategory && <p className="mt-1 text-[10px] leading-tight text-destructive">{error.subcategory}</p>}
-                </label>
-                <label className="block min-w-0">
-                  <span className="mb-1 block text-[11px] font-medium text-muted-foreground">Need / Want</span>
-                  <select value={entry.needsWant} onChange={event => onChange(entry.id, "needsWant", event.target.value)} aria-label={`Transaction ${index + 1} need or want`} disabled={saving} className="h-9 w-full min-w-0 rounded-md border border-input bg-background px-2 text-xs">
-                    <option value="na">N/A</option><option value="need">Need</option><option value="want">Want</option>
-                  </select>
-                  {error.needsWant && <p className="mt-1 text-[10px] text-destructive">{error.needsWant}</p>}
-                </label>
-              </div>
-
-              <div className="border-t border-dashed">
-                <button type="button" aria-expanded={detailsOpen} aria-controls={`transaction-${entry.id}-details`}
-                  onClick={() => setExpandedDetails(current => {
-                    const next = new Set(current);
-                    if (next.has(entry.id)) next.delete(entry.id);
-                    else next.add(entry.id);
-                    return next;
-                  })}
-                  className="flex h-9 w-full items-center gap-2 px-3 text-left text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground">
-                  <ChevronDown className={`h-3.5 w-3.5 transition-transform ${detailsOpen ? "rotate-180" : ""}`} />
-                  <span>Additional details</span>
-                  {detailCount > 0 && <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-normal">{detailCount}</span>}
-                </button>
-                {detailsOpen && (
-                  <div id={`transaction-${entry.id}-details`} className="grid min-w-0 grid-cols-1 gap-x-3 gap-y-2.5 border-t bg-muted/10 px-3 py-3 sm:grid-cols-2 lg:grid-cols-4">
-                    <label className="flex min-w-0 items-center gap-2 self-end rounded-md border bg-background px-3 py-2 text-xs">
-                      <input type="checkbox" checked={entry.isRecurring} onChange={event => onChange(entry.id, "isRecurring", event.target.checked)} aria-label={`Transaction ${index + 1} recurring`} disabled={saving} className="h-4 w-4 rounded border-input" />
-                      <span>Recurring transaction</span>
+      <div className="max-h-[55vh] overflow-auto overscroll-contain rounded-xl border" aria-label="Editable transaction preview">
+        <table className="w-full min-w-[2000px] text-left text-xs">
+          <caption className="sr-only">Editable preview of transactions from {fileName}</caption>
+          <thead className="sticky top-0 z-10 bg-muted">
+            <tr>
+              <th scope="col" className="sticky left-0 z-20 w-12 min-w-12 border-b bg-muted px-2 py-2 text-center font-medium">#</th>
+              <th scope="col" className="min-w-32 border-b px-2 py-2 font-medium">Save?</th>
+              <th scope="col" className="min-w-56 border-b px-2 py-2 font-medium">Match check</th>
+              <th scope="col" className="min-w-36 border-b px-2 py-2 font-medium">Date *</th>
+              <th scope="col" className="min-w-48 border-b px-2 py-2 font-medium">Description *</th>
+              <th scope="col" className="min-w-36 border-b px-2 py-2 font-medium">Merchant</th>
+              <th scope="col" className="min-w-28 border-b px-2 py-2 font-medium">Amount *</th>
+              <th scope="col" className="min-w-28 border-b px-2 py-2 font-medium">Type *</th>
+              <th scope="col" className="min-w-56 border-b px-2 py-2 font-medium">Category</th>
+              <th scope="col" className="min-w-28 border-b px-2 py-2 font-medium">Need / Want</th>
+              <th scope="col" className="min-w-28 border-b px-2 py-2 font-medium">Recurring</th>
+              <th scope="col" className="min-w-40 border-b px-2 py-2 font-medium">Recurring type</th>
+              <th scope="col" className="min-w-40 border-b px-2 py-2 font-medium">Notes</th>
+              <th scope="col" className="min-w-36 border-b px-2 py-2 font-medium">Source category</th>
+              <th scope="col" className="sticky right-0 z-20 w-10 min-w-10 border-b bg-muted px-1 py-2"><span className="sr-only">Remove</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            {entries.map((entry, index) => {
+              const error = errors[index];
+              const stable = entry.duplicate?.kind === "stable";
+              const included = entry.include !== false && !stable;
+              const matchingCategories = allCategories.filter(item => item.type.toLowerCase() === entry.type);
+              const selectedCategory = matchingCategories.find(item => item.category === entry.subcategory);
+              const input = (field: "date" | "description" | "merchant" | "amount" | "notes", placeholder = "") => (
+                <td className="border-b px-2 py-1.5 align-top">
+                  <Input type="text" inputMode={field === "date" ? "text" : field === "amount" ? "decimal" : undefined}
+                    value={entry[field]} onChange={event => onChange(entry.id, field, event.target.value)}
+                    placeholder={placeholder} aria-label={`Transaction ${index + 1} ${field}`} aria-invalid={!!error[field]}
+                    disabled={saving} className={`h-8 px-2 text-xs ${error[field] ? "border-destructive" : ""}`} />
+                  {error[field] && <p className="mt-1 max-w-40 text-[10px] leading-tight text-destructive">{error[field]}</p>}
+                </td>
+              );
+              return (
+                <tr key={entry.id} className={`${stable ? "bg-destructive/[0.035]" : included ? "" : "bg-muted/35"} ${Object.keys(error).length && included ? "bg-amber-50/40 dark:bg-amber-950/10" : ""}`}>
+                  <th scope="row" className="sticky left-0 z-[1] border-b bg-background px-2 py-1.5 text-center font-normal">
+                    <span className="block text-muted-foreground">{index + 1}</span>
+                    {Object.keys(error).length > 0 && included && <AlertCircle className="mx-auto mt-1 h-3.5 w-3.5 text-amber-600" aria-label="Needs review" />}
+                  </th>
+                  <td className="border-b px-2 py-2 align-top">
+                    <label className={`flex items-start gap-2 ${stable ? "cursor-not-allowed opacity-70" : "cursor-pointer"}`}>
+                      <input type="checkbox" checked={included} disabled={decisionDisabled || stable}
+                        onChange={event => onChange(entry.id, "include", event.target.checked)}
+                        aria-label={`Include transaction ${index + 1} in import`} className="mt-0.5 h-4 w-4 accent-primary" />
+                      <span>
+                        {included && <span className="block font-semibold">Selected</span>}
+                        {stable && <span className="block font-semibold">Already imported</span>}
+                        {stable ? (
+                          <span className="block text-[10px] text-muted-foreground">Cannot be saved again.</span>
+                        ) : !included ? (
+                          <span className="block text-[10px] text-muted-foreground">Currently excluded. Select to save this record.</span>
+                        ) : null}
+                      </span>
                     </label>
-                    <label className="block min-w-0">
-                      <span className="mb-1 block text-[11px] font-medium text-muted-foreground">Recurring type</span>
-                      <select value={entry.recurringType} onChange={event => onChange(entry.id, "recurringType", event.target.value)} aria-label={`Transaction ${index + 1} recurring type`} disabled={saving || !entry.isRecurring} className="h-9 w-full min-w-0 rounded-md border border-input bg-background px-2 text-xs disabled:opacity-60">
-                        <option value="">Choose type</option><option value="subscription">Subscription</option><option value="recurring_bill">Recurring bill</option>
-                      </select>
-                      {error.recurringType && <p className="mt-1 text-[10px] text-destructive">{error.recurringType}</p>}
-                    </label>
-                    {input("notes", "Notes")}
-                    <div className="min-w-0">
-                      <span className="mb-1 block text-[11px] font-medium text-muted-foreground">Source category</span>
-                      <p className="flex h-9 min-w-0 items-center truncate rounded-md border bg-muted/25 px-2 text-xs text-muted-foreground" title={entry.sourceCategory || entry.subcategory || "No source category"}>
-                        {((entry.sourceCategory && entry.sourceCategory !== entry.subcategory) || (entry.subcategory && !selectedCategory)) ? entry.sourceCategory || entry.subcategory : "—"}
-                      </p>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </article>
-          );
-        })}
+                    {entry.sourceTransactionId && <p className="mt-1 max-w-32 truncate text-[10px] text-muted-foreground" title={`Source transaction ID: ${entry.sourceTransactionId}`}>Source ID: {entry.sourceTransactionId}</p>}
+                  </td>
+                  <td className="border-b px-2 py-1.5 align-top">{entry.duplicate ? <DuplicateNotice entry={entry} /> : <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-1 font-medium text-primary"><CheckCircle2 className="h-3 w-3" /> No match found</span>}</td>
+                  {input("date", "YYYY-MM-DD")}
+                  {input("description", "Description")}
+                  {input("merchant", "Merchant")}
+                  {input("amount", "0.00")}
+                  <td className="border-b px-2 py-1.5 align-top">
+                    <select value={entry.type} onChange={event => onChange(entry.id, "type", event.target.value)} aria-label={`Transaction ${index + 1} type`} disabled={saving} className="h-8 w-full rounded-md border border-input bg-background px-2 text-xs">
+                      <option value="expense">Expense</option><option value="income">Income</option>
+                    </select>
+                    {error.type && <p className="mt-1 text-[10px] leading-tight text-destructive">{error.type}</p>}
+                  </td>
+                  <td className="border-b px-2 py-1.5 align-top">
+                    <select value={entry.subcategory} onChange={event => onChange(entry.id, "subcategory", event.target.value)} aria-label={`Transaction ${index + 1} category`} aria-invalid={!!error.subcategory} disabled={saving} className={`h-8 w-full min-w-52 rounded-md border bg-background px-2 text-xs ${error.subcategory ? "border-destructive" : "border-input"}`}>
+                      <option value="">Unassigned (optional)</option>
+                      {matchingCategories.map(category => <option key={`${category.parentCategory}-${category.category}`} value={category.category}>{category.parentCategory} · {category.category}</option>)}
+                    </select>
+                    {selectedCategory && <p className="mt-1 max-w-56 truncate text-[10px] text-muted-foreground" title={`Parent category: ${selectedCategory.parentCategory}`}>Parent: {selectedCategory.parentCategory}</p>}
+                    {error.subcategory && <p className="mt-1 text-[10px] leading-tight text-destructive">{error.subcategory}</p>}
+                  </td>
+                  <td className="border-b px-2 py-1.5 align-top"><select value={entry.needsWant} onChange={event => onChange(entry.id, "needsWant", event.target.value)} aria-label={`Transaction ${index + 1} need or want`} disabled={saving} className="h-8 w-full rounded-md border border-input bg-background px-2 text-xs"><option value="na">N/A</option><option value="need">Need</option><option value="want">Want</option></select>{error.needsWant && <p className="mt-1 text-[10px] text-destructive">{error.needsWant}</p>}</td>
+                  <td className="border-b px-2 py-1.5 align-top"><label className="flex h-8 items-center gap-2"><input type="checkbox" checked={entry.isRecurring} onChange={event => onChange(entry.id, "isRecurring", event.target.checked)} aria-label={`Transaction ${index + 1} recurring`} disabled={saving} className="h-4 w-4 rounded border-input" /><span>{entry.isRecurring ? "Yes" : "No"}</span></label></td>
+                  <td className="border-b px-2 py-1.5 align-top"><select value={entry.recurringType} onChange={event => onChange(entry.id, "recurringType", event.target.value)} aria-label={`Transaction ${index + 1} recurring type`} disabled={saving || !entry.isRecurring} className="h-8 w-full rounded-md border border-input bg-background px-2 text-xs disabled:opacity-60"><option value="">Choose type</option><option value="subscription">Subscription</option><option value="recurring_bill">Recurring bill</option></select>{error.recurringType && <p className="mt-1 text-[10px] text-destructive">{error.recurringType}</p>}</td>
+                  {input("notes", "Notes")}
+                  <td className="border-b px-2 py-1.5 align-top">{((entry.sourceCategory && entry.sourceCategory !== entry.subcategory) || (entry.subcategory && !selectedCategory)) ? <span className="block max-w-36 truncate text-xs text-muted-foreground" title={entry.sourceCategory || entry.subcategory}>{entry.sourceCategory || entry.subcategory}</span> : <span className="text-muted-foreground">—</span>}</td>
+                  <td className="sticky right-0 border-b bg-background px-1 py-1.5 align-top"><Button type="button" size="icon" variant="ghost" className="h-8 w-8 text-destructive" aria-label={`Remove transaction ${index + 1}`} onClick={() => onRemove(entry.id)} disabled={saving}><Trash2 className="h-3.5 w-3.5" /></Button></td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       </div>
       {!entries.length && <p className="rounded-lg border border-dashed p-5 text-center text-sm text-muted-foreground">No transactions remain. Add a row or discard this review.</p>}
       <div className="flex flex-wrap items-center justify-between gap-2">
