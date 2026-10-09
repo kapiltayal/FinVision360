@@ -178,11 +178,17 @@ function TransactionFileReview({
                   </th>
                   <td className="border-b px-2 py-2 align-top">
                     <label className={`flex items-start gap-2 ${stable ? "cursor-not-allowed opacity-70" : "cursor-pointer"}`}>
-                      <input type="checkbox" checked={included} disabled={decisionDisabled || stable || (!!entry.duplicate && !entry.keepDuplicate)}
+                      <input type="checkbox" checked={included} disabled={decisionDisabled || stable}
                         onChange={event => onChange(entry.id, "include", event.target.checked)}
                         aria-label={`Include transaction ${index + 1} in import`} className="mt-0.5 h-4 w-4 accent-primary" />
                       <span><span className="block font-semibold">{stable ? "Blocked" : included ? "Selected" : "Excluded"}</span>
-                        <span className="text-[10px] text-muted-foreground">{stable ? "Certain match" : "Choose whether to save"}</span></span>
+                        <span className="text-[10px] text-muted-foreground">
+                          {stable
+                            ? "Certain match"
+                            : entry.duplicate && !included
+                              ? "Currently excluded. Select to save this record."
+                              : "Choose whether to save"}
+                        </span></span>
                     </label>
                     {!stable && entry.duplicate && (
                       <Button type="button" variant={entry.keepDuplicate ? "default" : "outline"} size="sm"
@@ -469,13 +475,16 @@ export function TransactionFileImportPanel({
         if (field === "isRecurring" && value === false) return { ...entry, isRecurring: false, recurringType: "" };
         if (field === "keepDuplicate") {
           const keepDuplicate = value === true && entry.duplicate?.kind !== "stable";
-          return { ...entry, keepDuplicate, include: keepDuplicate ? true : entry.include };
+          return {
+            ...entry,
+            keepDuplicate,
+            include: keepDuplicate ? true : entry.duplicate ? false : entry.include,
+          };
         }
         if (field === "include") {
           if (entry.duplicate?.kind === "stable") return entry;
           const include = value === true;
-          if (include && entry.duplicate && !entry.keepDuplicate) return entry;
-          return { ...entry, include, keepDuplicate: entry.duplicate ? include && entry.keepDuplicate === true : false };
+          return { ...entry, include, keepDuplicate: entry.duplicate ? include : false };
         }
         if (["date", "description", "merchant", "amount", "type", "sourceTransactionId", "sourceAccount"].includes(field) && entry.duplicate) {
           return { ...entry, [field]: value, include: false, keepDuplicate: false };
