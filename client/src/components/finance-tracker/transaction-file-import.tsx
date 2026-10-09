@@ -186,7 +186,7 @@ function TransactionFileReview({
                         {stable && <span className="block font-semibold">Already imported</span>}
                         {stable ? (
                           <span className="block text-[10px] text-muted-foreground">Cannot be saved again.</span>
-                        ) : entry.duplicate && !included ? (
+                        ) : !included ? (
                           <span className="block text-[10px] text-muted-foreground">Currently excluded. Select to save this record.</span>
                         ) : null}
                       </span>
