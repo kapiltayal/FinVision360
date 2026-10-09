@@ -938,7 +938,7 @@ export default function FinanceTrackerPage() {
           setTransactionImportPanelKey(key => key + 1);
         }
       }}>
-        <DialogContent className={`max-h-[90vh] min-w-0 w-[calc(100vw-2rem)] overflow-x-hidden overflow-y-auto ${reviewingTransactions ? "max-w-[1500px]" : "max-w-2xl"}`}>
+        <DialogContent className={`max-h-[90vh] w-[calc(100vw-2rem)] overflow-y-auto ${reviewingTransactions ? "max-w-[1500px]" : "max-w-2xl"}`}>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Database className="h-4 w-4 text-blue-500" />
@@ -972,7 +972,7 @@ export default function FinanceTrackerPage() {
                   <Plus className="h-4 w-4 mr-2" />Open Manual Entry Form
                 </Button>
               </TabsContent>
-              <TabsContent value="upload" className="mt-4 min-w-0">
+              <TabsContent value="upload" className="mt-4">
                 <TransactionFileImportPanel
                   key={transactionImportPanelKey}
                   onImported={handleReviewedImport}
