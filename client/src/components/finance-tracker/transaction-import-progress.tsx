@@ -37,7 +37,7 @@ export function TransactionImportProgress({
     ? stages.indexOf(failedAt ?? "validation")
     : currentIndex;
   return (
-    <nav aria-label="Import progress" className="rounded-xl border border-border/80 bg-card px-3 py-4 sm:px-5">
+    <nav aria-label="Import progress" className="w-full rounded-xl border border-border/80 bg-card px-3 py-4 sm:px-5">
       <ol className="grid grid-cols-3 gap-x-2 gap-y-4 sm:grid-cols-5">
         {stages.map((stage, index) => {
           const failed = current === "failed" && stage === failedAt;

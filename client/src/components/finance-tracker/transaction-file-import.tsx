@@ -96,21 +96,23 @@ function TransactionFileReview({
 
   return (
     <div className="space-y-4" data-testid="transaction-file-review">
-      <TransactionImportProgress current={stage} failedAt={failedAt} />
-      <div className="relative w-fit max-w-full overflow-hidden rounded-xl border border-primary/10 bg-[linear-gradient(120deg,hsl(var(--card)),hsl(var(--muted)))] p-3">
-        <div className="flex flex-wrap items-start justify-between gap-2">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.13em] text-primary">Review before recording</p>
-            <h2 className="mt-1 text-lg font-semibold tracking-tight">Nothing is saved yet</h2>
-            <p className="mt-1 max-w-2xl break-all text-xs text-muted-foreground">{fileName}</p>
-            <p className="mt-1 max-w-2xl text-xs leading-relaxed text-muted-foreground">Check every movement before it enters your cash flow. Similar charges start excluded; keep one only when you recognize it as a separate real transaction.</p>
+      <div className="w-fit max-w-full space-y-4">
+        <TransactionImportProgress current={stage} failedAt={failedAt} />
+        <div className="relative w-full overflow-hidden rounded-xl border border-primary/10 bg-[linear-gradient(120deg,hsl(var(--card)),hsl(var(--muted)))] p-3">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.13em] text-primary">Review before recording</p>
+              <h2 className="mt-1 text-lg font-semibold tracking-tight">Nothing is saved yet</h2>
+              <p className="mt-1 max-w-2xl break-all text-xs text-muted-foreground">{fileName}</p>
+              <p className="mt-1 max-w-2xl text-xs leading-relaxed text-muted-foreground">Check every movement before it enters your cash flow. Similar charges start excluded; keep one only when you recognize it as a separate real transaction.</p>
+            </div>
+            <div className="flex gap-2 text-center">
+              <div className="rounded-lg border bg-background/75 px-3 py-2"><strong className="block text-lg tabular-nums">{entries.length}</strong><span className="text-[10px] text-muted-foreground">rows</span></div>
+              <div className="rounded-lg border bg-background/75 px-3 py-2"><strong className="block text-lg tabular-nums">{selectedIndexes.length}</strong><span className="text-[10px] text-muted-foreground">selected</span></div>
+            </div>
           </div>
-          <div className="flex gap-2 text-center">
-            <div className="rounded-lg border bg-background/75 px-3 py-2"><strong className="block text-lg tabular-nums">{entries.length}</strong><span className="text-[10px] text-muted-foreground">rows</span></div>
-            <div className="rounded-lg border bg-background/75 px-3 py-2"><strong className="block text-lg tabular-nums">{selectedIndexes.length}</strong><span className="text-[10px] text-muted-foreground">selected</span></div>
-          </div>
+          {ignoredBlankRows > 0 && <p className="relative mt-3 text-xs text-amber-800 dark:text-amber-300">{ignoredBlankRows} completely blank {ignoredBlankRows === 1 ? "row was" : "rows were"} left out.</p>}
         </div>
-        {ignoredBlankRows > 0 && <p className="relative mt-3 text-xs text-amber-800 dark:text-amber-300">{ignoredBlankRows} completely blank {ignoredBlankRows === 1 ? "row was" : "rows were"} left out.</p>}
       </div>
 
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border bg-muted/30 px-3 py-2.5 text-xs" aria-label="Duplicate summary">
