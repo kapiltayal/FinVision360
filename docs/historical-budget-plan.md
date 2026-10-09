@@ -69,3 +69,7 @@ Some older demo goal-history rows had previously been populated by copying curre
 - `server/finance-tracker-routes.ts` — historical month reads and read-only write protections.
 - `shared/budget-period.ts` — budget month definitions and category normalization.
 - `client/src/pages/budgeting-plan.tsx` — historical page behavior and refreshes.
+
+## Related documentation
+
+- [AI Lab: How Questions Become Responses](ai-lab-response-flow.md)
