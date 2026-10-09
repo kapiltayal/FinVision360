@@ -141,7 +141,7 @@ function TransactionFileReview({
           const included = entry.include !== false && !stable;
           const matchingCategories = allCategories.filter(item => item.type.toLowerCase() === entry.type);
           const selectedCategory = matchingCategories.find(item => item.category === entry.subcategory);
-          const detailsOpen = expandedDetails.has(entry.id);
+          const detailsOpen = expandedDetails.has(entry.id) || (included && !!error.recurringType);
           const detailCount = [entry.isRecurring, entry.recurringType, entry.notes?.trim(), entry.sourceCategory].filter(Boolean).length;
           const input = (field: "date" | "description" | "merchant" | "amount" | "notes", placeholder = "") => {
             const label = field === "date" ? "Date *" : field === "description" ? "Description *" : field === "amount" ? "Amount *" : field === "merchant" ? "Merchant" : "Notes";

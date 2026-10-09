@@ -28,7 +28,7 @@ const startingEntries: Entry[] = [
   { id: 1, include: true, date: "2025-02-18", description: "Market Street Grocers", merchant: "Market Street Grocers", amount: "84.36", type: "expense", category: "Groceries", needsWant: "need", recurring: false, recurringType: "", notes: "", sourceCategory: "Food & Dining", sourceId: "TXN-410882" },
   { id: 2, include: false, duplicate: { kind: "exact", reason: "Same amount and merchant on the same day as a recorded transaction.", account: "Everyday Checking · •• 4821" }, date: "2025-02-17", description: "AMZN Mktp US*4D8K2", merchant: "Amazon", amount: "62.40", type: "expense", category: "Shopping", needsWant: "want", recurring: false, recurringType: "", notes: "Household storage bins", sourceCategory: "Online retail", sourceId: "TXN-410879" },
   { id: 3, include: false, duplicate: { kind: "stable", reason: "This transaction is already in your FinVision360 history.", account: "Everyday Checking · •• 4821" }, date: "2025-02-16", description: "NORTHLIGHT ENERGY AUTOPAY", merchant: "Northlight Energy", amount: "118.72", type: "expense", category: "Utilities", needsWant: "need", recurring: true, recurringType: "recurring_bill", notes: "", sourceCategory: "Utilities", sourceId: "TXN-410861" },
-  { id: 4, include: true, date: "2025-02-15", description: "Payroll deposit — February", merchant: "Cedar & Stone Studio", amount: "2,840.00", type: "income", category: "Salary", needsWant: "na", recurring: true, recurringType: "recurring_bill", notes: "Biweekly pay", sourceCategory: "Direct deposit" },
+  { id: 4, include: true, date: "2025-02-15", description: "Payroll deposit — February", merchant: "Cedar & Stone Studio", amount: "2840.00", type: "income", category: "Salary", needsWant: "na", recurring: true, recurringType: "recurring_bill", notes: "Biweekly pay", sourceCategory: "Direct deposit" },
 ];
 const categories: Record<Entry["type"], { parent: string; values: string[] }> = {
   expense: { parent: "Living", values: ["Groceries", "Utilities", "Housing", "Dining", "Transportation", "Shopping"] },
@@ -127,9 +127,11 @@ export function Improved() {
         <button type="button" onClick={() => setNotice("Connected-account import is outside this uploaded-file review.")}><Landmark size={14} aria-hidden="true" />Connected</button>
       </nav>
       <section className="tr-progress" aria-label="Import progress">
-        <span className="tr-progress-step tr-progress-done"><i>1</i>Choose file</span><span className="tr-progress-line" />
-        <span className="tr-progress-step tr-progress-active"><i>2</i>Review transactions</span><span className="tr-progress-line" />
-        <span className="tr-progress-step"><i>3</i>Record activity</span>
+        <span className="tr-progress-step tr-progress-done"><i>1</i>Validate file</span><span className="tr-progress-line" />
+        <span className="tr-progress-step tr-progress-done"><i>2</i>Process &amp; categorize</span><span className="tr-progress-line" />
+        <span className="tr-progress-step tr-progress-done"><i>3</i>Check duplicates</span><span className="tr-progress-line" />
+        <span className="tr-progress-step tr-progress-active"><i>4</i>Review rows</span><span className="tr-progress-line" />
+        <span className="tr-progress-step"><i>5</i>Save &amp; complete</span>
       </section>
 
       <section className="tr-info-panel tr-info-compact">
@@ -176,7 +178,7 @@ export function Improved() {
                   <span className="tr-record-number">{String(index + 1).padStart(2, "0")}</span>
                   <label className={`tr-save-toggle ${locked ? "tr-disabled" : ""}`}>
                     <input type="checkbox" checked={included} disabled={locked || checking} aria-label={`Include transaction ${index + 1} in import`} onChange={event => update(entry.id, "include", event.target.checked)} />
-                    <span><strong>{locked ? "Already imported" : included ? "Selected for save" : "Excluded from save"}</strong><small>{locked ? "Cannot be saved again" : included ? "Included in this import" : "Select to save this record"}</small></span>
+                     <span><strong>{locked ? "Already imported" : included ? "Selected" : "Currently excluded."}</strong>{!included && <small>{locked ? "Cannot be saved again" : "Select to save this record."}</small>}</span>
                   </label>
                   <MatchNotice entry={entry} index={index} />
                 </div>
@@ -188,13 +190,13 @@ export function Improved() {
                 <FieldControl label="Description *" value={entry.description} placeholder="Transaction description" invalid={invalidDescription && included} errorText={error.description} onChange={value => update(entry.id, "description", value)} />
                 <FieldControl label="Merchant" value={entry.merchant} placeholder="Merchant" onChange={value => update(entry.id, "merchant", value)} />
                 <FieldControl label="Amount *" value={entry.amount} placeholder="0.00" inputMode="decimal" invalid={invalidAmount && included} errorText={error.amount} onChange={value => update(entry.id, "amount", value)} />
+                <label className="tr-field"><span className="tr-field-label">Type *</span><select className="tr-input" value={entry.type} onChange={event => update(entry.id, "type", event.target.value)}><option value="expense">Expense</option><option value="income">Income</option></select></label>
+                <label className="tr-field"><span className="tr-field-label">Category</span><select className="tr-input" value={entry.category} onChange={event => update(entry.id, "category", event.target.value)}><option value="">Unassigned (optional)</option>{available.values.map(value => <option key={value} value={value}>{available.parent} · {value}</option>)}</select><span className="tr-field-helper">{entry.category ? `Parent: ${available.parent}` : "Optional category"}</span></label>
+                <label className="tr-field"><span className="tr-field-label">Need / Want</span><select className="tr-input" value={entry.needsWant} onChange={event => update(entry.id, "needsWant", event.target.value)}><option value="na">N/A</option><option value="need">Need</option><option value="want">Want</option></select></label>
               </div>
               <details className="tr-details">
                 <summary><span>More transaction details</span><ChevronDown size={15} aria-hidden="true" /></summary>
                 <div className="tr-fields-details">
-                  <label className="tr-field"><span className="tr-field-label">Type *</span><select className={`tr-input ${error.type ? "tr-invalid" : ""}`} value={entry.type} aria-label={`Transaction ${index + 1} type`} aria-invalid={!!error.type} onChange={event => update(entry.id, "type", event.target.value as Entry["type"])}><option value="expense">Expense</option><option value="income">Income</option></select>{error.type && <span className="tr-error-text">{error.type}</span>}</label>
-                  <label className="tr-field"><span className="tr-field-label">Category</span><select className={`tr-input ${error.category ? "tr-invalid" : ""}`} value={entry.category} aria-label={`Transaction ${index + 1} category`} aria-invalid={!!error.category} onChange={event => update(entry.id, "category", event.target.value)}><option value="">Unassigned (optional)</option>{available.values.map(value => <option key={value} value={value}>{available.parent} · {value}</option>)}</select><span className="tr-field-helper">{error.category || (entry.category && available.values.includes(entry.category) ? `Parent: ${available.parent}` : "Optional category")}</span></label>
-                  <label className="tr-field"><span className="tr-field-label">Need / Want</span><select className={`tr-input ${error.needsWant ? "tr-invalid" : ""}`} value={entry.needsWant} aria-label={`Transaction ${index + 1} need or want`} aria-invalid={!!error.needsWant} onChange={event => update(entry.id, "needsWant", event.target.value as Entry["needsWant"])}><option value="na">N/A</option><option value="need">Need</option><option value="want">Want</option></select>{error.needsWant && <span className="tr-error-text">{error.needsWant}</span>}</label>
                   <label className="tr-field tr-recurring-field"><span className="tr-field-label">Recurring</span><span className="tr-check-control"><input type="checkbox" checked={entry.recurring} aria-label={`Transaction ${index + 1} recurring`} onChange={event => update(entry.id, "recurring", event.target.checked)} /><span>{entry.recurring ? "Yes" : "No"}</span></span></label>
                   <label className="tr-field"><span className="tr-field-label">Recurring type</span><select className={`tr-input ${error.recurringType ? "tr-invalid" : ""}`} value={entry.recurringType} aria-label={`Transaction ${index + 1} recurring type`} aria-invalid={!!error.recurringType} disabled={!entry.recurring} onChange={event => update(entry.id, "recurringType", event.target.value)}><option value="">Choose type</option><option value="subscription">Subscription</option><option value="recurring_bill">Recurring bill</option></select><span className={error.recurringType ? "tr-error-text" : "tr-field-helper"}>{error.recurringType || (entry.recurring ? "Choose the matching schedule" : "Enable recurring first")}</span></label>
                   <FieldControl label="Notes" value={entry.notes} placeholder="Add a note" onChange={value => update(entry.id, "notes", value)} />
