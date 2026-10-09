@@ -37,6 +37,90 @@ Both flows write to the `transactions` table. The signed-in user's ID is assigne
 
 The database constrains transaction type, Need/Want value, recurring type, and source. Amount is stored as `NUMERIC(12,2)`. Partial unique indexes protect `(user_id, plaid_transaction_id)` and `(user_id, upload_identity)` when those identities are present. Content-based similarities are deliberately not database uniqueness constraints: identical-looking charges can be legitimate.
 
+## How transaction categorization works
+
+Categorization produces a suggestion from the app's canonical categories, not a free-form label. The allowed values come from `transaction_type_list`, including each category's transaction type, parent category, display label, Need/Want default, and description. Before a category is saved, the server resolves it against that list and stores the database's canonical parent/category labels. A user can still correct the suggestion in the file review.
+
+The import methods intentionally differ:
+
+| Source | Categorization method | AI used? |
+|---|---|---|
+| Uploaded file | Saved user merchant preference → matching category supplied by the file → AI for unresolved rows → leave unresolved for review | Only for unresolved rows |
+| Plaid | Plaid personal-finance category mapping → description rules as fallback → skip if no canonical category can be resolved | No |
+| Manually entered transaction | Use the user's selected canonical category; if omitted, apply description rules | No |
+
+### Uploaded-file categorization, step by step
+
+1. **Establish the row's initial type and text.** The parser reads explicit type labels when present. Otherwise, a debit column implies expense and a credit column implies income; when it cannot infer either, it initially treats the row as an expense. Merchant defaults to the uploaded merchant or description.
+2. **Look for a saved merchant preference.** The server checks this user's manual transactions and transactions with a recorded explicit parent/category edit. It matches by transaction type and a normalized merchant key derived from the merchant, or the description when merchant is absent. The normalization lowercases text, removes punctuation/asterisks, and uses the first three words. When multiple saved choices match, recorded category edits and the newest matching choices take precedence. A preference is reused only if it still maps to a valid canonical category.
+3. **Try the uploaded category.** If the file has a `Category` or `Subcategory` value, it is matched against the canonical list for the row's current type. A supplied parent category further narrows that match. Matching ignores case and punctuation, but the value saved is the canonical database label. An unknown or type-incompatible source label remains visible in review; it is not silently stored as a category.
+4. **Ask AI only for rows still unresolved.** The server sends the unresolved raw source rows and the allowed canonical category list—including each category's type, parent, label, Need/Want default, and description—to the configured, non-streaming JSON classification call. The prompt asks for a transaction type and one exact category from the supplied list, and says to classify only clear transactions. The system message requires JSON only, with no markdown or commentary. The provider currently uses the shared `ADVISOR_MODEL` setting (currently `gpt-5.6-luna`), JSON-object response mode, and a maximum of 1,800 completion tokens; the shared provider caps total request content at 28,000 characters.
+5. **Validate the answer before using it.** Each returned `sourceIndex` must refer to a row sent in that call and may appear only once. The type must be `income` or `expense`, and the category must resolve to a canonical category for that type. Invalid, duplicate, missing, or unrecognized model results are ignored. The server applies only the validated type/category suggestion (and eligible canonical Need/Want default); it does not let AI replace the source date, amount, description, merchant, or server-created review-row identity.
+6. **Keep uncertainty reviewable.** If AI is unavailable or returns no usable classification, the upload preview continues. The category stays blank in review and is optional at save; if the user saves it without a category, it is stored as `unassigned`. This fallback prevents a categorization outage from dropping an otherwise valid transaction.
+
+The classifier receives the complete raw source row for unresolved entries, so any columns present in that row—including descriptions, amounts, notes, account metadata, or other exported fields—can be included in the request. It does not receive the signed-in user's database ID or a Plaid access token. Rows resolved from a saved preference or a valid uploaded category are not sent for AI classification. Treat files as financial data and avoid adding unrelated sensitive columns to an export when they are not needed.
+
+When an uploaded row contains a valid Need/Want value, that value is preserved. Otherwise, the selected canonical category's Need/Want default is suggested when available; unresolved categories use `na` until the user changes it. The reviewer can edit both the category and Need/Want value before saving.
+
+### Plaid categorization, step by step
+
+Plaid imports do not call the AI classifier or use the saved merchant-preference map. After transfer, pending, currency, account, and amount checks, the server determines transaction type from Plaid's amount sign (negative is income, otherwise expense), then uses Plaid's `personal_finance_category`:
+
+| Plaid category condition | FinVision360 category suggestion |
+|---|---|
+| Income detail contains `WAGES`, `DIVIDEND`, `INTEREST_EARNED`, or `TAX_REFUND`/`REFUND` | Salary, dividend, interest, or refund respectively |
+| Income primary is `INCOME` and no more specific income detail matched | Description-rule match, or Other Income if the description rules find nothing |
+| Expense primary is `RENT_AND_UTILITIES` | Housing for rent/mortgage details; otherwise utilities |
+| Expense primary is `FOOD_AND_DRINK` | Groceries for grocery details; otherwise dining out |
+| Expense primary is `ENTERTAINMENT`, `TRANSPORTATION`, `MEDICAL`, `PERSONAL_CARE`, `TRAVEL`, `GENERAL_MERCHANDISE`, `HOME_IMPROVEMENT`, `LOAN_PAYMENTS`, or `BANK_FEES` | Entertainment, transportation, healthcare, personal care, travel, shopping, housing, debt payment, or other expense respectively |
+| Government/non-profit primary with a tax detail | Taxes |
+| No listed mapping applies | Description-rule fallback |
+
+The description fallback checks transaction text against ordered income and expense keyword/merchant rules. The first matching rule wins, so when a description contains terms from more than one row below, the earlier row takes precedence.
+
+| Income rule, in order | Example terms in the description | Suggestion |
+|---|---|---|
+| 1 | Salary, payroll, direct deposit, wages, pay stub | Salary |
+| 2 | Bonus | Bonus |
+| 3 | Freelance, consulting, contract work, Upwork, Fiverr | Freelance |
+| 4 | Dividend, distribution | Dividend |
+| 5 | Interest, APY, savings yield | Interest |
+| 6 | Rental income, rent received, tenant | Rental |
+| 7 | Capital gain, stock sale, security sold | Capital gains |
+| 8 | Refund, cash back, rebate | Refund |
+| 9 | Business income, revenue, invoice | Business |
+| 10 | Gift, Zelle, Venmo, Cash App, PayPal | Gift |
+| No match | — | Unassigned (except Plaid's `INCOME` primary category, which falls back to Other Income) |
+
+| Expense rule, in order | Example terms in the description | Suggestion |
+|---|---|---|
+| 1 | Mortgage, rent (unless “rent received”), HOA fee, property tax, homeowners, house | Housing |
+| 2 | Electric, gas/water bill, internet/broadband, listed telecom or energy providers | Utilities |
+| 3 | Grocery terms, supermarket, listed grocery stores | Groceries |
+| 4 | Uber (exact match), Lyft, gas stations, parking, transit, auto loan/car payment | Transportation |
+| 5 | Restaurants, delivery services, cafes and restaurant/food terms | Dining out |
+| 6 | Streaming/music services, cinemas, concerts, ticket services, entertainment terms | Entertainment |
+| 7 | Pharmacies, hospitals, clinics, doctors, dental, vision, healthcare/medical terms | Healthcare |
+| 8 | Insurance or listed insurance providers | Insurance |
+| 9 | Tuition, universities, colleges, course services, student loan, Khan Academy | Education |
+| 10 | Retailers and marketplaces such as Amazon (not Amazon Web Services), Target, IKEA, or Home Depot | Shopping |
+| 11 | Music/cloud/software services, gym memberships, Prime membership, subscription | Subscriptions |
+| 12 | Salon, barber, spa, beauty supply, nail or hair-cut terms | Personal care |
+| 13 | Airlines, hotels, travel-booking services, Airbnb, VRBO | Travel |
+| 14 | Credit-card, card, loan or student-loan payment | Debt payment |
+| 15 | Vanguard, Fidelity, Schwab, ETF/mutual-fund/stock purchase, Robinhood, Coinbase, AWS | Investment |
+| 16 | IRS, income/state/property tax, tax payment/withholding | Taxes |
+| 17 | Transfer to savings, savings deposit/transfer, high-yield savings | Savings transfer |
+| No match | — | Unassigned |
+
+These rules are deliberately deterministic, not a confidence-ranked model. Their order matters: for example, the housing rule appears before taxes and includes “property tax,” so a description matching that rule is categorized as housing. If no rule matches, the result is `unassigned`; for Plaid, a row without a resolvable canonical category is counted as invalid and skipped rather than inserted unclassified.
+
+The internal rule labels are mapped to the current canonical category table before insertion. A category's canonical parent and Need/Want default are saved with it; if the category has no Need/Want default, the import uses `na`. On a later Plaid upsert, categorization is refreshed unless the transaction has been marked user-modified; in that case its existing category, parent category, and Need/Want values are preserved.
+
+### Manual choices and future file imports
+
+Manual transaction entry accepts a user-selected canonical category. If the user omits it, the server tries the same description-based deterministic rules and rejects the entry if it still cannot resolve a canonical category. A manual category choice, or an explicit category/parent edit recorded in transaction history, can become the saved merchant preference used by a later file import. This preference is scoped to the signed-in user and transaction type; Plaid categorization continues to follow Plaid's mapping rules.
+
 # File uploads
 
 ## 1. User selects a file
@@ -72,18 +156,7 @@ The preview drafts receive temporary row numbers for editing. These numbers are 
 
 ## 4. Category suggestions are prepared
 
-The server loads the user's canonical transaction categories and prior merchant-category preferences. For each row it uses this order:
-
-1. **Reuse the user's explicit merchant preference.** Preferences come from manual transactions or transactions with an explicit category/parent-category edit, keyed by normalized merchant and transaction type.
-2. **Match the uploaded category.** A source category is used only if it matches a canonical category for that income/expense type and, when present, its parent category.
-3. **Ask AI to classify unresolved rows.**
-4. **Leave it unassigned** if no usable canonical suggestion is available.
-
-The AI request is a separate, non-streaming JSON classification call. It receives only the rows still needing classification plus the allowed canonical category list. The prompt asks for an exact category from that list and a transaction type; the server validates each returned source-row index and verifies the type/category against the live canonical list. AI output cannot replace the row's date, amount, description, merchant, or temporary row identity.
-
-If the AI service is unavailable, returns malformed output, or cannot identify a valid category, the preview still proceeds. The row remains available for review and may be saved as unassigned. Valid uploaded Need/Want data is kept; otherwise, a canonical category's Need/Want value may be suggested.
-
-Because the classifier receives the complete source row for unresolved categories, that row can include uploaded fields such as descriptions, amounts, notes, or other columns. Rows already matched by user preference or source category are not sent for AI categorization. Plaid transaction imports use Plaid categories and deterministic rules instead; they do not call this AI classifier.
+The categorization priority, AI request and validation, canonical Need/Want defaults, and unassigned fallback are described in [How transaction categorization works](#how-transaction-categorization-works). In brief, each row tries the user's saved merchant preference first, then a valid category supplied by the file, and then AI classification for unresolved rows. The suggestion is editable and no transaction is stored during preview.
 
 ## 5. Duplicate identification, after categorization
 
@@ -181,7 +254,7 @@ For accepted rows:
 
 - Plaid's amount sign determines type: a negative amount is treated as income, otherwise expense. The stored amount is the absolute value.
 - The saved description/merchant uses `merchant_name`, then `name`, then `"Bank transaction"` as a fallback. The request asks Plaid to include its original description, but the current save mapping does not use `original_description`.
-- Plaid personal-finance categories are mapped to canonical categories first. Description-based deterministic rules provide fallback categories; this path does not call the AI classifier.
+- Plaid personal-finance categories are mapped to canonical categories first. The detailed mapping and description-rule fallback are described in [How transaction categorization works](#how-transaction-categorization-works); this path does not call the AI classifier or file-import merchant preferences.
 - Parent category and Need/Want come from the matched canonical category, defaulting Need/Want to `na` if it has none.
 - The saved row includes `source='plaid'`, Plaid transaction/account IDs, account name, and institution name.
 
