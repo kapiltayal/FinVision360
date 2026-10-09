@@ -97,14 +97,13 @@ function TransactionFileReview({
   return (
     <div className="space-y-4" data-testid="transaction-file-review">
       <TransactionImportProgress current={stage} failedAt={failedAt} />
-      <div className="relative overflow-hidden rounded-xl border border-primary/10 bg-[linear-gradient(120deg,hsl(var(--card)),hsl(var(--muted)))] p-4 sm:p-5">
-        <div className="absolute right-0 top-0 h-24 w-24 -translate-y-1/3 translate-x-1/3 rounded-full border-[18px] border-primary/5" aria-hidden />
-        <div className="relative flex flex-wrap items-start justify-between gap-3">
+      <div className="relative w-fit max-w-full overflow-hidden rounded-xl border border-primary/10 bg-[linear-gradient(120deg,hsl(var(--card)),hsl(var(--muted)))] p-3">
+        <div className="flex flex-wrap items-start justify-between gap-2">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.13em] text-primary">Review before recording</p>
             <h2 className="mt-1 text-lg font-semibold tracking-tight">Nothing is saved yet</h2>
             <p className="mt-1 max-w-2xl break-all text-xs text-muted-foreground">{fileName}</p>
-            <p className="mt-2 max-w-2xl text-xs leading-relaxed text-muted-foreground">Check every movement before it enters your cash flow. Similar charges start excluded; keep one only when you recognize it as a separate real transaction.</p>
+            <p className="mt-1 max-w-2xl text-xs leading-relaxed text-muted-foreground">Check every movement before it enters your cash flow. Similar charges start excluded; keep one only when you recognize it as a separate real transaction.</p>
           </div>
           <div className="flex gap-2 text-center">
             <div className="rounded-lg border bg-background/75 px-3 py-2"><strong className="block text-lg tabular-nums">{entries.length}</strong><span className="text-[10px] text-muted-foreground">rows</span></div>
