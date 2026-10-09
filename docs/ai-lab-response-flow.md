@@ -209,4 +209,5 @@ Archived responses are displayed through the four-section tab component. Ask Whi
 
 ## Related documentation
 
+- [Financial Transaction Ingestion and Processing](financial-transaction-ingestion.md)
 - [Historical Budget Plans](historical-budget-plan.md)
