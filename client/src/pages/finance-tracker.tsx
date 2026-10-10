@@ -945,7 +945,9 @@ export default function FinanceTrackerPage() {
               Add Transactions
             </DialogTitle>
             <DialogDescription>
-              Enter a transaction, upload a file, or import activity from a connected account.
+              {reviewingTransactions
+                ? "Review the transactions from your file before saving."
+                : "Enter a transaction, upload a file, or import activity from a connected account."}
             </DialogDescription>
           </DialogHeader>
             <Tabs value={intakeTab} onValueChange={value => {
@@ -956,11 +958,13 @@ export default function FinanceTrackerPage() {
                 setTransactionImportPanelKey(key => key + 1);
               }
             }}>
-              <TabsList className="grid grid-cols-3 w-full max-w-xl">
-                <TabsTrigger value="manual" disabled={intakeBusy}><Plus className="h-3.5 w-3.5 mr-1.5" />Manual</TabsTrigger>
-                <TabsTrigger value="upload" disabled={intakeBusy}><Upload className="h-3.5 w-3.5 mr-1.5" />Upload File</TabsTrigger>
-                <TabsTrigger value="import" disabled={intakeBusy}><Landmark className="h-3.5 w-3.5 mr-1.5" />Connected</TabsTrigger>
-              </TabsList>
+              {!reviewingTransactions && (
+                <TabsList className="grid grid-cols-3 w-full max-w-xl">
+                  <TabsTrigger value="manual" disabled={intakeBusy}><Plus className="h-3.5 w-3.5 mr-1.5" />Manual</TabsTrigger>
+                  <TabsTrigger value="upload" disabled={intakeBusy}><Upload className="h-3.5 w-3.5 mr-1.5" />Upload File</TabsTrigger>
+                  <TabsTrigger value="import" disabled={intakeBusy}><Landmark className="h-3.5 w-3.5 mr-1.5" />Connected</TabsTrigger>
+                </TabsList>
+              )}
               {intakeBusy && (
                 <p className="mt-3 flex items-center gap-2 text-sm text-muted-foreground" role="status">
                   <RefreshCw className="h-4 w-4 animate-spin" /> Transaction file request in progress. Keep this window open until it finishes.
