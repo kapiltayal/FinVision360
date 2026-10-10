@@ -96,7 +96,7 @@ function TransactionFileReview({
 
   return (
     <div className="space-y-4" data-testid="transaction-file-review">
-      <div className="w-full max-w-[70rem] space-y-4">
+      <div className="w-full space-y-4">
         <TransactionImportProgress current={stage} failedAt={failedAt} />
         <div className="relative w-full overflow-hidden rounded-xl border border-primary/10 bg-[linear-gradient(120deg,hsl(var(--card)),hsl(var(--muted)))] p-3">
           <div className="flex flex-wrap items-start justify-between gap-2">
@@ -106,15 +106,14 @@ function TransactionFileReview({
                 <h2 className="text-lg font-semibold tracking-tight">Nothing is saved yet</h2>
                 <p className="min-w-0 max-w-full truncate text-xs text-muted-foreground" title={fileName}>{fileName}</p>
               </div>
-              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">Review charges; possible duplicates stay excluded until selected.</p>
             </div>
             <div className="flex gap-2 text-center">
               <div className="rounded-lg border bg-background/75 px-3 py-2"><strong className="block text-lg tabular-nums">{entries.length}</strong><span className="text-[10px] text-muted-foreground">rows</span></div>
               <div className="rounded-lg border bg-background/75 px-3 py-2"><strong className="block text-lg tabular-nums">{selectedIndexes.length}</strong><span className="text-[10px] text-muted-foreground">selected</span></div>
             </div>
           </div>
-          {ignoredBlankRows > 0 && <p className="relative mt-3 text-xs text-amber-800 dark:text-amber-300">{ignoredBlankRows} completely blank {ignoredBlankRows === 1 ? "row was" : "rows were"} left out.</p>}
-          <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-border/60 pt-2 text-xs" aria-label="Duplicate summary">
+          <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs" aria-label="Duplicate summary">
+            <p className="text-muted-foreground">Review charges; possible duplicates stay excluded until selected.</p>
             <span className="font-semibold">Duplicate review</span>
             {possibleCount > 0 && <span className="text-amber-800 dark:text-amber-300">{possibleCount} similar {possibleCount === 1 ? "charge" : "charges"} · excluded by default</span>}
             {stableCount > 0 && <span className="text-destructive">{stableCount} already imported · cannot be kept</span>}
@@ -124,6 +123,7 @@ function TransactionFileReview({
               Recheck matches
             </Button>
           </div>
+          {ignoredBlankRows > 0 && <p className="relative mt-3 text-xs text-amber-800 dark:text-amber-300">{ignoredBlankRows} completely blank {ignoredBlankRows === 1 ? "row was" : "rows were"} left out.</p>}
         </div>
       </div>
 
