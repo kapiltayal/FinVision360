@@ -106,13 +106,13 @@ function TransactionFileReview({
                 <h2 className="text-lg font-semibold tracking-tight">Nothing is saved yet</h2>
                 <p className="min-w-0 max-w-full truncate text-xs text-muted-foreground" title={fileName}>{fileName}</p>
               </div>
+              {ignoredBlankRows > 0 && <p className="mt-1 text-xs text-amber-800 dark:text-amber-300">{ignoredBlankRows} completely blank {ignoredBlankRows === 1 ? "row was" : "rows were"} left out.</p>}
             </div>
             <div className="flex gap-2 text-center">
               <div className="rounded-lg border bg-background/75 px-3 py-2"><strong className="block text-lg tabular-nums">{entries.length}</strong><span className="text-[10px] text-muted-foreground">rows</span></div>
               <div className="rounded-lg border bg-background/75 px-3 py-2"><strong className="block text-lg tabular-nums">{selectedIndexes.length}</strong><span className="text-[10px] text-muted-foreground">selected</span></div>
             </div>
           </div>
-          {ignoredBlankRows > 0 && <p className="relative mt-3 text-xs text-amber-800 dark:text-amber-300">{ignoredBlankRows} completely blank {ignoredBlankRows === 1 ? "row was" : "rows were"} left out.</p>}
           <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-border/60 pt-2 text-xs" aria-label="Duplicate summary">
             <span className="font-semibold">Duplicate review</span>
             {possibleCount > 0 && <span className="text-amber-800 dark:text-amber-300">{possibleCount} similar {possibleCount === 1 ? "charge" : "charges"} · excluded by default</span>}
@@ -230,7 +230,7 @@ function TransactionFileReview({
         {entries.length >= 500 && <p className="text-xs text-muted-foreground">Maximum of 500 transaction rows reached.</p>}
         <div className="flex flex-nowrap items-center gap-2 overflow-x-auto pb-1">
           <Button type="button" variant="outline" className="shrink-0" onClick={onAdd} disabled={saving || entries.length >= 500}><Plus className="mr-2 h-4 w-4" /> Add transaction row</Button>
-          <Button type="button" variant="ghost" className="shrink-0" onClick={onDiscard} disabled={saving}>Discard review & choose another file</Button>
+          <Button type="button" variant="outline" className="shrink-0" onClick={onDiscard} disabled={saving}>Discard review & choose another file</Button>
           <Button type="button" className="shrink-0" onClick={onSave} disabled={decisionDisabled || categoriesLoading || categoriesError || !selectedIndexes.length || invalidCount > 0 || !!checkError} data-testid="button-save-reviewed-transactions">
             {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileCheck2 className="mr-2 h-4 w-4" />}
             {saving ? "Saving selected…" : `Save ${selectedIndexes.length} selected ${selectedIndexes.length === 1 ? "transaction" : "transactions"}`}
