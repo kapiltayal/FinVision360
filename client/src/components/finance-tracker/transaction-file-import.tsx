@@ -135,19 +135,19 @@ function TransactionFileReview({
       {checkError && <p className="text-sm text-destructive" role="alert">{checkError} Recheck before saving.</p>}
       {stage === "failed" && <div role="alert" className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /><div><p className="font-semibold">Import paused{failedAt ? ` during ${transactionImportStageLabel(failedAt).toLowerCase()}` : ""}</p><p className="mt-0.5">{errorMessage}</p><p className="mt-1 text-xs">Your review is still here. Correct the issue or retry when ready.</p></div></div>}
 
-      <div className="max-h-[55vh] overflow-auto overscroll-contain rounded-xl border" aria-label="Editable transaction preview">
-        <table className="w-full min-w-[2000px] text-left text-xs">
+      <div className="max-h-[min(260px,45vh)] overflow-auto overscroll-contain rounded-xl border" aria-label="Editable transaction preview">
+        <table className="w-full min-w-[1880px] text-left text-xs">
           <caption className="sr-only">Editable preview of transactions from {fileName}</caption>
           <thead className="sticky top-0 z-10 bg-muted">
             <tr>
               <th scope="col" className="sticky left-0 z-20 w-12 min-w-12 border-b bg-muted px-2 py-2 text-center font-medium">#</th>
-              <th scope="col" className="min-w-32 border-b px-2 py-2 font-medium">Save?</th>
-              <th scope="col" className="min-w-56 border-b px-2 py-2 font-medium">Match check</th>
-              <th scope="col" className="min-w-36 border-b px-2 py-2 font-medium">Date *</th>
-              <th scope="col" className="min-w-48 border-b px-2 py-2 font-medium">Description *</th>
-              <th scope="col" className="min-w-36 border-b px-2 py-2 font-medium">Merchant</th>
-              <th scope="col" className="min-w-28 border-b px-2 py-2 font-medium">Amount *</th>
-              <th scope="col" className="min-w-28 border-b px-2 py-2 font-medium">Type *</th>
+              <th scope="col" className="min-w-28 border-b px-2 py-2 font-medium">Save?</th>
+              <th scope="col" className="w-40 min-w-40 max-w-40 border-b px-2 py-2 font-medium">Match check</th>
+              <th scope="col" className="min-w-32 border-b px-2 py-2 font-medium">Date *</th>
+              <th scope="col" className="min-w-40 border-b px-2 py-2 font-medium">Description *</th>
+              <th scope="col" className="min-w-32 border-b px-2 py-2 font-medium">Merchant</th>
+              <th scope="col" className="min-w-24 border-b px-2 py-2 font-medium">Amount *</th>
+              <th scope="col" className="min-w-24 border-b px-2 py-2 font-medium">Type *</th>
               <th scope="col" className="min-w-56 border-b px-2 py-2 font-medium">Category</th>
               <th scope="col" className="min-w-28 border-b px-2 py-2 font-medium">Need / Want</th>
               <th scope="col" className="min-w-28 border-b px-2 py-2 font-medium">Recurring</th>
@@ -196,7 +196,7 @@ function TransactionFileReview({
                     </label>
                     {entry.sourceTransactionId && <p className="mt-1 max-w-32 truncate text-[10px] text-muted-foreground" title={`Source transaction ID: ${entry.sourceTransactionId}`}>Source ID: {entry.sourceTransactionId}</p>}
                   </td>
-                  <td className="border-b px-2 py-1.5 align-top">{entry.duplicate ? <DuplicateNotice entry={entry} /> : <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-1 font-medium text-primary"><CheckCircle2 className="h-3 w-3" /> No match found</span>}</td>
+                  <td className="w-40 min-w-40 max-w-40 border-b px-2 py-1.5 align-top">{entry.duplicate ? <DuplicateNotice entry={entry} /> : <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-1 font-medium text-primary"><CheckCircle2 className="h-3 w-3" /> No match found</span>}</td>
                   {input("date", "YYYY-MM-DD")}
                   {input("description", "Description")}
                   {input("merchant", "Merchant")}
