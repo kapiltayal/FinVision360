@@ -38,26 +38,6 @@ export default function AboutPage() {
           </p>
         </div>
 
-        <div className="rounded-xl border bg-card p-8 space-y-4">
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-md bg-primary/10 flex items-center justify-center shrink-0">
-              <Building2 className="h-5 w-5 text-primary" />
-            </div>
-            <div>
-              <h2 className="text-lg font-semibold">Tooothy LLC</h2>
-              <p className="text-sm text-muted-foreground">Parent Company</p>
-            </div>
-          </div>
-          <p className="text-muted-foreground leading-relaxed">
-            FinVision360.com is a product of <strong>Tooothy LLC</strong>, a Northbrook, IL based company dedicated to
-            building smart, approachable technology products that help people take control of their financial futures.
-          </p>
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <MapPin className="h-4 w-4 shrink-0" />
-            <span>Northbrook, Illinois, United States</span>
-          </div>
-        </div>
-
         <div className="space-y-6">
           <h2 className="text-2xl font-bold">Our Mission</h2>
           <p className="text-muted-foreground leading-relaxed">
@@ -117,6 +97,26 @@ export default function AboutPage() {
               </li>
             ))}
           </ul>
+        </div>
+
+        <div className="rounded-xl border bg-card p-8 space-y-4">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-md bg-primary/10 flex items-center justify-center shrink-0">
+              <Building2 className="h-5 w-5 text-primary" />
+            </div>
+            <div>
+              <h2 className="text-lg font-semibold">Tooothy LLC</h2>
+              <p className="text-sm text-muted-foreground">Parent Company</p>
+            </div>
+          </div>
+          <p className="text-muted-foreground leading-relaxed">
+            FinVision360.com is a product of <strong>Tooothy LLC</strong>, a Northbrook, IL based company dedicated to
+            building smart, approachable technology products that help people take control of their financial futures.
+          </p>
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <MapPin className="h-4 w-4 shrink-0" />
+            <span>Northbrook, Illinois, United States</span>
+          </div>
         </div>
 
         <div className="rounded-xl border bg-card p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
