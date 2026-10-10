@@ -114,19 +114,18 @@ function TransactionFileReview({
             </div>
           </div>
           {ignoredBlankRows > 0 && <p className="relative mt-3 text-xs text-amber-800 dark:text-amber-300">{ignoredBlankRows} completely blank {ignoredBlankRows === 1 ? "row was" : "rows were"} left out.</p>}
+          <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-border/60 pt-2 text-xs" aria-label="Duplicate summary">
+            <span className="font-semibold">Duplicate review</span>
+            {possibleCount > 0 && <span className="text-amber-800 dark:text-amber-300">{possibleCount} similar {possibleCount === 1 ? "charge" : "charges"} · excluded by default</span>}
+            {stableCount > 0 && <span className="text-destructive">{stableCount} already imported · cannot be kept</span>}
+            <span className="text-muted-foreground">{excludedCount} excluded from save</span>
+            <Button type="button" variant="ghost" size="sm" className="ml-auto h-7 px-2" onClick={onRecheck} disabled={decisionDisabled}>
+              {checking ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="mr-1.5 h-3.5 w-3.5" />}
+              Recheck matches
+            </Button>
+          </div>
         </div>
       </div>
-
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border bg-muted/30 px-3 py-2.5 text-xs" aria-label="Duplicate summary">
-          <span className="font-semibold">Duplicate review</span>
-          {possibleCount > 0 && <span className="text-amber-800 dark:text-amber-300">{possibleCount} similar {possibleCount === 1 ? "charge" : "charges"} · excluded by default</span>}
-          {stableCount > 0 && <span className="text-destructive">{stableCount} already imported · cannot be kept</span>}
-          <span className="text-muted-foreground">{excludedCount} excluded from save</span>
-          <Button type="button" variant="ghost" size="sm" className="ml-auto h-7 px-2" onClick={onRecheck} disabled={decisionDisabled}>
-            {checking ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="mr-1.5 h-3.5 w-3.5" />}
-            Recheck matches
-          </Button>
-        </div>
 
       {categoriesError && <p className="text-sm text-destructive" role="alert">Categories could not be loaded. Please try again before saving.</p>}
       {categoriesLoading && <p className="text-sm text-muted-foreground">Loading categories…</p>}
