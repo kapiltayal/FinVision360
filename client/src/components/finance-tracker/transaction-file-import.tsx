@@ -227,17 +227,17 @@ function TransactionFileReview({
         </table>
       </div>
       {!entries.length && <p className="rounded-lg border border-dashed p-5 text-center text-sm text-muted-foreground">No transactions remain. Add a row or discard this review.</p>}
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <Button type="button" variant="outline" onClick={onAdd} disabled={saving || entries.length >= 500}><Plus className="mr-2 h-4 w-4" /> Add transaction row</Button>
-        {entries.length >= 500 && <p className="text-xs text-muted-foreground">Maximum of 500 transaction rows reached.</p>}
-        <Button type="button" variant="ghost" onClick={onDiscard} disabled={saving}>Discard review & choose another file</Button>
-      </div>
-      <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-3">
+      <div className="space-y-2 border-t pt-3">
         <p className="max-w-lg text-xs text-muted-foreground">Category is optional. {excludedCount > 0 ? `${excludedCount} excluded ${excludedCount === 1 ? "row is" : "rows are"} ignored during validation and save.` : "Only selected, valid rows will be saved."}</p>
-        <Button type="button" onClick={onSave} disabled={decisionDisabled || categoriesLoading || categoriesError || !selectedIndexes.length || invalidCount > 0 || !!checkError} data-testid="button-save-reviewed-transactions">
-          {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileCheck2 className="mr-2 h-4 w-4" />}
-          {saving ? "Saving selected…" : `Save ${selectedIndexes.length} selected ${selectedIndexes.length === 1 ? "transaction" : "transactions"}`}
-        </Button>
+        {entries.length >= 500 && <p className="text-xs text-muted-foreground">Maximum of 500 transaction rows reached.</p>}
+        <div className="flex flex-nowrap items-center gap-2 overflow-x-auto pb-1">
+          <Button type="button" variant="outline" className="shrink-0" onClick={onAdd} disabled={saving || entries.length >= 500}><Plus className="mr-2 h-4 w-4" /> Add transaction row</Button>
+          <Button type="button" variant="ghost" className="shrink-0" onClick={onDiscard} disabled={saving}>Discard review & choose another file</Button>
+          <Button type="button" className="ml-auto shrink-0" onClick={onSave} disabled={decisionDisabled || categoriesLoading || categoriesError || !selectedIndexes.length || invalidCount > 0 || !!checkError} data-testid="button-save-reviewed-transactions">
+            {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileCheck2 className="mr-2 h-4 w-4" />}
+            {saving ? "Saving selected…" : `Save ${selectedIndexes.length} selected ${selectedIndexes.length === 1 ? "transaction" : "transactions"}`}
+          </Button>
+        </div>
       </div>
     </div>
   );
