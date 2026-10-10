@@ -96,7 +96,7 @@ function TransactionFileReview({
 
   return (
     <div className="space-y-4" data-testid="transaction-file-review">
-      <div className="w-fit max-w-full space-y-4">
+      <div className="w-full max-w-[70rem] space-y-4">
         <TransactionImportProgress current={stage} failedAt={failedAt} />
         <div className="relative w-full overflow-hidden rounded-xl border border-primary/10 bg-[linear-gradient(120deg,hsl(var(--card)),hsl(var(--muted)))] p-3">
           <div className="flex flex-wrap items-start justify-between gap-2">
