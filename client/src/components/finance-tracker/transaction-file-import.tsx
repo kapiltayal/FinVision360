@@ -106,7 +106,6 @@ function TransactionFileReview({
                 <h2 className="text-lg font-semibold tracking-tight">Nothing is saved yet</h2>
                 <p className="min-w-0 max-w-full truncate text-xs text-muted-foreground" title={fileName}>{fileName}</p>
               </div>
-              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">Review charges; possible duplicates stay excluded until selected.</p>
             </div>
             <div className="flex gap-2 text-center">
               <div className="rounded-lg border bg-background/75 px-3 py-2"><strong className="block text-lg tabular-nums">{entries.length}</strong><span className="text-[10px] text-muted-foreground">rows</span></div>
@@ -232,7 +231,7 @@ function TransactionFileReview({
         <div className="flex flex-nowrap items-center gap-2 overflow-x-auto pb-1">
           <Button type="button" variant="outline" className="shrink-0" onClick={onAdd} disabled={saving || entries.length >= 500}><Plus className="mr-2 h-4 w-4" /> Add transaction row</Button>
           <Button type="button" variant="ghost" className="shrink-0" onClick={onDiscard} disabled={saving}>Discard review & choose another file</Button>
-          <Button type="button" className="ml-auto shrink-0" onClick={onSave} disabled={decisionDisabled || categoriesLoading || categoriesError || !selectedIndexes.length || invalidCount > 0 || !!checkError} data-testid="button-save-reviewed-transactions">
+          <Button type="button" className="shrink-0" onClick={onSave} disabled={decisionDisabled || categoriesLoading || categoriesError || !selectedIndexes.length || invalidCount > 0 || !!checkError} data-testid="button-save-reviewed-transactions">
             {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileCheck2 className="mr-2 h-4 w-4" />}
             {saving ? "Saving selected…" : `Save ${selectedIndexes.length} selected ${selectedIndexes.length === 1 ? "transaction" : "transactions"}`}
           </Button>
