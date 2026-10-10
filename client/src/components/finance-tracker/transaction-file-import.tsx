@@ -190,7 +190,7 @@ function TransactionFileReview({
                         {stable ? (
                           <span className="block text-[10px] text-muted-foreground">Cannot be saved again.</span>
                         ) : !included ? (
-                          <span className="block text-[10px] text-muted-foreground">Currently excluded. Select to save this record.</span>
+                          <span className="block text-[10px] leading-tight text-muted-foreground">Excluded.<br />Select to save.</span>
                         ) : null}
                       </span>
                     </label>
@@ -212,7 +212,6 @@ function TransactionFileReview({
                       <option value="">Unassigned (optional)</option>
                       {matchingCategories.map(category => <option key={`${category.parentCategory}-${category.category}`} value={category.category}>{category.parentCategory} · {category.category}</option>)}
                     </select>
-                    {selectedCategory && <p className="mt-1 max-w-56 truncate text-[10px] text-muted-foreground" title={`Parent category: ${selectedCategory.parentCategory}`}>Parent: {selectedCategory.parentCategory}</p>}
                     {error.subcategory && <p className="mt-1 text-[10px] leading-tight text-destructive">{error.subcategory}</p>}
                   </td>
                   <td className="border-b px-2 py-1.5 align-top"><select value={entry.needsWant} onChange={event => onChange(entry.id, "needsWant", event.target.value)} aria-label={`Transaction ${index + 1} need or want`} disabled={saving} className="h-8 w-full rounded-md border border-input bg-background px-2 text-xs"><option value="na">N/A</option><option value="need">Need</option><option value="want">Want</option></select>{error.needsWant && <p className="mt-1 text-[10px] text-destructive">{error.needsWant}</p>}</td>
