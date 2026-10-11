@@ -355,7 +355,7 @@ export default function SnapshotPage() {
   if (isLoading) {
     return (
       <div className="min-h-screen">
-        <div className="h-36 bg-gradient-to-r from-sky-100 via-blue-100 to-cyan-100 dark:from-slate-900 dark:via-blue-950 dark:to-slate-900" />
+        <div className="h-36" style={{ background: "linear-gradient(135deg, #0f172a 0%, #1e3a5f 50%, #1a1040 100%)" }} />
         <div className="p-6 grid grid-cols-1 md:grid-cols-3 gap-5">
           {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-48 rounded-2xl" />)}
         </div>
@@ -373,26 +373,27 @@ export default function SnapshotPage() {
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
       {/* ── Hero Header ── */}
       <div
-        className="relative overflow-hidden border-b border-sky-200/70 bg-gradient-to-r from-sky-100 via-blue-100 to-cyan-100 dark:border-slate-800 dark:from-slate-900 dark:via-blue-950 dark:to-slate-900"
+        className="relative overflow-hidden"
+        style={{ background: "linear-gradient(120deg, #0d3a5c 0%, #1565a8 30%, #1c91d4 58%, #1060a0 80%, #0d3a5c 100%)" }}
       >
         <div className="absolute inset-0 pointer-events-none overflow-hidden">
           <div className="absolute -top-32 -right-32 w-[480px] h-[480px] rounded-full"
-            style={{ background: "radial-gradient(circle, rgba(14,165,233,0.12) 0%, transparent 70%)" }} />
+            style={{ background: "radial-gradient(circle, rgba(28,145,212,0.15) 0%, transparent 70%)" }} />
           <div className="absolute -bottom-16 -left-16 w-72 h-72 rounded-full"
-            style={{ background: "radial-gradient(circle, rgba(59,130,246,0.08) 0%, transparent 70%)" }} />
+            style={{ background: "radial-gradient(circle, rgba(99,102,241,0.12) 0%, transparent 70%)" }} />
           <div className="absolute inset-0"
-            style={{ backgroundImage: "radial-gradient(rgba(30,64,175,0.035) 1px, transparent 1px)", backgroundSize: "32px 32px" }} />
+            style={{ backgroundImage: "radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px)", backgroundSize: "32px 32px" }} />
         </div>
         <div className="relative max-w-7xl mx-auto px-5 py-5 md:px-8 md:py-6">
           <div className="flex flex-col gap-2.5 sm:flex-row sm:items-end sm:justify-between sm:gap-6">
             <div className="min-w-0">
-              <p className="text-blue-700 dark:text-blue-300 text-[10px] font-bold tracking-[0.24em] uppercase mb-1">Financial Snapshot</p>
-              <h1 className="text-2xl md:text-3xl font-bold text-slate-900 dark:text-white leading-tight tracking-tight">
-                {firstName}&apos;s Financial Snapshot{age !== null ? <span className="text-lg md:text-xl font-normal text-slate-600 dark:text-blue-200 ml-2.5 whitespace-nowrap">(Age: {age})</span> : null}
+              <p className="text-blue-300 text-[10px] font-bold tracking-[0.24em] uppercase mb-1">Financial Snapshot</p>
+              <h1 className="text-2xl md:text-3xl font-bold text-white leading-tight tracking-tight">
+                {firstName}&apos;s Financial Snapshot{age !== null ? <span className="text-lg md:text-xl font-normal text-blue-200 ml-2.5 whitespace-nowrap">(Age: {age})</span> : null}
               </h1>
             </div>
-            <p className="shrink-0 text-slate-600 dark:text-slate-300 text-xs sm:pb-1">
-              <span className="text-slate-500 dark:text-slate-400">As of</span>{" "}{today}
+            <p className="shrink-0 text-slate-300 text-xs sm:pb-1">
+              <span className="text-slate-400">As of</span>{" "}{today}
             </p>
           </div>
         </div>
