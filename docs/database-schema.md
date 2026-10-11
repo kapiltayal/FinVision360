@@ -11,321 +11,89 @@ This is a code-based reference for the PostgreSQL tables used by FinVision360. I
 - `JSONB` stores structured JSON data; its internal shape is defined by the feature code, not necessarily by PostgreSQL constraints.
 - `TIMESTAMP` is timestamp without time zone; `TIMESTAMPTZ` is timestamp with time zone.
 - Unless stated otherwise, a column is nullable when the table declaration does not mark it `NOT NULL`.
-- The application generally scopes user-owned rows using `user_id` and the authenticated user's local `users.id`. PostgreSQL Row-Level Security policies are not declared in this repository; see [Database isolation](#database-isolation-and-relationships).
+- The application generally scopes user-owned rows using `user_id` and the authenticated user's local `users.id`. PostgreSQL Row-Level Security policies are not declared in this repository; see [Database isolation](#database-isolation-and-data-handling).
 
 ## Table inventory
 
 ### Users and core financial records
 
-#### `users`
-**Purpose:** Local application profile linked to a Supabase Auth identity; parent record for most user-owned finance data.
-
-**Columns:** `id VARCHAR` (PK, generated UUID string); `full_name TEXT`; `email TEXT`; `is_admin BOOLEAN` (not null, default `false`); `supabase_id TEXT` (unique); `created_at TIMESTAMP` (not null, default current time); `date_of_birth DATE`; `street_address TEXT`; `city TEXT`; `state TEXT`; `postal_code TEXT`; `country TEXT` (default `"USA"`).
-
-**Keys:** PK `id`; unique `supabase_id`. Other user-owned tables commonly reference `users.id` with `ON DELETE CASCADE`.
-
-#### `assets`
-**Purpose:** User-entered or imported assets used for net-worth and retirement calculations.
-
-**Columns:** `id SERIAL` (PK); `user_id VARCHAR` (not null); `name TEXT` (not null); `category TEXT` (not null); `value NUMERIC(15,2)` (not null); `interest_rate NUMERIC(5,2)` (default `0`); `institution TEXT`; `notes TEXT`; `created_at TIMESTAMP` (not null, default current time).
-
-**Keys:** FK `user_id → users.id` (`ON DELETE CASCADE`).
-
-#### `liabilities`
-**Purpose:** User-entered or imported debts, balances, rates, and payment details.
-
-**Columns:** `id SERIAL` (PK); `user_id VARCHAR` (not null); `name TEXT` (not null); `category TEXT` (not null); `balance NUMERIC(15,2)` (not null); `interest_rate NUMERIC(5,2)` (default `0`); `minimum_payment NUMERIC(10,2)` (default `0`); `maturity_date DATE`; `institution TEXT`; `notes TEXT`; `created_at TIMESTAMP` (not null, default current time).
-
-**Keys:** FK `user_id → users.id` (`ON DELETE CASCADE`).
-
-#### `Asset_type_list`
-**Purpose:** Shared list of asset type/category hierarchy and projection return assumptions.
-
-**Columns:** `id SERIAL` (PK); `type TEXT` (not null); `parent_category TEXT` (not null); `category TEXT` (not null; application property `subCategory`); `description TEXT` (not null); `rate_of_return NUMERIC(10,8)` (not null); `rate_of_return_inflation_adjusted NUMERIC(10,8)` (not null).
-
-**Keys:** Unique index `asset_type_list_hierarchy_unique` on `(parent_category, category)`.
-
-#### `liabilities_type_list`
-**Purpose:** Shared liability type/category hierarchy.
-
-**Columns:** `id SERIAL` (PK); `type TEXT` (not null); `parent_category TEXT` (not null); `category TEXT` (not null; application property `subCategory`); `description TEXT` (not null).
-
-**Keys:** Unique index `liabilities_type_list_hierarchy_unique` on `(parent_category, category)`.
-
-#### `transaction_type_list`
-**Purpose:** Shared transaction category hierarchy, including need/want defaults and descriptions.
-
-**Columns:** `id SERIAL` (PK); `type TEXT` (not null; expected income/expense); `parent_category TEXT` (not null); `category TEXT` (not null); `need_vs_want TEXT`; `description TEXT` (not null).
-
-**Keys:** Unique index `transaction_type_list_hierarchy_unique` on `(type, parent_category, category)`.
-
-#### `transactions`
-**Purpose:** User's manual, uploaded, imported, and Plaid-synced income/expense transactions.
-
-**Columns:** `id SERIAL` (PK); `user_id VARCHAR` (not null); `date DATE` (not null); `description TEXT` (not null); `merchant TEXT`; `amount NUMERIC(12,2)` (not null); `type TEXT` (not null); `parent_category TEXT`; `subcategory TEXT` (not null, default `"unassigned"`); `needs_want TEXT`; `is_user_modified BOOLEAN` (not null, default `false`); `is_recurring BOOLEAN` (default `false`); `recurring_type TEXT`; `source TEXT` (not null, default `"manual"`); `plaid_transaction_id TEXT`; `plaid_account_id TEXT`; `plaid_account_name TEXT`; `plaid_institution_name TEXT`; `upload_source_id TEXT`; `upload_source_account TEXT`; `upload_identity TEXT`; `notes TEXT`; `created_at TIMESTAMPTZ` (default current time); `updated_at TIMESTAMPTZ` (default current time).
-
-**Keys and indexes:** PK `id`; indexes on `user_id`, `date`, and `type`; partial unique index `(user_id, plaid_transaction_id)` when the Plaid transaction ID is not null; partial unique index `(user_id, upload_identity)` when upload identity is not null. `user_id` is not declared as a foreign key in the shared schema or startup DDL.
-
-**Checks:** `type` is `income` or `expense`; `needs_want` is `need`, `want`, or `na`; `recurring_type` is `subscription` or `recurring_bill`; `source` is `manual`, `plaid`, `upload`, or `import`.
-
-#### `transaction_import_receipts`
-**Purpose:** Idempotency receipts for reviewed transaction imports; records the result for a user's import request so a retry does not repeat inserts.
-
-**Columns:** `id SERIAL` (PK); `user_id VARCHAR` (not null); `request_id VARCHAR(36)` (not null); `payload_hash TEXT` (not null); `result JSONB` (not null); `created_at TIMESTAMPTZ` (not null, default current time).
-
-**Keys:** Unique index `idx_transaction_import_receipt_unique` on `(user_id, request_id)`. `user_id` is not declared as a foreign key.
-
-#### `transaction_change_history`
-**Purpose:** Audit trail of transaction field changes, with the prior and new values.
-
-**Columns:** `id SERIAL` (PK); `user_id VARCHAR` (not null); `transaction_id INTEGER` (not null); `field TEXT` (not null); `old_value TEXT`; `new_value TEXT`; `created_at TIMESTAMPTZ` (not null, default current time).
-
-**Keys:** Index `idx_transaction_change_history_transaction` on `transaction_id`. Neither `user_id` nor `transaction_id` is declared as a foreign key in the shared schema/startup DDL.
-
-#### `ai_advisor_history`
-**Purpose:** Saved AI Advisor question and response history for a user.
-
-**Columns:** `id SERIAL` (PK); `user_id VARCHAR` (not null); `query_type TEXT` (not null); `query_text TEXT` (not null); `response_text TEXT` (not null); `created_at TIMESTAMPTZ` (not null, default current time).
-
-**Keys:** Index `idx_ai_advisor_history_user_date` on `(user_id, created_at)`. `user_id` is not declared as a foreign key.
-
-**Checks:** `query_type` is `scenario`, `debt_strategy`, or `forecast`.
+| Table | Purpose | Columns (PostgreSQL name and type) | Keys and constraints |
+| --- | --- | --- | --- |
+| `users` | Local application profile linked to a Supabase Auth identity; parent record for most user-owned finance data. | `id VARCHAR` (PK, generated UUID string)<br>`full_name TEXT`<br>`email TEXT`<br>`is_admin BOOLEAN` (not null, default `false`)<br>`supabase_id TEXT`<br>`created_at TIMESTAMP` (not null, default current time)<br>`date_of_birth DATE`<br>`street_address TEXT`<br>`city TEXT`<br>`state TEXT`<br>`postal_code TEXT`<br>`country TEXT` (default `"USA"`) | PK `id`; unique `supabase_id`. Other user-owned tables commonly reference `users.id` with `ON DELETE CASCADE`. |
+| `assets` | User-entered or imported assets used for net-worth and retirement calculations. | `id SERIAL` (PK)<br>`user_id VARCHAR` (not null)<br>`name TEXT` (not null)<br>`category TEXT` (not null)<br>`value NUMERIC(15,2)` (not null)<br>`interest_rate NUMERIC(5,2)` (default `0`)<br>`institution TEXT`<br>`notes TEXT`<br>`created_at TIMESTAMP` (not null, default current time) | FK `user_id → users.id` (`ON DELETE CASCADE`). |
+| `liabilities` | User-entered or imported debts, balances, rates, and payment details. | `id SERIAL` (PK)<br>`user_id VARCHAR` (not null)<br>`name TEXT` (not null)<br>`category TEXT` (not null)<br>`balance NUMERIC(15,2)` (not null)<br>`interest_rate NUMERIC(5,2)` (default `0`)<br>`minimum_payment NUMERIC(10,2)` (default `0`)<br>`maturity_date DATE`<br>`institution TEXT`<br>`notes TEXT`<br>`created_at TIMESTAMP` (not null, default current time) | FK `user_id → users.id` (`ON DELETE CASCADE`). |
+| `Asset_type_list` | Shared asset type/category hierarchy and projection return assumptions. | `id SERIAL` (PK)<br>`type TEXT` (not null)<br>`parent_category TEXT` (not null)<br>`category TEXT` (not null; application property `subCategory`)<br>`description TEXT` (not null)<br>`rate_of_return NUMERIC(10,8)` (not null)<br>`rate_of_return_inflation_adjusted NUMERIC(10,8)` (not null) | Unique index `asset_type_list_hierarchy_unique` on `(parent_category, category)`. |
+| `liabilities_type_list` | Shared liability type/category hierarchy. | `id SERIAL` (PK)<br>`type TEXT` (not null)<br>`parent_category TEXT` (not null)<br>`category TEXT` (not null; application property `subCategory`)<br>`description TEXT` (not null) | Unique index `liabilities_type_list_hierarchy_unique` on `(parent_category, category)`. |
+| `transaction_type_list` | Shared transaction category hierarchy, including need/want defaults and descriptions. | `id SERIAL` (PK)<br>`type TEXT` (not null; expected income/expense)<br>`parent_category TEXT` (not null)<br>`category TEXT` (not null)<br>`need_vs_want TEXT`<br>`description TEXT` (not null) | Unique index `transaction_type_list_hierarchy_unique` on `(type, parent_category, category)`. |
+| `transactions` | User's manual, uploaded, imported, and Plaid-synced income/expense transactions. | `id SERIAL` (PK)<br>`user_id VARCHAR` (not null)<br>`date DATE` (not null)<br>`description TEXT` (not null)<br>`merchant TEXT`<br>`amount NUMERIC(12,2)` (not null)<br>`type TEXT` (not null)<br>`parent_category TEXT`<br>`subcategory TEXT` (not null, default `"unassigned"`)<br>`needs_want TEXT`<br>`is_user_modified BOOLEAN` (not null, default `false`)<br>`is_recurring BOOLEAN` (default `false`)<br>`recurring_type TEXT`<br>`source TEXT` (not null, default `"manual"`)<br>`plaid_transaction_id TEXT`<br>`plaid_account_id TEXT`<br>`plaid_account_name TEXT`<br>`plaid_institution_name TEXT`<br>`upload_source_id TEXT`<br>`upload_source_account TEXT`<br>`upload_identity TEXT`<br>`notes TEXT`<br>`created_at TIMESTAMPTZ` (default current time)<br>`updated_at TIMESTAMPTZ` (default current time) | PK `id`; indexes on `user_id`, `date`, and `type`; partial unique indexes on `(user_id, plaid_transaction_id)` and `(user_id, upload_identity)` when the identity is not null. `user_id` is not declared as a foreign key. Checks: `type` is `income` or `expense`; `needs_want` is `need`, `want`, or `na`; `recurring_type` is `subscription` or `recurring_bill`; `source` is `manual`, `plaid`, `upload`, or `import`. |
+| `transaction_import_receipts` | Idempotency receipts for reviewed transaction imports; stores each user's request result so retries do not repeat inserts. | `id SERIAL` (PK)<br>`user_id VARCHAR` (not null)<br>`request_id VARCHAR(36)` (not null)<br>`payload_hash TEXT` (not null)<br>`result JSONB` (not null)<br>`created_at TIMESTAMPTZ` (not null, default current time) | Unique index `idx_transaction_import_receipt_unique` on `(user_id, request_id)`. `user_id` is not an FK. |
+| `transaction_change_history` | Audit trail of transaction field changes, with the prior and new values. | `id SERIAL` (PK)<br>`user_id VARCHAR` (not null)<br>`transaction_id INTEGER` (not null)<br>`field TEXT` (not null)<br>`old_value TEXT`<br>`new_value TEXT`<br>`created_at TIMESTAMPTZ` (not null, default current time) | Index `idx_transaction_change_history_transaction` on `transaction_id`. Neither `user_id` nor `transaction_id` is an FK in the declared schema/startup DDL. |
+| `ai_advisor_history` | Saved AI Advisor question and response history for a user. | `id SERIAL` (PK)<br>`user_id VARCHAR` (not null)<br>`query_type TEXT` (not null)<br>`query_text TEXT` (not null)<br>`response_text TEXT` (not null)<br>`created_at TIMESTAMPTZ` (not null, default current time) | Index `idx_ai_advisor_history_user_date` on `(user_id, created_at)`. `user_id` is not an FK. Check: `query_type` is `scenario`, `debt_strategy`, or `forecast`. |
 
 ### Insurance and recommendations
 
-#### `insurance_policies`
-**Purpose:** User's auto, home, life, and annuity policy details.
-
-**Columns:** `id SERIAL` (PK); `user_id VARCHAR` (not null); `type TEXT` (not null); `name TEXT` (not null); `provider TEXT`; `policy_number TEXT`; `premium NUMERIC(10,2)`; `premium_frequency TEXT` (default `"monthly"`); `coverage_amount NUMERIC(15,2)`; `deductible NUMERIC(10,2)`; `renewal_date TEXT`; `vehicle_year INTEGER`; `vehicle_make TEXT`; `vehicle_model TEXT`; `property_address TEXT`; `life_type TEXT`; `death_benefit NUMERIC(15,2)`; `cash_value NUMERIC(15,2)`; `beneficiary TEXT`; `annuity_type TEXT`; `current_value NUMERIC(15,2)`; `monthly_payout NUMERIC(10,2)`; `interest_rate NUMERIC(5,2)`; `surrender_period INTEGER`; `notes TEXT`; `created_at TIMESTAMP` (not null, default current time).
-
-**Keys:** FK `user_id → users.id` (`ON DELETE CASCADE`). Type-specific values are stored in nullable columns on this shared table.
-
-#### `recommendation_settings`
-**Purpose:** Per-user thresholds used for financial recommendations and the user's preferred AI Advisor name.
-
-**Columns:** `id SERIAL` (PK); `user_id VARCHAR` (not null); `interest_earning_threshold NUMERIC(15,2)`; `debt_interest_payment_reduction_threshold NUMERIC(15,2)`; `insurance_premium_savings_threshold NUMERIC(15,2)`; `ai_advisor_name TEXT` (not null, default `"Whizzy"`); `updated_at TIMESTAMP` (not null, default current time).
-
-**Keys:** `user_id` is unique; FK `user_id → users.id` (`ON DELETE CASCADE`).
+| Table | Purpose | Columns (PostgreSQL name and type) | Keys and constraints |
+| --- | --- | --- | --- |
+| `insurance_policies` | User's auto, home, life, and annuity policy details; policy-type-specific values share one table. | `id SERIAL` (PK)<br>`user_id VARCHAR` (not null)<br>`type TEXT` (not null)<br>`name TEXT` (not null)<br>`provider TEXT`<br>`policy_number TEXT`<br>`premium NUMERIC(10,2)`<br>`premium_frequency TEXT` (default `"monthly"`)<br>`coverage_amount NUMERIC(15,2)`<br>`deductible NUMERIC(10,2)`<br>`renewal_date TEXT`<br>`vehicle_year INTEGER`<br>`vehicle_make TEXT`<br>`vehicle_model TEXT`<br>`property_address TEXT`<br>`life_type TEXT`<br>`death_benefit NUMERIC(15,2)`<br>`cash_value NUMERIC(15,2)`<br>`beneficiary TEXT`<br>`annuity_type TEXT`<br>`current_value NUMERIC(15,2)`<br>`monthly_payout NUMERIC(10,2)`<br>`interest_rate NUMERIC(5,2)`<br>`surrender_period INTEGER`<br>`notes TEXT`<br>`created_at TIMESTAMP` (not null, default current time) | FK `user_id → users.id` (`ON DELETE CASCADE`). |
+| `recommendation_settings` | Per-user financial recommendation thresholds and preferred AI Advisor name. | `id SERIAL` (PK)<br>`user_id VARCHAR` (not null)<br>`interest_earning_threshold NUMERIC(15,2)`<br>`debt_interest_payment_reduction_threshold NUMERIC(15,2)`<br>`insurance_premium_savings_threshold NUMERIC(15,2)`<br>`ai_advisor_name TEXT` (not null, default `"Whizzy"`)<br>`updated_at TIMESTAMP` (not null, default current time) | `user_id` is unique; FK `user_id → users.id` (`ON DELETE CASCADE`). |
 
 ### Retirement planning
 
-#### `retirement_401k_goals`
-**Purpose:** One user's core 401(k) projection inputs.
-
-**Columns:** `id SERIAL` (PK); `user_id VARCHAR` (not null); `current_age INTEGER` (not null, default `35`); `current_balance NUMERIC(15,2)` (not null, default `25000`); `annual_salary NUMERIC(15,2)` (not null, default `80000`); `contribution_pct NUMERIC(5,2)` (not null, default `10`); `employer_match_pct NUMERIC(5,2)` (not null, default `4`); `employer_match_limit NUMERIC(5,2)` (not null, default `50`); `expected_return NUMERIC(5,2)` (not null, default `7`); `tax_bracket NUMERIC(5,2)` (not null, default `22`); `roth_tax_rate NUMERIC(5,2)` (not null, default `20`); `created_at TIMESTAMP` (not null, default current time).
-
-**Keys:** `user_id` is unique; FK `user_id → users.id` (`ON DELETE CASCADE`).
-
-#### `retirement_planner_settings`
-**Purpose:** Per-user retirement age and life-expectancy assumptions.
-
-**Columns:** `id SERIAL` (PK); `user_id VARCHAR` (not null); `retirement_age INTEGER` (not null, default `65`); `life_expectancy INTEGER` (not null, default `85`); `updated_at TIMESTAMP` (not null, default current time).
-
-**Keys:** `user_id` is unique; FK `user_id → users.id` (`ON DELETE CASCADE`).
-
-#### `retirement_income_expense_settings`
-**Purpose:** User-level expected monthly expense input for retirement-income/expense projections.
-
-**Columns:** `id SERIAL` (PK); `user_id VARCHAR` (not null); `expected_monthly_expenses NUMERIC(15,2)` (not null, default `0`); `updated_at TIMESTAMP` (not null, default current time).
-
-**Keys:** `user_id` is unique; FK `user_id → users.id` (`ON DELETE CASCADE`).
-
-**Checks:** Expected monthly expenses must be nonnegative.
-
-#### `retirement_income_expense_entries`
-**Purpose:** User-defined income or expense entries for a retirement projection.
-
-**Columns:** `id SERIAL` (PK); `user_id VARCHAR` (not null); `kind TEXT` (not null); `name TEXT` (not null); `amount NUMERIC(15,2)` (not null); `notes TEXT`; `created_at TIMESTAMP` (not null, default current time); `updated_at TIMESTAMP` (not null, default current time).
-
-**Keys:** FK `user_id → users.id` (`ON DELETE CASCADE`); index `retirement_income_expense_entries_user_kind_idx` on `(user_id, kind)`.
-
-**Checks:** `kind` is `income` or `expense`; `amount >= 0`.
-
-#### `retirement_account_withdrawal_rates`
-**Purpose:** Per-user withdrawal-rate and early-access overrides for a particular asset/account.
-
-**Columns:** `id SERIAL` (PK); `user_id VARCHAR` (not null); `asset_id INTEGER` (not null); `withdrawal_rate NUMERIC(5,2)` (not null, default `4`); `early_withdrawal_unlocked BOOLEAN` (not null, default `false`); `updated_at TIMESTAMP` (not null, default current time).
-
-**Keys:** Unique index on `(user_id, asset_id)`; FKs `user_id → users.id` and `asset_id → assets.id`, both `ON DELETE CASCADE`.
-
-**Checks:** `withdrawal_rate` is between `0` and `100`.
-
-#### `retirement_asset_projection_overrides`
-**Purpose:** User-specific assumed rate of return for a specific asset in retirement projections.
-
-**Columns:** `id SERIAL` (PK); `user_id VARCHAR` (not null); `asset_id INTEGER` (not null); `rate_of_return NUMERIC(6,3)` (not null); `updated_at TIMESTAMP` (not null, default current time).
-
-**Keys:** Unique index on `(user_id, asset_id)`; FKs to `users.id` and `assets.id`, both `ON DELETE CASCADE`.
-
-#### `retirement_projection_entries`
-**Purpose:** Additional user-entered assets or liabilities included in retirement projections without being part of the primary assets/liabilities lists.
-
-**Columns:** `id SERIAL` (PK); `user_id VARCHAR` (not null); `kind TEXT` (not null); `name TEXT` (not null); `parent_category TEXT` (not null); `category TEXT` (not null); `amount NUMERIC(15,2)` (not null); `notes TEXT`; `created_at TIMESTAMP` (not null, default current time); `updated_at TIMESTAMP` (not null, default current time).
-
-**Keys:** FK `user_id → users.id` (`ON DELETE CASCADE`); index `retirement_projection_entries_user_kind_idx` on `(user_id, kind)`.
-
-**Checks:** `kind` is `asset` or `liability`; `amount >= 0`.
-
-#### `retirement_pensions`
-**Purpose:** User-entered pension benefit assumptions.
-
-**Columns:** `id SERIAL` (PK); `user_id VARCHAR` (not null); `name TEXT` (not null); `amount NUMERIC(15,2)` (not null); `frequency TEXT` (not null, default `"monthly"`); `start_age INTEGER` (not null, default `65`); `notes TEXT`; `created_at TIMESTAMP` (not null, default current time).
-
-**Keys:** FK `user_id → users.id` (`ON DELETE CASCADE`).
-
-#### `social_security_settings`
-**Purpose:** User's Social Security benefit and life-age assumptions.
-
-**Columns:** `id SERIAL` (PK); `user_id VARCHAR` (not null); `fra_monthly_benefit NUMERIC(10,2)` (default `2000`); `expected_life_age INTEGER` (default `85`); `updated_at TIMESTAMP` (not null, default current time).
-
-**Keys:** `user_id` is unique; FK `user_id → users.id` (`ON DELETE CASCADE`).
-
-**Checks:** `fra_monthly_benefit >= 0`.
+| Table | Purpose | Columns (PostgreSQL name and type) | Keys and constraints |
+| --- | --- | --- | --- |
+| `retirement_401k_goals` | One user's core 401(k) projection inputs. | `id SERIAL` (PK)<br>`user_id VARCHAR` (not null)<br>`current_age INTEGER` (not null, default `35`)<br>`current_balance NUMERIC(15,2)` (not null, default `25000`)<br>`annual_salary NUMERIC(15,2)` (not null, default `80000`)<br>`contribution_pct NUMERIC(5,2)` (not null, default `10`)<br>`employer_match_pct NUMERIC(5,2)` (not null, default `4`)<br>`employer_match_limit NUMERIC(5,2)` (not null, default `50`)<br>`expected_return NUMERIC(5,2)` (not null, default `7`)<br>`tax_bracket NUMERIC(5,2)` (not null, default `22`)<br>`roth_tax_rate NUMERIC(5,2)` (not null, default `20`)<br>`created_at TIMESTAMP` (not null, default current time) | `user_id` is unique; FK `user_id → users.id` (`ON DELETE CASCADE`). |
+| `retirement_planner_settings` | Per-user retirement age and life-expectancy assumptions. | `id SERIAL` (PK)<br>`user_id VARCHAR` (not null)<br>`retirement_age INTEGER` (not null, default `65`)<br>`life_expectancy INTEGER` (not null, default `85`)<br>`updated_at TIMESTAMP` (not null, default current time) | `user_id` is unique; FK `user_id → users.id` (`ON DELETE CASCADE`). |
+| `retirement_income_expense_settings` | User-level expected monthly expense input for retirement-income/expense projections. | `id SERIAL` (PK)<br>`user_id VARCHAR` (not null)<br>`expected_monthly_expenses NUMERIC(15,2)` (not null, default `0`)<br>`updated_at TIMESTAMP` (not null, default current time) | `user_id` is unique; FK `user_id → users.id` (`ON DELETE CASCADE`). Check: expected expenses are nonnegative. |
+| `retirement_income_expense_entries` | User-defined income or expense entries for a retirement projection. | `id SERIAL` (PK)<br>`user_id VARCHAR` (not null)<br>`kind TEXT` (not null)<br>`name TEXT` (not null)<br>`amount NUMERIC(15,2)` (not null)<br>`notes TEXT`<br>`created_at TIMESTAMP` (not null, default current time)<br>`updated_at TIMESTAMP` (not null, default current time) | FK `user_id → users.id` (`ON DELETE CASCADE`); index `retirement_income_expense_entries_user_kind_idx` on `(user_id, kind)`. Checks: `kind` is `income` or `expense`; `amount >= 0`. |
+| `retirement_account_withdrawal_rates` | Per-user withdrawal-rate and early-access overrides for a particular asset/account. | `id SERIAL` (PK)<br>`user_id VARCHAR` (not null)<br>`asset_id INTEGER` (not null)<br>`withdrawal_rate NUMERIC(5,2)` (not null, default `4`)<br>`early_withdrawal_unlocked BOOLEAN` (not null, default `false`)<br>`updated_at TIMESTAMP` (not null, default current time) | Unique index on `(user_id, asset_id)`; FKs `user_id → users.id` and `asset_id → assets.id`, both `ON DELETE CASCADE`. Check: withdrawal rate is between `0` and `100`. |
+| `retirement_asset_projection_overrides` | User-specific assumed rate of return for an asset in retirement projections. | `id SERIAL` (PK)<br>`user_id VARCHAR` (not null)<br>`asset_id INTEGER` (not null)<br>`rate_of_return NUMERIC(6,3)` (not null)<br>`updated_at TIMESTAMP` (not null, default current time) | Unique index on `(user_id, asset_id)`; FKs to `users.id` and `assets.id`, both `ON DELETE CASCADE`. |
+| `retirement_projection_entries` | Additional user-entered assets or liabilities included in retirement projections outside the primary assets/liabilities lists. | `id SERIAL` (PK)<br>`user_id VARCHAR` (not null)<br>`kind TEXT` (not null)<br>`name TEXT` (not null)<br>`parent_category TEXT` (not null)<br>`category TEXT` (not null)<br>`amount NUMERIC(15,2)` (not null)<br>`notes TEXT`<br>`created_at TIMESTAMP` (not null, default current time)<br>`updated_at TIMESTAMP` (not null, default current time) | FK `user_id → users.id` (`ON DELETE CASCADE`); index `retirement_projection_entries_user_kind_idx` on `(user_id, kind)`. Checks: `kind` is `asset` or `liability`; `amount >= 0`. |
+| `retirement_pensions` | User-entered pension benefit assumptions. | `id SERIAL` (PK)<br>`user_id VARCHAR` (not null)<br>`name TEXT` (not null)<br>`amount NUMERIC(15,2)` (not null)<br>`frequency TEXT` (not null, default `"monthly"`)<br>`start_age INTEGER` (not null, default `65`)<br>`notes TEXT`<br>`created_at TIMESTAMP` (not null, default current time) | FK `user_id → users.id` (`ON DELETE CASCADE`). |
+| `social_security_settings` | User's Social Security benefit and life-age assumptions. | `id SERIAL` (PK)<br>`user_id VARCHAR` (not null)<br>`fra_monthly_benefit NUMERIC(10,2)` (default `2000`)<br>`expected_life_age INTEGER` (default `85`)<br>`updated_at TIMESTAMP` (not null, default current time) | `user_id` is unique; FK `user_id → users.id` (`ON DELETE CASCADE`). Check: `fra_monthly_benefit >= 0`. |
 
 ### Bank rates and Plaid connections
 
-#### `bank_configs`
-**Purpose:** Shared/admin-managed bank-rate scraper configuration.
-
-**Columns:** `id SERIAL` (PK); `bank_name TEXT` (not null); `bank_url TEXT` (not null); `selectors_json TEXT` (not null); `notes TEXT`; `is_active BOOLEAN` (not null, default `true`); `created_at TIMESTAMP` (not null, default current time).
-
-**Keys:** PK `id`; no user owner key.
-
-#### `bank_rates`
-**Purpose:** Scraped or manually entered bank product rates over time.
-
-**Columns:** `id SERIAL` (PK); `config_id INTEGER` (not null); `bank_name TEXT` (not null); `bank_type TEXT` (not null, default `"Standard Bank"`); `rate_type TEXT` (not null); `rate_name TEXT` (not null); `rate_value TEXT` (not null); `scraped_at TIMESTAMP` (not null, default current time).
-
-**Keys:** FK `config_id → bank_configs.id` (`ON DELETE CASCADE`).
-
-#### `plaid_items`
-**Purpose:** Plaid institution connections for a user, including the server-side access token and sync state.
-
-**Columns:** `id SERIAL` (PK); `user_id VARCHAR` (not null); `access_token TEXT` (not null; sensitive credential); `item_id TEXT` (not null, unique); `institution_id TEXT`; `institution_name TEXT`; `created_at TIMESTAMP` (not null, default current time); `last_synced TIMESTAMP`.
-
-**Keys:** FK `user_id → users.id` (`ON DELETE CASCADE`); unique `item_id`.
-
-#### `plaid_accounts`
-**Purpose:** Accounts returned for a Plaid item, with balances and optional links to a user's asset or liability.
-
-**Columns:** `id SERIAL` (PK); `user_id VARCHAR` (not null); `plaid_item_id INTEGER` (not null); `plaid_account_id TEXT` (not null, unique); `name TEXT` (not null); `official_name TEXT`; `type TEXT` (not null); `subtype TEXT`; `current_balance NUMERIC(15,2)`; `available_balance NUMERIC(15,2)`; `linked_asset_id INTEGER`; `linked_liability_id INTEGER`; `last_updated TIMESTAMP` (not null, default current time).
-
-**Keys:** FKs `user_id → users.id` and `plaid_item_id → plaid_items.id` (`ON DELETE CASCADE`); unique `plaid_account_id`. The linked asset/liability IDs are not declared as foreign keys in the shared schema.
+| Table | Purpose | Columns (PostgreSQL name and type) | Keys and constraints |
+| --- | --- | --- | --- |
+| `bank_configs` | Shared/admin-managed bank-rate scraper configuration. | `id SERIAL` (PK)<br>`bank_name TEXT` (not null)<br>`bank_url TEXT` (not null)<br>`selectors_json TEXT` (not null)<br>`notes TEXT`<br>`is_active BOOLEAN` (not null, default `true`)<br>`created_at TIMESTAMP` (not null, default current time) | PK `id`; no user owner key. |
+| `bank_rates` | Scraped or manually entered bank product rates over time. | `id SERIAL` (PK)<br>`config_id INTEGER` (not null)<br>`bank_name TEXT` (not null)<br>`bank_type TEXT` (not null, default `"Standard Bank"`)<br>`rate_type TEXT` (not null)<br>`rate_name TEXT` (not null)<br>`rate_value TEXT` (not null)<br>`scraped_at TIMESTAMP` (not null, default current time) | FK `config_id → bank_configs.id` (`ON DELETE CASCADE`). |
+| `plaid_items` | Plaid institution connections for a user, including the server-side access token and sync state. | `id SERIAL` (PK)<br>`user_id VARCHAR` (not null)<br>`access_token TEXT` (not null; sensitive credential)<br>`item_id TEXT` (not null)<br>`institution_id TEXT`<br>`institution_name TEXT`<br>`created_at TIMESTAMP` (not null, default current time)<br>`last_synced TIMESTAMP` | FK `user_id → users.id` (`ON DELETE CASCADE`); unique `item_id`. |
+| `plaid_accounts` | Accounts returned for a Plaid item, with balances and optional links to a user's asset or liability. | `id SERIAL` (PK)<br>`user_id VARCHAR` (not null)<br>`plaid_item_id INTEGER` (not null)<br>`plaid_account_id TEXT` (not null)<br>`name TEXT` (not null)<br>`official_name TEXT`<br>`type TEXT` (not null)<br>`subtype TEXT`<br>`current_balance NUMERIC(15,2)`<br>`available_balance NUMERIC(15,2)`<br>`linked_asset_id INTEGER`<br>`linked_liability_id INTEGER`<br>`last_updated TIMESTAMP` (not null, default current time) | FKs `user_id → users.id` and `plaid_item_id → plaid_items.id` (`ON DELETE CASCADE`); unique `plaid_account_id`. Linked asset/liability IDs are not FKs in the shared schema. |
 
 ### Estate and legacy planning
 
-#### `estate_beneficiaries`
-**Purpose:** Per-asset beneficiary designation status and notes.
-
-**Columns:** `id SERIAL` (PK); `user_id VARCHAR` (not null); `asset_id INTEGER` (not null); `has_beneficiary BOOLEAN` (not null, default `false`); `beneficiary_name TEXT`; `notes TEXT`.
-
-**Keys:** FKs to `users.id` and `assets.id`, both `ON DELETE CASCADE`. Startup SQL adds a unique constraint on `(user_id, asset_id)`.
-
-#### `estate_beneficiary_entries`
-**Purpose:** Individual beneficiary names and allocation percentages under a designation.
-
-**Columns:** `id SERIAL` (PK); `designation_id INTEGER` (not null); `user_id VARCHAR` (not null); `asset_id INTEGER` (not null); `beneficiary_name TEXT` (not null); `allocation_percentage NUMERIC(5,2)` (not null); `notes TEXT`.
-
-**Keys:** FKs `designation_id → estate_beneficiaries.id`, `user_id → users.id`, and `asset_id → assets.id`, all `ON DELETE CASCADE`; index on `designation_id`.
-
-**Checks:** `allocation_percentage > 0` and `allocation_percentage <= 100`.
-
-#### `estate_documents`
-**Purpose:** Per-user checklist status and notes for estate documents.
-
-**Columns:** `id SERIAL` (PK); `user_id VARCHAR` (not null); `document_type TEXT` (not null); `is_complete BOOLEAN` (not null, default `false`); `notes TEXT`; `updated_at TIMESTAMP` (not null, default current time).
-
-**Keys:** FK `user_id → users.id` (`ON DELETE CASCADE`). Startup SQL adds a unique constraint on `(user_id, document_type)`.
-
-#### `estate_contacts`
-**Purpose:** User's estate-planning contacts, such as an attorney, executor, trustee, advisor, or accountant.
-
-**Columns:** `id SERIAL` (PK); `user_id VARCHAR` (not null); `name TEXT` (not null); `role TEXT` (not null); `phone TEXT`; `email TEXT`; `firm TEXT`; `notes TEXT`.
-
-**Keys:** FK `user_id → users.id` (`ON DELETE CASCADE`).
+| Table | Purpose | Columns (PostgreSQL name and type) | Keys and constraints |
+| --- | --- | --- | --- |
+| `estate_beneficiaries` | Per-asset beneficiary designation status and notes. | `id SERIAL` (PK)<br>`user_id VARCHAR` (not null)<br>`asset_id INTEGER` (not null)<br>`has_beneficiary BOOLEAN` (not null, default `false`)<br>`beneficiary_name TEXT`<br>`notes TEXT` | FKs to `users.id` and `assets.id`, both `ON DELETE CASCADE`; startup SQL adds unique constraint `(user_id, asset_id)`. |
+| `estate_beneficiary_entries` | Individual beneficiary names and allocation percentages under a designation. | `id SERIAL` (PK)<br>`designation_id INTEGER` (not null)<br>`user_id VARCHAR` (not null)<br>`asset_id INTEGER` (not null)<br>`beneficiary_name TEXT` (not null)<br>`allocation_percentage NUMERIC(5,2)` (not null)<br>`notes TEXT` | FKs `designation_id → estate_beneficiaries.id`, `user_id → users.id`, and `asset_id → assets.id`, all `ON DELETE CASCADE`; index on `designation_id`. Check: allocation is greater than `0` and at most `100`. |
+| `estate_documents` | Per-user checklist status and notes for estate documents. | `id SERIAL` (PK)<br>`user_id VARCHAR` (not null)<br>`document_type TEXT` (not null)<br>`is_complete BOOLEAN` (not null, default `false`)<br>`notes TEXT`<br>`updated_at TIMESTAMP` (not null, default current time) | FK `user_id → users.id` (`ON DELETE CASCADE`); startup SQL adds unique constraint `(user_id, document_type)`. |
+| `estate_contacts` | User's estate-planning contacts, such as an attorney, executor, trustee, advisor, or accountant. | `id SERIAL` (PK)<br>`user_id VARCHAR` (not null)<br>`name TEXT` (not null)<br>`role TEXT` (not null)<br>`phone TEXT`<br>`email TEXT`<br>`firm TEXT`<br>`notes TEXT` | FK `user_id → users.id` (`ON DELETE CASCADE`). |
 
 ### Feedback and audit/history snapshots
 
-#### `feedback`
-**Purpose:** Feedback submitted by an authenticated user.
-
-**Columns:** `id SERIAL` (PK); `user_id VARCHAR` (not null); `message TEXT` (not null); `created_at TIMESTAMP` (not null, default current time).
-
-**Keys:** FK `user_id → users.id` (`ON DELETE CASCADE`).
-
-#### `contactus`
-**Purpose:** Public contact form submissions; these rows are not associated with an application user.
-
-**Columns:** `id SERIAL` (PK); `name TEXT` (not null); `email TEXT` (not null); `subject TEXT` (not null); `message TEXT` (not null); `created_at TIMESTAMP` (not null, default current time).
-
-#### `asset_history`
-**Purpose:** Point-in-time copies of asset values and descriptive fields for net-worth history.
-
-**Columns:** `id SERIAL` (PK); `user_id VARCHAR` (not null); `asset_id INTEGER` (not null; source asset ID retained as a value); `name TEXT` (not null); `category TEXT` (not null); `value NUMERIC(15,2)` (not null); `interest_rate NUMERIC(5,2)` (default `0`); `institution TEXT`; `notes TEXT`; `snapshot_at TIMESTAMP` (not null, default current time).
-
-**Keys:** FK `user_id → users.id` (`ON DELETE CASCADE`). `asset_id` is not declared as an FK so the snapshot can remain independent of later changes to the source record.
-
-#### `liability_history`
-**Purpose:** Point-in-time copies of liability balances and descriptive/payment fields for net-worth history.
-
-**Columns:** `id SERIAL` (PK); `user_id VARCHAR` (not null); `liability_id INTEGER` (not null; source liability ID retained as a value); `name TEXT` (not null); `category TEXT` (not null); `balance NUMERIC(15,2)` (not null); `interest_rate NUMERIC(5,2)` (default `0`); `minimum_payment NUMERIC(10,2)` (default `0`); `maturity_date DATE`; `institution TEXT`; `notes TEXT`; `snapshot_at TIMESTAMP` (not null, default current time).
-
-**Keys:** FK `user_id → users.id` (`ON DELETE CASCADE`); `liability_id` is not a foreign key.
-
-#### `user_goals`
-**Purpose:** Current savings or financial goals entered by a user.
-
-**Columns:** `id SERIAL` (PK); `user_id VARCHAR` (not null); `title VARCHAR(200)` (not null); `category VARCHAR(50)` (not null, default `"custom"`); `target_amount NUMERIC(12,2)` (not null); `current_amount NUMERIC(12,2)` (not null, default `0`); `target_date DATE`; `notes TEXT`; `created_at TIMESTAMP` (not null, default current time); `updated_at TIMESTAMP` (not null, default current time).
-
-**Keys:** FK `user_id → users.id` (`ON DELETE CASCADE`).
-
-#### `user_goals_history`
-**Purpose:** Point-in-time copies of goal values for monthly history, including the monthly savings requirement calculated at snapshot time.
-
-**Columns:** `id SERIAL` (PK); `user_id VARCHAR` (not null); `goal_id INTEGER` (not null; source goal ID retained as a value); `title VARCHAR(200)` (not null); `category VARCHAR(50)` (not null, default `"custom"`); `target_amount NUMERIC(12,2)` (not null); `current_amount NUMERIC(12,2)` (not null, default `0`); `target_date DATE`; `notes TEXT`; `created_at TIMESTAMP` (not null); `updated_at TIMESTAMP` (not null); `monthly_savings_needed NUMERIC(12,2)`; `snapshot_at TIMESTAMP` (not null, default current time).
-
-**Keys:** FK `user_id → users.id` (`ON DELETE CASCADE`); index `user_goals_history_snapshot_at_idx` on `snapshot_at`. `goal_id` is not an FK so archived goals remain in history after deletion. A null `monthly_savings_needed` means the monthly requirement could not be calculated.
+| Table | Purpose | Columns (PostgreSQL name and type) | Keys and constraints |
+| --- | --- | --- | --- |
+| `feedback` | Feedback submitted by an authenticated user. | `id SERIAL` (PK)<br>`user_id VARCHAR` (not null)<br>`message TEXT` (not null)<br>`created_at TIMESTAMP` (not null, default current time) | FK `user_id → users.id` (`ON DELETE CASCADE`). |
+| `contactus` | Public contact form submissions; not associated with an application user. | `id SERIAL` (PK)<br>`name TEXT` (not null)<br>`email TEXT` (not null)<br>`subject TEXT` (not null)<br>`message TEXT` (not null)<br>`created_at TIMESTAMP` (not null, default current time) | No user owner key or other declared FK. |
+| `asset_history` | Point-in-time copies of asset values and descriptive fields for net-worth history. | `id SERIAL` (PK)<br>`user_id VARCHAR` (not null)<br>`asset_id INTEGER` (not null; source ID retained as a value)<br>`name TEXT` (not null)<br>`category TEXT` (not null)<br>`value NUMERIC(15,2)` (not null)<br>`interest_rate NUMERIC(5,2)` (default `0`)<br>`institution TEXT`<br>`notes TEXT`<br>`snapshot_at TIMESTAMP` (not null, default current time) | FK `user_id → users.id` (`ON DELETE CASCADE`). `asset_id` is not an FK, so snapshots survive changes to the source record. |
+| `liability_history` | Point-in-time copies of liability balances and descriptive/payment fields for net-worth history. | `id SERIAL` (PK)<br>`user_id VARCHAR` (not null)<br>`liability_id INTEGER` (not null; source ID retained as a value)<br>`name TEXT` (not null)<br>`category TEXT` (not null)<br>`balance NUMERIC(15,2)` (not null)<br>`interest_rate NUMERIC(5,2)` (default `0`)<br>`minimum_payment NUMERIC(10,2)` (default `0`)<br>`maturity_date DATE`<br>`institution TEXT`<br>`notes TEXT`<br>`snapshot_at TIMESTAMP` (not null, default current time) | FK `user_id → users.id` (`ON DELETE CASCADE`); `liability_id` is not an FK. |
+| `user_goals` | Current savings or financial goals entered by a user. | `id SERIAL` (PK)<br>`user_id VARCHAR` (not null)<br>`title VARCHAR(200)` (not null)<br>`category VARCHAR(50)` (not null, default `"custom"`)<br>`target_amount NUMERIC(12,2)` (not null)<br>`current_amount NUMERIC(12,2)` (not null, default `0`)<br>`target_date DATE`<br>`notes TEXT`<br>`created_at TIMESTAMP` (not null, default current time)<br>`updated_at TIMESTAMP` (not null, default current time) | FK `user_id → users.id` (`ON DELETE CASCADE`). |
+| `user_goals_history` | Point-in-time copies of goal values, including the monthly savings requirement calculated at snapshot time. | `id SERIAL` (PK)<br>`user_id VARCHAR` (not null)<br>`goal_id INTEGER` (not null; source ID retained as a value)<br>`title VARCHAR(200)` (not null)<br>`category VARCHAR(50)` (not null, default `"custom"`)<br>`target_amount NUMERIC(12,2)` (not null)<br>`current_amount NUMERIC(12,2)` (not null, default `0`)<br>`target_date DATE`<br>`notes TEXT`<br>`created_at TIMESTAMP` (not null)<br>`updated_at TIMESTAMP` (not null)<br>`monthly_savings_needed NUMERIC(12,2)`<br>`snapshot_at TIMESTAMP` (not null, default current time) | FK `user_id → users.id` (`ON DELETE CASCADE`); index `user_goals_history_snapshot_at_idx` on `snapshot_at`. `goal_id` is not an FK, so archived goals survive deletion. Null `monthly_savings_needed` means the requirement could not be calculated. |
 
 ### Budget planning and close snapshots
 
-#### `budget_plans`
-**Purpose:** Editable per-user monthly plan line items. `plan_key` identifies the type/category or entity represented by each planned amount.
-
-**Columns:** `id SERIAL` (PK); `user_id VARCHAR` (not null); `month DATE` (not null; normalized to the plan month); `plan_key VARCHAR(250)` (not null); `planned_amount NUMERIC(12,2)` (not null, default `0`); `entity_metadata JSONB` (optional `{ name, category }` display metadata); `created_at TIMESTAMP` (not null, default current time); `updated_at TIMESTAMP` (not null, default current time).
-
-**Keys:** FK `user_id → users.id` (`ON DELETE CASCADE`); unique index `budget_plans_user_month_key_unique` on `(user_id, month, plan_key)`.
-
-**Checks:** `planned_amount >= 0`.
-
-#### `budget_close_runs`
-**Purpose:** Global run record for a monthly close/backup period. It records whether/how the close job ran, not one user's plan.
-
-**Columns:** `period_month DATE` (PK); `snapshot_at TIMESTAMPTZ` (not null, default current time); `result JSONB` (not null; run status/details).
-
-**Keys:** PK `period_month`; intentionally has no `user_id`.
-
-#### `budget_month_closes`
-**Purpose:** Per-user, per-period immutable close snapshot used to show historical monthly budget values and close-period debt/goal context.
-
-**Columns:** `id SERIAL` (PK); `user_id VARCHAR` (not null); `period_month DATE` (not null); `snapshot_at TIMESTAMPTZ` (not null, default current time); `payload JSONB` (not null; saved line items and captured close data).
-
-**Keys:** FK `user_id → users.id` (`ON DELETE CASCADE`); unique index `budget_month_closes_user_period_unique` on `(user_id, period_month)`.
+| Table | Purpose | Columns (PostgreSQL name and type) | Keys and constraints |
+| --- | --- | --- | --- |
+| `budget_plans` | Editable per-user monthly plan line items. `plan_key` identifies the category or entity represented by the amount. | `id SERIAL` (PK)<br>`user_id VARCHAR` (not null)<br>`month DATE` (not null; normalized to plan month)<br>`plan_key VARCHAR(250)` (not null)<br>`planned_amount NUMERIC(12,2)` (not null, default `0`)<br>`entity_metadata JSONB` (optional `{ name, category }` metadata)<br>`created_at TIMESTAMP` (not null, default current time)<br>`updated_at TIMESTAMP` (not null, default current time) | FK `user_id → users.id` (`ON DELETE CASCADE`); unique index `budget_plans_user_month_key_unique` on `(user_id, month, plan_key)`; check `planned_amount >= 0`. |
+| `budget_close_runs` | Global run record for a monthly close/backup period; stores run status/details, not an individual user's plan. | `period_month DATE` (PK)<br>`snapshot_at TIMESTAMPTZ` (not null, default current time)<br>`result JSONB` (not null) | PK `period_month`; intentionally has no `user_id`. |
+| `budget_month_closes` | Per-user, per-period immutable close snapshot of historical monthly plan and close-period debt/goal context. | `id SERIAL` (PK)<br>`user_id VARCHAR` (not null)<br>`period_month DATE` (not null)<br>`snapshot_at TIMESTAMPTZ` (not null, default current time)<br>`payload JSONB` (not null; saved line items and close data) | FK `user_id → users.id` (`ON DELETE CASCADE`); unique index `budget_month_closes_user_period_unique` on `(user_id, period_month)`. |
 
 ### Chat integration
 
-#### `conversations`
-**Purpose:** Conversation metadata for the Replit chat integration.
-
-**Columns:** `id SERIAL` (PK); `title TEXT` (not null); `created_at TIMESTAMP` (not null, default current time).
-
-**Keys:** PK `id`; the schema does not define a user owner column.
-
-#### `messages`
-**Purpose:** Messages belonging to a chat integration conversation.
-
-**Columns:** `id SERIAL` (PK); `conversation_id INTEGER` (not null); `role TEXT` (not null); `content TEXT` (not null); `created_at TIMESTAMP` (not null, default current time).
-
-**Keys:** FK `conversation_id → conversations.id` (`ON DELETE CASCADE`). The schema does not define a user owner column.
+| Table | Purpose | Columns (PostgreSQL name and type) | Keys and constraints |
+| --- | --- | --- | --- |
+| `conversations` | Conversation metadata for the Replit chat integration. | `id SERIAL` (PK)<br>`title TEXT` (not null)<br>`created_at TIMESTAMP` (not null, default current time) | PK `id`; no user owner column is defined. |
+| `messages` | Messages belonging to a chat integration conversation. | `id SERIAL` (PK)<br>`conversation_id INTEGER` (not null)<br>`role TEXT` (not null)<br>`content TEXT` (not null)<br>`created_at TIMESTAMP` (not null, default current time) | FK `conversation_id → conversations.id` (`ON DELETE CASCADE`); no user owner column is defined. |
 
 ## Key relationships and constraints at a glance
 
