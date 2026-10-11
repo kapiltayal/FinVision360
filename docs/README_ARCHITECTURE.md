@@ -30,7 +30,7 @@ Drizzle's schema source is `shared/schema.ts`, configured in `drizzle.config.ts`
 | --- | --- |
 | `package.json` | Lists runtime/development dependencies and the dev, build, production, database, and test commands. |
 | `package-lock.json` | Locks the npm dependency graph for repeatable installs. |
-| `README_ARCHITECTURE.md` | This architecture and security overview. |
+| `docs/README_ARCHITECTURE.md` | This architecture and security overview. |
 | `replit.md` | Project context and Replit-specific operating notes; some older descriptions may not match the current code, so verify implementation before relying on them. |
 | `.replit` | Replit environment, workflow, port, development/production frontend configuration, and deployment settings. |
 | `vite.config.ts` | Vite plugins, client root, module aliases, and frontend build settings. |
@@ -40,7 +40,7 @@ Drizzle's schema source is `shared/schema.ts`, configured in `drizzle.config.ts`
 | `client/` | Browser application source and public static files. |
 | `server/` | Express server, authentication middleware, API routes, data access, and domain services. |
 | `shared/` | Database schema, shared domain types, validators, and logic used on both client and server. |
-| `docs/` | Feature-specific engineering documentation, including AI response flow, transaction ingestion, and historical budget planning. |
+| `docs/` | Feature-specific engineering documentation, including AI response flow, transaction ingestion, historical budget planning, and this architecture guide. |
 | `scripts/`, `script/` | Maintenance, setup, and development/test scripts. |
 | `attached_assets/` | Project images and other imported assets referenced by the application. |
 | `artifacts/` | Workspace artifacts and isolated mockup-sandbox content; not part of the core API implementation. |
