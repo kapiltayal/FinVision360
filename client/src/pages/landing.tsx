@@ -330,15 +330,15 @@ function AuthModal({
 const features = [
   {
     icon: Wallet,
-    title: "Daily Finance Management",
-    desc: "Track every account — checking, savings, cash — in one place. Know your real balance at all times.",
+    title: "Wealth Tracking",
+    desc: "Monitor all your cash, bank accounts, investments, and retirement funds with real-time net worth calculations.",
     color: "text-[#1C91D4]",
     bg: "bg-[#1C91D4]/10",
   },
   {
     icon: BarChart3,
-    title: "Investments & Portfolio",
-    desc: "Monitor all your investments, brokerage accounts, and retirement funds with real-time net worth calculations.",
+    title: "Smart Budgeting",
+    desc: "Build a smart, flexible budget that adapts to your life. Track spending, plan ahead, and stay in control month after month.",
     color: "text-violet-500",
     bg: "bg-violet-500/10",
   },
@@ -366,7 +366,7 @@ const features = [
   {
     icon: Brain,
     title: "AI-Powered Advisor",
-    desc: "Get recommendations, debt payoff strategies, and net worth forecasts from your personal finance Copilot.",
+    desc: "Get financial insights, debt payoff strategies, and net worth forecasts from your personal finance Copilot.",
     color: "text-pink-500",
     bg: "bg-pink-500/10",
   },
@@ -376,9 +376,10 @@ const benefits = [
   "Track all assets and liabilities in one dashboard",
   "See your real net worth updated instantly",
   "Understand the interest you earn vs. what you pay",
+  "Monitor expenses and smart budgeting month-to-month",
   "Plan retirement with net worth and income projections",
-  "AI-powered debt reduction strategies",
-  "Scenario planning: 'What if?' financial modeling",
+  "AI-powered financial insights and strategies",
+
 ];
 
 export default function LandingPage() {
