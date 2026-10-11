@@ -26,7 +26,6 @@ import {
   BarChart3,
   Target,
   ShieldCheck,
-  CalendarDays,
   Banknote,
   ScrollText,
   UserCheck,
@@ -372,32 +371,33 @@ export default function SnapshotPage() {
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
-      {/* ── Snapshot Header ── */}
-      <header className="border-b border-slate-200/80 bg-white/85 dark:border-slate-800 dark:bg-slate-900/75">
-        <div className="mx-auto max-w-7xl px-5 py-5 md:px-8 md:py-6">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      {/* ── Hero Header ── */}
+      <div
+        className="relative overflow-hidden"
+        style={{ background: "linear-gradient(120deg, #0d3a5c 0%, #1565a8 30%, #1c91d4 58%, #1060a0 80%, #0d3a5c 100%)" }}
+      >
+        <div className="absolute inset-0 pointer-events-none overflow-hidden">
+          <div className="absolute -top-32 -right-32 w-[480px] h-[480px] rounded-full"
+            style={{ background: "radial-gradient(circle, rgba(28,145,212,0.15) 0%, transparent 70%)" }} />
+          <div className="absolute -bottom-16 -left-16 w-72 h-72 rounded-full"
+            style={{ background: "radial-gradient(circle, rgba(99,102,241,0.12) 0%, transparent 70%)" }} />
+          <div className="absolute inset-0"
+            style={{ backgroundImage: "radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px)", backgroundSize: "32px 32px" }} />
+        </div>
+        <div className="relative max-w-7xl mx-auto px-5 py-5 md:px-8 md:py-6">
+          <div className="flex flex-col gap-2.5 sm:flex-row sm:items-end sm:justify-between sm:gap-6">
             <div className="min-w-0">
-              <p className="mb-1.5 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.2em] text-sky-700 dark:text-sky-300">
-                <span className="h-1.5 w-1.5 rounded-full bg-sky-500" aria-hidden="true" />
-                Financial Snapshot
-              </p>
-              <h1 className="text-2xl font-bold leading-tight tracking-tight text-slate-900 dark:text-white md:text-3xl">
-                {firstName}&apos;s Financial Snapshot
-                {age !== null && (
-                  <span className="ml-2.5 inline-flex translate-y-[-2px] items-center rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 align-middle text-xs font-medium tracking-normal text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
-                    Age {age}
-                  </span>
-                )}
+              <p className="text-blue-300 text-[10px] font-bold tracking-[0.24em] uppercase mb-1">Financial Snapshot</p>
+              <h1 className="text-2xl md:text-3xl font-bold text-white leading-tight tracking-tight">
+                {firstName}&apos;s Financial Snapshot{age !== null ? <span className="text-lg md:text-xl font-normal text-blue-200 ml-2.5 whitespace-nowrap">(Age: {age})</span> : null}
               </h1>
             </div>
-            <div className="inline-flex shrink-0 items-center gap-2 self-start rounded-full border border-slate-200 bg-slate-50 px-3.5 py-2 text-xs dark:border-slate-700 dark:bg-slate-800/80 sm:self-auto">
-              <CalendarDays className="h-3.5 w-3.5 text-sky-700 dark:text-sky-300" aria-hidden="true" />
-              <span className="text-muted-foreground">As of</span>
-              <time className="font-semibold text-foreground">{today}</time>
-            </div>
+            <p className="shrink-0 text-slate-300 text-xs sm:pb-1">
+              <span className="text-slate-400">As of</span>{" "}{today}
+            </p>
           </div>
         </div>
-      </header>
+      </div>
 
       {/* ── Cards Grid ── */}
       <div className="p-4 md:p-6 grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-5 max-w-7xl mx-auto">
