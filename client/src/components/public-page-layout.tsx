@@ -5,9 +5,13 @@ import logoPath from "@assets/FinVision360_Logo_H_(transparent)_1776714495394.pn
 import { useTheme } from "@/components/theme-provider";
 import { Sun, Moon } from "lucide-react";
 import { AppFooter } from "@/components/app-footer";
+import { useAuth } from "@/hooks/use-auth";
 
 export function PublicPageLayout({ children }: { children: React.ReactNode }) {
   const { theme, toggleTheme } = useTheme();
+  const { user } = useAuth();
+  const backHref = user ? "/snapshot" : "/";
+  const backLabel = user ? "Back to Snapshot" : "Back to Home";
 
   return (
     <div className="min-h-screen flex flex-col bg-background text-foreground">
@@ -25,10 +29,10 @@ export function PublicPageLayout({ children }: { children: React.ReactNode }) {
             >
               {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
             </Button>
-            <Link href="/">
+            <Link href={backHref}>
               <Button variant="ghost" size="sm" className="gap-1.5">
                 <ArrowLeft className="h-3.5 w-3.5" />
-                Back to Home
+                {backLabel}
               </Button>
             </Link>
           </div>
