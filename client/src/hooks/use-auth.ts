@@ -5,6 +5,7 @@ import { getSupabase, getAccessToken, clearCachedToken } from "@/lib/supabase";
 import { useLocation } from "wouter";
 import type { SupabaseClient, Session } from "@supabase/supabase-js";
 import { isHoneypotFilled } from "@/components/honeypot-field";
+import { SIGNUP_DISCOVERY_SOURCES } from "@shared/signup-discovery";
 
 export function useAuth() {
   const { data: user, isLoading } = useQuery({
@@ -65,13 +66,29 @@ export function useLogin() {
 export function useRegister() {
   const [, setLocation] = useLocation();
   return useMutation({
-    mutationFn: async ({ email, password, fullName, honeypot }: { email: string; password: string; fullName?: string; honeypot?: string }) => {
+    mutationFn: async ({
+      email,
+      password,
+      fullName,
+      discoverySource,
+      honeypot,
+    }: {
+      email: string;
+      password: string;
+      fullName: string;
+      discoverySource: string;
+      honeypot?: string;
+    }) => {
       if (isHoneypotFilled(honeypot)) throw new Error("Unable to process this request.");
+      if (!fullName.trim()) throw new Error("Please enter your full name.");
+      if (!(SIGNUP_DISCOVERY_SOURCES as readonly string[]).includes(discoverySource)) {
+        throw new Error("Please choose how you found us.");
+      }
       const sb = await getSupabase();
       const { error, data } = await sb.auth.signUp({
         email,
         password,
-        options: { data: { full_name: fullName } },
+        options: { data: { full_name: fullName, discovery_source: discoverySource } },
       });
       if (error) throw new Error(error.message);
       // Provision the local users row immediately after signup so it exists

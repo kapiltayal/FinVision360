@@ -9,12 +9,13 @@ import { Eye, EyeOff, Mail, Lock, User } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { getSupabase } from "@/lib/supabase";
 import { HoneypotField, isHoneypotFilled } from "@/components/honeypot-field";
+import { SIGNUP_DISCOVERY_SOURCES } from "@shared/signup-discovery";
 import logoPath from "@assets/FinVision360_Logo_H_(transparent)_1776714495394.png";
 
 export default function AuthPage() {
   const [tab, setTab] = useState<"login" | "register" | "reset">("login");
   const [loginData, setLoginData] = useState({ email: "", password: "" });
-  const [registerData, setRegisterData] = useState({ email: "", password: "", fullName: "" });
+  const [registerData, setRegisterData] = useState({ email: "", password: "", fullName: "", discoverySource: "" });
   const [resetEmail, setResetEmail] = useState("");
   const [loginHoneypot, setLoginHoneypot] = useState("");
   const [registerHoneypot, setRegisterHoneypot] = useState("");
@@ -197,7 +198,9 @@ export default function AuthPage() {
                 <TabsContent value="register">
                   <form onSubmit={handleRegister} className="space-y-4">
                     <div className="space-y-2">
-                      <Label htmlFor="reg-fullname">Full Name</Label>
+                      <Label htmlFor="reg-fullname">
+                        Full Name <span className="text-red-500" aria-hidden="true">*</span>
+                      </Label>
                       <div className="relative">
                         <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                         <Input
@@ -207,11 +210,14 @@ export default function AuthPage() {
                           value={registerData.fullName}
                           onChange={(e) => setRegisterData({ ...registerData, fullName: e.target.value })}
                           placeholder="John Doe"
+                          required
                         />
                       </div>
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="reg-email">Email</Label>
+                      <Label htmlFor="reg-email">
+                        Email <span className="text-red-500" aria-hidden="true">*</span>
+                      </Label>
                       <div className="relative">
                         <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                         <Input
@@ -227,7 +233,9 @@ export default function AuthPage() {
                       </div>
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="reg-password">Password</Label>
+                      <Label htmlFor="reg-password">
+                        Password <span className="text-red-500" aria-hidden="true">*</span>
+                      </Label>
                       <div className="relative">
                         <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                         <Input
@@ -246,10 +254,29 @@ export default function AuthPage() {
                           size="icon"
                           className="absolute right-0 top-0 h-full px-3"
                           onClick={() => setShowRegPassword(!showRegPassword)}
+                          aria-label={showRegPassword ? "Hide password" : "Show password"}
                         >
                           {showRegPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                         </Button>
                       </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="reg-discovery-source">
+                        How did you find us? <span className="text-red-500" aria-hidden="true">*</span>
+                      </Label>
+                      <select
+                        id="reg-discovery-source"
+                        data-testid="select-register-discovery-source"
+                        className="h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                        value={registerData.discoverySource}
+                        onChange={(e) => setRegisterData({ ...registerData, discoverySource: e.target.value })}
+                        required
+                      >
+                        <option value="" disabled>Select an option...</option>
+                        {SIGNUP_DISCOVERY_SOURCES.map((source) => (
+                          <option key={source} value={source}>{source}</option>
+                        ))}
+                      </select>
                     </div>
                     <HoneypotField id="auth-register-website" value={registerHoneypot} onChange={setRegisterHoneypot} />
                     <Button type="submit" className="w-full" disabled={register.isPending} data-testid="button-register">

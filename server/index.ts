@@ -124,6 +124,10 @@ app.use((req, res, next) => {
       WHERE plaid_transaction_id IS NOT NULL;
   `);
 
+  // Capture the source selected during signup. Keep this additive so existing
+  // users and databases can be upgraded without changing existing records.
+  await pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS discovery_source TEXT");
+
   // Both npm run dev and the published dist/index.cjs enter this bootstrap.
   // Apply additive import schema before registering endpoints that require it.
   await ensureTransactionImportSchema(pool);

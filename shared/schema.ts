@@ -7,6 +7,7 @@ export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   fullName: text("full_name"),
   email: text("email"),
+  discoverySource: text("discovery_source"),
   isAdmin: boolean("is_admin").default(false).notNull(),
   supabaseId: text("supabase_id").unique(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -21,6 +22,7 @@ export const users = pgTable("users", {
 export const insertUserSchema = createInsertSchema(users).pick({
   fullName: true,
   email: true,
+  discoverySource: true,
   supabaseId: true,
   dateOfBirth: true,
   streetAddress: true,

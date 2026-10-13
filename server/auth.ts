@@ -2,6 +2,16 @@ import { createClient } from "@supabase/supabase-js";
 import { type Express, type Request, type Response, type NextFunction } from "express";
 import { storage } from "./storage";
 import { COUNTRY_OPTIONS, US_STATE_OPTIONS } from "@shared/profile-options";
+import { SIGNUP_DISCOVERY_SOURCES } from "@shared/signup-discovery";
+
+function getSignupDiscoverySource(userMetadata: unknown): string | undefined {
+  if (!userMetadata || typeof userMetadata !== "object") return undefined;
+  const source = (userMetadata as Record<string, unknown>).discovery_source;
+  return typeof source === "string"
+    && (SIGNUP_DISCOVERY_SOURCES as readonly string[]).includes(source)
+    ? source
+    : undefined;
+}
 
 // Node.js < 22 has no native WebSocket — polyfill for @supabase/realtime-js
 import ws from "ws";
@@ -47,7 +57,11 @@ export function setupAuth(app: Express) {
       if (!localUser) {
         const email = supabaseUser.email || "";
         const fullName = supabaseUser.user_metadata?.full_name as string | undefined;
-        localUser = await storage.createUserFromSupabase(supabaseUser.id, email, fullName);
+        const discoverySource = getSignupDiscoverySource(supabaseUser.user_metadata);
+        if (!discoverySource) {
+          return res.status(400).json({ message: "A valid signup source is required." });
+        }
+        localUser = await storage.createUserFromSupabase(supabaseUser.id, email, fullName, discoverySource);
         await storage.upsertRecommendationSettings({
           userId: localUser.id,
           interestEarningThreshold: "200",
@@ -120,7 +134,8 @@ export async function authenticateSupabase(req: any, res: Response, next: NextFu
     if (!localUser) {
       const email = supabaseUser.email || "";
       const fullName = supabaseUser.user_metadata?.full_name as string | undefined;
-      localUser = await storage.createUserFromSupabase(supabaseUser.id, email, fullName);
+      const discoverySource = getSignupDiscoverySource(supabaseUser.user_metadata);
+      localUser = await storage.createUserFromSupabase(supabaseUser.id, email, fullName, discoverySource);
       await storage.upsertRecommendationSettings({
         userId: localUser.id,
         interestEarningThreshold: "200",

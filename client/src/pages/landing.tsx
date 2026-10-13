@@ -34,6 +34,7 @@ import logoPath from "@assets/FinVision360_Logo_H_(transparent)_1776714495394.pn
 import { useTheme } from "@/components/theme-provider";
 import { useLogout } from "@/hooks/use-auth";
 import { HoneypotField, isHoneypotFilled } from "@/components/honeypot-field";
+import { SIGNUP_DISCOVERY_SOURCES } from "@shared/signup-discovery";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -115,8 +116,9 @@ function AuthModal({
   defaultTab: "login" | "register";
 }) {
   const [loginData, setLoginData] = useState({ email: "", password: "" });
-  const [registerData, setRegisterData] = useState({ email: "", password: "", fullName: "" });
+  const [registerData, setRegisterData] = useState({ email: "", password: "", fullName: "", discoverySource: "" });
   const [showPassword, setShowPassword] = useState(false);
+  const [showRegPassword, setShowRegPassword] = useState(false);
   const [resetMode, setResetMode] = useState(false);
   const [resetEmail, setResetEmail] = useState("");
   const [loginHoneypot, setLoginHoneypot] = useState("");
@@ -127,8 +129,9 @@ function AuthModal({
   useEffect(() => {
     if (!open) {
       setLoginData({ email: "", password: "" });
-      setRegisterData({ email: "", password: "", fullName: "" });
+      setRegisterData({ email: "", password: "", fullName: "", discoverySource: "" });
       setShowPassword(false);
+      setShowRegPassword(false);
       setResetMode(false);
       setResetEmail("");
     }
@@ -283,17 +286,24 @@ function AuthModal({
               <form onSubmit={handleRegister} className="space-y-4">
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-2">
-                    <Label>Full Name</Label>
+                    <Label htmlFor="landing-reg-fullname">
+                      Full Name <span className="text-red-500" aria-hidden="true">*</span>
+                    </Label>
                     <Input
+                      id="landing-reg-fullname"
                       data-testid="input-register-fullname"
                       value={registerData.fullName}
                       onChange={(e) => setRegisterData({ ...registerData, fullName: e.target.value })}
                       placeholder="Jane Doe"
+                      required
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label>Email</Label>
+                    <Label htmlFor="landing-reg-email">
+                      Email <span className="text-red-500" aria-hidden="true">*</span>
+                    </Label>
                     <Input
+                      id="landing-reg-email"
                       data-testid="input-register-email"
                       type="email"
                       value={registerData.email}
@@ -304,15 +314,49 @@ function AuthModal({
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label>Password</Label>
-                  <Input
-                    data-testid="input-register-password"
-                    type="password"
-                    value={registerData.password}
-                    onChange={(e) => setRegisterData({ ...registerData, password: e.target.value })}
-                    placeholder="Min 6 characters"
+                  <Label htmlFor="landing-reg-password">
+                    Password <span className="text-red-500" aria-hidden="true">*</span>
+                  </Label>
+                  <div className="relative">
+                    <Input
+                      id="landing-reg-password"
+                      data-testid="input-register-password"
+                      type={showRegPassword ? "text" : "password"}
+                      className="pr-10"
+                      value={registerData.password}
+                      onChange={(e) => setRegisterData({ ...registerData, password: e.target.value })}
+                      placeholder="Min 6 characters"
+                      required
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="absolute right-0 top-0 h-full px-3"
+                      onClick={() => setShowRegPassword(!showRegPassword)}
+                      aria-label={showRegPassword ? "Hide password" : "Show password"}
+                    >
+                      {showRegPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </Button>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="landing-reg-discovery-source">
+                    How did you find us? <span className="text-red-500" aria-hidden="true">*</span>
+                  </Label>
+                  <select
+                    id="landing-reg-discovery-source"
+                    data-testid="select-register-discovery-source"
+                    className="h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    value={registerData.discoverySource}
+                    onChange={(e) => setRegisterData({ ...registerData, discoverySource: e.target.value })}
                     required
-                  />
+                  >
+                    <option value="" disabled>Select an option...</option>
+                    {SIGNUP_DISCOVERY_SOURCES.map((source) => (
+                      <option key={source} value={source}>{source}</option>
+                    ))}
+                  </select>
                 </div>
                 <HoneypotField id="landing-register-website" value={registerHoneypot} onChange={setRegisterHoneypot} />
                 <Button type="submit" className="w-full" disabled={register.isPending} data-testid="button-register">
