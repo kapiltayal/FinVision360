@@ -1,23 +1,23 @@
 .pricing-page {
-  --price-ink: 19 42% 20%;
-  --price-teal: 166 46% 34%;
-  --price-teal-deep: 168 50% 25%;
-  --price-sage: 153 34% 92%;
-  --price-lime: 75 55% 73%;
-  --price-muted: 166 12% 44%;
-  --price-line: 165 18% 83%;
+  --price-ink: 215 45% 20%;
+  --price-teal: var(--primary);
+  --price-teal-deep: 202 80% 34%;
+  --price-sage: 202 80% 95%;
+  --price-lime: 199 85% 78%;
+  --price-muted: 215 18% 43%;
+  --price-line: 207 35% 84%;
   color: hsl(var(--price-ink));
   padding: 0 0 1.5rem;
 }
 
 .dark .pricing-page {
-  --price-ink: 155 25% 91%;
-  --price-teal: 159 42% 64%;
-  --price-teal-deep: 158 43% 72%;
-  --price-sage: 164 20% 17%;
-  --price-lime: 76 50% 65%;
-  --price-muted: 158 13% 68%;
-  --price-line: 160 17% 27%;
+  --price-ink: 210 30% 92%;
+  --price-teal: var(--primary);
+  --price-teal-deep: 202 85% 74%;
+  --price-sage: 214 36% 17%;
+  --price-lime: 199 85% 70%;
+  --price-muted: 214 20% 70%;
+  --price-line: 214 28% 28%;
 }
 
 .pricing-hero {
