@@ -2,6 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import { type Express, type Request, type Response, type NextFunction } from "express";
 import { storage } from "./storage";
 import { COUNTRY_OPTIONS, US_STATE_OPTIONS } from "@shared/profile-options";
+import { isSignupReferralSource } from "@shared/signup-referral";
 
 // Node.js < 22 has no native WebSocket — polyfill for @supabase/realtime-js
 import ws from "ws";
@@ -47,7 +48,10 @@ export function setupAuth(app: Express) {
       if (!localUser) {
         const email = supabaseUser.email || "";
         const fullName = supabaseUser.user_metadata?.full_name as string | undefined;
-        localUser = await storage.createUserFromSupabase(supabaseUser.id, email, fullName);
+        const referralSource = isSignupReferralSource(supabaseUser.user_metadata?.referral_source)
+          ? supabaseUser.user_metadata.referral_source
+          : undefined;
+        localUser = await storage.createUserFromSupabase(supabaseUser.id, email, fullName, referralSource);
         await storage.upsertRecommendationSettings({
           userId: localUser.id,
           interestEarningThreshold: "200",
@@ -120,7 +124,10 @@ export async function authenticateSupabase(req: any, res: Response, next: NextFu
     if (!localUser) {
       const email = supabaseUser.email || "";
       const fullName = supabaseUser.user_metadata?.full_name as string | undefined;
-      localUser = await storage.createUserFromSupabase(supabaseUser.id, email, fullName);
+      const referralSource = isSignupReferralSource(supabaseUser.user_metadata?.referral_source)
+        ? supabaseUser.user_metadata.referral_source
+        : undefined;
+      localUser = await storage.createUserFromSupabase(supabaseUser.id, email, fullName, referralSource);
       await storage.upsertRecommendationSettings({
         userId: localUser.id,
         interestEarningThreshold: "200",

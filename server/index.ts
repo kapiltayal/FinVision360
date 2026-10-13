@@ -123,6 +123,9 @@ app.use((req, res, next) => {
       ON transactions(user_id, plaid_transaction_id)
       WHERE plaid_transaction_id IS NOT NULL;
   `);
+  await pool.query(`
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS referral_source TEXT;
+  `);
 
   // Both npm run dev and the published dist/index.cjs enter this bootstrap.
   // Apply additive import schema before registering endpoints that require it.
