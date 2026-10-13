@@ -166,6 +166,19 @@ export const transactions = pgTable("transactions", {
   sourceCheck: check("transactions_source_check", sql`${table.source} IN ('manual', 'plaid', 'upload', 'import')`),
 }));
 
+export const merchants = pgTable("merchants", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  logoUrl: text("logo_url"),
+  category: text("category"),
+  isKnownSubscription: boolean("is_known_subscription").notNull().default(false),
+}, (table) => ({
+  nameUnique: uniqueIndex("merchants_name_unique").on(table.name),
+}));
+
+export type Merchant = typeof merchants.$inferSelect;
+export type InsertMerchant = typeof merchants.$inferInsert;
+
 export const transactionImportReceipts = pgTable("transaction_import_receipts", {
   id: serial("id").primaryKey(),
   userId: varchar("user_id").notNull(),

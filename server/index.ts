@@ -124,6 +124,17 @@ app.use((req, res, next) => {
       WHERE plaid_transaction_id IS NOT NULL;
   `);
 
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS merchants (
+      id SERIAL PRIMARY KEY,
+      name TEXT NOT NULL,
+      logo_url TEXT,
+      category TEXT,
+      is_known_subscription BOOLEAN NOT NULL DEFAULT FALSE
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS merchants_name_unique ON merchants(name);
+  `);
+
   // Capture the source selected during signup. Keep this additive so existing
   // users and databases can be upgraded without changing existing records.
   await pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS discovery_source TEXT");
