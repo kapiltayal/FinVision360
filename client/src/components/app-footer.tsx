@@ -63,6 +63,7 @@ export function AppFooter() {
 
         <div className="flex flex-wrap justify-center gap-x-5 gap-y-1 text-xs text-muted-foreground">
           <Link href="/about" className="hover:text-foreground transition-colors">About Us</Link>
+          <Link href="/pricing" className="hover:text-foreground transition-colors">Pricing</Link>
           <Link href="/contact" className="hover:text-foreground transition-colors">Contact Us</Link>
           <Link href="/faq" className="hover:text-foreground transition-colors">FAQ</Link>
           <Link href="/blog" className="hover:text-foreground transition-colors">Blog</Link>

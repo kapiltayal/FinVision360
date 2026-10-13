@@ -17,3 +17,4 @@
 - [Budget plan defaults](budget-plan-defaults.md) — displayed suggestions count toward the plan; saved zero overrides them, and viewing a month must not silently save defaults.
 - [Goal snapshot savings](goal-snapshot-policy.md) — archives use the Goals-page calculation at backup time; never recompute historical requirements from live goals.
 - [Historical budget policy](historical-budget-policy.md) — past plans are read-only; missing closes retain saved amounts, never use live defaults, and hide rolling metrics.
+- [Pricing scope](pricing-scope.md) — paid rates are intentionally undecided; a marketing comparison is not permission to charge or enforce plan limits.

@@ -7,7 +7,13 @@ import { Sun, Moon } from "lucide-react";
 import { AppFooter } from "@/components/app-footer";
 import { useAuth } from "@/hooks/use-auth";
 
-export function PublicPageLayout({ children }: { children: React.ReactNode }) {
+export function PublicPageLayout({
+  children,
+  width = "max-w-4xl",
+}: {
+  children: React.ReactNode;
+  width?: string;
+}) {
   const { theme, toggleTheme } = useTheme();
   const { user } = useAuth();
   const backHref = user ? "/snapshot" : "/";
@@ -40,7 +46,7 @@ export function PublicPageLayout({ children }: { children: React.ReactNode }) {
       </header>
 
       <main className="flex-1">
-        <div className="max-w-4xl mx-auto px-4 py-12">
+        <div className={`${width} mx-auto px-4 py-12`}>
           {children}
         </div>
       </main>

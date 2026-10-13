@@ -440,6 +440,14 @@ export default function LandingPage() {
   const { theme, toggleTheme } = useTheme();
   const { user } = useAuth();
   const logout = useLogout();
+  const [location] = useLocation();
+
+  useEffect(() => {
+    if (location === "/signup") {
+      setPendingAuthTab("register");
+      setDisclaimerOpen(true);
+    }
+  }, [location]);
 
   const openLogin = () => { setPendingAuthTab("login"); setDisclaimerOpen(true); };
   const openRegister = () => { setPendingAuthTab("register"); setDisclaimerOpen(true); };
@@ -463,6 +471,7 @@ export default function LandingPage() {
           <nav aria-label="Public navigation" className="order-last md:order-none w-full md:w-auto flex items-center justify-center gap-6 text-sm text-muted-foreground">
             <a href="#features" className="hover-elevate rounded-sm px-1">Features</a>
             <a href="#how-it-works" className="hover-elevate rounded-sm px-1">How It Works</a>
+            <Link href="/pricing" className="hover-elevate rounded-sm px-1">Pricing</Link>
             <Link href="/blog" className="hover-elevate rounded-sm px-1">Blog</Link>
           </nav>
           <div className="flex items-center gap-2">
@@ -744,6 +753,7 @@ export default function LandingPage() {
                 <p className="font-medium text-xs uppercase tracking-wide text-muted-foreground">Quick links</p>
                 <div className="space-y-1.5">
                   <div><Link href="/about" className="text-xs text-muted-foreground hover:text-foreground transition-colors">About Us</Link></div>
+                  <div><Link href="/pricing" className="text-xs text-muted-foreground hover:text-foreground transition-colors">Pricing</Link></div>
                   <div><Link href="/faq" className="text-xs text-muted-foreground hover:text-foreground transition-colors">FAQ</Link></div>
                   <div><Link href="/blog" className="text-xs text-muted-foreground hover:text-foreground transition-colors">Blog</Link></div>
                   <div><Link href="/contact" className="text-xs text-muted-foreground hover:text-foreground transition-colors">Contact Us</Link></div>
