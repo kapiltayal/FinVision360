@@ -794,14 +794,6 @@ export default function FinanceTrackerPage() {
     onSuccess: () => { invalidateAll(); toast({ title: "Deleted" }); },
     onError: () => toast({ title: "Failed to delete", variant: "destructive" }),
   });
-  const recurringMut = useMutation({
-    mutationFn: () => apiRequest("POST", "/api/transactions/detect-recurring"),
-    onSuccess: (res: any) => res.json().then((d: any) => {
-      invalidateAll();
-      toast({ title: `Recurring detection complete`, description: `${d.updated} transactions flagged` });
-    }),
-  });
-
   const income = parseFloat(stats?.total_income ?? "0");
   const expenses = parseFloat(stats?.total_expenses ?? "0");
   const netFlow = income - expenses;
@@ -917,9 +909,6 @@ export default function FinanceTrackerPage() {
           <p className="text-muted-foreground text-sm">See every transaction clearly categorized, analyzed, and transformed into actionable financial insights.</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <Button size="sm" variant="outline" onClick={() => recurringMut.mutate()} disabled={recurringMut.isPending}>
-            <RefreshCw className="h-3.5 w-3.5 mr-1.5" />Detect Recurring
-          </Button>
           <Button size="sm" onClick={() => setDataIntakeOpen(true)}>
             <Plus className="h-3.5 w-3.5 mr-1.5" />
             Add Transaction
