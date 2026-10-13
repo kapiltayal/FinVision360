@@ -34,7 +34,6 @@ import logoPath from "@assets/FinVision360_Logo_H_(transparent)_1776714495394.pn
 import { useTheme } from "@/components/theme-provider";
 import { useLogout } from "@/hooks/use-auth";
 import { HoneypotField, isHoneypotFilled } from "@/components/honeypot-field";
-import { isSignupReferralSource, SIGNUP_REFERRAL_SOURCES, type SignupReferralSource } from "@shared/signup-referral";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -116,12 +115,7 @@ function AuthModal({
   defaultTab: "login" | "register";
 }) {
   const [loginData, setLoginData] = useState({ email: "", password: "" });
-  const [registerData, setRegisterData] = useState<{
-    email: string;
-    password: string;
-    fullName: string;
-    referralSource: SignupReferralSource | "";
-  }>({ email: "", password: "", fullName: "", referralSource: "" });
+  const [registerData, setRegisterData] = useState({ email: "", password: "", fullName: "" });
   const [showPassword, setShowPassword] = useState(false);
   const [resetMode, setResetMode] = useState(false);
   const [resetEmail, setResetEmail] = useState("");
@@ -133,7 +127,7 @@ function AuthModal({
   useEffect(() => {
     if (!open) {
       setLoginData({ email: "", password: "" });
-       setRegisterData({ email: "", password: "", fullName: "", referralSource: "" });
+      setRegisterData({ email: "", password: "", fullName: "" });
       setShowPassword(false);
       setResetMode(false);
       setResetEmail("");
@@ -159,11 +153,7 @@ function AuthModal({
       toast({ title: "Password too short", description: "Minimum 6 characters", variant: "destructive" });
       return;
     }
-    if (!isSignupReferralSource(registerData.referralSource)) {
-      toast({ title: "Please select an option", description: "Choose how you found us to create an account.", variant: "destructive" });
-      return;
-    }
-    register.mutate({ ...registerData, referralSource: registerData.referralSource, honeypot: registerHoneypot }, {
+    register.mutate({ ...registerData, honeypot: registerHoneypot }, {
       onError: (error: any) => toast({ title: "Registration failed", description: error.message, variant: "destructive" }),
       onSuccess: (data: any) => {
         if (!data.session) {
@@ -255,27 +245,6 @@ function AuthModal({
                     placeholder="you@example.com"
                     required
                   />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="landing-reg-referral-source">
-                    How did you find us? <span className="text-destructive">*</span>
-                  </Label>
-                  <select
-                    id="landing-reg-referral-source"
-                    data-testid="select-landing-register-referral-source"
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                    value={registerData.referralSource}
-                    onChange={(e) => setRegisterData({
-                      ...registerData,
-                      referralSource: e.target.value as SignupReferralSource | "",
-                    })}
-                    required
-                  >
-                    <option value="" disabled>Select an option...</option>
-                    {SIGNUP_REFERRAL_SOURCES.map((source) => (
-                      <option key={source} value={source}>{source}</option>
-                    ))}
-                  </select>
                 </div>
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">

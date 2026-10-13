@@ -1,6 +1,5 @@
 import { eq, and, desc, asc } from "drizzle-orm";
 import { db, pool } from "./db";
-import type { SignupReferralSource } from "@shared/signup-referral";
 import {
   type User, type InsertUser,
   type Asset, type InsertAsset,
@@ -31,12 +30,7 @@ export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserBySupabaseId(supabaseId: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
-  createUserFromSupabase(
-    supabaseId: string,
-    email: string,
-    fullName?: string,
-    referralSource?: SignupReferralSource,
-  ): Promise<User>;
+  createUserFromSupabase(supabaseId: string, email: string, fullName?: string): Promise<User>;
   updateUser(id: string, data: Partial<InsertUser>): Promise<User | undefined>;
 
   getAssets(userId: string): Promise<Asset[]>;
@@ -141,17 +135,11 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
-  async createUserFromSupabase(
-    supabaseId: string,
-    email: string,
-    fullName?: string,
-    referralSource?: SignupReferralSource,
-  ): Promise<User> {
+  async createUserFromSupabase(supabaseId: string, email: string, fullName?: string): Promise<User> {
     const [user] = await db.insert(users).values({
       supabaseId,
       email,
       fullName: fullName || null,
-      referralSource: referralSource ?? null,
     }).returning();
     return user;
   }

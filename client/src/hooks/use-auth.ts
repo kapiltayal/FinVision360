@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest, getQueryFn } from "@/lib/queryClient";
 import { getSupabase, getAccessToken, clearCachedToken } from "@/lib/supabase";
-import type { SignupReferralSource } from "@shared/signup-referral";
 import { useLocation } from "wouter";
 import type { SupabaseClient, Session } from "@supabase/supabase-js";
 import { isHoneypotFilled } from "@/components/honeypot-field";
@@ -66,25 +65,13 @@ export function useLogin() {
 export function useRegister() {
   const [, setLocation] = useLocation();
   return useMutation({
-    mutationFn: async ({
-      email,
-      password,
-      fullName,
-      referralSource,
-      honeypot,
-    }: {
-      email: string;
-      password: string;
-      fullName?: string;
-      referralSource: SignupReferralSource;
-      honeypot?: string;
-    }) => {
+    mutationFn: async ({ email, password, fullName, honeypot }: { email: string; password: string; fullName?: string; honeypot?: string }) => {
       if (isHoneypotFilled(honeypot)) throw new Error("Unable to process this request.");
       const sb = await getSupabase();
       const { error, data } = await sb.auth.signUp({
         email,
         password,
-        options: { data: { full_name: fullName, referral_source: referralSource } },
+        options: { data: { full_name: fullName } },
       });
       if (error) throw new Error(error.message);
       // Provision the local users row immediately after signup so it exists

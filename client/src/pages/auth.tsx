@@ -10,17 +10,11 @@ import { useToast } from "@/hooks/use-toast";
 import { getSupabase } from "@/lib/supabase";
 import { HoneypotField, isHoneypotFilled } from "@/components/honeypot-field";
 import logoPath from "@assets/FinVision360_Logo_H_(transparent)_1776714495394.png";
-import { isSignupReferralSource, SIGNUP_REFERRAL_SOURCES, type SignupReferralSource } from "@shared/signup-referral";
 
 export default function AuthPage() {
   const [tab, setTab] = useState<"login" | "register" | "reset">("login");
   const [loginData, setLoginData] = useState({ email: "", password: "" });
-  const [registerData, setRegisterData] = useState<{
-    email: string;
-    password: string;
-    fullName: string;
-    referralSource: SignupReferralSource | "";
-  }>({ email: "", password: "", fullName: "", referralSource: "" });
+  const [registerData, setRegisterData] = useState({ email: "", password: "", fullName: "" });
   const [resetEmail, setResetEmail] = useState("");
   const [loginHoneypot, setLoginHoneypot] = useState("");
   const [registerHoneypot, setRegisterHoneypot] = useState("");
@@ -49,11 +43,7 @@ export default function AuthPage() {
       toast({ title: "Password too short", description: "Password must be at least 6 characters.", variant: "destructive" });
       return;
     }
-    if (!isSignupReferralSource(registerData.referralSource)) {
-      toast({ title: "Please select an option", description: "Choose how you found us to create an account.", variant: "destructive" });
-      return;
-    }
-    register.mutate({ ...registerData, referralSource: registerData.referralSource, honeypot: registerHoneypot }, {
+    register.mutate({ ...registerData, honeypot: registerHoneypot }, {
       onError: (error: any) => {
         toast({ title: "Registration failed", description: error.message, variant: "destructive" });
       },
@@ -235,27 +225,6 @@ export default function AuthPage() {
                           required
                         />
                       </div>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="reg-referral-source">
-                        How did you find us? <span className="text-destructive">*</span>
-                      </Label>
-                      <select
-                        id="reg-referral-source"
-                        data-testid="select-register-referral-source"
-                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                        value={registerData.referralSource}
-                        onChange={(e) => setRegisterData({
-                          ...registerData,
-                          referralSource: e.target.value as SignupReferralSource | "",
-                        })}
-                        required
-                      >
-                        <option value="" disabled>Select an option...</option>
-                        {SIGNUP_REFERRAL_SOURCES.map((source) => (
-                          <option key={source} value={source}>{source}</option>
-                        ))}
-                      </select>
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="reg-password">Password</Label>
