@@ -11,32 +11,32 @@ export default function BlogPage() {
   });
 
   return (
-    <PublicPageLayout>
-      <div className="mx-auto max-w-5xl">
-        <section className="relative overflow-hidden rounded-[2rem] border border-primary/15 bg-primary/[0.07] px-6 py-10 text-foreground dark:border-primary/25 dark:bg-primary/[0.12] sm:px-10 sm:py-14">
-          <div aria-hidden="true" className="pointer-events-none absolute -right-12 -top-20 h-64 w-64 rounded-full border border-primary/10 sm:h-80 sm:w-80" />
-          <div aria-hidden="true" className="pointer-events-none absolute -right-1 top-1/2 h-40 w-40 -translate-y-1/2 rounded-full border border-primary/10 sm:right-8" />
+    <PublicPageLayout width="max-w-7xl">
+      <div className="mx-auto">
+        <section className="relative isolate overflow-hidden rounded-xl border-b border-primary/15 bg-gradient-to-r from-primary/[0.07] via-primary/[0.035] to-background px-6 py-5 text-foreground sm:px-10 sm:py-6">
+          <div aria-hidden="true" className="pointer-events-none absolute -right-8 -top-16 h-48 w-48 rounded-full border border-primary/10 sm:right-0 sm:top-1/2 sm:h-56 sm:w-56 sm:-translate-y-1/2" />
+          <div aria-hidden="true" className="pointer-events-none absolute right-4 top-1/2 h-32 w-32 -translate-y-1/2 rounded-full border border-primary/10 sm:right-14 sm:h-40 sm:w-40" />
           <div className="relative max-w-2xl">
-            <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-background/70 px-3 py-1.5 text-xs font-semibold tracking-[0.12em] text-primary dark:bg-background/45">
+            <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-background/70 px-3 py-1 text-[10px] font-semibold tracking-[0.12em] text-primary dark:bg-background/45">
               <Sparkles aria-hidden="true" className="h-3.5 w-3.5" />
               THE FINVISION360 JOURNAL
             </div>
-            <h1 className="font-serif text-4xl leading-[1.04] tracking-[-0.045em] sm:text-6xl">
+            <h1 className="font-serif text-[2.5rem] leading-[1.02] tracking-[-0.045em] sm:text-5xl">
               A clearer view of
               <br />
               <span className="italic text-primary">your money.</span>
             </h1>
-            <p className="mt-5 max-w-lg text-base leading-7 text-muted-foreground sm:text-lg">
+            <p className="mt-3 max-w-xl text-sm leading-6 text-muted-foreground sm:text-base">
               Small, thoughtful ways to make sense of the whole picture—and feel more at home in your finances.
             </p>
-            <div className="mt-8 flex items-center gap-3 text-sm text-muted-foreground">
-              <span className="h-px w-10 bg-primary/45" />
+            <div className="mt-4 flex items-center gap-3 text-xs text-muted-foreground sm:text-sm">
+              <span className="h-px w-10 shrink-0 bg-primary/45" />
               A little clarity goes a long way
             </div>
           </div>
         </section>
 
-        <section aria-labelledby="stories-heading" className="mt-12">
+        <section aria-labelledby="stories-heading" className="mx-auto mt-8 max-w-5xl">
           <div className="mb-5 flex items-end justify-between gap-4 border-b border-border pb-4">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Ideas for everyday money</p>
