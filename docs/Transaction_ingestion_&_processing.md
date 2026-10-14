@@ -2,26 +2,121 @@
 
 *Implementation guide, updated October 14, 2026.*
 
-This guide covers the two transaction sources exposed in the Finance Tracker: user-uploaded files and transactions imported on request from Plaid-connected accounts. It follows each path from the user's selection through parsing, quality checks, categorization, preview or confirmation, and database persistence.
+This guide covers the three ways transactions enter the Finance Tracker: user-uploaded files, transactions imported on request from Plaid-connected accounts, and transactions entered manually. It follows each path from the user's selection through validation, categorization, review or confirmation, and database persistence.
 
 ## At a glance
 
 ```text
 File upload
-Choose file → validation → processing/categorization → duplicate check
-→ editable review → final validation and duplicate recheck → atomic save → complete
+Choose file → validate and parse → normalize rows → categorize suggestions
+→ check duplicates → user reviews/edits → revalidate and recheck duplicates
+→ atomically save selected rows + retry receipt → complete
 
 Plaid
-Choose institution/account and dates → server fetches Plaid pages
-→ filters and categorizes each transaction → insert-or-update by Plaid ID
-→ recurring detection → import summary
+Choose accounts and dates → verify ownership → fetch pages
+→ filter and normalize → preference/profile/Plaid/description category
+→ upsert by Plaid transaction ID → protect user-edited categories
+→ detect cadence for eligible rows when data changed → import summary
+
+Manual entry
+Enter transaction → validate → use selected category or preference/profile/rules
+→ insert one transaction → return saved row
 ```
 
-The key user-facing difference is that **file uploads are previewed and edited before saving**, while **Plaid rows are written immediately after the user clicks Import**. Files use source IDs when available and conservative content matching otherwise; Plaid retains its existing ID-based upsert behavior.
+The key difference is that **file uploads are previewed and edited before saving**, **Plaid rows are written immediately after the user clicks Import**, and **manual entries are written one at a time**. Files use source IDs when available and conservative content matching otherwise; Plaid retains its ID-based upsert behavior.
+
+## Step-by-step ingestion flowcharts
+
+The diagrams show the runtime path from the user's action to database writes. In particular, file preview and duplicate checks are read-only: transaction rows are inserted only after review and final validation.
+
+### Uploaded file: preview, review, and atomic save
+
+```mermaid
+flowchart TD
+    A["Choose CSV, TSV, TXT, XLS, or XLSX"] --> B["Authenticate; check upload size, type, and file signature"]
+    B --> C["Parse and normalize rows; reject files over 500 nonblank rows"]
+    C --> D["Suggest categories in priority order"]
+    D --> D1["User preference → valid source category → known merchant profile"]
+    D1 --> E{"Category resolved?"}
+    E -- "Yes" --> G["Apply available category and Need/Want suggestions; keep unresolved rows blank"]
+    E -- "No" --> F["AI classifies remaining rows"]
+    F --> G
+    G --> H["Check duplicates against this user's saved transactions and this file"]
+    H --> I["Return editable preview; no transaction rows written"]
+    I --> J["User edits rows and selects which transactions to save"]
+    J --> K["Validate all selected rows; verify duplicate review is current"]
+    K --> L["Begin database transaction; repeat duplicate check"]
+    L --> M{"Valid and duplicate-safe?"}
+    M -- "No" --> N["Roll back; keep review available for correction"]
+    M -- "Yes" --> O["Insert selected transactions and save retry receipt"]
+    O --> P["Commit and return import counts"]
+```
+
+AI-unavailable or unresolved categories remain editable; a valid reviewed transaction may be saved as `unassigned`. If a duplicate conflict appears during final save, nothing from that reviewed batch is committed.
+
+### Plaid: connected-account import and refresh
+
+```mermaid
+flowchart TD
+    A["Choose institution/accounts and date range"] --> B["Authenticate; validate date range and account ownership"]
+    B --> C["Fetch Plaid transactions in pages"]
+    C --> D{"Pending, transfer, unsupported currency, or invalid account/amount?"}
+    D -- "Yes" --> E["Skip and count the reason"]
+    E --> U{"More rows, pages, or selected institutions?"}
+    D -- "No" --> F["Normalize merchant, date, amount, and type"]
+    F --> G["Use user's saved merchant preference"]
+    G --> H{"Resolved?"}
+    H -- "No" --> I["Match known merchant category_id"]
+    I --> J{"Resolved?"}
+    J -- "No" --> K["Map Plaid category, then deterministic description rules"]
+    J -- "Yes" --> M["Resolve exact canonical category and parent"]
+    H -- "Yes" --> M
+    K --> L{"Canonical category found?"}
+    L -- "No" --> E
+    L -- "Yes" --> M
+    M --> N["Upsert by user_id + Plaid transaction ID"]
+    N --> O{"Existing row is user-modified?"}
+    O -- "Yes" --> P["Refresh bank details; keep category, parent, and Need/Want"]
+    O -- "No" --> Q["Refresh bank details and suggested classification"]
+    P --> U
+    Q --> U
+    U -- "Yes" --> C
+    U -- "No" --> V{"Any rows inserted or updated?"}
+    V -- "Yes" --> R["Detect recurring cadence for eligible rows"]
+    V -- "No" --> S["Return inserted/updated/skipped/unavailable counts"]
+    R --> S
+```
+
+An import can report an institution as unavailable while continuing with the remaining selected institutions. Plaid data is written during the import; there is no editable per-transaction preview.
+
+### Manual transaction: single-row creation
+
+```mermaid
+flowchart TD
+    A["Enter transaction details"] --> B{"Authenticated; required fields, date, and type valid?"}
+    B -- "No" --> L["Reject; do not insert"]
+    B -- "Yes" --> C{"User supplied a category?"}
+    C -- "Yes" --> D["Validate the chosen category for the transaction type"]
+    D --> E{"Valid canonical category?"}
+    E -- "No" --> L
+    E -- "Yes" --> J["Use canonical category, parent, and Need/Want default"]
+    C -- "No" --> F["Try this user's saved merchant preference"]
+    F --> G{"Resolved?"}
+    G -- "No" --> H["Try the matching known merchant profile"]
+    H --> I{"Resolved?"}
+    I -- "No" --> K["Try deterministic description rules"]
+    I -- "Yes" --> J
+    G -- "Yes" --> J
+    K --> P{"Canonical category found?"}
+    P -- "No" --> L
+    P -- "Yes" --> J
+    J --> M["Insert one transaction with source=manual"]
+    M --> N["Return saved transaction"]
+```
 
 ## Common transaction record
 
-Both flows write to the `transactions` table. The signed-in user's ID is assigned by the server, not taken from an uploaded row or browser-supplied transaction identity.
+All three flows write to the `transactions` table. The signed-in user's ID is assigned by the server, not taken from an uploaded row or browser-supplied transaction identity.
 
 | Field | What is stored |
 |---|---|
@@ -30,12 +125,28 @@ Both flows write to the `transactions` table. The signed-in user's ID is assigne
 | `parent_category`, `subcategory` | Canonical category values; the parent may be empty for unassigned transactions. |
 | `needs_want` | `need`, `want`, or `na`. |
 | `is_recurring`, `recurring_type` | Recurrence flag and, when set, `subscription` or `recurring_bill`. |
-| `source` | `upload` for file imports or `plaid` for connected-account imports. Manual transactions use a separate source. |
+| `source` | `upload` for reviewed file imports, `plaid` for connected-account imports, or `manual` for single-row manual entry. |
 | Plaid metadata | Plaid transaction ID, account ID/name, and institution name; populated only for Plaid rows. |
 | Upload identity | Source transaction ID and account context, when supplied by the file; `upload_identity` is a hash of that account context plus source ID. |
 | `notes`, timestamps | Optional notes and database-managed creation/update timestamps. |
 
 The database constrains transaction type, Need/Want value, recurring type, and source. Amount is stored as `NUMERIC(12,2)`. Partial unique indexes protect `(user_id, plaid_transaction_id)` and `(user_id, upload_identity)` when those identities are present. Content-based similarities are deliberately not database uniqueness constraints: identical-looking charges can be legitimate.
+
+## Merchant and category reference tables
+
+`merchants` is a shared canonical profile catalog used during category suggestions and recurring classification. It does not contain a `user_id`; user-specific category preferences are instead derived from that user's manual transactions and explicit category-edit history.
+
+| Column | Purpose |
+|---|---|
+| `id` | Merchant profile primary key. |
+| `name` | Canonical brand name used for transaction matching; a unique index prevents duplicate exact names. |
+| `logo_url` | Optional brand icon URL for display. |
+| `category_id` | Optional foreign key to `transaction_type_list.id`; a known profile suggests this exact category row, including its canonical parent and Need/Want default. Deleting the category sets this field to `NULL`. |
+| `is_known_subscription` | Defaults to `false`; helps label a qualifying recurring monthly merchant sequence as a subscription, but a profile flag or a single purchase does not establish recurrence. |
+
+`transaction_type_list` remains the authoritative category dictionary, including transaction type, parent, display label, and Need/Want defaults. Merchant matching must resolve the profile's `category_id` against this table and confirm its transaction type. A missing category reference or income/expense mismatch does not supply a category.
+
+Other persistence supporting these paths includes `transaction_import_receipts` (user-scoped, idempotent reviewed-file saves) and `transaction_change_history` (audit records used to preserve and reuse explicit user category choices). These support tables do not replace the transaction or canonical category records.
 
 ## How transaction categorization works
 
@@ -309,12 +420,13 @@ The UI shows counts for **New**, **Updated**, **Skipped**, and **Unavailable**, 
 - `client/src/pages/finance-tracker.tsx` — import dialogs, success messages, and transaction-list refresh.
 - `server/asset-liability-ingestion.ts` — CSV/TSV/TXT and spreadsheet parsing.
 - `server/transaction-import.ts` — file-field normalization, server validation, and atomic reviewed-batch inserts.
+- `server/merchant-matching.ts` — normalized exact/descriptor matching shared by category and recurring logic.
 - `shared/transaction-duplicates.ts` — conservative matching rules and duplicate explanations.
 - `server/transaction-duplicates.ts` — owner-scoped checks, locking, receipts, and retry-safe finalization.
 - `server/finance-tracker-routes.ts` — preview, direct import, Plaid retrieval, category mapping, deduplication, and recurring detection.
 - `server/ai/provider.ts` — shared model provider used for file-category classification.
 - `shared/transaction-import.ts` — preview and result contracts.
-- `shared/schema.ts` — transaction fields, receipt table, and unique indexes.
+- `shared/schema.ts` — transaction, merchant, category, and import-receipt schemas and their key constraints.
 - `server/transaction-import-schema.ts` — narrow, additive migration called by the existing application schema bootstrap before routes start. Both `npm run dev` and the published `dist/index.cjs` apply it; concurrent cold starts are serialized, failures stop startup, and no existing transaction data is changed.
 - `scripts/transaction-import-schema.ts` — optional standalone runner for the same migration (`npx tsx scripts/transaction-import-schema.ts`); normal application/deployment startup does not depend on running it manually.
 
