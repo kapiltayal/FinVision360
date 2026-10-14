@@ -125,9 +125,16 @@ function StatCard({
               <Icon className={`h-5 w-5 ${iconColor}`} />
             </div>
             {onClick && (
-              isExpanded
-                ? <ChevronUp className="h-3.5 w-3.5 text-muted-foreground" />
-                : <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+              <>
+                {isExpanded
+                  ? <ChevronUp className="h-3.5 w-3.5 text-muted-foreground" />
+                  : (
+                    <>
+                      <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                      <span className="whitespace-nowrap text-[9px] leading-none text-muted-foreground">click to expand</span>
+                    </>
+                  )}
+              </>
             )}
           </div>
         </div>
@@ -706,7 +713,7 @@ export default function DashboardPage() {
         <StatCard
           title="Net Worth"
           value={formatCurrency(netWorth)}
-          subtitle={`${netWorth >= 0 ? "Positive net worth" : "Negative net worth"} · click to expand`}
+          subtitle={`${netWorth >= 0 ? "Positive net worth" : "Negative net worth"}`}
           icon={netWorth >= 0 ? TrendingUp : TrendingDown}
           trend={netWorth >= 0 ? "up" : "down"}
           color={netWorth >= 0 ? "green" : "red"}
@@ -725,7 +732,7 @@ export default function DashboardPage() {
         <StatCard
           title="Total Assets"
           value={formatCurrency(totalAssets)}
-          subtitle={`${assets.length} account${assets.length !== 1 ? "s" : ""}${excludedAssetIds.size > 0 ? ` · ${excludedAssetIds.size} excluded` : ""} · click to expand`}
+          subtitle={`${assets.length} account${assets.length !== 1 ? "s" : ""}${excludedAssetIds.size > 0 ? ` · ${excludedAssetIds.size} excluded` : ""}`}
           icon={Wallet}
           trend="up"
           testId="card-total-assets"
@@ -743,7 +750,7 @@ export default function DashboardPage() {
         <StatCard
           title="Total Liabilities"
           value={formatCurrency(totalLiabilities)}
-          subtitle={`${liabilities.length} account${liabilities.length !== 1 ? "s" : ""}${excludedLiabilityIds.size > 0 ? ` · ${excludedLiabilityIds.size} excluded` : ""} · click to expand`}
+          subtitle={`${liabilities.length} account${liabilities.length !== 1 ? "s" : ""}${excludedLiabilityIds.size > 0 ? ` · ${excludedLiabilityIds.size} excluded` : ""}`}
           icon={CreditCard}
           trend="down"
           testId="card-total-liabilities"
@@ -768,7 +775,6 @@ export default function DashboardPage() {
               <p>Paying {formatCurrency(paidAnnual)} ({weightedLiabilityRate.toFixed(2)}%)</p>
             </div>
           }
-          subtitle="click to expand"
           icon={TrendingUp}
           trend={netAnnualReturn >= 0 ? "up" : "down"}
           testId="card-interest-spread"
