@@ -32,8 +32,9 @@ The application already uses the official vendor tarball for **xlsx 0.20.3**, no
 - [GHSA-5pgg-2g8v-p4x9](https://github.com/advisories/GHSA-5pgg-2g8v-p4x9) affects versions **below 0.20.2**.
 - The installed **0.20.3** is outside both vulnerable ranges.
 - [The vendor's installation documentation](https://docs.sheetjs.com/docs/getting-started/installation/nodejs/) specifies the same 0.20.3 tarball, warns that the public npm registry is outdated, and documents prototype-pollution scanner false positives.
+- [OSV-Scanner issue #3073](https://github.com/google/osv-scanner/issues/3073) reproduces this exact CDN-resolved lockfile entry. OSV's generated ranges treat it as affected from version 0, while the source advisories record the actual affected floors as `<0.19.3` and `<0.20.2`. The lockfile's CDN URL and SHA-512 match the official 0.20.3 distribution.
 
-The fresh workspace scanner still reports these two entries. They were not suppressed or concealed. The patched vendor version remains intentionally installed: downgrading to npm's 0.18.5 would reintroduce the vulnerabilities, while replacing the parser with an XLSX-only library would remove existing legacy XLS import support.
+The fresh workspace scanner still reports these two entries, but `npm audit` reports zero findings and the installed vendor build is beyond both source-advisory affected ranges. They were not suppressed or concealed. The patched vendor version remains intentionally installed: downgrading to npm's 0.18.5 would reintroduce the vulnerabilities, while replacing the parser with an XLSX-only library would remove existing legacy XLS import support.
 
 ## Build-tooling advisory removed with an approved styling upgrade
 
