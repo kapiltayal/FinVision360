@@ -129,7 +129,7 @@ app.use((req, res, next) => {
       id SERIAL PRIMARY KEY,
       name TEXT NOT NULL,
       logo_url TEXT,
-      category TEXT,
+      category_id INTEGER,
       is_known_subscription BOOLEAN NOT NULL DEFAULT FALSE
     );
     CREATE UNIQUE INDEX IF NOT EXISTS merchants_name_unique ON merchants(name);
