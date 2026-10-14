@@ -14,9 +14,12 @@ import {
   applyImportCategorySuggestion,
   hasSuppliedNeedWant,
   isBlankTransactionSourceRow,
+  knownMerchantCategory,
   transactionEntryFromSource,
   validateReviewedTransactionEntries,
+  type CategoryMerchant,
 } from "./transaction-import";
+import { buildMerchantCatalog } from "./merchant-matching";
 import { checkUserTransactionDuplicates, ImportConflict, saveDuplicateSafeImport, validDuplicateReview } from "./transaction-duplicates";
 import { detectAndMarkRecurring } from "./recurring-transactions";
 import { formatSafeApiError, getSafeApiRoutePath } from "./api-logging";
@@ -26,6 +29,7 @@ const CORRUPT_TRANSACTION_FILE = "File content could not be read or appears corr
 const INVALID_TRANSACTION_FILE_TYPE = "File type is not supported or does not match its contents.";
 const UNASSIGNED_TRANSACTION_CATEGORY = "unassigned";
 type CanonicalTransactionCategory = {
+  id: number;
   type: string; parentCategory: string; category: string; needVsWant: string | null; description: string;
   storedCategory: string; storedParentCategory: string;
 };
@@ -35,15 +39,19 @@ function categoryKey(value: unknown): string {
 }
 async function canonicalTransactionCategories(): Promise<CanonicalTransactionCategory[]> {
   const { rows } = await pool.query(
-    `SELECT type, parent_category, category, need_vs_want, description FROM transaction_type_list ORDER BY type, parent_category, category`,
+    `SELECT id, type, parent_category, category, need_vs_want, description FROM transaction_type_list ORDER BY type, parent_category, category`,
   );
   return rows.map((row) => ({
-    type: String(row.type), parentCategory: String(row.parent_category), category: String(row.category),
+    id: Number(row.id), type: String(row.type), parentCategory: String(row.parent_category), category: String(row.category),
     needVsWant: row.need_vs_want ? String(row.need_vs_want) : null, description: String(row.description),
     // Values persisted to transactions are the authoritative DB labels.
     // categoryKey is strictly an input compatibility/matching concern.
     storedCategory: String(row.category), storedParentCategory: String(row.parent_category),
   }));
+}
+async function knownCategoryMerchants() {
+  const { rows } = await pool.query<CategoryMerchant>("SELECT id, name, category_id FROM merchants");
+  return buildMerchantCatalog(rows);
 }
 function supportedTransactionFile(file: Express.Multer.File): boolean {
   const ext = file.originalname.toLowerCase().match(/\.([a-z0-9]+)$/)?.[1];
@@ -1019,7 +1027,9 @@ export function registerFinanceTrackerRoutes(app: Express) {
       if (parentCategory !== undefined && supplied === undefined) return res.status(400).json({ message: "Invalid category" });
       const selected = supplied !== undefined
         ? categoryForInput(categories, type, supplied, parentCategory)
-        : deterministicTransactionCategory(categories, description, type);
+        : categoryFromMerchantPreference(await userMerchantCategoryPreferences(userId, categories), { type, description }) ||
+          knownMerchantCategory({ type, description }, await knownCategoryMerchants(), categories) ||
+          deterministicTransactionCategory(categories, description, type);
       if (!selected) return res.status(400).json({ message: "Invalid category" });
       if (needsWant !== undefined && !isNeedWant(needsWant)) return res.status(400).json({ message: "Invalid Need / Want value" });
       const finalNW = needsWant ?? selected.needVsWant?.toLowerCase() ?? "na";
@@ -1077,18 +1087,19 @@ export function registerFinanceTrackerRoutes(app: Express) {
       const userId = (req.user as any).id;
       const categories = await canonicalTransactionCategories();
       const preferences = await userMerchantCategoryPreferences(userId, categories);
+      const merchantCatalog = await knownCategoryMerchants();
       const entries = sourceRows.map((row, index) => transactionEntryFromSource(row, index + 1));
       const assignments = new Map<number, CanonicalTransactionCategory>();
       const unknownIndexes: number[] = [];
 
       entries.forEach((entry, index) => {
         // Preserve the import contract order: explicit merchant preference,
-        // source category, AI suggestion, then an empty category for review.
+        // source category, known profile, AI, then an empty category for review.
         const merchantMatch = categoryFromMerchantPreference(preferences, entry);
         const suppliedMatch = entry.sourceCategory
           ? categoryForInput(categories, entry.type, entry.sourceCategory, field(sourceRows[index], "parentcategory"))
           : undefined;
-        const selected = merchantMatch || suppliedMatch;
+        const selected = merchantMatch || suppliedMatch || knownMerchantCategory(entry, merchantCatalog, categories);
         if (selected) assignments.set(index, selected);
         else unknownIndexes.push(index);
       });
@@ -1240,6 +1251,8 @@ export function registerFinanceTrackerRoutes(app: Express) {
 
       const plaid = getPlaidClient();
       const canonicalCategories = await canonicalTransactionCategories();
+      const preferences = await userMerchantCategoryPreferences(userId, canonicalCategories);
+      const merchantCatalog = await knownCategoryMerchants();
       const accountByPlaidId = new Map(allAccounts.map((account) => [account.plaidAccountId, account]));
 
       let inserted = 0;
@@ -1308,7 +1321,9 @@ export function registerFinanceTrackerRoutes(app: Express) {
             const merchant = (transaction.merchant_name || transaction.name || description).trim();
             const type: "income" | "expense" = amount < 0 ? "income" : "expense";
             const category = categorizePlaidTransaction(transaction, description, type);
-            const canonicalCategory = categoryForInput(
+            const identity = { type, merchant, description };
+            const canonicalCategory = categoryFromMerchantPreference(preferences, identity) ||
+              knownMerchantCategory(identity, merchantCatalog, canonicalCategories) || categoryForInput(
               canonicalCategories, type, legacyCategoryAliases[category.subcategory] || category.subcategory,
             ) || deterministicTransactionCategory(canonicalCategories, description, type);
             if (!canonicalCategory) {

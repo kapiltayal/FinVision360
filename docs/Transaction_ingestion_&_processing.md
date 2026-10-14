@@ -1,6 +1,6 @@
 # Financial Transaction Ingestion and Processing
 
-*Implementation guide, updated October 9, 2026.*
+*Implementation guide, updated October 14, 2026.*
 
 This guide covers the two transaction sources exposed in the Finance Tracker: user-uploaded files and transactions imported on request from Plaid-connected accounts. It follows each path from the user's selection through parsing, quality checks, categorization, preview or confirmation, and database persistence.
 
@@ -45,26 +45,27 @@ The import methods intentionally differ:
 
 | Source | Categorization method | AI used? |
 |---|---|---|
-| Uploaded file | Saved user merchant preference → matching category supplied by the file → AI for unresolved rows → leave unresolved for review | Only for unresolved rows |
-| Plaid | Plaid personal-finance category mapping → description rules as fallback → skip if no canonical category can be resolved | No |
-| Manually entered transaction | Use the user's selected canonical category; if omitted, apply description rules | No |
+| Uploaded file | Saved user merchant preference → matching category supplied by the file → known merchant profile → AI for unresolved rows → leave unresolved for review | Only for unresolved rows |
+| Plaid | Saved user merchant preference → known merchant profile → Plaid personal-finance category mapping → description rules as fallback → skip if no canonical category can be resolved | No |
+| Manually entered transaction | User-selected canonical category → saved user merchant preference → known merchant profile → description rules | No |
 
 ### Uploaded-file categorization, step by step
 
 1. **Establish the row's initial type and text.** The parser reads explicit type labels when present. Otherwise, a debit column implies expense and a credit column implies income; when it cannot infer either, it initially treats the row as an expense. Merchant defaults to the uploaded merchant or description.
 2. **Look for a saved merchant preference.** The server checks this user's manual transactions and transactions with a recorded explicit parent/category edit. It matches by transaction type and a normalized merchant key derived from the merchant, or the description when merchant is absent. The normalization lowercases text, removes punctuation/asterisks, and uses the first three words. When multiple saved choices match, recorded category edits and the newest matching choices take precedence. A preference is reused only if it still maps to a valid canonical category.
 3. **Try the uploaded category.** If the file has a `Category` or `Subcategory` value, it is matched against the canonical list for the row's current type. A supplied parent category further narrows that match. Matching ignores case and punctuation, but the value saved is the canonical database label. An unknown or type-incompatible source label remains visible in review; it is not silently stored as a category.
-4. **Ask AI only for rows still unresolved.** The server sends the unresolved raw source rows and the allowed canonical category list—including each category's type, parent, label, Need/Want default, and description—to the configured, non-streaming JSON classification call. The prompt asks for a transaction type and one exact category from the supplied list, and says to classify only clear transactions. The system message requires JSON only, with no markdown or commentary. The provider currently uses the shared `ADVISOR_MODEL` setting (currently `gpt-5.6-luna`), JSON-object response mode, and a maximum of 1,800 completion tokens; the shared provider caps total request content at 28,000 characters.
-5. **Validate the answer before using it.** Each returned `sourceIndex` must refer to a row sent in that call and may appear only once. The type must be `income` or `expense`, and the category must resolve to a canonical category for that type. Invalid, duplicate, missing, or unrecognized model results are ignored. The server applies only the validated type/category suggestion (and eligible canonical Need/Want default); it does not let AI replace the source date, amount, description, merchant, or server-created review-row identity.
-6. **Keep uncertainty reviewable.** If AI is unavailable or returns no usable classification, the upload preview continues. The category stays blank in review and is optional at save; if the user saves it without a category, it is stored as `unassigned`. This fallback prevents a categorization outage from dropping an otherwise valid transaction.
+4. **Try a known merchant profile.** Match an exact, normalized merchant identity first. When merchant is missing or copies the bank description, allow whole-token brand matching in the description, preferring longer specific names and rejecting ambiguous normalized matches. A distinct explicit merchant is not replaced by an incidental brand in its description. Resolve `merchants.category_id` to the exact `transaction_type_list` row, including its parent and Need/Want default. A missing/stale category reference or incompatible income/expense type supplies no suggestion; a refund must not become an expense just because its brand has an expense category.
+5. **Ask AI only for rows still unresolved.** The server sends the unresolved raw source rows and the allowed canonical category list—including each category's type, parent, label, Need/Want default, and description—to the configured, non-streaming JSON classification call. The prompt asks for a transaction type and one exact category from the supplied list, and says to classify only clear transactions. The system message requires JSON only, with no markdown or commentary. The provider currently uses the shared `ADVISOR_MODEL` setting (currently `gpt-5.6-luna`), JSON-object response mode, and a maximum of 1,800 completion tokens; the shared provider caps total request content at 28,000 characters.
+6. **Validate the answer before using it.** Each returned `sourceIndex` must refer to a row sent in that call and may appear only once. The type must be `income` or `expense`, and the category must resolve to a canonical category for that type. Invalid, duplicate, missing, or unrecognized model results are ignored. The server applies only the validated type/category suggestion (and eligible canonical Need/Want default); it does not let AI replace the source date, amount, description, merchant, or server-created review-row identity.
+7. **Keep uncertainty reviewable.** If AI is unavailable or returns no usable classification, the upload preview continues. The category stays blank in review and is optional at save; if the user saves it without a category, it is stored as `unassigned`. This fallback prevents a categorization outage from dropping an otherwise valid transaction.
 
-The classifier receives the complete raw source row for unresolved entries, so any columns present in that row—including descriptions, amounts, notes, account metadata, or other exported fields—can be included in the request. It does not receive the signed-in user's database ID or a Plaid access token. Rows resolved from a saved preference or a valid uploaded category are not sent for AI classification. Treat files as financial data and avoid adding unrelated sensitive columns to an export when they are not needed.
+The classifier receives the complete raw source row for unresolved entries, so any columns present in that row—including descriptions, amounts, notes, account metadata, or other exported fields—can be included in the request. It does not receive the signed-in user's database ID or a Plaid access token. Rows resolved from a saved preference, a valid uploaded category, or a known merchant profile are not sent for AI classification. Treat files as financial data and avoid adding unrelated sensitive columns to an export when they are not needed.
 
 When an uploaded row contains a valid Need/Want value, that value is preserved. Otherwise, the selected canonical category's Need/Want default is suggested when available; unresolved categories use `na` until the user changes it. The reviewer can edit both the category and Need/Want value before saving.
 
 ### Plaid categorization, step by step
 
-Plaid imports do not call the AI classifier or use the saved merchant-preference map. After transfer, pending, currency, account, and amount checks, the server determines transaction type from Plaid's amount sign (negative is income, otherwise expense), then uses Plaid's `personal_finance_category`:
+Plaid imports do not call the AI classifier. After transfer, pending, currency, account, and amount checks, the server determines transaction type from Plaid's amount sign (negative is income, otherwise expense). It first tries this user's saved merchant preference and then the type-compatible known merchant profile. If neither resolves a category, it uses Plaid's `personal_finance_category`:
 
 | Plaid category condition | FinVision360 category suggestion |
 |---|---|
@@ -119,7 +120,7 @@ The internal rule labels are mapped to the current canonical category table befo
 
 ### Manual choices and future file imports
 
-Manual transaction entry accepts a user-selected canonical category. If the user omits it, the server tries the same description-based deterministic rules and rejects the entry if it still cannot resolve a canonical category. A manual category choice, or an explicit category/parent edit recorded in transaction history, can become the saved merchant preference used by a later file import. This preference is scoped to the signed-in user and transaction type; Plaid categorization continues to follow Plaid's mapping rules.
+Manual transaction entry accepts a user-selected canonical category. If the user omits it, the server tries this user's saved merchant preference, then a type-compatible known merchant profile, then description-based deterministic rules, and rejects the entry if it still cannot resolve a canonical category. A manual category choice, or an explicit category/parent edit recorded in transaction history, can become the saved merchant preference used by later file imports, manual entries, and Plaid imports. This preference is scoped to the signed-in user and transaction type. Reviewed file saves retain the reviewer's final category selection rather than rerunning merchant categorization. Existing user-modified Plaid rows keep their category, parent, and Need/Want values on refresh.
 
 # File uploads
 
@@ -156,7 +157,7 @@ The preview drafts receive temporary row numbers for editing. These numbers are 
 
 ## 4. Category suggestions are prepared
 
-The categorization priority, AI request and validation, canonical Need/Want defaults, and unassigned fallback are described in [How transaction categorization works](#how-transaction-categorization-works). In brief, each row tries the user's saved merchant preference first, then a valid category supplied by the file, and then AI classification for unresolved rows. The suggestion is editable and no transaction is stored during preview.
+The categorization priority, AI request and validation, canonical Need/Want defaults, and unassigned fallback are described in [How transaction categorization works](#how-transaction-categorization-works). In brief, each row tries the user's saved merchant preference first, then a valid category supplied by the file, then a known merchant profile, and then AI classification for unresolved rows. The suggestion is editable and no transaction is stored during preview.
 
 ## 5. Duplicate identification, after categorization
 
@@ -254,7 +255,7 @@ For accepted rows:
 
 - Plaid's amount sign determines type: a negative amount is treated as income, otherwise expense. The stored amount is the absolute value.
 - The saved description/merchant uses `merchant_name`, then `name`, then `"Bank transaction"` as a fallback. The request asks Plaid to include its original description, but the current save mapping does not use `original_description`.
-- Plaid personal-finance categories are mapped to canonical categories first. The detailed mapping and description-rule fallback are described in [How transaction categorization works](#how-transaction-categorization-works); this path does not call the AI classifier or file-import merchant preferences.
+- User merchant preferences and type-compatible known merchant profiles are tried before Plaid personal-finance categories and description-rule fallback. The detailed mapping is described in [How transaction categorization works](#how-transaction-categorization-works); this path does not call the AI classifier.
 - Parent category and Need/Want come from the matched canonical category, defaulting Need/Want to `na` if it has none.
 - The saved row includes `source='plaid'`, Plaid transaction/account IDs, account name, and institution name.
 

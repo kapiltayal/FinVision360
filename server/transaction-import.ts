@@ -2,14 +2,30 @@ import type { TransactionImportEntry } from "../shared/transaction-import";
 import { createHash } from "node:crypto";
 import { stableSourceKey } from "../shared/transaction-duplicates";
 import type { RawRow } from "./asset-liability-ingestion";
+import { matchKnownMerchant, type MerchantCatalog, type MerchantIdentity } from "./merchant-matching";
 
 export interface ImportCategory {
+  id?: number;
   type: string;
   parentCategory: string;
   category: string;
   needVsWant?: string | null;
   storedCategory?: string;
   storedParentCategory?: string;
+}
+
+export type CategoryMerchant = { id: number; name: string; category_id: number | null };
+
+/** Resolve by the FK, not category name: duplicate labels can have different parents/types. */
+export function knownMerchantCategory<T extends ImportCategory>(
+  row: MerchantIdentity & { type: string },
+  catalog: MerchantCatalog<CategoryMerchant>,
+  categories: T[],
+): T | undefined {
+  const merchant = matchKnownMerchant(row, catalog);
+  if (merchant?.category_id == null) return undefined;
+  return categories.find(category => category.id === merchant.category_id &&
+    category.type.toLowerCase() === row.type.toLowerCase());
 }
 
 export interface PreparedReviewedTransaction {

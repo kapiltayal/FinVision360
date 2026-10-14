@@ -1,4 +1,5 @@
 import type { Pool } from "pg";
+import { buildMerchantCatalog, matchKnownMerchant } from "./merchant-matching";
 
 export type RecurringTransaction = {
   id: number;
@@ -25,37 +26,12 @@ function merchantKey(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 }
 
-/**
- * Prefer the explicit merchant's exact identity. Imports may copy a bank
- * descriptor into merchant when no clean identity is available. For those
- * rows (or missing merchant), accept whole-token names, not substrings.
- * Longer catalog names win; ambiguous normalized identities do not match.
- */
-function matchMerchant(
-  row: RecurringTransaction,
-  merchants: Array<{ merchant: RecurringMerchant; key: string }>,
-): RecurringMerchant | undefined {
-  const explicit = merchantKey(row.merchant || "");
-  const descriptor = merchantKey(row.description);
-  const exact = explicit ? merchants.filter(({ key }) => key === explicit) : [];
-  if (exact.length) return exact.length === 1 ? exact[0].merchant : undefined;
-  // A distinct explicit identity must not be overridden by incidental brands
-  // in its description. Equality covers Plaid/file descriptor fallback values.
-  if (explicit && explicit !== descriptor) return undefined;
-  const description = ` ${descriptor} `;
-  const matches = merchants
-    .filter(({ key }) => key && description.includes(` ${key} `));
-  if (!matches.length || (matches[1] && matches[0].key.length === matches[1].key.length)) return undefined;
-  return matches[0].merchant;
-}
-
 /** Known merchants influence classification, never the requirement for history. */
 export function identifyRecurringTransactions(
   rows: RecurringTransaction[],
   merchants: RecurringMerchant[],
 ): RecurringUpdate[] {
-  const catalog = merchants.map(merchant => ({ merchant, key: merchantKey(merchant.name) }))
-    .sort((a, b) => b.key.length - a.key.length);
+  const catalog = buildMerchantCatalog(merchants);
   const groups = new Map<string, {
     knownSubscription: boolean;
     charges: Array<{ id: number; time: number; amount: number }>;
@@ -65,7 +41,7 @@ export function identifyRecurringTransactions(
     const amount = Number(row.amount);
     if (row.is_user_modified || row.type.toLowerCase() !== "expense" ||
         !Number.isFinite(time) || !Number.isFinite(amount) || amount === 0) continue;
-    const merchant = matchMerchant(row, catalog);
+    const merchant = matchKnownMerchant(row, catalog);
     // Retain the legacy description grouping for unmatched imports: their
     // merchant field can itself contain changing bank reference numbers.
     const fallback = merchantKey(row.description || row.merchant || "").split(" ").slice(0, 3).join(" ");
