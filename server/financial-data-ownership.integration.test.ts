@@ -73,9 +73,9 @@ test("financial APIs isolate transaction, budget, asset, and liability reads and
     liabilityBId = liabilities.find((row) => row.user_id === userB)!.id;
 
     const { rows: transactions } = await pool.query(
-      `INSERT INTO transactions(user_id, date, description, amount, type, subcategory) VALUES
-       ($1, $3::date, 'Owner A transaction', 111, 'expense', 'owner-a-only'),
-       ($2, $3::date, 'Owner B transaction', 222, 'expense', 'owner-b-only')
+      `INSERT INTO transactions(user_id, date, description, merchant, amount, type, subcategory, needs_want) VALUES
+       ($1, $3::date, 'Owner A transaction', 'Shared ownership merchant', 111, 'expense', 'owner-a-only', 'need'),
+       ($2, $3::date, 'Owner B transaction', 'Shared ownership merchant', 222, 'expense', 'owner-b-only', 'need')
        RETURNING id, user_id`,
       [userA, userB, `${month}-10`],
     );
@@ -144,27 +144,27 @@ test("financial APIs isolate transaction, budget, asset, and liability reads and
     assert.equal((await call("delete", "/api/budget-plan", userB, {
       query: { month, planKey: "expense:owner-a-only" },
     })).code, 404);
-    await call("put", "/api/budget-plan", userB, {
+    assert.equal((await call("put", "/api/budget-plan", userB, {
       body: { month, planKey: "expense:shared", plannedAmount: 250, userId: userA },
-    });
+    })).code, 200);
     const { rows: sharedPlans } = await pool.query(
-      "SELECT user_id, planned_amount FROM budget_plans WHERE month=$1::date AND plan_key='expense:shared' ORDER BY user_id",
-      [periodMonth],
+      "SELECT user_id, planned_amount FROM budget_plans WHERE month=$1::date AND plan_key='expense:shared' AND user_id=ANY($2::varchar[])",
+      [periodMonth, userIds],
     );
     assert.deepEqual(sharedPlans.map((row) => [row.user_id, Number(row.planned_amount)]).sort(), [
       [userA, 100], [userB, 250],
-    ], "an upsert with another user's ID in the request body only changes the authenticated caller's row");
+    ].sort(), "an upsert with another user's ID in the request body only changes the authenticated caller's row");
 
-    await call("put", "/api/budget-plan/bulk", userB, {
+    assert.equal((await call("put", "/api/budget-plan/bulk", userB, {
       body: { month, bulk: true, plans: [{ planKey: "expense:bulk-shared", plannedAmount: 999, userId: userA }] },
-    });
+    })).code, 200);
     const { rows: bulkPlans } = await pool.query(
-      "SELECT user_id, planned_amount FROM budget_plans WHERE month=$1::date AND plan_key='expense:bulk-shared' ORDER BY user_id",
-      [periodMonth],
+      "SELECT user_id, planned_amount FROM budget_plans WHERE month=$1::date AND plan_key='expense:bulk-shared' AND user_id=ANY($2::varchar[])",
+      [periodMonth, userIds],
     );
     assert.deepEqual(bulkPlans.map((row) => [row.user_id, Number(row.planned_amount)]).sort(), [
       [userA, 10], [userB, 999],
-    ]);
+    ].sort());
     assert.equal((await call("delete", "/api/budget-plan", userB, {
       query: { month, planKey: "expense:bulk-shared" },
     })).code, 204);
@@ -181,6 +181,10 @@ test("financial APIs isolate transaction, budget, asset, and liability reads and
       assert.deepEqual(response.body.map((row: any) => row.description), [expectedDescription]);
       assert.equal(response.body.some((row: any) => row.description === foreignDescription), false);
     }
+    const statsA = await call("get", "/api/transactions/stats", userA);
+    const statsB = await call("get", "/api/transactions/stats", userB);
+    assert.equal(Number(statsA.body.total_expenses), 111);
+    assert.equal(Number(statsB.body.total_expenses), 222);
     const refusedTransactionEdit = await call("patch", "/api/transactions/:id", userB, {
       params: { id: String(transactionAId) }, body: { notes: "Cross-user edit", userId: userA },
     });
@@ -189,6 +193,31 @@ test("financial APIs isolate transaction, budget, asset, and liability reads and
       params: { id: String(transactionAId) },
     })).code, 404);
     assert.equal((await pool.query("SELECT notes FROM transactions WHERE id=$1 AND user_id=$2", [transactionAId, userA])).rows[0].notes, null);
+
+    const { rows: companion } = await pool.query(
+      `INSERT INTO transactions(user_id, date, description, merchant, amount, type, subcategory, needs_want)
+       VALUES ($1, $2::date, 'Owner A companion', 'Shared ownership merchant', 33, 'expense', 'owner-a-only', 'need')
+       RETURNING id`,
+      [userA, `${month}-10`],
+    );
+    const merchantEdit = await call("patch", "/api/transactions/:id", userA, {
+      params: { id: String(transactionAId) },
+      body: { needsWant: "want", applyToMerchant: true, merchantFields: ["needsWant"], userId: userB },
+    });
+    assert.equal(merchantEdit.code, 200);
+    assert.equal(merchantEdit.body.updatedCount, 2);
+    assert.deepEqual((await pool.query(
+      "SELECT needs_want FROM transactions WHERE user_id=$1 AND id=ANY($2::int[])",
+      [userA, [transactionAId, companion[0].id]],
+    )).rows.map((row) => row.needs_want), ["want", "want"]);
+    assert.equal((await pool.query(
+      "SELECT needs_want FROM transactions WHERE user_id=$1 AND id=$2",
+      [userB, transactionBId],
+    )).rows[0].needs_want, "need", "merchant-wide edits never touch the same merchant in another user's book");
+    assert.equal((await pool.query(
+      "SELECT id FROM transaction_change_history WHERE user_id=$1", [userB],
+    )).rowCount, 0, "merchant-wide edits do not add another user's audit entries");
+
     assert.equal((await call("patch", "/api/transactions/:id", userA, {
       params: { id: String(transactionAId) }, body: { notes: "Owner A edit" },
     })).code, 200);
@@ -211,8 +240,8 @@ test("financial APIs isolate transaction, budget, asset, and liability reads and
       query: { month, planKey: "expense:shared" },
     })).code, 204);
     assert.deepEqual((await pool.query(
-      "SELECT user_id, planned_amount FROM budget_plans WHERE month=$1::date AND plan_key='expense:shared'",
-      [periodMonth],
+      "SELECT user_id, planned_amount FROM budget_plans WHERE month=$1::date AND plan_key='expense:shared' AND user_id=ANY($2::varchar[])",
+      [periodMonth, userIds],
     )).rows.map((row) => [row.user_id, Number(row.planned_amount)]), [[userA, 100]]);
   } finally {
     await pool.query("DELETE FROM transaction_change_history WHERE user_id=ANY($1::varchar[])", [userIds]);
