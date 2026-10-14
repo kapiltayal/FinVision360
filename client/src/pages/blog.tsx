@@ -11,8 +11,8 @@ export default function BlogPage() {
   });
 
   return (
-    <PublicPageLayout width="max-w-7xl">
-      <div className="mx-auto">
+    <PublicPageLayout>
+      <div className="mx-auto max-w-5xl">
         <section className="relative isolate overflow-hidden rounded-xl border-b border-primary/15 bg-gradient-to-r from-primary/[0.07] via-primary/[0.035] to-background px-6 py-5 text-foreground sm:px-10 sm:py-6">
           <div aria-hidden="true" className="pointer-events-none absolute -right-8 -top-16 h-48 w-48 rounded-full border border-primary/10 sm:right-0 sm:top-1/2 sm:h-56 sm:w-56 sm:-translate-y-1/2" />
           <div aria-hidden="true" className="pointer-events-none absolute right-4 top-1/2 h-32 w-32 -translate-y-1/2 rounded-full border border-primary/10 sm:right-14 sm:h-40 sm:w-40" />
