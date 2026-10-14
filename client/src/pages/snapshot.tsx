@@ -511,7 +511,6 @@ export default function SnapshotPage() {
           )}
 
           <div className="space-y-2 pt-3 border-t border-slate-100 dark:border-slate-800">
-            <StatRow label="Savings & Cash Assets" value={formatCurrency(emergencyFunds)} />
             {totalMonthlyExpenses > 0 && (
               <>
                 <p className="text-[11px] text-muted-foreground leading-relaxed">
