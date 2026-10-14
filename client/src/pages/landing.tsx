@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useLocation, Link } from "wouter";
+import { useLocation, useSearch, Link } from "wouter";
 import { useSEO } from "@/hooks/use-seo";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -441,13 +441,18 @@ export default function LandingPage() {
   const { user } = useAuth();
   const logout = useLogout();
   const [location] = useLocation();
+  const search = useSearch();
+  const authIntent = new URLSearchParams(search).get("auth");
 
   useEffect(() => {
     if (location === "/signup") {
       setPendingAuthTab("register");
       setDisclaimerOpen(true);
+    } else if (location === "/home" && authIntent === "login") {
+      setPendingAuthTab("login");
+      setDisclaimerOpen(true);
     }
-  }, [location]);
+  }, [location, authIntent]);
 
   const openLogin = () => { setPendingAuthTab("login"); setDisclaimerOpen(true); };
   const openRegister = () => { setPendingAuthTab("register"); setDisclaimerOpen(true); };

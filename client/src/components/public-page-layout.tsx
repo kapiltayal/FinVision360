@@ -1,4 +1,4 @@
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import logoPath from "@assets/FinVision360_Logo_H_(transparent)_1776714495394.png";
 import { useTheme } from "@/components/theme-provider";
@@ -15,6 +15,7 @@ export function PublicPageLayout({
 }) {
   const { theme, toggleTheme } = useTheme();
   const { user } = useAuth();
+  const [, setLocation] = useLocation();
 
   return (
     <div className="min-h-screen flex flex-col bg-background text-foreground">
@@ -41,7 +42,25 @@ export function PublicPageLayout({
             >
               {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
             </Button>
-            {user && (
+            {!user ? (
+              <>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setLocation("/home?auth=login")}
+                  data-testid="button-public-signin"
+                >
+                  Sign In
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() => setLocation("/signup")}
+                  data-testid="button-public-signup"
+                >
+                  Get Started
+                </Button>
+              </>
+            ) : (
               <Link href="/snapshot">
                 <Button variant="ghost" size="sm">Back to Snapshot</Button>
               </Link>
