@@ -1,6 +1,7 @@
 import { ArrowDown, ArrowRight, Check, ChevronRight, Minus, Sparkles } from "lucide-react";
 import { Link } from "wouter";
 import { PublicPageLayout } from "@/components/public-page-layout";
+import { useAuth } from "@/hooks/use-auth";
 import { useSEO } from "@/hooks/use-seo";
 import {
   pricingFeatureGroups,
@@ -46,7 +47,33 @@ function FeatureMark({ value }: { value: FeatureValue | undefined }) {
   );
 }
 
-function PlanCard({ plan, index }: { plan: PricingPlan; index: number }) {
+function PlanCard({
+  plan, index, isAuthenticated, isAuthLoading,
+}: {
+  plan: PricingPlan;
+  index: number;
+  isAuthenticated: boolean;
+  isAuthLoading: boolean;
+}) {
+  const paidPlanUnavailable = isAuthenticated && (plan.id === "plus" || plan.id === "pro");
+  const ctaHref = !isAuthenticated
+    ? "/signup"
+    : plan.id === "custom"
+      ? "/contact"
+      : "/snapshot";
+  const ctaLabel = !isAuthenticated
+    ? plan.cta
+    : plan.id === "custom"
+      ? "Contact Us"
+      : "Go to Dashboard";
+  const ctaFootnote = paidPlanUnavailable
+    ? "Paid upgrades aren't available yet."
+    : plan.id === "custom"
+      ? "Custom account limits and features"
+      : plan.id === "free"
+        ? "No payment details required"
+        : "Monthly plan";
+
   return (
     <article
       className={`pricing-card ${plan.id === "plus" ? "pricing-card-featured" : ""}`}
@@ -84,21 +111,40 @@ function PlanCard({ plan, index }: { plan: PricingPlan; index: number }) {
           </li>
         ))}
       </ul>
-      <Link
-        href="/signup"
-        className={`pricing-cta pricing-cta-link ${plan.id === "plus" ? "pricing-cta-primary" : ""}`}
-      >
-        {plan.cta}
-        <ArrowRight aria-hidden="true" />
-      </Link>
-      <p className="pricing-card-footnote">
-        {plan.id === "custom" ? "Custom account limits and features" : plan.id === "free" ? "No payment details required" : "Monthly plan"}
+      {isAuthLoading ? (
+        <button type="button" className="pricing-cta pricing-cta-link pricing-cta-disabled" disabled aria-live="polite">
+          Checking sign-in…
+        </button>
+      ) : paidPlanUnavailable ? (
+        <button
+          type="button"
+          className="pricing-cta pricing-cta-link pricing-cta-disabled"
+          disabled
+          aria-describedby={`pricing-cta-note-${plan.id}`}
+          data-testid={`button-pricing-cta-${plan.id}`}
+        >
+          Coming soon
+        </button>
+      ) : (
+        <Link
+          href={ctaHref}
+          className="pricing-cta pricing-cta-link"
+          data-testid={`button-pricing-cta-${plan.id}`}
+        >
+          {ctaLabel}
+          <ArrowRight aria-hidden="true" />
+        </Link>
+      )}
+      <p id={paidPlanUnavailable ? `pricing-cta-note-${plan.id}` : undefined} className="pricing-card-footnote">
+        {ctaFootnote}
       </p>
     </article>
   );
 }
 
 export default function PricingPage() {
+  const { user, isLoading: isAuthLoading } = useAuth();
+
   useSEO({
     title: "Pricing — FinVision360",
     description:
@@ -145,7 +191,15 @@ export default function PricingPage() {
             <span className="pricing-monthly-note">All plans shown monthly</span>
           </div>
           <div className="pricing-cards">
-            {pricingPlans.map((plan, index) => <PlanCard key={plan.id} plan={plan} index={index} />)}
+            {pricingPlans.map((plan, index) => (
+              <PlanCard
+                key={plan.id}
+                plan={plan}
+                index={index}
+                isAuthenticated={!!user}
+                isAuthLoading={isAuthLoading}
+              />
+            ))}
           </div>
         </section>
 
@@ -190,9 +244,15 @@ export default function PricingPage() {
             <h2>Clarity is a good first move.</h2>
             <p>Begin with a complete financial picture, then grow from there.</p>
           </div>
-          <Link href="/signup" className="pricing-bottom-link">
-            <span>Get Started <ArrowRight aria-hidden="true" /></span>
-          </Link>
+          {isAuthLoading ? (
+            <span className="pricing-bottom-link pricing-bottom-link-disabled" aria-live="polite">
+              Checking sign-in…
+            </span>
+          ) : (
+            <Link href={user ? "/snapshot" : "/signup"} className="pricing-bottom-link">
+              <span>{user ? "Go to Dashboard" : "Get Started"} <ArrowRight aria-hidden="true" /></span>
+            </Link>
+          )}
         </section>
       </div>
     </PublicPageLayout>

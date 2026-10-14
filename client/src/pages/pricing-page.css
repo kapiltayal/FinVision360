@@ -310,6 +310,18 @@
 .pricing-cta:hover svg { transform: translateX(3px); }
 .pricing-cta-primary { background: hsl(var(--price-teal-deep)); color: hsl(var(--background)); border-color: hsl(var(--price-teal-deep)); }
 .pricing-cta-primary:hover { background: hsl(var(--price-teal-deep) / .9); color: hsl(var(--background)); }
+.pricing-cta-disabled,
+.pricing-cta-disabled:hover {
+  appearance: none;
+  padding: .5rem;
+  font-family: inherit;
+  color: hsl(var(--price-muted));
+  background: hsl(var(--price-sage) / .42);
+  border-color: hsl(var(--price-line));
+  cursor: not-allowed;
+  opacity: .8;
+  transform: none;
+}
 .pricing-card-footnote { margin: .7rem 0 0; text-align: center; color: hsl(var(--price-muted)); font-size: .62rem; }
 
 .pricing-comparison { max-width: 1240px; margin: 0 auto 5.25rem; scroll-margin-top: 5rem; }
@@ -383,6 +395,7 @@
 .pricing-bottom-link:hover { transform: translateY(-2px); background: hsl(var(--price-teal-deep) / .9); }
 .pricing-bottom-link span { display: flex; align-items: center; gap: .5rem; }
 .pricing-bottom-link svg { height: 16px; width: 16px; }
+.pricing-bottom-link-disabled { cursor: wait; opacity: .75; }
 
 @keyframes pricing-enter {
   from { opacity: 0; transform: translateY(12px); }
