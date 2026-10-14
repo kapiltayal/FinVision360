@@ -35,19 +35,40 @@ The application already uses the official vendor tarball for **xlsx 0.20.3**, no
 
 The fresh workspace scanner still reports these two entries. They were not suppressed or concealed. The patched vendor version remains intentionally installed: downgrading to npm's 0.18.5 would reintroduce the vulnerabilities, while replacing the parser with an XLSX-only library would remove existing legacy XLS import support.
 
-## Separate remaining advisory
+## Build-tooling advisory removed with an approved styling upgrade
 
-The fresh audit also reports **GHSA-vfj7-8cjw-p6xm** in `braces@3.0.3`. This is a new finding outside the ten originally listed; there is no published patch. npm reports seven aggregate high-severity notices for its dependent build packages.
+**GHSA-vfj7-8cjw-p6xm** in `braces@3.0.3` has no published patch. The user approved upgrading the styling tools rather than leaving the build-only dependency in place.
 
-In this application, `braces` is used through Tailwind's build-time glob tooling with repository-controlled content patterns. Financial upload routes do not call it, and customer uploads are not build inputs. Keep build configuration trusted. Resolving the dependency itself requires a separate reviewed build-toolchain change; no forced Tailwind major upgrade was performed.
+Tailwind was migrated to **4.3.3**, using its dedicated Vite plugin. The old PostCSS integration and unused autoprefixer dependency were removed. Tailwind Merge was upgraded to **3.7.0**. Neither `braces` nor `brace-expansion` remains in the application lockfile or installed tree.
+
+The legacy theme configuration remains explicitly loaded. Existing palette values, shadows, blur/radius defaults, placeholder styles, button cursors, and accessible focus outlines are preserved with a compatibility stylesheet. Radix menu and chart CSS-variable utilities use the supported Tailwind 4 syntax.
+
+Tailwind 4 requires modern browsers: Safari 16.4+, Chrome 111+, and Firefox 128+.
+
+## Additional dependency findings verified
+
+The subsequent 32-finding review included 31 findings already resolved by the previous npm autofix/selector override, plus the now-removed `braces` finding. Current versions were compared with every listed GitHub advisory:
+
+| Package | Resolved version | Highest required patched floor for the listed findings |
+|---|---|---|
+| proxy-addr | 2.0.8 | 2.0.8 |
+| axios | 1.20.0 | 1.20.0 |
+| source-map-js | 1.2.2 | 1.2.2 |
+| brace-expansion | Removed | 2.1.7 on its former 2.x branch |
+| undici | 7.30.0 | 7.29.1 on the 7.x branch |
+| braces | Removed | No published patch |
+| multer | 2.4.0 | 2.4.0 |
+| dompurify | 3.4.17 | 3.4.16 |
+| postcss-selector-parser | 7.1.6 | 7.1.6 |
 
 ## Verification
 
 - Re-enumerated the complete manifest tree, including untracked nested manifests; only the two manifests described above were found.
 - Checked every npm lockfile against the advisory patched floors. No listed old version remains except the reviewed, patched SheetJS 0.20.3 distribution.
 - Passed 27 focused tests covering XLS/XLSX/CSV imports, transaction review, and API logging.
+- Passed three additional styling-toolchain regressions covering patched dependency floors, preserved design values/forced-colors focus outlines, and CSS-variable class merging.
 - Passed PDF-table export and ZIP round-trip smoke checks.
-- Built the client and server successfully and verified the public preview after restarting the application.
+- Built the client and server successfully. Verified Pricing and Blog on desktop, Pricing on mobile, and the public signup disclaimer after restarting the application. The signup form behind that disclaimer and signed-in screens were not visually verified; authentication was not bypassed.
 - The full TypeScript check still reports the same 14 existing errors in unrelated integration scaffolding and the scraper.
 
-The workspace scanner is **not clean**: it retains the two SheetJS false positives and the separate `braces` advisory. This review does not claim that every dependency risk has been eliminated.
+`npm audit` reports **zero vulnerabilities**. The workspace scanner retains **only the two documented SheetJS false positives**; none of the 32 subsequent findings remains. This review does not suppress scanner results or claim protection against all future dependency risks.

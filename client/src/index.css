@@ -1,6 +1,6 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss" source("../");
+@import "./styles/tailwind-compat.css";
+@config "../../tailwind.config.ts";
 
 /* LIGHT MODE */
 :root {
@@ -168,6 +168,28 @@
 @layer base {
   * {
     @apply border-border;
+  }
+
+  ::before,
+  ::after,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: hsl(var(--border));
+  }
+
+  input::placeholder,
+  textarea::placeholder {
+    color: #9ca3af;
+    opacity: 1;
+  }
+
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+
+  dialog {
+    margin: auto;
   }
 
   body {
