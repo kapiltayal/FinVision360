@@ -258,6 +258,10 @@
   border-top-color: hsl(var(--primary)) !important;
   border-top-width: 3px !important;
 }
+.stat-card-accent-green {
+  border-top-color: rgb(16 185 129) !important;
+  border-top-width: 3px !important;
+}
 .stat-card-accent-red {
   border-top-color: rgb(239 68 68) !important;
   border-top-width: 3px !important;
