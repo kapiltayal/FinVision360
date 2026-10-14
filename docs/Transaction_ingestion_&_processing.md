@@ -275,7 +275,18 @@ The importer upserts rows returned by Plaid; it does not delete existing transac
 
 ## 5. Recurring detection and import summary
 
-After at least one Plaid row is inserted or updated, the server runs recurring detection across that user's transactions that are not marked `is_user_modified`. It groups normalized descriptions and checks consecutive transactions 20–45 days apart. When at least one such pair is found, it marks the group's rows recurring: amounts less than two cents apart for every qualifying pair are labeled `subscription`; otherwise they are labeled `recurring_bill`.
+After at least one Plaid row is inserted or updated, the server runs recurring detection across that user's unmodified expense transactions. The authenticated `POST /api/transactions/detect-recurring` endpoint uses the same detector; the Transactions page no longer exposes a manual detection button.
+
+The detector reads canonical profiles from `merchants`. An exact normalized `merchant` name takes precedence. Charges with a missing merchant, or a merchant copied from the normalized bank description (the Plaid/file import fallback), can match whole-token canonical names, with longer names preferred and ambiguous matches rejected. A distinct explicit merchant identity is never overridden by incidental brands in its description. Matched charges are grouped by merchant ID. Unmatched charges retain the existing normalized first-three-description-words grouping so changing bank reference numbers do not split their history.
+
+A merchant's `is_known_subscription` flag is only a classification signal, not proof of recurrence. At least two consecutive charges 20–45 days apart are still required. Only rows in qualifying monthly sequences are marked, not unrelated one-off charges elsewhere in the same merchant's history:
+
+- A qualifying sequence for a known subscription merchant is labeled `subscription`, even when prices vary.
+- Other qualifying sequences retain the amount-based rule: amounts less than two cents apart throughout the sequence mean `subscription`; varying amounts mean `recurring_bill`.
+- Single charges, non-monthly histories, income/transfers, invalid amounts/dates, and user-modified rows are not automatically marked.
+- Writes recheck ownership and manual-edit protection. The reported count includes only rows whose recurrence classification actually changed.
+
+Merchant profiles must be populated to supply the known-subscription signal; detection does not seed merchants automatically.
 
 The UI shows counts for **New**, **Updated**, **Skipped**, and **Unavailable**, plus skip reasons and institutions that could not provide transactions. It also reports how many rows the recurring detector flagged. The transaction list is refreshed after the import.
 

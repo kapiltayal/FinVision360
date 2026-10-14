@@ -18,6 +18,7 @@ import {
   validateReviewedTransactionEntries,
 } from "./transaction-import";
 import { checkUserTransactionDuplicates, ImportConflict, saveDuplicateSafeImport, validDuplicateReview } from "./transaction-duplicates";
+import { detectAndMarkRecurring } from "./recurring-transactions";
 
 const transactionUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024, files: 1 } });
 const CORRUPT_TRANSACTION_FILE = "File content could not be read or appears corrupted.";
@@ -379,54 +380,6 @@ function normalizeMerchant(description: string): string {
     .split(" ")
     .slice(0, 3)
     .join(" ");
-}
-
-async function detectAndMarkRecurring(userId: string): Promise<number> {
-  const { rows } = await pool.query(
-    `SELECT id, date, description, amount, type FROM transactions WHERE user_id = $1 AND NOT is_user_modified ORDER BY date ASC`,
-    [userId]
-  );
-
-  const groups: Record<string, Array<{ id: number; date: Date; amount: number }>> = {};
-  for (const row of rows) {
-    const key = normalizeMerchant(row.description);
-    if (!key || key.length < 3) continue;
-    if (!groups[key]) groups[key] = [];
-    groups[key].push({ id: row.id, date: new Date(row.date), amount: parseFloat(row.amount) });
-  }
-
-  const updates: Array<{ id: number; recurringType: string }> = [];
-
-  for (const [, txns] of Object.entries(groups)) {
-    if (txns.length < 2) continue;
-    txns.sort((a, b) => a.date.getTime() - b.date.getTime());
-
-    let recurringPairs = 0;
-    let sameAmountPairs = 0;
-
-    for (let i = 1; i < txns.length; i++) {
-      const daysDiff =
-        (txns[i].date.getTime() - txns[i - 1].date.getTime()) / 86_400_000;
-      if (daysDiff >= 20 && daysDiff <= 45) {
-        recurringPairs++;
-        if (Math.abs(txns[i].amount - txns[i - 1].amount) < 0.02) sameAmountPairs++;
-      }
-    }
-
-    if (recurringPairs < 1) continue;
-    const recurringType = sameAmountPairs === recurringPairs ? "subscription" : "recurring_bill";
-    for (const t of txns) updates.push({ id: t.id, recurringType });
-  }
-
-  for (const u of updates) {
-    await pool.query(
-      `UPDATE transactions SET is_recurring = TRUE, recurring_type = $1, updated_at = NOW()
-       WHERE id = $2 AND user_id = $3`,
-      [u.recurringType, u.id, userId]
-    );
-  }
-
-  return updates.length;
 }
 
 // ─── ROUTE REGISTRATION ───────────────────────────────────────────────────────
@@ -1409,7 +1362,7 @@ export function registerFinanceTrackerRoutes(app: Express) {
         } while (offset < totalTransactions);
       }
 
-      const recurringMarked = inserted || updated ? await detectAndMarkRecurring(userId) : 0;
+      const recurringMarked = inserted || updated ? await detectAndMarkRecurring(pool, userId) : 0;
       res.json({
         inserted,
         updated,
@@ -1434,7 +1387,7 @@ export function registerFinanceTrackerRoutes(app: Express) {
   app.post("/api/transactions/detect-recurring", requireAuth, async (req, res) => {
     try {
       const userId = (req.user as any).id;
-      const updated = await detectAndMarkRecurring(userId);
+      const updated = await detectAndMarkRecurring(pool, userId);
       res.json({ updated });
     } catch (e) {
       console.error(e);

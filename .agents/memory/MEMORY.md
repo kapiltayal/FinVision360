@@ -6,12 +6,13 @@
 - [Native AI integration provisioning](native-ai-integration.md) — Replit-managed AI uses Agent provisioning, not the third-party connector inventory or a personal provider key.
 - [Financial ingestion AI trust boundary](financial-ingestion-ai-trust.md) — AI assigns categories only; source values and server-owned row identities remain authoritative.
 - [Financial import duplicate policy](financial-import-duplicate-policy.md) — uncertain matches require user review; legitimate repeats remain possible, and uncertain-save retries keep their identity.
+- [Merchant identity fallbacks](merchant-identity-fallbacks.md) — imported merchant text can be a copied bank descriptor; retain guarded brand matching and descriptor grouping.
 - [Additive schema changes](additive-schema-changes.md) — avoid broad schema pushes when unrelated drift triggers destructive prompts; use narrowly scoped additive dev DDL.
 - [Recommendation thresholds](recommendation-thresholds.md) — recommendation settings use three aggregate savings thresholds instead of account or policy subtypes.
 - [Retirement net-worth projections](retirement-net-worth-projections.md) — use category fallback returns and conservative debt carry-forward rules when inputs are incomplete.
 - [Early retirement account access](retirement-early-withdrawal-access.md) — under-59½ pretax locks use account category/name inference and a persisted per-account projection override.
 - [AI retirement timeline](ai-retirement-age.md) — AI snapshots use the Retirement Planner timeline as the authoritative retirement age.
-- [Inline TypeScript verification scripts](inline-tsx-verification.md) — wrap async tsx -e work in an IIFE and avoid newer runtime APIs not supported by the project Node version.
+- [TypeScript verification constraints](inline-tsx-verification.md) — builds and runtime tests can accept code the compiler target rejects; use compatible iteration and wrap async inline scripts.
 - [Calculator slider controls](home-affordability-inputs.md) — use a slider with a live value readout, not a duplicate numeric input.
 - [Radix submenu placement](radix-submenu-placement.md) — use a full-row trigger anchor; narrow arrow anchors overlap the root when Radix flips submenus left.
 - [Budget plan defaults](budget-plan-defaults.md) — displayed suggestions count toward the plan; saved zero overrides them, and viewing a month must not silently save defaults.
