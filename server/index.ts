@@ -4,6 +4,7 @@ import { serveStatic } from "./static";
 import { createServer } from "http";
 import { pool } from "./db";
 import { ensureTransactionImportSchema } from "./transaction-import-schema";
+import { createApiRequestLogger, formatSafeApiError, getSafeApiRoutePath } from "./api-logging";
 
 const app = express();
 const httpServer = createServer(app);
@@ -36,31 +37,7 @@ export function log(message: string, source = "express") {
   console.log(`${formattedTime} [${source}] ${message}`);
 }
 
-app.use((req, res, next) => {
-  const start = Date.now();
-  const path = req.path;
-  let capturedJsonResponse: Record<string, any> | undefined = undefined;
-
-  const originalResJson = res.json;
-  res.json = function (bodyJson, ...args) {
-    capturedJsonResponse = bodyJson;
-    return originalResJson.apply(res, [bodyJson, ...args]);
-  };
-
-  res.on("finish", () => {
-    const duration = Date.now() - start;
-    if (path.startsWith("/api")) {
-      let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
-      if (capturedJsonResponse) {
-        logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
-      }
-
-      log(logLine);
-    }
-  });
-
-  next();
-});
+app.use(createApiRequestLogger((message) => log(message)));
 
 (async () => {
   // Ensure estate planning tables exist on every startup (safe on existing DBs).
@@ -170,7 +147,7 @@ app.use((req, res, next) => {
       firm TEXT,
       notes TEXT
     );
-  `).catch((e) => console.error("Estate table init error:", e));
+  `).catch((e) => console.error(formatSafeApiError("Estate schema initialization", e)));
 
   // Add unique constraints if missing (needed for ON CONFLICT upserts).
   await pool.query(`
@@ -188,11 +165,11 @@ app.use((req, res, next) => {
         ALTER TABLE estate_documents ADD CONSTRAINT estate_documents_user_type_unique UNIQUE (user_id, document_type);
       END IF;
     END $$;
-  `).catch((e) => console.error("Estate constraint init error:", e));
+  `).catch((e) => console.error(formatSafeApiError("Estate constraint initialization", e)));
 
   if (process.env.NODE_ENV !== "production") {
     const { seedDatabase } = await import("./seed");
-    await seedDatabase().catch((e) => console.error("Seed error:", e));
+    await seedDatabase().catch((e) => console.error(formatSafeApiError("Development seed initialization", e)));
   }
   await registerRoutes(httpServer, app);
 
@@ -203,7 +180,8 @@ app.use((req, res, next) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
 
-    console.error("Internal Server Error:", err);
+    const routePath = getSafeApiRoutePath(req.route?.path);
+    console.error(formatSafeApiError(`${req.method} ${routePath} status=${status}`, err));
 
     if (res.headersSent) {
       return next(err);

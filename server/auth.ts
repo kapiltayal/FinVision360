@@ -3,6 +3,7 @@ import { type Express, type Request, type Response, type NextFunction } from "ex
 import { storage } from "./storage";
 import { COUNTRY_OPTIONS, US_STATE_OPTIONS } from "@shared/profile-options";
 import { SIGNUP_DISCOVERY_SOURCES } from "@shared/signup-discovery";
+import { formatSafeApiError } from "./api-logging";
 
 function getSignupDiscoverySource(userMetadata: unknown): string | undefined {
   if (!userMetadata || typeof userMetadata !== "object") return undefined;
@@ -77,7 +78,7 @@ export function setupAuth(app: Express) {
       }
       res.json({ ok: true });
     } catch (err) {
-      console.error("Provision error:", err);
+      console.error(formatSafeApiError("User provisioning", err));
       res.status(500).json({ message: "Failed to provision user" });
     }
   });
@@ -152,7 +153,7 @@ export async function authenticateSupabase(req: any, res: Response, next: NextFu
     req.user = localUser;
     next();
   } catch (err) {
-    console.error("Auth middleware error:", err);
+    console.error(formatSafeApiError("Supabase authentication", err));
     return res.status(500).json({ message: "Authentication error" });
   }
 }

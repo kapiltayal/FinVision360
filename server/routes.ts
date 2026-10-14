@@ -6,6 +6,7 @@ import { setupAuth, requireAuth, requireAdmin, authenticateSupabase } from "./au
 import { db, pool } from "./db";
 import { CloseWindowError, runMonthlyBackup } from "./monthly-backup";
 import { registerFinanceTrackerRoutes } from "./finance-tracker-routes";
+import { formatSafeApiError, getSafeApiRoutePath } from "./api-logging";
 import {
   assets,
   liabilities,
@@ -265,7 +266,7 @@ async function streamAdvisorResponse(
         try {
           await onComplete(completedResponse);
         } catch (historyError) {
-          console.error(`AI ${operation} history save error:`, historyError);
+          console.error(formatSafeApiError("AI analysis history save", historyError));
         }
       }
       res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
@@ -273,7 +274,7 @@ async function streamAdvisorResponse(
     }
   } catch (error) {
     if (abortController.signal.aborted || res.destroyed) return;
-    console.error(`AI ${operation} error:`, error);
+    console.error(formatSafeApiError("AI analysis", error));
     const message = error instanceof AIProviderError ? error.message : "AI analysis failed";
     if (res.headersSent) {
       res.write(`data: ${JSON.stringify({ error: message })}\n\n`);
@@ -303,6 +304,9 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
+  const logRouteFailure = (req: any, error: unknown) => {
+    console.error(formatSafeApiError(getSafeApiRoutePath(req?.route?.path), error));
+  };
   setupAuth(app);
 
   async function categoriesFor(kind: IngestionKind): Promise<Category[]> {
@@ -444,7 +448,7 @@ export async function registerRoutes(
         else await tx.insert(liabilities).values(liabilityEntries);
       });
     } catch (error) {
-      console.error(`[${kind} import] transaction failed`, error);
+      logRouteFailure(req, error);
       return res.status(500).json({ message: "Nothing was saved. Please try again." });
     }
     res.status(201).json({ inserted: entries.length, updated: 0, skipped: 0, skippedReasons: {} });
@@ -1067,7 +1071,7 @@ Include a year-by-year overview, useful milestones, a conservative/base/optimist
       );
       res.json(rows);
     } catch (error) {
-      console.error("AI history load error:", error);
+      logRouteFailure(req, error);
       res.status(500).json({ message: "Failed to load AI query history" });
     }
   });
@@ -1087,7 +1091,7 @@ Include a year-by-year overview, useful milestones, a conservative/base/optimist
       if (!rowCount) return res.status(404).json({ message: "Archive entry not found" });
       res.status(204).end();
     } catch (error) {
-      console.error("AI history delete error:", error);
+      logRouteFailure(req, error);
       res.status(500).json({ message: "Failed to delete archive entry" });
     }
   });
@@ -1100,7 +1104,7 @@ Include a year-by-year overview, useful milestones, a conservative/base/optimist
       );
       res.json({ deleted: rowCount ?? 0 });
     } catch (error) {
-      console.error("AI history clear error:", error);
+      logRouteFailure(req, error);
       res.status(500).json({ message: "Failed to clear AI Lab archives" });
     }
   });
@@ -1657,7 +1661,7 @@ Include a year-by-year overview, useful milestones, a conservative/base/optimist
         if (result.imported) inserted++;
         else addSkipped(result.reason ?? "could not be imported");
       } catch (error) {
-        console.error("[plaid] import to book failed", error);
+        logRouteFailure(req, error);
         addSkipped("could not be imported");
       }
     }
@@ -1683,7 +1687,7 @@ Include a year-by-year overview, useful milestones, a conservative/base/optimist
       });
       res.json({ link_token: response.data.link_token });
     } catch (err: any) {
-      console.error("[plaid] create-link-token error:", err?.response?.data || err.message);
+      logRouteFailure(req, err);
       res.status(500).json({ message: "Failed to create Plaid link token" });
     }
   });
@@ -1731,7 +1735,7 @@ Include a year-by-year overview, useful milestones, a conservative/base/optimist
 
       res.json({ success: true, institution: plaidItem.institutionName });
     } catch (err: any) {
-      console.error("[plaid] exchange-token error:", err?.response?.data || err.message);
+      logRouteFailure(req, err);
       res.status(500).json({ message: "Failed to connect account" });
     }
   });
@@ -1772,7 +1776,7 @@ Include a year-by-year overview, useful milestones, a conservative/base/optimist
       });
       res.json({ link_token: response.data.link_token });
     } catch (err: any) {
-      console.error("[plaid] create-update-link-token error:", err?.response?.data || err.message);
+      logRouteFailure(req, err);
       res.status(500).json({ message: "Failed to prepare account reconnect" });
     }
   });
@@ -1807,7 +1811,7 @@ Include a year-by-year overview, useful milestones, a conservative/base/optimist
       const accounts = await storage.getPlaidAccountsByItem(item.id);
       res.json({ accounts, lastSynced: new Date() });
     } catch (err: any) {
-      console.error("[plaid] sync error:", err?.response?.data || err.message);
+      logRouteFailure(req, err);
       if (err?.response?.data?.error_code === "ITEM_LOGIN_REQUIRED") {
         return res.status(409).json({
           code: "ITEM_LOGIN_REQUIRED",
@@ -1840,7 +1844,7 @@ Include a year-by-year overview, useful milestones, a conservative/base/optimist
       await storage.deletePlaidItem(id, userId);
       res.status(204).send();
     } catch (err: any) {
-      console.error("[plaid] delete error:", err.message);
+      logRouteFailure(req, err);
       res.status(500).json({ message: "Failed to disconnect account" });
     }
   });
@@ -1855,7 +1859,7 @@ Include a year-by-year overview, useful milestones, a conservative/base/optimist
       return res.status(400).json({ message: "Please enter a valid email address." });
     }
     await storage.createContactSubmission({ name, email, subject, message });
-    console.log(`[contact] New submission saved from ${name} <${email}> | Subject: ${subject}`);
+    console.log("[contact] Submission received");
     res.json({ message: "Thank you! We've received your message and will be in touch soon." });
   });
 
@@ -1913,7 +1917,7 @@ Include a year-by-year overview, useful milestones, a conservative/base/optimist
 
       res.json(data);
     } catch (err) {
-      console.error("[history/net-worth]", err);
+      logRouteFailure(req, err);
       res.status(500).json({ message: "Failed to load history" });
     }
   });
@@ -1932,7 +1936,7 @@ Include a year-by-year overview, useful milestones, a conservative/base/optimist
       return res.json(result);
     } catch (err) {
       if (err instanceof CloseWindowError) return res.status(409).json({ message: err.message });
-      console.error("[monthly-backup] database error:", err);
+      logRouteFailure(req, err);
       return res.status(500).json({ message: "Database error during monthly backup" });
     }
   });
@@ -1965,7 +1969,7 @@ Include a year-by-year overview, useful milestones, a conservative/base/optimist
       });
       return res.status(201).json(goal);
     } catch (err: any) {
-      console.error("[POST /api/goals] error:", err.message);
+      logRouteFailure(req, err);
       return res.status(500).json({ message: "Failed to create goal" });
     }
   });

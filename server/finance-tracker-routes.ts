@@ -19,6 +19,7 @@ import {
 } from "./transaction-import";
 import { checkUserTransactionDuplicates, ImportConflict, saveDuplicateSafeImport, validDuplicateReview } from "./transaction-duplicates";
 import { detectAndMarkRecurring } from "./recurring-transactions";
+import { formatSafeApiError, getSafeApiRoutePath } from "./api-logging";
 
 const transactionUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024, files: 1 } });
 const CORRUPT_TRANSACTION_FILE = "File content could not be read or appears corrupted.";
@@ -384,13 +385,17 @@ function normalizeMerchant(description: string): string {
 
 // ─── ROUTE REGISTRATION ───────────────────────────────────────────────────────
 export function registerFinanceTrackerRoutes(app: Express) {
+  const logRouteFailure = (req: any, error: unknown) => {
+    console.error(formatSafeApiError(getSafeApiRoutePath(req?.route?.path), error));
+  };
+
   // Canonical selectable categories.  Display labels remain DB-owned while the
   // storage keys are deliberately lowercase to match existing transactions.
   app.get("/api/transaction-categories", requireAuth, async (_req, res) => {
     try {
       res.json(await canonicalTransactionCategories());
     } catch (error) {
-      console.error(error);
+      logRouteFailure(_req, error);
       res.status(500).json({ message: "Failed to fetch transaction categories" });
     }
   });
@@ -522,7 +527,7 @@ export function registerFinanceTrackerRoutes(app: Express) {
         })),
       });
     } catch (error) {
-      console.error("[GET /api/budget-plan] error:", error);
+      logRouteFailure(req, error);
       return res.status(500).json({ message: "Failed to load the monthly budget plan" });
     }
   });
@@ -579,7 +584,7 @@ export function registerFinanceTrackerRoutes(app: Express) {
         })),
       });
     } catch (error) {
-      console.error("[PUT /api/budget-plan/bulk] error:", error);
+      logRouteFailure(req, error);
       return res.status(500).json({ message: "Failed to copy monthly averages to the budget plan" });
     }
   });
@@ -617,7 +622,7 @@ export function registerFinanceTrackerRoutes(app: Express) {
         plannedAmount: Number(rows[0].planned_amount),
       });
     } catch (error) {
-      console.error("[PUT /api/budget-plan] error:", error);
+      logRouteFailure(req, error);
       return res.status(500).json({ message: "Failed to save the monthly budget plan" });
     }
   });
@@ -639,7 +644,7 @@ export function registerFinanceTrackerRoutes(app: Express) {
       if (!rowCount) return res.status(404).json({ message: "Budget plan not found" });
       return res.status(204).send();
     } catch (error) {
-      console.error("[DELETE /api/budget-plan] error:", error);
+      logRouteFailure(req, error);
       return res.status(500).json({ message: "Failed to remove the budget plan line" });
     }
   });
@@ -663,7 +668,7 @@ export function registerFinanceTrackerRoutes(app: Express) {
       );
       res.json(rows);
     } catch (e) {
-      console.error(e);
+      logRouteFailure(req, e);
       res.status(500).json({ message: "Failed to fetch transaction accounts" });
     }
   });
@@ -692,7 +697,7 @@ export function registerFinanceTrackerRoutes(app: Express) {
       const { rows } = await pool.query(sql, params);
       res.json(rows);
     } catch (e) {
-      console.error(e);
+      logRouteFailure(req, e);
       res.status(500).json({ message: "Failed to fetch transactions" });
     }
   });
@@ -722,7 +727,7 @@ export function registerFinanceTrackerRoutes(app: Express) {
       );
       res.json(rows[0]);
     } catch (e) {
-      console.error(e);
+      logRouteFailure(req, e);
       res.status(500).json({ message: "Failed to fetch stats" });
     }
   });
@@ -836,7 +841,7 @@ export function registerFinanceTrackerRoutes(app: Express) {
         categories,
       });
     } catch (e) {
-      console.error(e);
+      logRouteFailure(req, e);
       res.status(500).json({ message: "Failed to calculate monthly transaction averages" });
     }
   });
@@ -902,7 +907,7 @@ export function registerFinanceTrackerRoutes(app: Express) {
 
       res.json(completeSeries);
     } catch (e) {
-      console.error(e);
+      logRouteFailure(req, e);
       res.status(500).json({ message: "Failed to fetch trend" });
     }
   });
@@ -928,7 +933,7 @@ export function registerFinanceTrackerRoutes(app: Express) {
       );
       res.json(rows);
     } catch (e) {
-      console.error(e);
+      logRouteFailure(req, e);
       res.status(500).json({ message: "Failed to fetch categories" });
     }
   });
@@ -989,7 +994,7 @@ export function registerFinanceTrackerRoutes(app: Express) {
         needsWant: needsWantRows[0] ?? { needs: "0", wants: "0", unclassified: "0" },
       });
     } catch (e) {
-      console.error(e);
+      logRouteFailure(req, e);
       res.status(500).json({ message: "Failed to fetch spending insights" });
     }
   });
@@ -1028,7 +1033,7 @@ export function registerFinanceTrackerRoutes(app: Express) {
 
       res.status(201).json(rows[0]);
     } catch (e) {
-      console.error(e);
+      logRouteFailure(req, e);
       res.status(500).json({ message: "Failed to create transaction" });
     }
   });
@@ -1112,7 +1117,7 @@ export function registerFinanceTrackerRoutes(app: Express) {
       }
       return res.json(preview);
     } catch (error) {
-      console.error("[POST /api/transactions/ingest/preview] error:", error);
+      logRouteFailure(req, error);
       return fail(500, "Failed to preview transaction import");
     }
   });
@@ -1125,7 +1130,7 @@ export function registerFinanceTrackerRoutes(app: Express) {
       const entries = await checkUserTransactionDuplicates(pool, (req.user as any).id, req.body.entries);
       return res.json({ entries });
     } catch (error) {
-      console.error("Transaction duplicate review failed:", error);
+      logRouteFailure(req, error);
       return res.status(500).json({ message: "Could not check duplicates. Your review has not been saved." });
     }
   });
@@ -1159,7 +1164,7 @@ export function registerFinanceTrackerRoutes(app: Express) {
       return res.json(result);
     } catch (error) {
       if (error instanceof ImportConflict) return res.status(409).json({ message: error.message, code: error.code });
-      console.error("[POST /api/transactions/import-reviewed] error:", error);
+      logRouteFailure(req, error);
       return res.status(500).json({ message: "Failed to save reviewed transactions" });
     } finally {
       if (importClient) {
@@ -1265,10 +1270,7 @@ export function registerFinanceTrackerRoutes(app: Express) {
               },
             });
           } catch (error: any) {
-            console.error(
-              `[plaid] transaction import failed for item ${item.id}:`,
-              error?.response?.data || error?.message
-            );
+            logRouteFailure(req, error);
             unavailableInstitutions.push(item.institutionName || "Connected Institution");
             break;
           }
@@ -1379,7 +1381,7 @@ export function registerFinanceTrackerRoutes(app: Express) {
         recurringMarked,
       });
     } catch (e) {
-      console.error(e);
+      logRouteFailure(req, e);
       res.status(500).json({ message: "Failed to import connected account transactions" });
     }
   });
@@ -1391,7 +1393,7 @@ export function registerFinanceTrackerRoutes(app: Express) {
       const updated = await detectAndMarkRecurring(pool, userId);
       res.json({ updated });
     } catch (e) {
-      console.error(e);
+      logRouteFailure(req, e);
       res.status(500).json({ message: "Failed to detect recurring" });
     }
   });
@@ -1593,7 +1595,7 @@ export function registerFinanceTrackerRoutes(app: Express) {
         await editClient.query("ROLLBACK").catch(() => undefined);
         editClient.release();
       }
-      console.error(e);
+      logRouteFailure(req, e);
       res.status(500).json({ message: "Failed to update transaction" });
     }
   });
@@ -1609,7 +1611,7 @@ export function registerFinanceTrackerRoutes(app: Express) {
       if (!rowCount) return res.status(404).json({ message: "Not found" });
       res.status(204).send();
     } catch (e) {
-      console.error(e);
+      logRouteFailure(req, e);
       res.status(500).json({ message: "Failed to delete transaction" });
     }
   });
