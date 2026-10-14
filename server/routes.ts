@@ -502,7 +502,8 @@ export async function registerRoutes(
   app.delete("/api/assets/:id", requireAuth, async (req, res) => {
     const userId = (req.user as any).id;
     const id = parseInt(req.params.id);
-    await storage.deleteAsset(id, userId);
+    const deleted = await storage.deleteAsset(id, userId);
+    if (!deleted) return res.status(404).json({ message: "Asset not found" });
     res.status(204).send();
   });
 
@@ -568,7 +569,8 @@ export async function registerRoutes(
   app.delete("/api/liabilities/:id", requireAuth, async (req, res) => {
     const userId = (req.user as any).id;
     const id = parseInt(req.params.id);
-    await storage.deleteLiability(id, userId);
+    const deleted = await storage.deleteLiability(id, userId);
+    if (!deleted) return res.status(404).json({ message: "Liability not found" });
     res.status(204).send();
   });
 

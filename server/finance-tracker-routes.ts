@@ -631,11 +631,12 @@ export function registerFinanceTrackerRoutes(app: Express) {
         return res.status(400).json({ message: "A valid budget month and planKey are required" });
       }
       if (isHistoricalBudgetMonth(month)) return res.status(403).json({ message: "Historical budget plans are read-only" });
-      await pool.query(
+      const { rowCount } = await pool.query(
         `DELETE FROM budget_plans
          WHERE user_id = $1 AND month = $2::date AND plan_key = $3`,
         [userId, `${month}-01`, planKey.trim()],
       );
+      if (!rowCount) return res.status(404).json({ message: "Budget plan not found" });
       return res.status(204).send();
     } catch (error) {
       console.error("[DELETE /api/budget-plan] error:", error);

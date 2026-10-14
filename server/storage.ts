@@ -42,13 +42,13 @@ export interface IStorage {
   getAsset(id: number, userId: string): Promise<Asset | undefined>;
   createAsset(asset: InsertAsset): Promise<Asset>;
   updateAsset(id: number, userId: string, data: Partial<InsertAsset>): Promise<Asset | undefined>;
-  deleteAsset(id: number, userId: string): Promise<void>;
+  deleteAsset(id: number, userId: string): Promise<boolean>;
 
   getLiabilities(userId: string): Promise<Liability[]>;
   getLiability(id: number, userId: string): Promise<Liability | undefined>;
   createLiability(liability: InsertLiability): Promise<Liability>;
   updateLiability(id: number, userId: string, data: Partial<InsertLiability>): Promise<Liability | undefined>;
-  deleteLiability(id: number, userId: string): Promise<void>;
+  deleteLiability(id: number, userId: string): Promise<boolean>;
   getAssetCategories(): Promise<Array<{ parentCategory: string; category: string; description: string }>>;
   getLiabilityCategories(): Promise<Array<{ parentCategory: string; category: string; description: string }>>;
 
@@ -179,12 +179,15 @@ export class DatabaseStorage implements IStorage {
     return updated;
   }
 
-  async deleteAsset(id: number, userId: string): Promise<void> {
-    await db.transaction(async (tx) => {
+  async deleteAsset(id: number, userId: string): Promise<boolean> {
+    return db.transaction(async (tx) => {
       await tx.update(plaidAccounts)
         .set({ linkedAssetId: null })
         .where(and(eq(plaidAccounts.linkedAssetId, id), eq(plaidAccounts.userId, userId)));
-      await tx.delete(assets).where(and(eq(assets.id, id), eq(assets.userId, userId)));
+      const [deleted] = await tx.delete(assets)
+        .where(and(eq(assets.id, id), eq(assets.userId, userId)))
+        .returning({ id: assets.id });
+      return Boolean(deleted);
     });
   }
 
@@ -207,12 +210,15 @@ export class DatabaseStorage implements IStorage {
     return updated;
   }
 
-  async deleteLiability(id: number, userId: string): Promise<void> {
-    await db.transaction(async (tx) => {
+  async deleteLiability(id: number, userId: string): Promise<boolean> {
+    return db.transaction(async (tx) => {
       await tx.update(plaidAccounts)
         .set({ linkedLiabilityId: null })
         .where(and(eq(plaidAccounts.linkedLiabilityId, id), eq(plaidAccounts.userId, userId)));
-      await tx.delete(liabilities).where(and(eq(liabilities.id, id), eq(liabilities.userId, userId)));
+      const [deleted] = await tx.delete(liabilities)
+        .where(and(eq(liabilities.id, id), eq(liabilities.userId, userId)))
+        .returning({ id: liabilities.id });
+      return Boolean(deleted);
     });
   }
 
