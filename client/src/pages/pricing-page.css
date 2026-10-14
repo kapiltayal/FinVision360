@@ -21,11 +21,10 @@
 }
 
 .pricing-hero {
-  min-height: 355px;
-  margin: -1.25rem -1.5rem 4.75rem;
-  padding: 3.5rem clamp(1.5rem, 7vw, 6.5rem) 2.75rem;
+  margin: -1.25rem -1.5rem 2.5rem;
+  padding: 1.25rem clamp(1.5rem, 5vw, 4.5rem);
   display: grid;
-  grid-template-columns: 1.1fr .9fr;
+  grid-template-columns: 1.55fr .45fr;
   align-items: center;
   position: relative;
   overflow: hidden;
@@ -67,7 +66,7 @@
   display: flex;
   align-items: center;
   gap: .65rem;
-  margin-bottom: 1.25rem;
+  margin-bottom: .65rem;
 }
 
 .pricing-eyebrow > span {
@@ -80,8 +79,8 @@
   max-width: 650px;
   margin: 0;
   font-family: Georgia, "Times New Roman", serif;
-  font-size: clamp(3rem, 6vw, 5.65rem);
-  line-height: .99;
+  font-size: clamp(2rem, 3.4vw, 2.75rem);
+  line-height: 1.06;
   letter-spacing: -.058em;
   font-weight: 500;
 }
@@ -92,11 +91,11 @@
 }
 
 .pricing-intro {
-  max-width: 425px;
+  max-width: 580px;
   color: hsl(var(--price-muted));
-  font-size: 1.02rem;
-  line-height: 1.7;
-  margin: 1.45rem 0 1.15rem;
+  font-size: .9rem;
+  line-height: 1.5;
+  margin: .7rem 0 .45rem;
 }
 
 .pricing-compare-link {
@@ -123,11 +122,11 @@
 }
 
 .pricing-orbit {
-  width: min(100%, 390px);
+  width: min(100%, 210px);
   aspect-ratio: 1;
   justify-self: center;
   position: relative;
-  margin: -1rem 0 -1.5rem;
+  margin: 0;
   animation: pricing-enter .8s .1s both;
 }
 
@@ -398,10 +397,10 @@
 
 @media (max-width: 700px) {
   .pricing-page { padding-bottom: .25rem; }
-  .pricing-hero { grid-template-columns: 1fr; min-height: auto; margin: -1rem -1rem 3rem; padding: 2.7rem 1.25rem 1.5rem; }
-  .pricing-hero h1 { font-size: clamp(3rem, 12vw, 4.3rem); }
-  .pricing-intro { max-width: 390px; font-size: .93rem; }
-  .pricing-orbit { width: min(76vw, 300px); margin: 1rem auto -.8rem; }
+  .pricing-hero { grid-template-columns: 1fr; margin: -1rem -1rem 2rem; padding: 1.35rem 1.25rem; }
+  .pricing-hero h1 { font-size: clamp(1.85rem, 7.8vw, 2.35rem); }
+  .pricing-intro { max-width: 390px; font-size: .875rem; }
+  .pricing-orbit { position: absolute; width: 170px; right: -65px; top: 1rem; margin: 0; opacity: .12; animation: none; pointer-events: none; }
   .pricing-plans-section, .pricing-comparison { margin-bottom: 3.5rem; }
   .pricing-section-heading { align-items: flex-start; flex-direction: column; gap: .65rem; margin-bottom: 1.2rem; }
   .pricing-monthly-note { padding: 0; }
