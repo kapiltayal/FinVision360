@@ -21,3 +21,4 @@
 - [Pricing scope](pricing-scope.md) — paid rates are intentionally undecided; a marketing comparison is not permission to charge or enforce plan limits.
 - [Database test isolation](database-test-isolation.md) — pooled route/ORM tests need shared committed fixtures and user-scoped cleanup; handler identity tests do not verify login tokens.
 - [API log privacy](api-log-privacy.md) — log route templates, status and duration; error summaries keep safe type/code without bodies, URLs, tokens or financial values.
+- [SheetJS advisory ranges](sheetjs-advisory-versioning.md) — vendor releases can be newer than npm; compare actual affected ranges and document scanner false positives.
