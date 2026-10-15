@@ -22,29 +22,29 @@ without attempting any email through another account.
 
 ## Required sender-domain setup
 
-The user selected `finvision360.com` instead of the already verified
-`finquest360.com` domain. A verification attempt returned "This domain has been
-claimed by another team and can no longer be verified." Its public DKIM key
-differs from the one issued to the connected account.
-
 The user confirmed that FinVision360 has its own completely separate Resend
 account. Configure the project-only secret from that account rather than
 replacing the shared connector's credentials. Verify the domain in the separate
 account before testing email. A sending-only key cannot list domains; check
 verification in the account's dashboard if that permission is restricted.
 
-**The records below and in Resend_DNS_records.txt are archived values from the
-previously connected team, not authoritative setup instructions. Do not overwrite
-working DNS with them. Use the intended team's Resend Domains page instead.**
+The dedicated key was confirmed against the intended account. The records below
+and in `Resend_DNS_records.txt` were retrieved from that account and supersede
+the earlier legacy-account records. Resend's current domain page is the source
+of truth if the domain is recreated or its DNS configuration changes.
 
 Names below are relative to **finvision360.com**.
 
-| Type | Name | Value | Priority |
-| --- | --- | --- | --- |
-| TXT | `resend._domainkey` | `p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDuBbTVtX3VKD4S2wnYeqP1K09bPXt+VpYfwDD4/MN5RQgy9cu2K0evLDrIeup6/i0KPc4UYFbUp4SARimZ4q21Jfno6DFJc72lKQWWgbYtD39Bc7A0dUmlUtY0d6EgP9n21JNzFN+OnVWuuetUBdR4Qpm3uHi6whrEPFjmqGjlXwIDAQAB` | — |
-| MX | `send` | `feedback-smtp.us-east-1.amazonses.com` | 10 |
-| TXT | `send` | `v=spf1 include:amazonses.com ~all` | — |
-| CNAME | `rsend` | `send.forge.rmta.net` | — |
+| Type | Name | Value |
+| --- | --- | --- |
+| TXT | `resend._domainkey` | `p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQC6N6oMPus6nX5CMk95wgksDB0QATILZgm6pEYluTIlT8FPWuEltz+oqSyspM6LhxWHb/JjdcANAfe7KnVfoJKrVi6anRGuM82RDlACiHrzRzEa4AXLs8JBq6K4/UXKCaXAcwwLtZPmwXyuOZJj1AhU8U0Mp7sjtmaEeG1wIsQOtwIDAQAB` |
+| CNAME | `send` | `send.forge.rmta.net` |
+| CNAME | `rsend` | `rsend.forge.rmta.net` |
+
+Replace an empty `v=DKIM1; p=` TXT value with the complete DKIM value above.
+Do not create competing TXT keys at that host. A CNAME cannot coexist with other
+record types at the same hostname; do not combine the old account's `send`
+MX/TXT instructions with this account's `send` CNAME.
 
 These are sending-domain records. **Do not replace the domain's existing root
 MX records** or disrupt the mailbox receiving mail at contactus@finvision360.com.

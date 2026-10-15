@@ -23,6 +23,8 @@ The newly generated DKIM records were therefore not authoritative for that team.
 **How to apply:** A domain-claim rejection is not necessarily invalid credentials
 or slow DNS propagation. Use the intended owner's account and its domain
 records, rather than repeatedly verifying or overwriting working DNS.
+Record types can differ between accounts as well as their values; use the
+intended account's current domain records rather than a generic MX/SPF template.
 
 Keep the FinVision360 Resend account completely separate from FinQuest360.
 Do not reuse the legacy shared connection or replace its credentials.

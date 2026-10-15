@@ -1,37 +1,32 @@
 DNS records for finvision360.com — Resend feedback notifications
 
-CAUTION: THESE RECORDS ARE ARCHIVED, NOT CURRENT SETUP INSTRUCTIONS.
-Resend reports that this domain has been claimed by another team, and its
-public DKIM record differs from the key below. This app must use its dedicated
-RESEND_API_KEY secret from the separate FinVision360 Resend account.
-Do not replace the shared FinQuest connector's credentials.
-Use that team's Domains page as the source of truth for DNS records.
-Do not overwrite working DNS with the archived values below.
+CURRENT RECORDS FROM THE SEPARATE FINVISION360 RESEND ACCOUNT
+These replace the earlier records issued by the legacy shared account.
+The dedicated RESEND_API_KEY has been confirmed to access only finvision360.com.
 
-Add these records in the DNS provider for finvision360.com.
+Add or correct these three records in the DNS provider for finvision360.com.
 Use TTL Auto (or the provider's default). Names are relative to finvision360.com.
 Do not replace the existing root MX records used by your receiving mail provider.
 
 1. DKIM
 Type: TXT
 Name: resend._domainkey
-Value: p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDuBbTVtX3VKD4S2wnYeqP1K09bPXt+VpYfwDD4/MN5RQgy9cu2K0evLDrIeup6/i0KPc4UYFbUp4SARimZ4q21Jfno6DFJc72lKQWWgbYtD39Bc7A0dUmlUtY0d6EgP9n21JNzFN+OnVWuuetUBdR4Qpm3uHi6whrEPFjmqGjlXwIDAQAB
+Value: p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQC6N6oMPus6nX5CMk95wgksDB0QATILZgm6pEYluTIlT8FPWuEltz+oqSyspM6LhxWHb/JjdcANAfe7KnVfoJKrVi6anRGuM82RDlACiHrzRzEa4AXLs8JBq6K4/UXKCaXAcwwLtZPmwXyuOZJj1AhU8U0Mp7sjtmaEeG1wIsQOtwIDAQAB
+Replace the existing empty "v=DKIM1; p=" TXT value at this host with the ENTIRE
+value above. Do not leave p= empty or create competing DKIM values at this host.
 
 2. Sending return path
-Type: MX
+Type: CNAME
 Name: send
-Value: feedback-smtp.us-east-1.amazonses.com
-Priority: 10
+Value: send.forge.rmta.net
+Use DNS-only mode if the provider offers proxying.
+Do not create the old account's MX/TXT records at the send host alongside this
+CNAME; a CNAME cannot coexist with other record types at the same host.
 
-3. SPF
-Type: TXT
-Name: send
-Value: v=spf1 include:amazonses.com ~all
-
-4. Sending routing
+3. Sending routing
 Type: CNAME
 Name: rsend
-Value: send.forge.rmta.net
+Value: rsend.forge.rmta.net
 Use DNS-only mode if the provider offers proxying.
 
 After adding the records, open finvision360.com in Resend's Domains page
