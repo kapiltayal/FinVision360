@@ -1,0 +1,16 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "EVBDKUlIUwC9msBbGSOBo"
+uri = "file://docs/Resend_DNS_records.txt"
+type = "text"
+title = "Resend DNS records for finvision360.com"
+description = "Copy these four records into your DNS provider to verify the sender domain. Keep your existing root MX records unchanged."
+logical_id = "a7825509-2a45-4819-af4b-732edfb8d503"
+content_hash = "sha256:b0b0d20d2edcdd98f154843d88874d49226ff348050fed9c39ddaf1ac4bee156"
+size = 1135
+mtime_ms = 1792091838700
+storage_uri = "gcs://replit-rams-assets-picard/rams/assets/repl:5e09c6ac-9b26-4639-b703-f5f7a6f15d48/a7825509-2a45-4819-af4b-732edfb8d503/c27164c9-2f25-4eb5-8ce5-05f884084882"
+storage_version_token = "1792091999784544"
+content_type = "text/plain"

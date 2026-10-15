@@ -23,3 +23,4 @@
 - [API log privacy](api-log-privacy.md) — log route templates, status and duration; error summaries keep safe type/code without bodies, URLs, tokens or financial values.
 - [SheetJS advisory ranges](sheetjs-advisory-versioning.md) — vendor releases can be newer than npm; compare actual affected ranges and document scanner false positives.
 - [Styling compatibility](styling-compatibility.md) — security-driven toolchain upgrades preserve the existing design; avoid token collisions and focus-accessibility regressions.
+- [Feedback sender policy](feedback-email-policy.md) — use the FinVision360 sender domain, not the older FinQuest domain; save feedback before notifying.

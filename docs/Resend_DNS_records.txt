@@ -1,0 +1,33 @@
+DNS records for finvision360.com — Resend feedback notifications
+
+Add these records in the DNS provider for finvision360.com.
+Use TTL Auto (or the provider's default). Names are relative to finvision360.com.
+Do not replace the existing root MX records used by your receiving mail provider.
+
+1. DKIM
+Type: TXT
+Name: resend._domainkey
+Value: p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDuBbTVtX3VKD4S2wnYeqP1K09bPXt+VpYfwDD4/MN5RQgy9cu2K0evLDrIeup6/i0KPc4UYFbUp4SARimZ4q21Jfno6DFJc72lKQWWgbYtD39Bc7A0dUmlUtY0d6EgP9n21JNzFN+OnVWuuetUBdR4Qpm3uHi6whrEPFjmqGjlXwIDAQAB
+
+2. Sending return path
+Type: MX
+Name: send
+Value: feedback-smtp.us-east-1.amazonses.com
+Priority: 10
+
+3. SPF
+Type: TXT
+Name: send
+Value: v=spf1 include:amazonses.com ~all
+
+4. Sending routing
+Type: CNAME
+Name: rsend
+Value: send.forge.rmta.net
+Use DNS-only mode if the provider offers proxying.
+
+After adding the records, open finvision360.com in Resend's Domains page
+and verify it. The domain must show verified before feedback emails can send.
+
+Notification sender: FinVision360 Feedback <notifications@finvision360.com>
+Notification recipient: contactus@finvision360.com

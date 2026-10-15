@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { MAX_FEEDBACK_LENGTH, type FeedbackSubmissionResult } from "@shared/feedback";
 
 export function FeedbackButton() {
   const [open, setOpen] = useState(false);
@@ -14,10 +15,18 @@ export function FeedbackButton() {
   const { toast } = useToast();
 
   const submitFeedback = useMutation({
-    mutationFn: () => apiRequest("POST", "/api/feedback", { message }),
-    onSuccess: () => {
+    mutationFn: async (): Promise<FeedbackSubmissionResult> => {
+      const response = await apiRequest("POST", "/api/feedback", { message });
+      return response.json();
+    },
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ["/api/feedback"] });
-      toast({ title: "Thank you!", description: "Your feedback has been submitted." });
+      toast(result.notificationEmailStatus === "failed"
+        ? {
+          title: "Feedback saved",
+          description: "Your feedback is saved, but the email notification could not be confirmed. You don't need to submit it again.",
+        }
+        : { title: "Thank you!", description: "Your feedback has been submitted." });
       setMessage("");
       setOpen(false);
     },
@@ -72,6 +81,7 @@ export function FeedbackButton() {
             onChange={(e) => setMessage(e.target.value)}
             placeholder="What's on your mind?"
             rows={5}
+            maxLength={MAX_FEEDBACK_LENGTH}
             className="resize-none"
             data-testid="textarea-feedback"
           />

@@ -2,6 +2,8 @@ import type { Express, Response } from "express";
 import { createServer, type Server } from "http";
 import { and, eq, sql } from "drizzle-orm";
 import { storage } from "./storage";
+import { createFeedbackHandler } from "./feedback";
+import { sendFeedbackNotification } from "./feedback-email";
 import { setupAuth, requireAuth, requireAdmin, authenticateSupabase } from "./auth";
 import { db, pool } from "./db";
 import { CloseWindowError, runMonthlyBackup } from "./monthly-backup";
@@ -1438,13 +1440,11 @@ Include a year-by-year overview, useful milestones, a conservative/base/optimist
     res.status(204).send();
   });
 
-  app.post("/api/feedback", requireAuth, async (req, res) => {
-    const userId = (req.user as any).id;
-    const { message } = req.body;
-    if (!message || !message.trim()) return res.status(400).json({ message: "Feedback message is required" });
-    const created = await storage.createFeedback({ userId, message: message.trim() });
-    res.status(201).json(created);
-  });
+  app.post("/api/feedback", requireAuth, createFeedbackHandler({
+    createFeedback: data => storage.createFeedback(data),
+    sendNotification: sendFeedbackNotification,
+    logEmailError: error => console.error(formatSafeApiError("Feedback email notification", error)),
+  }));
 
   app.get("/api/feedback", requireAdmin, async (_req, res) => {
     res.json(await storage.getFeedback());
