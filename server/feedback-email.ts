@@ -1,4 +1,3 @@
-import { ReplitConnectors } from "@replit/connectors-sdk";
 import type { Feedback } from "@shared/schema";
 
 export interface FeedbackAuthor {
@@ -7,10 +6,9 @@ export interface FeedbackAuthor {
   fullName?: string | null;
 }
 
-type EmailProxy = (
-  connector: string,
-  path: string,
-  options: { method: string; headers: Record<string, string>; body: unknown },
+type EmailRequest = (
+  url: string,
+  options: RequestInit,
 ) => Promise<Response>;
 
 export class FeedbackEmailError extends Error {
@@ -23,11 +21,13 @@ export class FeedbackEmailError extends Error {
 export async function sendFeedbackNotification(
   feedback: Feedback,
   author: FeedbackAuthor,
-  options: { proxy?: EmailProxy; timeoutMs?: number } = {},
+  options: { request?: EmailRequest; timeoutMs?: number; apiKey?: string } = {},
 ): Promise<void> {
-  // Create a fresh client for each send; credentials stay in the connector.
-  const proxy: EmailProxy = options.proxy ?? ((connector, path, request) =>
-    new ReplitConnectors().proxy(connector, path, request));
+  // FinVision uses its own project secret, never the shared FinQuest connector.
+  // The optional key/transport overrides allow isolated tests with fake credentials.
+  const apiKey = (options.apiKey ?? process.env.RESEND_API_KEY)?.trim();
+  if (!apiKey) throw new FeedbackEmailError("RESEND_NOT_CONFIGURED");
+  const request = options.request ?? fetch;
   const email = author.email?.trim();
   const validReplyTo = email && /^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(email);
   const body = {
@@ -50,14 +50,17 @@ export async function sendFeedbackNotification(
   };
 
   let timer: ReturnType<typeof setTimeout> | undefined;
+  const controller = new AbortController();
   const send = async () => {
-    const response = await proxy("resend", "/emails", {
+    const response = await request("https://api.resend.com/emails", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        "Authorization": `Bearer ${apiKey}`,
         "Idempotency-Key": `feedback-notification/${feedback.id}`,
       },
-      body,
+      body: JSON.stringify(body),
+      signal: controller.signal,
     });
     if (!response.ok) {
       // Do not include provider bodies; they can contain private customer data.
@@ -72,7 +75,10 @@ export async function sendFeedbackNotification(
     await Promise.race([
       send(),
       new Promise<never>((_, reject) => {
-        timer = setTimeout(() => reject(new FeedbackEmailError("RESEND_TIMEOUT")), options.timeoutMs ?? 15_000);
+        timer = setTimeout(() => {
+          reject(new FeedbackEmailError("RESEND_TIMEOUT"));
+          controller.abort();
+        }, options.timeoutMs ?? 15_000);
       }),
     ]);
   } finally {

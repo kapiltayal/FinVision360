@@ -21,8 +21,18 @@ the selected domain was blocked because another Resend team had claimed it.
 The newly generated DKIM records were therefore not authoritative for that team.
 
 **How to apply:** A domain-claim rejection is not necessarily invalid credentials
-or slow DNS propagation. Reconnect to the intended owner's team and use its
-domain records, rather than repeatedly verifying or overwriting working DNS.
+or slow DNS propagation. Use the intended owner's account and its domain
+records, rather than repeatedly verifying or overwriting working DNS.
+
+Keep the FinVision360 Resend account completely separate from FinQuest360.
+Do not reuse the legacy shared connection or replace its credentials.
+
+**Why:** The user explicitly stated that they created a completely separate
+Resend account for FinVision360 and want it totally separate from FinQuest360.
+
+**How to apply:** Use a project-only API key from the FinVision account, with
+no shared-connector fallback. Never resolve a setup issue by altering the
+FinQuest account, its credentials, or its domain ownership.
 
 Feedback must be stored before a notification is attempted. An email problem
 must not undo the saved feedback or encourage the user to submit it again.

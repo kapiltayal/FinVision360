@@ -2,7 +2,7 @@
 
 Authenticated feedback submissions (`POST /api/feedback`) are saved in the
 `feedback` table first. After a successful insert, the server sends a plain-text
-notification through the connected Resend integration.
+notification directly through the Resend API using this project's dedicated key.
 
 - Sender: `FinVision360 Feedback <notifications@finvision360.com>`
 - Recipient: `contactus@finvision360.com`
@@ -10,8 +10,15 @@ notification through the connected Resend integration.
 - Content: feedback ID, timestamp, account name/email, and the saved feedback text
 - Scope: the feedback button; the separate public Contact Us form is unchanged
 
-Credentials are managed by the Replit Resend connector, not stored in application
-code or exposed to the browser. Every send uses a fresh connector client.
+Set `RESEND_API_KEY` in this project's Replit Secrets using a key from the
+separate FinVision360 Resend account. Prefer a sending-only key restricted to
+`finvision360.com`. Never use a `VITE_` variable, paste the key in chat, or
+commit it to source. The key is read only by server code.
+
+The user requires complete separation from FinQuest360. This app does not use or
+fall back to the shared Resend connector, and its credentials must not be
+replaced or revoked on FinQuest's behalf. A missing project key fails explicitly
+without attempting any email through another account.
 
 ## Required sender-domain setup
 
@@ -20,9 +27,11 @@ The user selected `finvision360.com` instead of the already verified
 claimed by another team and can no longer be verified." Its public DKIM key
 differs from the one issued to the connected account.
 
-Reconnect this project's Resend integration using an API key from the team where
-`finvision360.com` is verified. Do not paste credentials in chat or application
-code. Confirm the domain through the newly connected account before testing email.
+The user confirmed that FinVision360 has its own completely separate Resend
+account. Configure the project-only secret from that account rather than
+replacing the shared connector's credentials. Verify the domain in the separate
+account before testing email. A sending-only key cannot list domains; check
+verification in the account's dashboard if that permission is restricted.
 
 **The records below and in Resend_DNS_records.txt are archived values from the
 previously connected team, not authoritative setup instructions. Do not overwrite

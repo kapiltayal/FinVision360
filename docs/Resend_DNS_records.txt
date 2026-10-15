@@ -2,8 +2,9 @@ DNS records for finvision360.com — Resend feedback notifications
 
 CAUTION: THESE RECORDS ARE ARCHIVED, NOT CURRENT SETUP INSTRUCTIONS.
 Resend reports that this domain has been claimed by another team, and its
-public DKIM record differs from the key below. Reconnect this project's
-Resend integration to the team where finvision360.com is verified.
+public DKIM record differs from the key below. This app must use its dedicated
+RESEND_API_KEY secret from the separate FinVision360 Resend account.
+Do not replace the shared FinQuest connector's credentials.
 Use that team's Domains page as the source of truth for DNS records.
 Do not overwrite working DNS with the archived values below.
 
