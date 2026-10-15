@@ -1,5 +1,12 @@
 DNS records for finvision360.com — Resend feedback notifications
 
+CAUTION: THESE RECORDS ARE ARCHIVED, NOT CURRENT SETUP INSTRUCTIONS.
+Resend reports that this domain has been claimed by another team, and its
+public DKIM record differs from the key below. Reconnect this project's
+Resend integration to the team where finvision360.com is verified.
+Use that team's Domains page as the source of truth for DNS records.
+Do not overwrite working DNS with the archived values below.
+
 Add these records in the DNS provider for finvision360.com.
 Use TTL Auto (or the provider's default). Names are relative to finvision360.com.
 Do not replace the existing root MX records used by your receiving mail provider.

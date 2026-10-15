@@ -16,11 +16,19 @@ code or exposed to the browser. Every send uses a fresh connector client.
 ## Required sender-domain setup
 
 The user selected `finvision360.com` instead of the already verified
-`finquest360.com` domain. The new domain has been added to Resend, but it must pass
-DNS verification before notifications can be sent.
+`finquest360.com` domain. A verification attempt returned "This domain has been
+claimed by another team and can no longer be verified." Its public DKIM key
+differs from the one issued to the connected account.
 
-Add the following records in the DNS provider for **finvision360.com**. Names
-below are relative to that domain. Use TTL Auto (or the provider's default).
+Reconnect this project's Resend integration using an API key from the team where
+`finvision360.com` is verified. Do not paste credentials in chat or application
+code. Confirm the domain through the newly connected account before testing email.
+
+**The records below and in Resend_DNS_records.txt are archived values from the
+previously connected team, not authoritative setup instructions. Do not overwrite
+working DNS with them. Use the intended team's Resend Domains page instead.**
+
+Names below are relative to **finvision360.com**.
 
 | Type | Name | Value | Priority |
 | --- | --- | --- | --- |
