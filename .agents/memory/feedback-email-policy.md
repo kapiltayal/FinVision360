@@ -26,6 +26,16 @@ records, rather than repeatedly verifying or overwriting working DNS.
 Record types can differ between accounts as well as their values; use the
 intended account's current domain records rather than a generic MX/SPF template.
 
+Wait for the domain's full `verified` status before testing delivery.
+
+**Why:** Resend rejected sends while the domain was `partially_verified`, even
+with DKIM and `send` verified, until `rsend` also finished verification. Public
+recursive DNS briefly returned stale missing-record results despite correct
+authoritative records.
+
+**How to apply:** If authoritative DNS matches the intended account, allow
+verification/cache propagation instead of asking for repeated DNS edits.
+
 Keep the FinVision360 Resend account completely separate from FinQuest360.
 Do not reuse the legacy shared connection or replace its credentials.
 
