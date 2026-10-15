@@ -1,4 +1,4 @@
-import type { Feedback } from "@shared/schema";
+import type { Contactus, Feedback } from "@shared/schema";
 
 export interface FeedbackAuthor {
   id: string;
@@ -11,6 +11,8 @@ type EmailRequest = (
   options: RequestInit,
 ) => Promise<Response>;
 
+type EmailOptions = { request?: EmailRequest; timeoutMs?: number; apiKey?: string };
+
 export class FeedbackEmailError extends Error {
   constructor(public readonly code: string) {
     super("Feedback email notification could not be confirmed");
@@ -21,13 +23,8 @@ export class FeedbackEmailError extends Error {
 export async function sendFeedbackNotification(
   feedback: Feedback,
   author: FeedbackAuthor,
-  options: { request?: EmailRequest; timeoutMs?: number; apiKey?: string } = {},
+  options: EmailOptions = {},
 ): Promise<void> {
-  // FinVision uses its own project secret, never the shared FinQuest connector.
-  // The optional key/transport overrides allow isolated tests with fake credentials.
-  const apiKey = (options.apiKey ?? process.env.RESEND_API_KEY)?.trim();
-  if (!apiKey) throw new FeedbackEmailError("RESEND_NOT_CONFIGURED");
-  const request = options.request ?? fetch;
   const email = author.email?.trim();
   const validReplyTo = email && /^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(email);
   const body = {
@@ -48,7 +45,43 @@ export async function sendFeedbackNotification(
       feedback.message,
     ].join("\n"),
   };
+  await sendNotificationEmail(body, `feedback-notification/${feedback.id}`, options);
+}
 
+export async function sendContactNotification(
+  submission: Contactus,
+  options: EmailOptions = {},
+): Promise<void> {
+  await sendNotificationEmail({
+    from: "FinVision360 Contact <notifications@finvision360.com>",
+    to: ["contactus@finvision360.com"],
+    // Keep user-controlled subjects in the plain-text body, not mail headers.
+    subject: `New FinVision360 contact message #${submission.id}`,
+    reply_to: submission.email,
+    text: [
+      "Someone submitted the Contact Us form on FinVision360.",
+      "",
+      `Submission ID: ${submission.id}`,
+      `Submitted at: ${new Date(submission.createdAt).toISOString()}`,
+      `Name: ${submission.name}`,
+      `Email: ${submission.email}`,
+      `Subject: ${submission.subject}`,
+      "",
+      "Message:",
+      submission.message,
+    ].join("\n"),
+  }, `contact-notification/${submission.id}`, options);
+}
+
+async function sendNotificationEmail(
+  body: { from: string; to: string[]; subject: string; text: string; reply_to?: string },
+  idempotencyKey: string,
+  options: EmailOptions,
+): Promise<void> {
+  // FinVision uses its own project secret, never the shared FinQuest connector.
+  const apiKey = (options.apiKey ?? process.env.RESEND_API_KEY)?.trim();
+  if (!apiKey) throw new FeedbackEmailError("RESEND_NOT_CONFIGURED");
+  const request = options.request ?? fetch;
   let timer: ReturnType<typeof setTimeout> | undefined;
   const controller = new AbortController();
   const send = async () => {
@@ -57,7 +90,7 @@ export async function sendFeedbackNotification(
       headers: {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${apiKey}`,
-        "Idempotency-Key": `feedback-notification/${feedback.id}`,
+        "Idempotency-Key": idempotencyKey,
       },
       body: JSON.stringify(body),
       signal: controller.signal,

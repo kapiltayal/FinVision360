@@ -8,7 +8,23 @@ notification directly through the Resend API using this project's dedicated key.
 - Recipient: `contactus@finvision360.com`
 - Reply-to: the submitting user's account email, when valid
 - Content: feedback ID, timestamp, account name/email, and the saved feedback text
-- Scope: the feedback button; the separate public Contact Us form is unchanged
+- Scope: the feedback button and the public Contact Us form
+
+## Contact Us notifications
+
+Public submissions (`POST /api/contact`) are saved in `contactus` first, then
+emailed through the same separate FinVision360 account to `contactus@finvision360.com`.
+The sender is `FinVision360 Contact <notifications@finvision360.com>`. Emails
+include the saved name, email, subject, message, ID and timestamp in plain text.
+The validated visitor email is used as Reply-To; no copy is sent to the visitor.
+Each saved submission uses a distinct `contact-notification/{id}` idempotency key.
+
+All four fields are required and trimmed. Maximum lengths: name 200, email 254,
+subject 500, message 10,000 characters. Invalid submissions are rejected before
+storage or email. A storage failure sends no email. A notification failure
+preserves the submission, returns HTTP 200 with `notificationEmailStatus: "failed"`,
+and the page confirms the message was saved without asking the visitor to retry.
+As with feedback, there is no automatic notification retry queue.
 
 Set `RESEND_API_KEY` in this project's Replit Secrets using a key from the
 separate FinVision360 Resend account. Prefer a sending-only key restricted to
@@ -71,6 +87,6 @@ Resend accepts the notification and it arrives in the destination inbox.
 
 ## Verification
 
-Run `npx tsx --test server/feedback.test.ts server/feedback-email.test.ts`.
+Run `npx tsx --test server/feedback.test.ts server/feedback-email.test.ts server/contact.test.ts`.
 These tests use in-memory storage/transport substitutes: they do not send real
 emails, bypass application authentication, or modify the database.

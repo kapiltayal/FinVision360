@@ -16,6 +16,7 @@ export default function ContactPage() {
   const [form, setForm] = useState({ name: "", email: "", subject: "", message: "" });
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
+  const [notificationFailed, setNotificationFailed] = useState(false);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
@@ -36,6 +37,7 @@ export default function ContactPage() {
         setErrorMsg(data.message || "Something went wrong. Please try again.");
         setStatus("error");
       } else {
+        setNotificationFailed(data.notificationEmailStatus === "failed");
         setStatus("success");
       }
     } catch {
@@ -70,8 +72,12 @@ export default function ContactPage() {
               <CheckCircle2 className="h-8 w-8 text-emerald-600 dark:text-emerald-400" />
             </div>
             <div className="space-y-1">
-              <p className="font-semibold text-xl">Message sent!</p>
-              <p className="text-sm text-muted-foreground">Thanks for reaching out. We'll get back to you soon.</p>
+              <p className="font-semibold text-xl">{notificationFailed ? "Message saved!" : "Message sent!"}</p>
+              <p className="text-sm text-muted-foreground">
+                {notificationFailed
+                  ? "Your message was saved, but the email notification could not be confirmed. You don't need to submit it again."
+                  : "Thanks for reaching out. We'll get back to you soon."}
+              </p>
             </div>
             <Button
               variant="outline"
@@ -89,6 +95,7 @@ export default function ContactPage() {
                   <Input
                     id="contact-name"
                     name="name"
+                    maxLength={200}
                     placeholder="Your name"
                     value={form.name}
                     onChange={handleChange}
@@ -102,6 +109,7 @@ export default function ContactPage() {
                     id="contact-email"
                     name="email"
                     type="email"
+                    maxLength={254}
                     placeholder="you@example.com"
                     value={form.email}
                     onChange={handleChange}
@@ -115,6 +123,7 @@ export default function ContactPage() {
                 <Input
                   id="contact-subject"
                   name="subject"
+                  maxLength={500}
                   placeholder="What's this about?"
                   value={form.subject}
                   onChange={handleChange}
@@ -127,6 +136,7 @@ export default function ContactPage() {
                 <Textarea
                   id="contact-message"
                   name="message"
+                  maxLength={10_000}
                   placeholder="Tell us how we can help..."
                   rows={6}
                   value={form.message}

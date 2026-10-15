@@ -3,7 +3,8 @@ import { createServer, type Server } from "http";
 import { and, eq, sql } from "drizzle-orm";
 import { storage } from "./storage";
 import { createFeedbackHandler } from "./feedback";
-import { sendFeedbackNotification } from "./feedback-email";
+import { sendContactNotification, sendFeedbackNotification } from "./feedback-email";
+import { createContactHandler } from "./contact";
 import { setupAuth, requireAuth, requireAdmin, authenticateSupabase } from "./auth";
 import { db, pool } from "./db";
 import { CloseWindowError, runMonthlyBackup } from "./monthly-backup";
@@ -1849,19 +1850,11 @@ Include a year-by-year overview, useful milestones, a conservative/base/optimist
     }
   });
 
-  app.post("/api/contact", async (req, res) => {
-    const { name, email, subject, message } = req.body;
-    if (!name || !email || !subject || !message) {
-      return res.status(400).json({ message: "All fields are required." });
-    }
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      return res.status(400).json({ message: "Please enter a valid email address." });
-    }
-    await storage.createContactSubmission({ name, email, subject, message });
-    console.log("[contact] Submission received");
-    res.json({ message: "Thank you! We've received your message and will be in touch soon." });
-  });
+  app.post("/api/contact", createContactHandler({
+    createSubmission: data => storage.createContactSubmission(data),
+    sendNotification: sendContactNotification,
+    logEmailError: error => console.error(formatSafeApiError("Contact email notification", error)),
+  }));
 
   app.get("/api/contact", requireAdmin, async (_req, res) => {
     res.json(await storage.getContactSubmissions());
