@@ -36,7 +36,7 @@ function render(rows: Liability[]): string {
   }
 }
 
-test("rendered timeline preserves exact width, expanded thickness, APR tones and cent-precise accessible details", () => {
+test("rendered timeline preserves exact width, proportional thickness, APR tones and cent-precise accessible details", () => {
   const html = render([
     row(1, { name: "High APR loan", interestRate: "15.01" }),
     row(2, { name: "Medium APR loan", balance: "500.17", interestRate: "6", maturityDate: maturityAfter(6) }),
@@ -46,7 +46,7 @@ test("rendered timeline preserves exact width, expanded thickness, APR tones and
   for (const label of ["Highest APR First", "Smallest Balance First", "Longest Duration First"]) assert.ok(html.includes(label));
   assert.ok(html.includes("width:100%;height:100px"));
   assert.ok(html.includes("width:50%;height:50px"));
-  assert.ok(html.includes("width:25%;height:20px"));
+  assert.ok(html.includes("width:25%;height:5px"));
   assert.match(html, /data-testid="liability-map-row-1" class="grid [^"]+" style="height:112px"/);
   assert.match(html, /data-testid="liability-map-row-2" class="grid [^"]+" style="height:62px"/);
   assert.match(html, /data-testid="liability-map-row-3" class="grid [^"]+" style="height:40px"/);

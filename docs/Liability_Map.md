@@ -9,7 +9,7 @@ It does not introduce another debt store or change saved liability records.
 - All bars begin at the current calendar month on one shared time scale.
 - Width is remaining months divided by the longest known remaining duration.
 - Bar height scales with balance: balance divided by the largest balance, times
-  100px, with a 20px minimum. Rows grow to fit the bar plus spacing, with a
+  100px, with a 5px minimum. Rows grow to fit the bar plus spacing, with a
   40px minimum row height. The timeline width and relative durations are unchanged.
 - APR colors: red above 15%; yellow from 6% through 15%; green below 6%;
   neutral if APR is unknown. Tooltips and keyboard-focus labels include exact

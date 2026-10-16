@@ -67,11 +67,12 @@ test("sorting implements avalanche, snowball and duration without mutating sourc
   assert.deepEqual(items.map(i => i.id), [1, 2, 3, 4]);
 });
 
-test("bar thickness scales proportionally to balance from 20px to 100px", () => {
+test("bar thickness scales proportionally to balance from 5px to 100px", () => {
   assert.equal(getBarHeight(1000, 1000), 100);
   assert.equal(getBarHeight(500, 1000), 50);
-  assert.equal(getBarHeight(1, 1000), 20);
-  assert.equal(getBarHeight(1000, 0), 20);
+  assert.equal(getBarHeight(100, 1000), 10);
+  assert.equal(getBarHeight(1, 1000), 5);
+  assert.equal(getBarHeight(1000, 0), 5);
 });
 
 test("timeline includes current month and exact maximum endpoint across year boundaries", () => {
