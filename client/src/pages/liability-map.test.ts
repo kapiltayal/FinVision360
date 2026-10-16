@@ -43,9 +43,10 @@ test("rendered timeline preserves exact width, thickness, APR tones and cent-pre
     row(4, { name: "Upper yellow boundary", interestRate: "15" }),
   ]);
   for (const label of ["Highest APR First", "Smallest Balance First", "Longest Duration First"]) assert.ok(html.includes(label));
-  assert.match(html, /width:100%;height:80px/);
-  assert.match(html, /width:50%;height:40px/);
-  assert.match(html, /width:25%;height:16px/);
+  assert.ok(html.includes(`width:100%;height:${80 / 3}px`));
+  assert.ok(html.includes(`width:50%;height:${40 / 3}px`));
+  assert.ok(html.includes(`width:25%;height:${16 / 3}px`));
+  assert.match(html, /data-testid="liability-map-row-1" class="grid h-10 /);
   assert.match(html, /bg-red-500/);
   assert.match(html, /bg-yellow-400/);
   assert.match(html, /bg-emerald-500/);

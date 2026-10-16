@@ -91,8 +91,8 @@ export function sortExposure(items: ExposureItem[], sort: ExposureSort): Exposur
 }
 
 export function getBarHeight(balance: number, maxBalance: number): number {
-  if (!Number.isFinite(balance) || !Number.isFinite(maxBalance) || maxBalance <= 0) return 16;
-  return Math.max(16, Math.min(80, balance / maxBalance * 80));
+  if (!Number.isFinite(balance) || !Number.isFinite(maxBalance) || maxBalance <= 0) return 16 / 3;
+  return Math.max(16, Math.min(80, balance / maxBalance * 80)) / 3;
 }
 
 export function getTimelineTicks(maxMonths: number, now: Date): { month: number; label: string }[] {

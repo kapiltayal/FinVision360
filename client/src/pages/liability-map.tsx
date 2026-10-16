@@ -202,7 +202,7 @@ export default function LiabilityMapPage() {
             <div className="overflow-x-auto overscroll-x-contain" tabIndex={0} aria-label="Horizontally scrollable liability exposure timeline">
               <div className="min-w-[1000px]" style={{ width: "100%" }}>
                 <div className="grid grid-cols-[280px_minmax(720px,1fr)] border-b bg-muted/15">
-                  <div className="flex items-end px-5 pb-3 pt-4 text-[11px] font-semibold uppercase tracking-[0.13em] text-muted-foreground">Liability / planning duration</div>
+                  <div className="flex items-end px-5 pb-3 pt-4 text-[11px] font-semibold uppercase tracking-[0.13em] text-muted-foreground">Liability / months left</div>
                   <div className="relative h-[66px]">
                     <div className="absolute inset-x-0 bottom-0 top-0">
                       {ticks.map((tick, index) => {
@@ -230,22 +230,23 @@ export default function LiabilityMapPage() {
                   const hasBar = item.durationSource !== "unknown" && item.durationSource !== "paid" && duration !== null && duration > 0;
                   const widthPercent = hasBar ? (duration / maxMonths) * 100 : 0;
                   return (
-                    <div key={item.id} className={`grid min-h-[88px] grid-cols-[280px_minmax(720px,1fr)] border-b last:border-b-0 ${index % 2 ? "bg-muted/[0.08]" : "bg-background"}`}>
-                      <div className="flex min-w-0 flex-col justify-center px-4 py-3 sm:px-5">
-                        <div className="flex min-w-0 items-center gap-2">
-                          <span className="truncate text-sm font-semibold" title={item.name}>{item.name}</span>
+                    <div key={item.id} data-testid={`liability-map-row-${item.id}`} className={`grid h-10 grid-cols-[280px_minmax(720px,1fr)] border-b last:border-b-0 ${index % 2 ? "bg-muted/[0.08]" : "bg-background"}`}>
+                      <div className="flex min-w-0 items-center gap-2 px-4 py-1 sm:px-5">
+                        <div className="min-w-0 flex-1" title={item.issue ?? `Duration source: ${item.durationSource}`}>
+                        <div className="flex min-w-0 items-center gap-1">
+                          <span className="truncate text-xs font-semibold leading-4" title={item.name}>{item.name}</span>
                           {item.durationSource === "paid" && <Badge variant="secondary" className="shrink-0 px-1.5 py-0 text-[10px]">Paid</Badge>}
-                          {item.durationSource === "unknown" && <Badge variant="outline" className="shrink-0 border-amber-500/30 bg-amber-500/[0.06] px-1.5 py-0 text-[10px] text-amber-800 dark:text-amber-300">Needs duration</Badge>}
                         </div>
-                        <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
+                        <div className="flex items-center gap-1.5 whitespace-nowrap text-[10px] leading-3 text-muted-foreground">
                           <span className="font-medium text-foreground/80">{formatCurrency(item.balance)}</span>
                           <span aria-hidden="true">·</span>
                           <span className={item.apr === null ? "" : item.apr > 15 ? "text-red-600 dark:text-red-400" : item.apr >= 6 ? "text-yellow-700 dark:text-yellow-400" : "text-emerald-700 dark:text-emerald-400"}>
                             {item.apr === null ? "APR unknown" : formatPercent(item.apr)}
                           </span>
                         </div>
-                        <div className="mt-2 flex items-center gap-2">
-                          <label htmlFor={`duration-${item.id}`} className="shrink-0 text-[11px] text-muted-foreground">Months left</label>
+                        </div>
+                        <div className="flex shrink-0 items-center gap-1">
+                          <label htmlFor={`duration-${item.id}`} className="sr-only">Months left</label>
                           <Input
                             id={`duration-${item.id}`}
                             type="number"
@@ -259,23 +260,24 @@ export default function LiabilityMapPage() {
                              aria-describedby={`duration-help-${item.id}`}
                             onChange={(event) => updateDuration(item.id, event.target.value)}
                              onBlur={() => { if (draft === "") resetDuration(item.id); }}
-                            placeholder="Not known"
+                             placeholder="—"
                             aria-label={`Planning duration in months for ${item.name}`}
-                            className="h-7 w-[92px] px-2 text-xs"
+                             title={invalidDraft ? "Enter a whole number from 1 to 12,000." : item.issue ?? "Planning duration in months"}
+                             className={`h-6 w-[68px] px-1.5 text-[11px] ${invalidDraft ? "border-destructive" : ""}`}
                           />
                           {isOverride && (
                             <button
                               type="button"
                               onClick={() => resetDuration(item.id)}
-                              className="inline-flex items-center gap-1 rounded px-1.5 py-1 text-[11px] text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                              className="inline-flex h-6 w-5 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                               aria-label={`Reset ${item.name} duration to saved date or payment estimate`}
                               title="Restore saved-date/payment-derived duration"
                             >
-                              <RotateCcw className="h-3 w-3" /> Reset
+                              <RotateCcw className="h-3 w-3" />
                             </button>
                           )}
                         </div>
-                        <span id={`duration-help-${item.id}`} className={`mt-1 text-[10px] leading-relaxed ${invalidDraft ? "text-destructive" : "text-muted-foreground"}`}>
+                        <span id={`duration-help-${item.id}`} className="sr-only" aria-live="polite">
                           {invalidDraft ? "Enter a whole number from 1 to 12,000." : item.issue ??
                             (item.durationSource === "paid" ? "No balance remaining" : item.durationSource === "override" ? "Planning adjustment" :
                               item.durationSource === "maturity" ? "From saved maturity date" : "Estimated from APR and monthly payment")}
@@ -293,7 +295,7 @@ export default function LiabilityMapPage() {
                             <TooltipTrigger asChild>
                               <button
                                 type="button"
-                                className={`relative z-[1] block shrink-0 rounded-r-md rounded-l-[3px] border transition-[filter,transform] duration-150 hover:brightness-105 focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${toneClasses(item.apr)}`}
+                                className={`relative z-[1] block shrink-0 rounded-r-md rounded-l-[3px] border before:absolute before:inset-x-0 before:top-1/2 before:h-full before:min-h-6 before:-translate-y-1/2 before:content-[''] transition-[filter,transform] duration-150 hover:brightness-105 focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${toneClasses(item.apr)}`}
                                 style={{ width: `${widthPercent}%`, height: `${getBarHeight(item.balance, maxBalance)}px` }}
                                 aria-label={`${item.name}, balance ${formatCurrencyFull(item.balance)}, APR ${item.apr === null ? "unknown" : formatPercent(item.apr)}, ${monthDurationLabel(duration)}, source ${item.durationSource}`}
                                 data-testid={`liability-map-bar-${item.id}`}
