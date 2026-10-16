@@ -63,6 +63,12 @@ test("rendered timeline preserves exact width, proportional thickness, APR tones
   assert.ok(html.indexOf("High APR loan") < html.indexOf("Upper yellow boundary"));
 });
 
+test("header matches the shared Assets and Liabilities page-header height", () => {
+  const html = render([]);
+  assert.match(html, /class="page-header-gradient relative min-h-\[110px\] overflow-hidden"/);
+  assert.match(html, /class="relative flex min-h-\[76px\] flex-col justify-center/);
+});
+
 test("unknown duration remains named without a fabricated bar; unknown APR is disclosed", () => {
   const html = render([row(1, { maturityDate: null, interestRate: null })]);
   assert.ok(html.includes("Debt 1"));

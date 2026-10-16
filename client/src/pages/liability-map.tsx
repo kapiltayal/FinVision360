@@ -113,15 +113,17 @@ export default function LiabilityMapPage() {
 
   return (
     <div className="mx-auto max-w-7xl space-y-6 p-4 pb-10 sm:p-6">
-      <header className="relative overflow-hidden rounded-2xl border border-primary/15 bg-gradient-to-br from-primary/[0.085] via-background to-amber-500/[0.07] p-5 sm:p-7">
+      <header className="page-header-gradient relative min-h-[110px] overflow-hidden">
         <div className="pointer-events-none absolute -right-12 -top-20 h-64 w-64 rounded-full border-[32px] border-primary/[0.04]" />
-        <div className="relative flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
-          <div className="max-w-2xl">
-            <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-primary/15 bg-background/70 px-3 py-1 text-xs font-medium tracking-wide text-primary">
+        <div className="relative flex min-h-[76px] flex-col justify-center gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="text-2xl font-bold tracking-tight">Your liabilities, on a timeline.</h1>
+              <div className="inline-flex items-center gap-2 rounded-full border border-primary/15 bg-background/70 px-3 py-1 text-xs font-medium tracking-wide text-primary">
               <Waves className="h-3.5 w-3.5" /> DEBT EXPOSURE
+              </div>
             </div>
-            <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Your liabilities, on a timeline.</h1>
-            <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">
+            <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
               See how each balance extends across time. Adjust a planning duration to compare scenarios—your saved accounts stay untouched.
             </p>
           </div>
