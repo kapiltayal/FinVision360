@@ -91,7 +91,7 @@ export default function ContactPage() {
             <form onSubmit={handleSubmit} className="space-y-5">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <Label htmlFor="contact-name">Name</Label>
+                  <Label htmlFor="contact-name">Name <span className="text-destructive" aria-hidden="true">*</span></Label>
                   <Input
                     id="contact-name"
                     name="name"
@@ -104,7 +104,7 @@ export default function ContactPage() {
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="contact-email">Email</Label>
+                  <Label htmlFor="contact-email">Email <span className="text-destructive" aria-hidden="true">*</span></Label>
                   <Input
                     id="contact-email"
                     name="email"
@@ -119,7 +119,7 @@ export default function ContactPage() {
                 </div>
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="contact-subject">Subject</Label>
+                <Label htmlFor="contact-subject">Subject <span className="text-destructive" aria-hidden="true">*</span></Label>
                 <Input
                   id="contact-subject"
                   name="subject"
@@ -132,7 +132,7 @@ export default function ContactPage() {
                 />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="contact-message">Message</Label>
+                <Label htmlFor="contact-message">Message <span className="text-destructive" aria-hidden="true">*</span></Label>
                 <Textarea
                   id="contact-message"
                   name="message"
