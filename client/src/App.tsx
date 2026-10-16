@@ -58,6 +58,7 @@ function AuthenticatedApp() {
           <Route path="/home" component={LandingPage} />
           <Route path="/assets" component={NetWorthPage} />
           <Route path="/liabilities" component={NetWorthPage} />
+          <Route path="/liability-map" component={NetWorthPage} />
           <Route path="/retirement" component={RetirementPage} />
           <Route path="/retirement/social-security" component={RetirementPage} />
           <Route path="/retirement/401k" component={LegacyRetirement401kRedirect} />

@@ -1,13 +1,15 @@
 import { useLocation, Link, Switch, Route } from "wouter";
-import { LayoutDashboard, Wallet, CreditCard } from "lucide-react";
+import { LayoutDashboard, Wallet, CreditCard, BarChart3 } from "lucide-react";
 import DashboardPage from "./dashboard";
 import AssetsPage from "./assets";
 import LiabilitiesPage from "./liabilities";
+import LiabilityMapPage from "./liability-map";
 
 const tabs = [
   { title: "Net Worth", url: "/", icon: LayoutDashboard },
   { title: "Assets", url: "/assets", icon: Wallet },
   { title: "Liabilities", url: "/liabilities", icon: CreditCard },
+  { title: "Liability Map", url: "/liability-map", icon: BarChart3 },
 ];
 
 export default function NetWorthPage() {
@@ -54,6 +56,7 @@ export default function NetWorthPage() {
           <Route path="/" component={DashboardPage} />
           <Route path="/assets" component={AssetsPage} />
           <Route path="/liabilities" component={LiabilitiesPage} />
+          <Route path="/liability-map" component={LiabilityMapPage} />
         </Switch>
       </div>
     </div>
