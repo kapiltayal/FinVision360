@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { AlertCircle, ArrowRight, CalendarClock, CreditCard, RotateCcw, Waves } from "lucide-react";
+import { AlertCircle, ArrowRight, CreditCard, RotateCcw, Waves } from "lucide-react";
 import { type Liability } from "@shared/schema";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { formatCurrency, formatCurrencyFull, formatPercent } from "@/lib/format";
-import { buildExposure, getBarHeight, getTimelineTicks, sortExposure, type ExposureSort } from "@/lib/liability-map";
+import { buildExposure, estimateRemainingInterest, getBarHeight, getTimelineTicks, sortExposure, type ExposureSort } from "@/lib/liability-map";
 
 const sortOptions: { value: ExposureSort; label: string }[] = [
   { value: "avalanche", label: "Highest APR First" },
@@ -58,14 +58,12 @@ export default function LiabilityMapPage() {
   );
   const sortedExposure = useMemo(() => sortExposure(exposure, sort), [exposure, sort]);
   const totalBalance = exposure.reduce((total, item) => total + item.balance, 0);
-  const monthlyInterest = exposure.reduce(
-    (total, item) => total + (item.apr !== null ? item.balance * (item.apr / 100) / 12 : 0),
-    0,
-  );
+  const interestEstimates = exposure.map(estimateRemainingInterest);
+  const totalInterestOwed = interestEstimates.reduce((total, item) => total + (item ?? 0), 0);
+  const excludedInterestCount = exposure.filter((item, index) => item.balance > 0 && interestEstimates[index] === null).length;
   const maxBalance = Math.max(0, ...exposure.map((item) => item.balance));
   const maxMonths = Math.max(1, ...exposure.map((item) => item.monthsRemaining ?? 0));
   const ticks = getTimelineTicks(maxMonths, new Date());
-  const unknownAprCount = exposure.filter(item => item.balance > 0 && item.apr === null).length;
 
   const updateDuration = (id: number, value: string) => {
     setDurationDrafts(current => ({ ...current, [id]: value }));
@@ -147,26 +145,20 @@ export default function LiabilityMapPage() {
         </Card>
       ) : (
         <>
-          <section className="grid gap-3 sm:grid-cols-2" aria-label="Liability summary">
-            <Card className="border-border/70 bg-card/75">
-              <CardContent className="flex items-center gap-4 p-4 sm:p-5">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary"><CreditCard className="h-5 w-5" /></div>
-                <div><p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Current balance</p><p className="mt-0.5 text-2xl font-semibold tracking-tight">{formatCurrency(totalBalance)}</p></div>
-              </CardContent>
-            </Card>
-            <Card className="border-border/70 bg-card/75">
-              <CardContent className="flex items-center gap-4 p-4 sm:p-5">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500/10 text-amber-700 dark:text-amber-400"><CalendarClock className="h-5 w-5" /></div>
-                <div>
-                  <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Estimated interest this month</p>
-                  <p className="mt-0.5 text-2xl font-semibold tracking-tight">{formatCurrency(monthlyInterest)}</p>
-                  {unknownAprCount > 0 && <p className="mt-1 text-xs text-muted-foreground">Excludes {unknownAprCount} {unknownAprCount === 1 ? "debt" : "debts"} with unknown APR.</p>}
-                </div>
-              </CardContent>
-            </Card>
-          </section>
-
           <Card className="overflow-hidden border-border/75 shadow-sm">
+            <div className="flex flex-wrap items-baseline gap-x-8 gap-y-2 border-b bg-background px-4 py-3 sm:px-5" aria-label="Liability totals">
+              <p className="flex items-baseline gap-2">
+                <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Current balance</span>
+                <span className="text-lg font-semibold tracking-tight">{formatCurrency(totalBalance)}</span>
+              </p>
+              <p className="flex items-baseline gap-2">
+                <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Total interest owed</span>
+                <span className="text-lg font-semibold tracking-tight">{formatCurrency(totalInterestOwed)}</span>
+              </p>
+              <p className="basis-full text-xs text-muted-foreground">
+                Estimated over the displayed duration at the current APR; excludes {excludedInterestCount} {excludedInterestCount === 1 ? "debt" : "debts"} without a usable APR or duration.
+              </p>
+            </div>
             <div className="flex flex-col gap-4 border-b bg-muted/20 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
               <div>
                 <h2 className="font-semibold">Exposure matrix</h2>
@@ -198,7 +190,6 @@ export default function LiabilityMapPage() {
                 <span className="inline-flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-sm bg-emerald-500" /> &lt;6%</span>
                 <span className="inline-flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-sm border bg-muted" /> Unknown</span>
               </div>
-              <p className="text-xs text-muted-foreground">Monthly interest is an estimate from current balance × APR ÷ 12.</p>
             </div>
 
             <div className="overflow-x-auto overscroll-x-contain" tabIndex={0} aria-label="Horizontally scrollable liability exposure timeline">

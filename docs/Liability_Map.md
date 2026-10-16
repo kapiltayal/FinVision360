@@ -14,6 +14,9 @@ It does not introduce another debt store or change saved liability records.
 - APR colors: red above 15%; yellow from 6% through 15%; green below 6%;
   neutral if APR is unknown. Tooltips and keyboard-focus labels include exact
   balances to cents, APR, months remaining, and duration source.
+- Summary totals appear unboxed at the top of the timeline. Total interest owed
+  is an estimate using the current balance and APR, amortized over the displayed
+  remaining duration; debts without a usable APR or duration are excluded.
 - Future saved maturity dates take precedence. Without a maturity date,
   duration is estimated using constant APR and monthly payment amortization.
   Zero APR uses balance divided by payment. Estimates assume no fees, new

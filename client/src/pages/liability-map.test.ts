@@ -50,6 +50,10 @@ test("rendered timeline preserves exact width, proportional thickness, APR tones
   assert.match(html, /data-testid="liability-map-row-1" class="grid [^"]+" style="height:112px"/);
   assert.match(html, /data-testid="liability-map-row-2" class="grid [^"]+" style="height:62px"/);
   assert.match(html, /data-testid="liability-map-row-3" class="grid [^"]+" style="height:40px"/);
+  assert.ok(html.includes('aria-label="Liability totals"'));
+  assert.ok(html.includes("Total interest owed"));
+  assert.ok(!html.includes("Estimated interest this month"));
+  assert.ok(html.includes("Estimated over the displayed duration at the current APR"));
   assert.match(html, /bg-red-500/);
   assert.match(html, /bg-yellow-400/);
   assert.match(html, /bg-emerald-500/);
@@ -74,7 +78,7 @@ test("unknown duration remains named without a fabricated bar; unknown APR is di
   assert.ok(html.includes("Debt 1"));
   assert.ok(html.includes("APR unknown"));
   assert.ok(html.includes("Add a duration to place on timeline"));
-  assert.ok(html.includes("Excludes 1 debt with unknown APR."));
+  assert.ok(html.includes("excludes 1 debt without a usable APR or duration."));
   assert.ok(!html.includes('data-testid="liability-map-bar-1"'));
 });
 

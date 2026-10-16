@@ -90,6 +90,23 @@ export function sortExposure(items: ExposureItem[], sort: ExposureSort): Exposur
   });
 }
 
+/** Estimates interest from the current balance through the selected remaining term. */
+export function estimateRemainingInterest(item: ExposureItem): number | null {
+  if (item.balance === 0) return 0;
+  if (!Number.isFinite(item.balance) || item.balance < 0 ||
+      item.apr === null || !Number.isFinite(item.apr) || item.apr < 0) {
+    return null;
+  }
+  if (item.apr === 0) return 0;
+  if (item.monthsRemaining === null || !Number.isSafeInteger(item.monthsRemaining) || item.monthsRemaining <= 0) return null;
+
+  const monthlyRate = item.apr / 1_200;
+  const denominator = -Math.expm1(-item.monthsRemaining * Math.log1p(monthlyRate));
+  const estimatedPayment = item.balance * monthlyRate / denominator;
+  const estimatedInterest = estimatedPayment * item.monthsRemaining - item.balance;
+  return Number.isFinite(estimatedInterest) ? Math.max(0, estimatedInterest) : null;
+}
+
 export function getBarHeight(balance: number, maxBalance: number): number {
   if (!Number.isFinite(balance) || !Number.isFinite(maxBalance) || maxBalance <= 0) return 5;
   return Math.max(5, Math.min(100, balance / maxBalance * 100));

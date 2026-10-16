@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { Liability } from "@shared/schema";
-import { buildExposure, getBarHeight, getTimelineTicks, sortExposure } from "./liability-map";
+import { buildExposure, estimateRemainingInterest, getBarHeight, getTimelineTicks, sortExposure } from "./liability-map";
 
 const now = new Date(2026, 9, 15);
 const liability = (overrides: Partial<Liability> = {}): Liability => ({
@@ -73,6 +73,16 @@ test("bar thickness scales proportionally to balance from 5px to 100px", () => {
   assert.equal(getBarHeight(100, 1000), 10);
   assert.equal(getBarHeight(1, 1000), 5);
   assert.equal(getBarHeight(1000, 0), 5);
+});
+
+test("remaining interest uses the amortized payoff over the selected duration", () => {
+  const item = buildExposure([liability({ balance: "1000", interestRate: "12", minimumPayment: "100" })], now)[0];
+  const estimatedInterest = estimateRemainingInterest({ ...item, monthsRemaining: 12 });
+  assert.ok(estimatedInterest !== null);
+  assert.ok(Math.abs(estimatedInterest - 66.19) < 0.01);
+  assert.equal(estimateRemainingInterest({ ...item, apr: 0, monthsRemaining: null }), 0);
+  assert.equal(estimateRemainingInterest({ ...item, apr: null }), null);
+  assert.equal(estimateRemainingInterest({ ...item, monthsRemaining: null }), null);
 });
 
 test("timeline includes current month and exact maximum endpoint across year boundaries", () => {
