@@ -34,6 +34,7 @@ import {
   DropdownMenuSubTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useAuth, useLogout } from "@/hooks/use-auth";
+import { netWorthNavigationTabs } from "@/components/net-worth-tabs";
 
 type NavigationTab = {
   title: string;
@@ -57,12 +58,8 @@ const baseNavItems: NavigationItem[] = [
     title: "Net Worth",
     url: "/",
     icon: LayoutDashboard,
-    matches: ["/", "/assets", "/liabilities"],
-    tabs: [
-      { title: "Net Worth", url: "/" },
-      { title: "Assets", url: "/assets" },
-      { title: "Liabilities", url: "/liabilities" },
-    ],
+    matches: netWorthNavigationTabs.map((tab) => tab.url),
+    tabs: netWorthNavigationTabs.map(({ title, url }) => ({ title, url })),
   },
   {
     title: "Income & Expenses",

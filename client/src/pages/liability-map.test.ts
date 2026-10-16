@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Router } from "wouter";
 import type { Liability } from "@shared/schema";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { NetWorthTabs, netWorthNavigationTabs } from "@/components/net-worth-tabs";
 import LiabilityMapPage from "./liability-map";
 
 function maturityAfter(months: number): string {
@@ -79,4 +80,15 @@ test("empty liabilities render a functional link to the liabilities input page",
   const html = render([]);
   assert.ok(html.includes("No liabilities to map yet"));
   assert.ok(html.includes('href="/liabilities"'));
+});
+
+test("Liability Map tab includes a visual separator after Liabilities", () => {
+  const html = renderToStaticMarkup(createElement(Router, { ssrPath: "/liability-map" }, createElement(NetWorthTabs)));
+  const liabilitiesIndex = html.indexOf('data-testid="tab-liabilities"');
+  const separatorIndex = html.indexOf('data-testid="separator-liabilities-liability-map"');
+  const mapIndex = html.indexOf('data-testid="tab-liability-map"');
+  assert.ok(liabilitiesIndex >= 0 && separatorIndex > liabilitiesIndex && mapIndex > separatorIndex);
+  assert.ok(html.includes('href="/liability-map"'));
+  assert.ok(netWorthNavigationTabs.some(tab => tab.title === "Liability Map" && tab.url === "/liability-map"),
+    "the shared navigation config also feeds the main app navigation menu");
 });
