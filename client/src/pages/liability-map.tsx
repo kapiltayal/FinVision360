@@ -229,8 +229,10 @@ export default function LiabilityMapPage() {
                     (!Number.isSafeInteger(Number(draft)) || Number(draft) < 1 || Number(draft) > 12_000);
                   const hasBar = item.durationSource !== "unknown" && item.durationSource !== "paid" && duration !== null && duration > 0;
                   const widthPercent = hasBar ? (duration / maxMonths) * 100 : 0;
+                  const barHeight = hasBar ? getBarHeight(item.balance, maxBalance) : 0;
+                  const rowHeight = Math.max(40, barHeight + 12);
                   return (
-                    <div key={item.id} data-testid={`liability-map-row-${item.id}`} className={`grid h-10 grid-cols-[280px_minmax(720px,1fr)] border-b last:border-b-0 ${index % 2 ? "bg-muted/[0.08]" : "bg-background"}`}>
+                    <div key={item.id} data-testid={`liability-map-row-${item.id}`} className={`grid grid-cols-[280px_minmax(720px,1fr)] border-b last:border-b-0 ${index % 2 ? "bg-muted/[0.08]" : "bg-background"}`} style={{ height: `${rowHeight}px` }}>
                       <div className="flex min-w-0 items-center gap-2 px-4 py-1 sm:px-5">
                         <div className="min-w-0 flex-1" title={item.issue ?? `Duration source: ${item.durationSource}`}>
                         <div className="flex min-w-0 items-center gap-1">
@@ -296,7 +298,7 @@ export default function LiabilityMapPage() {
                               <button
                                 type="button"
                                 className={`relative z-[1] block shrink-0 rounded-r-md rounded-l-[3px] border before:absolute before:inset-x-0 before:top-1/2 before:h-full before:min-h-6 before:-translate-y-1/2 before:content-[''] transition-[filter,transform] duration-150 hover:brightness-105 focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${toneClasses(item.apr)}`}
-                                style={{ width: `${widthPercent}%`, height: `${getBarHeight(item.balance, maxBalance)}px` }}
+                                style={{ width: `${widthPercent}%`, height: `${barHeight}px` }}
                                 aria-label={`${item.name}, balance ${formatCurrencyFull(item.balance)}, APR ${item.apr === null ? "unknown" : formatPercent(item.apr)}, ${monthDurationLabel(duration)}, source ${item.durationSource}`}
                                 data-testid={`liability-map-bar-${item.id}`}
                               >
