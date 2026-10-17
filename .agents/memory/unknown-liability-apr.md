@@ -1,10 +1,10 @@
 ---
-name: Unknown liability APR
-description: Product rule distinguishing missing debt interest rates from explicitly supplied zero rates.
+name: Unknown account rates
+description: Product rule distinguishing missing asset returns and debt APRs from explicit zero rates.
 ---
 
-Missing liability APR means unknown, not 0%. Only an explicitly supplied zero rate should be treated as zero interest. Existing stored zero rates must not be bulk-converted to unknown without evidence of their origin.
+Missing asset interest/return rates and liability APRs mean unknown, not 0%. Only an explicitly supplied zero rate should be treated as zero interest/return. Existing stored zero rates must not be bulk-converted to unknown without evidence of their origin.
 
-**Why:** The user confirmed this distinction and agreed to leave existing zero-rate records unchanged because historical defaults cannot be distinguished safely from intentional entries.
+**Why:** The user confirmed the distinction for liabilities and explicitly extended it to assets. Historical default zeros cannot be distinguished safely from intentional entries.
 
-**How to apply:** Preserve missing APRs through manual entry, imports, and bank linking. Exclude unknown rates from interest estimates and weighted-rate denominators while still counting their debt balances. Clearly disclose incomplete estimates.
+**How to apply:** Preserve missing rates through manual entry, imports, and bank linking. Exclude unknown rates from current interest/return estimates and weighted-rate denominators while still counting all asset values and debt balances. Clearly disclose incomplete estimates. Preserve separately documented retirement projection assumptions.

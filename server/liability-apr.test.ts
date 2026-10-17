@@ -20,3 +20,16 @@ test("valid rates are normalized and invalid values are rejected", () => {
     assert.ok(parseOptionalInterestRate(value).error);
   }
 });
+
+test("asset rates preserve missing and explicit zero values and allow negative returns", () => {
+  for (const value of [undefined, null, "", "   "]) {
+    assert.deepEqual(parseOptionalInterestRate(value, { allowNegative: true }), { value: null });
+  }
+  for (const value of [0, "0", "0.00"]) {
+    assert.deepEqual(parseOptionalInterestRate(value, { allowNegative: true }), { value: "0.00" });
+  }
+  assert.deepEqual(parseOptionalInterestRate("-5.5", { allowNegative: true }), { value: "-5.50" });
+  for (const value of ["-1000", "1000", "bad", false, {}]) {
+    assert.ok(parseOptionalInterestRate(value, { allowNegative: true }).error);
+  }
+});

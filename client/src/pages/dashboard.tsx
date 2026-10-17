@@ -34,6 +34,7 @@ import {
 import { type Asset, type Liability, ASSET_CATEGORIES, LIABILITY_CATEGORIES } from "@shared/schema";
 import { formatCurrency, formatPercent, getCategoryLabel } from "@/lib/format";
 import { getKnownLiabilityApr, summarizeLiabilityRates } from "@/lib/liability-rates";
+import { getKnownAssetRate, summarizeAssetRates } from "@/lib/asset-rates";
 import { ExportMenu } from "@/components/export-menu";
 import { useAuth } from "@/hooks/use-auth";
 import { getQueryFn } from "@/lib/queryClient";
@@ -186,7 +187,7 @@ function InterestTooltip({ active, payload }: any) {
 }
 
 function DonutChartWithLegend({
-  data, colors, label, emptyText, testId, accentColor, rateNote, weightedAvgRate, unknownRateCount,
+  data, colors, label, emptyText, testId, accentColor, rateNote, weightedAvgRate, unknownRateCount, unknownRateLabel = "APR",
 }: {
   data: { name: string; value: number; rate: number }[];
   colors: string[];
@@ -197,6 +198,7 @@ function DonutChartWithLegend({
   rateNote?: string;
   weightedAvgRate?: number | null;
   unknownRateCount?: number;
+  unknownRateLabel?: string;
 }) {
   const totalInterest = data.reduce((sum, d) => sum + d.value, 0);
 
@@ -207,6 +209,9 @@ function DonutChartWithLegend({
   return (
     <div data-testid={testId}>
       <p className="text-sm font-medium text-center mb-1 text-muted-foreground">{label}</p>
+      {!!unknownRateCount && (
+        <p className="text-[10px] text-center text-muted-foreground">Excludes {unknownRateCount} {unknownRateLabel === "APR" ? "debts with unknown APR" : "assets with unknown rates"}</p>
+      )}
       {data.length === 0 ? (
         <div className="h-44 flex items-center justify-center text-muted-foreground text-sm">{emptyText}</div>
       ) : (
@@ -216,9 +221,6 @@ function DonutChartWithLegend({
               <p className={`text-lg font-bold leading-tight ${headerValueClass}`}>{formatCurrency(totalInterest)}/yr</p>
               {weightedAvgRate !== undefined && weightedAvgRate !== null && (
                 <p className="text-xs text-muted-foreground">Weighted avg. rate: {weightedAvgRate.toFixed(2)}%</p>
-              )}
-              {!!unknownRateCount && (
-                <p className="text-[10px] text-muted-foreground">Excludes {unknownRateCount} unknown APR</p>
               )}
             </div>
           </div>
@@ -280,11 +282,12 @@ function CollapsibleSection({ open, children }: { open: boolean; children: React
 }
 
 function StackedRateBar({
-  items, colors, barLabel,
+  items, colors, barLabel, rateLabel = "APR",
 }: {
   items: { name: string; value: number; rate: number | null }[];
   colors: string[];
   barLabel: string;
+  rateLabel?: string;
 }) {
   const total = items.reduce((sum, item) => sum + item.value, 0);
   if (total === 0 || items.length === 0) return null;
@@ -299,7 +302,7 @@ function StackedRateBar({
           return (
             <div
               key={i}
-              title={`${item.name}: ${formatCurrency(item.value)} · ${item.rate === null ? "APR unknown" : `APR: ${item.rate.toFixed(2)}%`}`}
+              title={`${item.name}: ${formatCurrency(item.value)} · ${item.rate === null ? `${rateLabel} unknown` : `${rateLabel}: ${item.rate.toFixed(2)}%`}`}
               className="relative flex items-center justify-center hover:brightness-110 transition-all cursor-default"
               style={{ width: `${pct}%`, backgroundColor: colors[i % colors.length] }}
             >
@@ -318,7 +321,7 @@ function StackedRateBar({
             <div className="h-2 w-2 rounded-sm shrink-0" style={{ backgroundColor: colors[i % colors.length] }} />
             <span className="text-[10px] text-muted-foreground truncate max-w-[110px]">{item.name}</span>
             <span className="text-[10px] font-semibold text-foreground whitespace-nowrap">
-              {item.rate === null ? "APR unknown" : `${item.rate.toFixed(2)}%`}
+              {item.rate === null ? `${rateLabel} unknown` : `${item.rate.toFixed(2)}%`}
             </span>
           </div>
         ))}
@@ -553,18 +556,13 @@ export default function DashboardPage() {
   const totalLiabilities = includedLiabilities.reduce((sum, l) => sum + parseFloat(l.balance || "0"), 0);
   const netWorth = totalAssets - totalLiabilities;
   const liabilityRateSummary = summarizeLiabilityRates(includedLiabilities);
+  const assetRateSummary = summarizeAssetRates(includedAssets);
 
-  // Dollar-weighted avg rate over ALL included items (0%-rate items count toward denominator)
-  const weightedAssetRate =
-    totalAssets > 0
-      ? includedAssets.reduce((sum, a) => sum + parseFloat(a.value || "0") * parseFloat(a.interestRate || "0"), 0) / totalAssets
-      : 0;
+  // Explicit zero rates count in weighted averages; unknown rates do not.
+  const weightedAssetRate = assetRateSummary.weightedRate;
   const weightedLiabilityRate = liabilityRateSummary.weightedRate;
 
-  const earnedAnnual = includedAssets.reduce(
-    (sum, a) => sum + (parseFloat(a.value || "0") * parseFloat(a.interestRate || "0")) / 100,
-    0,
-  );
+  const earnedAnnual = assetRateSummary.annualReturn;
   const paidAnnual = liabilityRateSummary.annualInterest;
   const netAnnualReturn = earnedAnnual - paidAnnual;
 
@@ -584,7 +582,7 @@ export default function DashboardPage() {
 
   const assetBarItems = [...includedAssets]
     .sort((a, b) => parseFloat(b.value || "0") - parseFloat(a.value || "0"))
-    .map((a) => ({ name: a.name, value: parseFloat(a.value || "0"), rate: parseFloat(a.interestRate || "0") }))
+    .map((a) => ({ name: a.name, value: parseFloat(a.value || "0"), rate: getKnownAssetRate(a.interestRate) }))
     .filter((a) => a.value > 0);
 
   const liabilityBarItems = [...includedLiabilities]
@@ -593,10 +591,11 @@ export default function DashboardPage() {
     .filter((l) => l.value > 0);
 
   const interestEarnedBySource = includedAssets
+    .filter((asset) => getKnownAssetRate(asset.interestRate) !== null)
     .map((a) => ({
       name: a.name,
-      value: Math.round(parseFloat(a.value || "0") * parseFloat(a.interestRate || "0") / 100),
-      rate: parseFloat(a.interestRate || "0"),
+      value: Math.round(parseFloat(a.value || "0") * (getKnownAssetRate(a.interestRate) ?? 0) / 100),
+      rate: getKnownAssetRate(a.interestRate) ?? 0,
     }))
     .filter((a) => a.value > 0);
 
@@ -640,7 +639,7 @@ export default function DashboardPage() {
     );
   }
 
-  const spreadPct = weightedLiabilityRate === null ? null : weightedAssetRate - weightedLiabilityRate;
+  const spreadPct = weightedAssetRate === null || weightedLiabilityRate === null ? null : weightedAssetRate - weightedLiabilityRate;
 
   const exportData = {
     filename: "Net Worth Summary",
@@ -652,7 +651,7 @@ export default function DashboardPage() {
           ["Net Worth", formatCurrency(netWorth)],
           ["Total Assets", formatCurrency(totalAssets)],
           ["Total Liabilities", formatCurrency(totalLiabilities)],
-          ["Weighted Asset Rate", formatPercent(weightedAssetRate)],
+          ["Weighted Asset Rate", weightedAssetRate === null ? "Unknown" : formatPercent(weightedAssetRate)],
           ["Weighted Liability Rate", weightedLiabilityRate === null ? "Unknown" : formatPercent(weightedLiabilityRate)],
           ["Interest Spread", spreadPct === null ? "Unknown" : `${spreadPct.toFixed(2)}%`],
         ],
@@ -664,7 +663,7 @@ export default function DashboardPage() {
           a.name,
           getCategoryLabel(ASSET_CATEGORIES, a.category),
           parseFloat(a.value || "0"),
-          parseFloat(a.interestRate || "0"),
+          getKnownAssetRate(a.interestRate) ?? "",
           a.institution || "",
           a.notes || "",
         ]),
@@ -772,7 +771,10 @@ export default function DashboardPage() {
           color={netAnnualReturn >= 0 ? "green" : "red"}
           extraLine={
             <div className="mt-1 space-y-0.5 text-xs text-muted-foreground">
-              <p>Earning {formatCurrency(earnedAnnual)} ({weightedAssetRate.toFixed(2)}%)</p>
+              <p>Earning {formatCurrency(earnedAnnual)} ({weightedAssetRate === null ? "rate unknown" : `${weightedAssetRate.toFixed(2)}%`})</p>
+              {assetRateSummary.unknownRateCount > 0 && (
+                <p>Excludes {assetRateSummary.unknownRateCount} {assetRateSummary.unknownRateCount === 1 ? "asset" : "assets"} with unknown rates</p>
+              )}
               <p>Paying {formatCurrency(paidAnnual)} ({weightedLiabilityRate === null ? "APR unknown" : `${weightedLiabilityRate.toFixed(2)}%`})</p>
               {liabilityRateSummary.unknownRateCount > 0 && (
                 <p>Excludes {liabilityRateSummary.unknownRateCount} {liabilityRateSummary.unknownRateCount === 1 ? "debt" : "debts"} with unknown APR</p>
@@ -884,6 +886,7 @@ export default function DashboardPage() {
                       items={assetBarItems}
                       colors={CHART_COLORS}
                       barLabel="Rate of Return by Asset"
+                      rateLabel="Return rate"
                     />
                   </>
                 )}
@@ -988,6 +991,8 @@ export default function DashboardPage() {
                 testId="chart-interest-earned"
                 accentColor="emerald"
                 weightedAvgRate={weightedAssetRate}
+                unknownRateCount={assetRateSummary.unknownRateCount}
+                unknownRateLabel="return rate"
                 rateNote="% shown is the rate of return for that asset"
               />
               <DonutChartWithLegend
@@ -1066,9 +1071,9 @@ export default function DashboardPage() {
                         </div>
                         <div className="text-right shrink-0">
                           <p className="text-sm font-semibold">{formatCurrency(asset.value)}</p>
-                          {parseFloat(asset.interestRate || "0") > 0 && (
-                            <p className="text-xs text-emerald-500">{formatPercent(asset.interestRate || "0")}</p>
-                          )}
+                          <p className="text-xs text-emerald-500">
+                            {getKnownAssetRate(asset.interestRate) === null ? "Return rate unknown" : formatPercent(asset.interestRate!)}
+                          </p>
                         </div>
                       </div>
                     );

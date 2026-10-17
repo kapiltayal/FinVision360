@@ -198,7 +198,7 @@ function toAdvisorAssetContext(items: Array<{ name: string; category: string; va
     name: advisorItemText(item.name),
     category: advisorItemText(item.category),
     value: finiteNumber(item.value),
-    interestRate: finiteNumber(item.interestRate),
+    interestRate: item.interestRate == null || item.interestRate.trim() === "" ? null : finiteNumber(item.interestRate),
   }));
 }
 
@@ -416,8 +416,8 @@ export async function registerRoutes(
         (typeof rawAmount === "string" && rawAmount.trim().length > 0) ||
         (typeof rawAmount === "number" && Number.isFinite(rawAmount));
       const amount = hasSuppliedAmount ? Number(rawAmount) : Number.NaN;
-      const parsedInterestRate = parseOptionalInterestRate(entry?.interestRate ?? null);
-      const interestRate = parsedInterestRate.value ?? (kind === "asset" ? "0.00" : null);
+      const parsedInterestRate = parseOptionalInterestRate(entry?.interestRate ?? null, { allowNegative: kind === "asset" });
+      const interestRate = parsedInterestRate.value;
       const minimumPayment = entry?.minimumPayment === undefined || entry?.minimumPayment === "" ? 0 : Number(entry.minimumPayment);
       const maturityDate = optionalIsoDate(entry?.maturityDate);
 
@@ -436,7 +436,7 @@ export async function registerRoutes(
       if (kind === "asset") {
         assetEntries.push({
           userId, name, category, value: normalizedAmount.toFixed(2),
-          interestRate: interestRate ?? "0.00", institution, notes,
+          interestRate, institution, notes,
         });
       } else {
         liabilityEntries.push({
@@ -481,7 +481,9 @@ export async function registerRoutes(
     if (!await hasValidCategory("asset", category)) {
       return res.status(400).json({ message: "Invalid category" });
     }
-    const asset = await storage.createAsset({ userId, name, category, value, interestRate, institution, notes });
+    const parsedInterestRate = parseOptionalInterestRate(interestRate, { allowNegative: true });
+    if ("error" in parsedInterestRate) return res.status(400).json({ message: parsedInterestRate.error });
+    const asset = await storage.createAsset({ userId, name, category, value, interestRate: parsedInterestRate.value, institution, notes });
     res.status(201).json(asset);
   });
 
@@ -503,7 +505,11 @@ export async function registerRoutes(
     if (category !== undefined && !await hasValidCategory("asset", category)) {
       return res.status(400).json({ message: "Invalid category" });
     }
-    const updated = await storage.updateAsset(id, userId, { name, category, value, interestRate, institution, notes });
+    const parsedInterestRate = parseOptionalInterestRate(interestRate, { allowNegative: true });
+    if ("error" in parsedInterestRate) return res.status(400).json({ message: parsedInterestRate.error });
+    const updated = await storage.updateAsset(id, userId, {
+      name, category, value, interestRate: interestRate === undefined ? undefined : parsedInterestRate.value, institution, notes,
+    });
     if (!updated) return res.status(404).json({ message: "Asset not found" });
     res.json(updated);
   });
@@ -1614,7 +1620,7 @@ Include a year-by-year overview, useful milestones, a conservative/base/optimist
       if (expectedKind === "asset") {
         const created = await client.query<{ id: number }>(
           `INSERT INTO assets (user_id, name, category, value, interest_rate, institution, notes)
-           VALUES ($1, $2, $3, $4, '0', $5, 'Synced from Plaid')
+           VALUES ($1, $2, $3, $4, NULL, $5, 'Synced from Plaid')
            RETURNING id`,
           [userId, account.name, mapping.category, balance, account.institutionName],
         );

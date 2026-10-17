@@ -4,17 +4,19 @@ export type ParsedOptionalInterestRate =
 
 const MAX_INTEREST_RATE = 999.99;
 
-/** Blank APR means unknown; an explicit numeric zero remains a known 0% rate. */
-export function parseOptionalInterestRate(value: unknown): ParsedOptionalInterestRate {
+/** Blank rates are unknown; asset returns may also be explicitly negative. */
+export function parseOptionalInterestRate(value: unknown, options: { allowNegative?: boolean } = {}): ParsedOptionalInterestRate {
+  const minimum = options.allowNegative ? -MAX_INTEREST_RATE : 0;
+  const error = `Interest rate must be a number from ${minimum} to 999.99, or blank`;
   if (value === undefined || value === null || (typeof value === "string" && value.trim() === "")) {
     return { value: null };
   }
   if (typeof value !== "string" && typeof value !== "number") {
-    return { error: "Interest rate must be a number from 0 to 999.99, or blank" };
+    return { error };
   }
   const rate = Number(value);
-  if (!Number.isFinite(rate) || rate < 0 || rate > MAX_INTEREST_RATE) {
-    return { error: "Interest rate must be a number from 0 to 999.99, or blank" };
+  if (!Number.isFinite(rate) || rate < minimum || rate > MAX_INTEREST_RATE) {
+    return { error };
   }
   return { value: rate.toFixed(2) };
 }

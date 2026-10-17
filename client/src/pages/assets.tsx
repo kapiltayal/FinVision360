@@ -15,6 +15,7 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Plus, Pencil, Trash2, Wallet, TrendingUp, ChevronDown, Clock, Link2, LayoutGrid, Table2, Layers3, ArrowDown, ArrowUp, ArrowUpDown, Info } from "lucide-react";
 import { type Asset, type PlaidAccount } from "@shared/schema";
 import { formatCurrency, formatPercent } from "@/lib/format";
+import { getKnownAssetRate, summarizeAssetRates } from "@/lib/asset-rates";
 import { type BookCategory, categoryLabel, categoryParent, groupedBookCategories, groupedBookEntries } from "@/lib/book-categories";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
@@ -76,7 +77,7 @@ function AssetForm({
     name: asset?.name || "",
     category: asset?.category || "",
     value: asset?.value || "",
-    interestRate: asset?.interestRate || "0",
+    interestRate: asset?.interestRate ?? "",
     institution: asset?.institution || "",
     notes: asset?.notes || "",
   });
@@ -174,11 +175,14 @@ function AssetForm({
           <Input
             data-testid="input-asset-rate"
             type="number"
+            min="-999.99"
+            max="999.99"
             step="0.01"
             value={form.interestRate}
             onChange={(e) => setForm({ ...form, interestRate: e.target.value })}
-            placeholder="0.00"
+            placeholder="e.g., 4.5"
           />
+          <p className="text-xs text-muted-foreground">Leave blank if unknown. Enter 0 only for an explicit 0% return.</p>
         </div>
         <div className="space-y-2">
           <Label>Institution</Label>
@@ -238,13 +242,9 @@ export default function AssetsPage() {
   });
 
   const totalValue = assets.reduce((sum, a) => sum + parseFloat(a.value || "0"), 0);
-  const weightedRate = totalValue > 0
-    ? assets.reduce((sum, a) => sum + parseFloat(a.value || "0") * parseFloat(a.interestRate || "0"), 0) / totalValue
-    : 0;
-  const annualInterestEarned = assets.reduce(
-    (sum, a) => sum + (parseFloat(a.value || "0") * parseFloat(a.interestRate || "0")) / 100,
-    0,
-  );
+  const rateSummary = summarizeAssetRates(assets);
+  const weightedRate = rateSummary.weightedRate;
+  const annualInterestEarned = rateSummary.annualReturn;
   const sortedAssets = useMemo(() => {
     const sorted = [...assets];
     sorted.sort((a, b) => {
@@ -262,7 +262,10 @@ export default function AssetsPage() {
       } else if (sortConfig.key === "value") {
         comparison = parseFloat(a.value || "0") - parseFloat(b.value || "0");
       } else {
-        comparison = parseFloat(a.interestRate || "0") - parseFloat(b.interestRate || "0");
+        const aRate = getKnownAssetRate(a.interestRate);
+        const bRate = getKnownAssetRate(b.interestRate);
+        if ((aRate === null) !== (bRate === null)) return aRate === null ? 1 : -1;
+        comparison = (aRate ?? 0) - (bRate ?? 0);
       }
 
       if (comparison === 0 && sortConfig.key !== "parentCategory" && sortConfig.key !== "category") {
@@ -323,7 +326,7 @@ export default function AssetsPage() {
         a.name,
         categoryLabel(categories, a.category),
         parseFloat(a.value || "0"),
-        parseFloat(a.interestRate || "0"),
+        getKnownAssetRate(a.interestRate) ?? "",
         a.institution || "",
         a.notes || "",
       ]),
@@ -394,13 +397,16 @@ export default function AssetsPage() {
                       </button>
                     </TooltipTrigger>
                     <TooltipContent side="top" className="max-w-xs text-xs leading-relaxed">
-                      Annual return is the estimated absolute dollar change across all assets, calculated as the sum of (asset value × rate ÷ 100). The percentage return is a dollar-weighted average calculated as (asset value × rate) ÷ total asset value. This applies to both income-producing assets and assets that appreciate in value. Assets with a 0% rate still count in the total.
+                      Annual return is estimated from assets with known rates as the sum of (asset value × rate ÷ 100). The percentage return is weighted by the value of those assets only. Unknown rates are excluded, while an explicit 0% rate is included. All asset values still count toward total assets.
                     </TooltipContent>
                   </Tooltip>
                 </p>
                 <p className="text-xl font-bold text-emerald-600 dark:text-emerald-400" data-testid="text-avg-rate">
-                  {formatCurrency(annualInterestEarned)} <span className="text-sm font-semibold">({formatPercent(weightedRate)})</span>
+                  {weightedRate === null ? "Unknown" : <>{formatCurrency(annualInterestEarned)} <span className="text-sm font-semibold">({formatPercent(weightedRate)})</span></>}
                 </p>
+                {rateSummary.unknownRateCount > 0 && (
+                  <p className="text-xs text-muted-foreground">Excludes {rateSummary.unknownRateCount} {rateSummary.unknownRateCount === 1 ? "asset" : "assets"} with unknown rates</p>
+                )}
               </div>
             </div>
           </CardContent>
@@ -493,9 +499,9 @@ export default function AssetsPage() {
                     <td className="px-5 py-3 text-muted-foreground">{asset.institution || "—"}</td>
                     <td className="px-5 py-3 text-right font-semibold whitespace-nowrap">{formatCurrency(asset.value)}</td>
                     <td className="px-5 py-3 text-right whitespace-nowrap">
-                      {parseFloat(asset.interestRate || "0") > 0
-                        ? <span className="text-emerald-600 dark:text-emerald-400">{formatPercent(asset.interestRate || "0")}</span>
-                        : "—"}
+                      {getKnownAssetRate(asset.interestRate) === null
+                        ? <span className="text-muted-foreground">Unknown</span>
+                        : <span className="text-emerald-600 dark:text-emerald-400">{formatPercent(asset.interestRate!)}</span>}
                     </td>
                     <td className="px-5 py-3">
                       <div className="flex justify-end gap-1">
@@ -535,9 +541,8 @@ export default function AssetsPage() {
               {categoryGroups.map(({ category, entries: categoryAssets }, idx) => {
                 const isOpen = openCategory === category;
                 const categoryTotal = categoryAssets.reduce((sum, a) => sum + parseFloat(a.value || "0"), 0);
-                const categoryWeightedRate = categoryTotal > 0
-                  ? categoryAssets.reduce((sum, a) => sum + parseFloat(a.value || "0") * parseFloat(a.interestRate || "0"), 0) / categoryTotal
-                  : 0;
+                const categoryRateSummary = summarizeAssetRates(categoryAssets);
+                const categoryWeightedRate = categoryRateSummary.weightedRate;
 
                 return (
                   <div key={category} className={idx < categoryGroups.length - 1 ? "border-b" : ""}>
@@ -558,9 +563,8 @@ export default function AssetsPage() {
                       <div className="flex items-center gap-4">
                         <div className="text-right hidden sm:block">
                           <p className="text-sm font-semibold">{formatCurrency(categoryTotal)}</p>
-                          {categoryWeightedRate > 0 && (
-                            <p className="text-xs text-emerald-600 dark:text-emerald-400">{formatPercent(categoryWeightedRate)} avg rate</p>
-                          )}
+                          <p className="text-xs text-emerald-600 dark:text-emerald-400">{categoryWeightedRate === null ? "Rate unknown" : `${formatPercent(categoryWeightedRate)} avg rate`}</p>
+                          {categoryRateSummary.unknownRateCount > 0 && <p className="text-[10px] text-muted-foreground">{categoryRateSummary.unknownRateCount} unknown {categoryRateSummary.unknownRateCount === 1 ? "rate" : "rates"} excluded</p>}
                         </div>
                         <ChevronDown className={`h-4 w-4 text-muted-foreground shrink-0 transition-transform duration-300 ${isOpen ? "rotate-180" : ""}`} />
                       </div>
@@ -599,12 +603,10 @@ export default function AssetsPage() {
                                       <span className="text-sm text-muted-foreground">Value</span>
                                       <span className="text-lg font-bold">{formatCurrency(asset.value)}</span>
                                     </div>
-                                    {parseFloat(asset.interestRate || "0") > 0 && (
-                                      <div className="flex items-center justify-between">
-                                        <span className="text-sm text-muted-foreground">Rate of Return</span>
-                                        <span className="text-sm font-medium text-emerald-600 dark:text-emerald-400">{formatPercent(asset.interestRate || "0")}</span>
-                                      </div>
-                                    )}
+                                    <div className="flex items-center justify-between">
+                                      <span className="text-sm text-muted-foreground">Rate of Return</span>
+                                      <span className="text-sm font-medium text-emerald-600 dark:text-emerald-400">{getKnownAssetRate(asset.interestRate) === null ? "Unknown" : formatPercent(asset.interestRate!)}</span>
+                                    </div>
                                   </div>
                                 </CardContent>
                               </Card>

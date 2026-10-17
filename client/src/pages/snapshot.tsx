@@ -35,6 +35,7 @@ import {
 } from "lucide-react";
 import { type Asset, type Liability, type InsurancePolicy, type Retirement401kGoal, type RetirementPlannerSettings, type EstateBeneficiary, type EstateDocument, type EstateContact, ESTATE_DOCUMENT_TYPES } from "@shared/schema";
 import { getKnownLiabilityApr, summarizeLiabilityRates } from "@/lib/liability-rates";
+import { summarizeAssetRates } from "@/lib/asset-rates";
 
 const INSURANCE_TYPES = [
   { key: "auto", label: "Auto", Icon: Car },
@@ -210,13 +211,8 @@ export default function SnapshotPage() {
   const totalAssets = useMemo(() => assets.reduce((s, a) => s + parseFloat(a.value || "0"), 0), [assets]);
   const totalLiabilities = useMemo(() => liabilities.reduce((s, l) => s + parseFloat(l.balance || "0"), 0), [liabilities]);
   const netWorth = totalAssets - totalLiabilities;
-  const annualReturnOnAssets = useMemo(
-    () => assets.reduce(
-      (sum, asset) => sum + (parseFloat(asset.value || "0") * parseFloat(asset.interestRate || "0")) / 100,
-      0,
-    ),
-    [assets],
-  );
+  const assetRateSummary = useMemo(() => summarizeAssetRates(assets), [assets]);
+  const annualReturnOnAssets = assetRateSummary.annualReturn;
   const liabilityRateSummary = useMemo(() => summarizeLiabilityRates(liabilities), [liabilities]);
   const annualInterestOwed = liabilityRateSummary.annualInterest;
   const netReturnOnAssets = annualReturnOnAssets - annualInterestOwed;
@@ -423,9 +419,14 @@ export default function SnapshotPage() {
               label="Net Return on Assets"
               value={`${netReturnOnAssets >= 0 ? "+" : ""}${formatCurrency(netReturnOnAssets)}/yr`}
               className="text-emerald-600 dark:text-emerald-400 font-medium"
-              tooltip={`Net return on assets subtracts the estimated interest for liabilities with known APRs from estimated asset returns.${liabilityRateSummary.unknownRateCount > 0 ? ` It excludes ${liabilityRateSummary.unknownRateCount} ${liabilityRateSummary.unknownRateCount === 1 ? "debt" : "debts"} with unknown APR.` : ""}`}
+              tooltip={`Net return on assets uses known asset return rates and liability APRs only.${assetRateSummary.unknownRateCount > 0 ? ` It excludes ${assetRateSummary.unknownRateCount} assets with unknown return rates.` : ""}${liabilityRateSummary.unknownRateCount > 0 ? ` It excludes ${liabilityRateSummary.unknownRateCount} ${liabilityRateSummary.unknownRateCount === 1 ? "debt" : "debts"} with unknown APR.` : ""}`}
             />
           </div>
+          {assetRateSummary.unknownRateCount > 0 && (
+            <p className="mt-2 text-[11px] text-muted-foreground">
+              Return estimate excludes {assetRateSummary.unknownRateCount} {assetRateSummary.unknownRateCount === 1 ? "asset" : "assets"} with unknown rates.
+            </p>
+          )}
           {liabilityRateSummary.unknownRateCount > 0 && (
             <p className="mt-2 text-[11px] text-muted-foreground">
               Interest estimate excludes {liabilityRateSummary.unknownRateCount} {liabilityRateSummary.unknownRateCount === 1 ? "debt" : "debts"} with unknown APR.
