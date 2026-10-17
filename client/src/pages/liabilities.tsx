@@ -15,6 +15,7 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Plus, Pencil, Trash2, CreditCard, TrendingDown, ChevronDown, Clock, Link2, LayoutGrid, Table2, Layers3, ArrowDown, ArrowUp, ArrowUpDown, Info } from "lucide-react";
 import { type Liability, type PlaidAccount } from "@shared/schema";
 import { formatCurrency, formatPercent } from "@/lib/format";
+import { getKnownLiabilityApr, summarizeLiabilityRates } from "@/lib/liability-rates";
 import { type BookCategory, categoryLabel, categoryParent, groupedBookCategories, groupedBookEntries } from "@/lib/book-categories";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
@@ -76,7 +77,7 @@ function LiabilityForm({
     name: liability?.name || "",
     category: liability?.category || "",
     balance: liability?.balance || "",
-    interestRate: liability?.interestRate || "0",
+    interestRate: liability?.interestRate ?? "",
     minimumPayment: liability?.minimumPayment || "0",
     maturityDate: liability?.maturityDate || "",
     institution: liability?.institution || "",
@@ -189,8 +190,9 @@ function LiabilityForm({
             step="0.01"
             value={form.interestRate}
             onChange={(e) => setForm({ ...form, interestRate: e.target.value })}
-            placeholder="0.00"
+            placeholder="e.g., 6.5"
           />
+          <p className="text-xs text-muted-foreground">Leave blank if unknown. Enter 0 only when the APR is actually 0%.</p>
         </div>
         <div className="space-y-2">
           <Label>Minimum Payment ($)</Label>
@@ -274,13 +276,10 @@ export default function LiabilitiesPage() {
   });
 
   const totalBalance = liabilities.reduce((sum, l) => sum + parseFloat(l.balance || "0"), 0);
-  const weightedRate = totalBalance > 0
-    ? liabilities.reduce((sum, l) => sum + parseFloat(l.balance || "0") * parseFloat(l.interestRate || "0"), 0) / totalBalance
-    : 0;
-  const annualInterestOwed = liabilities.reduce(
-    (sum, l) => sum + (parseFloat(l.balance || "0") * parseFloat(l.interestRate || "0")) / 100,
-    0,
-  );
+  const rateSummary = summarizeLiabilityRates(liabilities);
+  const weightedRate = rateSummary.weightedRate;
+  const annualInterestOwed = rateSummary.annualInterest;
+  const unknownRateCount = rateSummary.unknownRateCount;
   const totalMinPayment = liabilities.reduce((sum, l) => sum + parseFloat(l.minimumPayment || "0"), 0);
   const sortedLiabilities = useMemo(() => {
     const sorted = [...liabilities];
@@ -299,7 +298,10 @@ export default function LiabilitiesPage() {
       } else if (sortConfig.key === "balance") {
         comparison = parseFloat(a.balance || "0") - parseFloat(b.balance || "0");
       } else if (sortConfig.key === "rate") {
-        comparison = parseFloat(a.interestRate || "0") - parseFloat(b.interestRate || "0");
+        const aUnknown = getKnownLiabilityApr(a.interestRate) === null;
+        const bUnknown = getKnownLiabilityApr(b.interestRate) === null;
+        if (aUnknown !== bUnknown) return aUnknown ? 1 : -1;
+        comparison = (getKnownLiabilityApr(a.interestRate) ?? 0) - (getKnownLiabilityApr(b.interestRate) ?? 0);
       } else if (sortConfig.key === "maturityDate") {
         comparison = (a.maturityDate || "9999-12-31").localeCompare(b.maturityDate || "9999-12-31");
       } else {
@@ -364,7 +366,7 @@ export default function LiabilitiesPage() {
         l.name,
         categoryLabel(categories, l.category),
         parseFloat(l.balance || "0"),
-        parseFloat(l.interestRate || "0"),
+        l.interestRate == null ? "" : parseFloat(l.interestRate),
         parseFloat(l.minimumPayment || "0"),
         l.maturityDate || "",
         l.institution || "",
@@ -437,13 +439,18 @@ export default function LiabilitiesPage() {
                       </button>
                     </TooltipTrigger>
                     <TooltipContent side="top" className="max-w-xs text-xs leading-relaxed">
-                      Annual interest owed is the absolute dollar amount calculated as the sum of (balance × rate ÷ 100). The interest rate is a balance-weighted average calculated as (balance × rate) ÷ total balance. Liabilities with a 0% rate still count in the total.
+                      The estimates include only debts with a known APR. Annual interest is the sum of (balance × APR ÷ 100); the rate is balance-weighted over known-rate debts. Explicit 0% rates count as zero; unknown APRs are excluded.
                     </TooltipContent>
                   </Tooltip>
                 </p>
                 <p className="text-xl font-bold text-red-600 dark:text-red-400" data-testid="text-avg-liability-rate">
-                  {formatCurrency(annualInterestOwed)} <span className="text-sm font-semibold">({formatPercent(weightedRate)})</span>
+                  {formatCurrency(annualInterestOwed)} <span className="text-sm font-semibold">({weightedRate === null ? "APR unknown" : formatPercent(weightedRate)})</span>
                 </p>
+                {unknownRateCount > 0 && (
+                  <p className="mt-0.5 text-[10px] text-muted-foreground">
+                    Excludes {unknownRateCount} {unknownRateCount === 1 ? "debt" : "debts"} with unknown APR
+                  </p>
+                )}
               </div>
             </div>
           </CardContent>
@@ -538,9 +545,9 @@ export default function LiabilitiesPage() {
                     <td className="px-5 py-3 text-muted-foreground">{liability.institution || "—"}</td>
                     <td className="px-5 py-3 text-right font-semibold whitespace-nowrap">{formatCurrency(liability.balance)}</td>
                     <td className="px-5 py-3 text-right whitespace-nowrap">
-                      {parseFloat(liability.interestRate || "0") > 0
-                        ? <span className="text-red-600 dark:text-red-400">{formatPercent(liability.interestRate || "0")}</span>
-                        : "—"}
+                      {liability.interestRate == null || liability.interestRate.trim() === ""
+                        ? <span className="text-muted-foreground">Unknown</span>
+                        : <span className={Number(liability.interestRate) > 15 ? "text-red-600 dark:text-red-400" : ""}>{formatPercent(liability.interestRate)}</span>}
                     </td>
                     <td className="px-5 py-3 text-right whitespace-nowrap">
                       {parseFloat(liability.minimumPayment || "0") > 0
@@ -590,9 +597,9 @@ export default function LiabilitiesPage() {
               {categoryGroups.map(({ category, entries: categoryLiabilities }, idx) => {
                 const isOpen = openCategory === category;
                 const categoryTotal = categoryLiabilities.reduce((sum, l) => sum + parseFloat(l.balance || "0"), 0);
-                const categoryWeightedRate = categoryTotal > 0
-                  ? categoryLiabilities.reduce((sum, l) => sum + parseFloat(l.balance || "0") * parseFloat(l.interestRate || "0"), 0) / categoryTotal
-                  : 0;
+                const categoryRateSummary = summarizeLiabilityRates(categoryLiabilities);
+                const categoryWeightedRate = categoryRateSummary.weightedRate;
+                const categoryUnknownRateCount = categoryRateSummary.unknownRateCount;
                 const categoryMinPayment = categoryLiabilities.reduce((sum, l) => sum + parseFloat(l.minimumPayment || "0"), 0);
 
                 return (
@@ -615,8 +622,11 @@ export default function LiabilitiesPage() {
                         <div className="text-right hidden sm:block">
                           <p className="text-sm font-semibold">{formatCurrency(categoryTotal)}</p>
                           <div className="flex items-center gap-2 justify-end">
-                            {categoryWeightedRate > 0 && (
+                            {categoryWeightedRate !== null && (
                               <p className="text-xs text-red-500 dark:text-red-400">{formatPercent(categoryWeightedRate)} rate</p>
+                            )}
+                            {categoryUnknownRateCount > 0 && (
+                              <p className="text-xs text-muted-foreground">{categoryUnknownRateCount} unknown APR</p>
                             )}
                             {categoryMinPayment > 0 && (
                               <p className="text-xs text-muted-foreground">{formatCurrency(categoryMinPayment)}/mo</p>
@@ -660,12 +670,12 @@ export default function LiabilitiesPage() {
                                       <span className="text-sm text-muted-foreground">Balance</span>
                                       <span className="text-lg font-bold">{formatCurrency(liability.balance)}</span>
                                     </div>
-                                    {parseFloat(liability.interestRate || "0") > 0 && (
-                                      <div className="flex items-center justify-between">
-                                        <span className="text-sm text-muted-foreground">Interest Rate</span>
-                                        <span className="text-sm font-medium text-red-600 dark:text-red-400">{formatPercent(liability.interestRate || "0")}</span>
-                                      </div>
-                                    )}
+                                    <div className="flex items-center justify-between">
+                                      <span className="text-sm text-muted-foreground">Interest Rate</span>
+                                      <span className={`text-sm font-medium ${liability.interestRate == null || liability.interestRate.trim() === "" ? "text-muted-foreground" : Number(liability.interestRate) > 15 ? "text-red-600 dark:text-red-400" : ""}`}>
+                                        {liability.interestRate == null || liability.interestRate.trim() === "" ? "Unknown" : formatPercent(liability.interestRate)}
+                                      </span>
+                                    </div>
                                     {parseFloat(liability.minimumPayment || "0") > 0 && (
                                       <div className="flex items-center justify-between">
                                         <span className="text-sm text-muted-foreground">Min Payment</span>

@@ -61,7 +61,7 @@ export const liabilities = pgTable("liabilities", {
   name: text("name").notNull(),
   category: text("category").notNull(),
   balance: numeric("balance", { precision: 15, scale: 2 }).notNull(),
-  interestRate: numeric("interest_rate", { precision: 5, scale: 2 }).default("0"),
+  interestRate: numeric("interest_rate", { precision: 5, scale: 2 }),
   minimumPayment: numeric("minimum_payment", { precision: 10, scale: 2 }).default("0"),
   maturityDate: date("maturity_date"),
   institution: text("institution"),

@@ -34,6 +34,7 @@ import {
   Landmark,
 } from "lucide-react";
 import { type Asset, type Liability, type InsurancePolicy, type Retirement401kGoal, type RetirementPlannerSettings, type EstateBeneficiary, type EstateDocument, type EstateContact, ESTATE_DOCUMENT_TYPES } from "@shared/schema";
+import { getKnownLiabilityApr, summarizeLiabilityRates } from "@/lib/liability-rates";
 
 const INSURANCE_TYPES = [
   { key: "auto", label: "Auto", Icon: Car },
@@ -216,13 +217,8 @@ export default function SnapshotPage() {
     ),
     [assets],
   );
-  const annualInterestOwed = useMemo(
-    () => liabilities.reduce(
-      (sum, liability) => sum + (parseFloat(liability.balance || "0") * parseFloat(liability.interestRate || "0")) / 100,
-      0,
-    ),
-    [liabilities],
-  );
+  const liabilityRateSummary = useMemo(() => summarizeLiabilityRates(liabilities), [liabilities]);
+  const annualInterestOwed = liabilityRateSummary.annualInterest;
   const netReturnOnAssets = annualReturnOnAssets - annualInterestOwed;
 
   const cashFlow = cashFlowSummary?.averages ?? { income: 0, expenses: 0, net: 0, savingsRate: 0 };
@@ -277,17 +273,18 @@ export default function SnapshotPage() {
     }
 
     const ccDebt = liabilities.filter(l => l.category === "credit_card");
-    const ccTotal = ccDebt.reduce((s, l) => s + parseFloat(l.balance || "0"), 0);
-    if (ccTotal > 0) {
-      const avgRate = ccDebt.reduce((s, l) => s + parseFloat(l.interestRate || "0"), 0) / ccDebt.length;
+    const ccDebtWithKnownApr = ccDebt.filter((liability) => getKnownLiabilityApr(liability.interestRate) !== null);
+    const ccTotalWithKnownApr = ccDebtWithKnownApr.reduce((sum, liability) => sum + parseFloat(liability.balance || "0"), 0);
+    if (ccTotalWithKnownApr > 0) {
+      const avgRate = ccDebtWithKnownApr.reduce((sum, liability) => sum + (getKnownLiabilityApr(liability.interestRate) ?? 0), 0) / ccDebtWithKnownApr.length;
       if (avgRate > 15) {
         recs.push({
           priority: "high",
           title: "Eliminate High-Interest Debt",
-          description: `${formatCurrency(ccTotal)} in credit card debt at ~${avgRate.toFixed(1)}% APR is costly. Use the avalanche method to pay off the highest-rate cards first.`,
+          description: `${formatCurrency(ccTotalWithKnownApr)} in credit card debt with known APRs averages ~${avgRate.toFixed(1)}% APR. Use the avalanche method to pay off the highest-rate cards first.`,
           color: "#f97316",
           category: "save",
-          monthlyPotential: (ccTotal * (avgRate / 100)) / 12,
+          monthlyPotential: (ccTotalWithKnownApr * (avgRate / 100)) / 12,
         });
       }
     }
@@ -426,9 +423,14 @@ export default function SnapshotPage() {
               label="Net Return on Assets"
               value={`${netReturnOnAssets >= 0 ? "+" : ""}${formatCurrency(netReturnOnAssets)}/yr`}
               className="text-emerald-600 dark:text-emerald-400 font-medium"
-              tooltip="Net return on assets is the annual return on all assets minus the annual interest owed on all liabilities."
+              tooltip={`Net return on assets subtracts the estimated interest for liabilities with known APRs from estimated asset returns.${liabilityRateSummary.unknownRateCount > 0 ? ` It excludes ${liabilityRateSummary.unknownRateCount} ${liabilityRateSummary.unknownRateCount === 1 ? "debt" : "debts"} with unknown APR.` : ""}`}
             />
           </div>
+          {liabilityRateSummary.unknownRateCount > 0 && (
+            <p className="mt-2 text-[11px] text-muted-foreground">
+              Interest estimate excludes {liabilityRateSummary.unknownRateCount} {liabilityRateSummary.unknownRateCount === 1 ? "debt" : "debts"} with unknown APR.
+            </p>
+          )}
         </SnapshotCard>
 
         {/* ── Income & Expenses ── */}

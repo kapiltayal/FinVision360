@@ -82,7 +82,7 @@ export default function LiabilityMapPage() {
   const sortedExposure = useMemo(() => sortExposure(exposure, sort), [exposure, sort]);
   const totalBalance = exposure.reduce((total, item) => total + item.balance, 0);
   const interestEstimates = exposure.map(estimateRemainingInterest);
-  const totalInterestOwed = interestEstimates.reduce((total, item) => total + (item ?? 0), 0);
+  const totalInterestOwed = interestEstimates.reduce<number>((total, item) => total + (item ?? 0), 0);
   const excludedInterestCount = exposure.filter((item, index) => item.balance > 0 && interestEstimates[index] === null).length;
   const maxBalance = Math.max(0, ...exposure.map((item) => item.balance));
   const maxMonths = Math.max(1, ...exposure.map((item) => item.monthsRemaining ?? 0));

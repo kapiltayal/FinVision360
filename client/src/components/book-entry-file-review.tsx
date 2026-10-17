@@ -94,7 +94,10 @@ export function BookEntryFileReview({
               <th scope="col" className="min-w-40 border-b px-2 py-2 font-medium">Name *</th>
               <th scope="col" className="min-w-48 border-b px-2 py-2 font-medium">Category *</th>
               <th scope="col" className="min-w-28 border-b px-2 py-2 font-medium">{kind === "asset" ? "Value *" : "Balance *"}</th>
-              <th scope="col" className="min-w-28 border-b px-2 py-2 font-medium">Rate (%)</th>
+              <th scope="col" className="min-w-28 border-b px-2 py-2 font-medium">
+                Rate (%)
+                {kind === "liability" && <span className="block text-[10px] font-normal text-muted-foreground">blank = unknown</span>}
+              </th>
               {kind === "liability" && (
                 <>
                   <th scope="col" className="min-w-28 border-b px-2 py-2 font-medium">Min. payment</th>

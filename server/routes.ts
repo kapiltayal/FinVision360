@@ -38,6 +38,7 @@ import {
 } from "./asset-liability-ingestion";
 import { buildRetirementNetWorthProjection } from "./retirement-projection";
 import { buildRetirementIncomeExpenseProjection, isPretaxRetirementAccountCategory } from "./retirement-income-expense-projection";
+import { parseOptionalInterestRate } from "./liability-apr";
 
 const MAX_PENSION_AMOUNT = 9_999_999_999_999.99;
 const MAX_SOCIAL_SECURITY_MONTHLY_BENEFIT = 99_999_999.99;
@@ -415,14 +416,15 @@ export async function registerRoutes(
         (typeof rawAmount === "string" && rawAmount.trim().length > 0) ||
         (typeof rawAmount === "number" && Number.isFinite(rawAmount));
       const amount = hasSuppliedAmount ? Number(rawAmount) : Number.NaN;
-      const interestRate = entry?.interestRate === undefined || entry?.interestRate === "" ? 0 : Number(entry.interestRate);
+      const parsedInterestRate = parseOptionalInterestRate(entry?.interestRate ?? null);
+      const interestRate = parsedInterestRate.value ?? (kind === "asset" ? "0.00" : null);
       const minimumPayment = entry?.minimumPayment === undefined || entry?.minimumPayment === "" ? 0 : Number(entry.minimumPayment);
       const maturityDate = optionalIsoDate(entry?.maturityDate);
 
       const invalid = !name ? "missing name" :
         !validCategories.has(category) ? "invalid or missing category" :
         !Number.isFinite(amount) || (kind === "asset" && amount < 0) ? `invalid ${kind === "asset" ? "value" : "balance"}` :
-        !Number.isFinite(interestRate) || interestRate < 0 ? "invalid interest rate" :
+        parsedInterestRate.error ? "invalid interest rate" :
         kind === "liability" && (!Number.isFinite(minimumPayment) || minimumPayment < 0) ? "invalid minimum payment" :
         kind === "liability" && maturityDate.error ? "invalid maturity date" : null;
       if (invalid) return res.status(422).json({ message: `Entry ${index + 1}: ${invalid}. Nothing was saved.` });
@@ -434,12 +436,12 @@ export async function registerRoutes(
       if (kind === "asset") {
         assetEntries.push({
           userId, name, category, value: normalizedAmount.toFixed(2),
-          interestRate: interestRate.toFixed(2), institution, notes,
+          interestRate: interestRate ?? "0.00", institution, notes,
         });
       } else {
         liabilityEntries.push({
           userId, name, category, balance: normalizedAmount.toFixed(2),
-          interestRate: interestRate.toFixed(2), minimumPayment: minimumPayment.toFixed(2),
+          interestRate, minimumPayment: minimumPayment.toFixed(2),
           maturityDate: maturityDate.value ?? null, institution, notes,
         });
       }
@@ -536,10 +538,12 @@ export async function registerRoutes(
     if (!await hasValidCategory("liability", category)) {
       return res.status(400).json({ message: "Invalid category" });
     }
+    const parsedInterestRate = parseOptionalInterestRate(interestRate ?? null);
+    if ("error" in parsedInterestRate) return res.status(400).json({ message: parsedInterestRate.error });
     const parsedMaturityDate = optionalIsoDate(maturityDate);
     if (parsedMaturityDate.error) return res.status(400).json({ message: parsedMaturityDate.error });
     const liability = await storage.createLiability({
-      userId, name, category, balance, interestRate, minimumPayment,
+      userId, name, category, balance, interestRate: parsedInterestRate.value, minimumPayment,
       maturityDate: parsedMaturityDate.value ?? null, institution, notes,
     });
     res.status(201).json(liability);
@@ -563,10 +567,14 @@ export async function registerRoutes(
     if (category !== undefined && !await hasValidCategory("liability", category)) {
       return res.status(400).json({ message: "Invalid category" });
     }
+    const parsedInterestRate = interestRate === undefined
+      ? { value: undefined as string | null | undefined }
+      : parseOptionalInterestRate(interestRate);
+    if ("error" in parsedInterestRate) return res.status(400).json({ message: parsedInterestRate.error });
     const parsedMaturityDate = optionalIsoDate(maturityDate);
     if (parsedMaturityDate.error) return res.status(400).json({ message: parsedMaturityDate.error });
     const updated = await storage.updateLiability(id, userId, {
-      name, category, balance, interestRate, minimumPayment,
+      name, category, balance, interestRate: parsedInterestRate.value, minimumPayment,
       maturityDate: parsedMaturityDate.value, institution, notes,
     });
     if (!updated) return res.status(404).json({ message: "Liability not found" });
@@ -1619,7 +1627,7 @@ Include a year-by-year overview, useful milestones, a conservative/base/optimist
       } else {
         const created = await client.query<{ id: number }>(
           `INSERT INTO liabilities (user_id, name, category, balance, interest_rate, minimum_payment, institution, notes)
-           VALUES ($1, $2, $3, $4, '0', '0', $5, 'Synced from Plaid')
+           VALUES ($1, $2, $3, $4, NULL, '0', $5, 'Synced from Plaid')
            RETURNING id`,
           [userId, account.name, mapping.category, balance, account.institutionName],
         );
