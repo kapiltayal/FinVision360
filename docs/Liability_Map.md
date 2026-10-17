@@ -29,7 +29,10 @@ It does not introduce another debt store or change saved liability records.
   are marked paid off.
 - Remaining-month inputs provide temporary planning adjustments. Reset or
   leaving the page restores the source-derived calculation. They do not
-  alter saved loans or establish a new repayment agreement.
+  alter saved loans or establish a new repayment agreement. The input column
+  is labeled “Months left.” Each row shows the saved maturity date when known,
+  or an estimated ending month below the input; a missing duration prompts
+  the user to add months.
 - Monthly interest is an estimate of current balance × APR ÷ 12, not lifetime
   interest. Unknown APR accounts are explicitly excluded from that summary.
 - Avalanche, Snowball and Longest Duration sorting reorder the same debts

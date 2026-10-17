@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { formatCurrency, formatCurrencyFull, formatPercent } from "@/lib/format";
-import { buildExposure, estimateRemainingInterest, getBarHeight, getTimelineTicks, sortExposure, type ExposureSort } from "@/lib/liability-map";
+import { buildExposure, estimateRemainingInterest, getBarHeight, getTimelineTicks, sortExposure, type ExposureItem, type ExposureSort } from "@/lib/liability-map";
 
 const sortOptions: { value: ExposureSort; label: string }[] = [
   { value: "avalanche", label: "Highest APR First" },
@@ -39,7 +39,30 @@ function monthDurationLabel(months: number | null) {
   return `${months} ${months === 1 ? "month" : "months"}`;
 }
 
+function endingDateLabel(item: ExposureItem, draft: string | undefined, now: Date) {
+  if (item.durationSource === "paid") return "Paid off";
+  if (draft !== undefined) {
+    const draftMonths = Number(draft);
+    if (draft.trim() === "" || !Number.isSafeInteger(draftMonths) || draftMonths < 1 || draftMonths > 12_000) {
+      return "Enter valid months";
+    }
+    const date = new Date(now.getFullYear(), now.getMonth() + draftMonths, 1);
+    return `Est. end ${date.toLocaleDateString("en-US", { month: "short", year: "numeric" })}`;
+  }
+  if (item.durationSource === "maturity" && item.maturityDate) {
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(item.maturityDate);
+    if (match) {
+      const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+      return `Ends ${date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`;
+    }
+  }
+  if (item.monthsRemaining === null || item.monthsRemaining < 1) return "Add months for date";
+  const date = new Date(now.getFullYear(), now.getMonth() + item.monthsRemaining, 1);
+  return `Est. end ${date.toLocaleDateString("en-US", { month: "short", year: "numeric" })}`;
+}
+
 export default function LiabilityMapPage() {
+  const [now] = useState(() => new Date());
   const [sort, setSort] = useState<ExposureSort>("avalanche");
   const [overrides, setOverrides] = useState<Record<number, number>>({});
   const [durationDrafts, setDurationDrafts] = useState<Record<number, string>>({});
@@ -53,8 +76,8 @@ export default function LiabilityMapPage() {
   } = useQuery<Liability[]>({ queryKey: ["/api/liabilities"] });
 
   const exposure = useMemo(
-    () => buildExposure(liabilities, new Date(), overrides),
-    [liabilities, overrides],
+    () => buildExposure(liabilities, now, overrides),
+    [liabilities, now, overrides],
   );
   const sortedExposure = useMemo(() => sortExposure(exposure, sort), [exposure, sort]);
   const totalBalance = exposure.reduce((total, item) => total + item.balance, 0);
@@ -63,7 +86,7 @@ export default function LiabilityMapPage() {
   const excludedInterestCount = exposure.filter((item, index) => item.balance > 0 && interestEstimates[index] === null).length;
   const maxBalance = Math.max(0, ...exposure.map((item) => item.balance));
   const maxMonths = Math.max(1, ...exposure.map((item) => item.monthsRemaining ?? 0));
-  const ticks = getTimelineTicks(maxMonths, new Date());
+  const ticks = getTimelineTicks(maxMonths, now);
 
   const updateDuration = (id: number, value: string) => {
     setDurationDrafts(current => ({ ...current, [id]: value }));
@@ -195,7 +218,10 @@ export default function LiabilityMapPage() {
             <div className="overflow-x-auto overscroll-x-contain" tabIndex={0} aria-label="Horizontally scrollable liability exposure timeline">
               <div className="min-w-[1000px]" style={{ width: "100%" }}>
                 <div className="grid grid-cols-[280px_minmax(720px,1fr)] border-b bg-muted/15">
-                  <div className="flex items-end px-5 pb-3 pt-4 text-[11px] font-semibold uppercase tracking-[0.13em] text-muted-foreground">Liability / months left</div>
+                  <div className="flex items-end justify-between px-5 pb-3 pt-4 text-[11px] font-semibold uppercase tracking-[0.13em] text-muted-foreground">
+                    <span>Liability</span>
+                    <span className="w-[96px] text-center">Months left</span>
+                  </div>
                   <div className="relative h-[66px]">
                     <div className="absolute inset-x-0 bottom-0 top-0">
                       {ticks.map((tick, index) => {
@@ -250,37 +276,46 @@ export default function LiabilityMapPage() {
                           </span>
                         </div>
                         </div>
-                        <div className="flex shrink-0 items-center gap-1">
-                          <label htmlFor={`duration-${item.id}`} className="sr-only">Months left</label>
-                          <Input
-                            id={`duration-${item.id}`}
-                            type="number"
-                            min="1"
-                             max="12000"
-                            step="1"
-                            inputMode="numeric"
-                             value={draft ?? (duration === null ? "" : String(duration))}
-                             disabled={item.durationSource === "paid"}
-                             aria-invalid={invalidDraft}
-                             aria-describedby={`duration-help-${item.id}`}
-                            onChange={(event) => updateDuration(item.id, event.target.value)}
-                             onBlur={() => { if (draft === "") resetDuration(item.id); }}
-                             placeholder="—"
-                            aria-label={`Planning duration in months for ${item.name}`}
-                             title={invalidDraft ? "Enter a whole number from 1 to 12,000." : item.issue ?? "Planning duration in months"}
-                             className={`h-6 w-[68px] px-1.5 text-[11px] ${invalidDraft ? "border-destructive" : ""}`}
-                          />
-                          {isOverride && (
-                            <button
-                              type="button"
-                              onClick={() => resetDuration(item.id)}
-                              className="inline-flex h-6 w-5 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                              aria-label={`Reset ${item.name} duration to saved date or payment estimate`}
-                              title="Restore saved-date/payment-derived duration"
-                            >
-                              <RotateCcw className="h-3 w-3" />
-                            </button>
-                          )}
+                        <div className="flex w-[96px] shrink-0 flex-col items-center gap-0.5">
+                          <div className="flex items-center gap-1">
+                            <label htmlFor={`duration-${item.id}`} className="sr-only">Months left</label>
+                            <Input
+                              id={`duration-${item.id}`}
+                              type="number"
+                              min="1"
+                              max="12000"
+                              step="1"
+                              inputMode="numeric"
+                              value={draft ?? (duration === null ? "" : String(duration))}
+                              disabled={item.durationSource === "paid"}
+                              aria-invalid={invalidDraft}
+                              aria-describedby={`duration-help-${item.id}`}
+                              onChange={(event) => updateDuration(item.id, event.target.value)}
+                              onBlur={() => { if (draft === "") resetDuration(item.id); }}
+                              placeholder="—"
+                              aria-label={`Planning duration in months for ${item.name}`}
+                              title={invalidDraft ? "Enter a whole number from 1 to 12,000." : item.issue ?? "Planning duration in months"}
+                              className={`h-6 w-[68px] px-1.5 text-[11px] ${invalidDraft ? "border-destructive" : ""}`}
+                            />
+                            {isOverride && (
+                              <button
+                                type="button"
+                                onClick={() => resetDuration(item.id)}
+                                className="inline-flex h-6 w-5 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                aria-label={`Reset ${item.name} duration to saved date or payment estimate`}
+                                title="Restore saved-date/payment-derived duration"
+                              >
+                                <RotateCcw className="h-3 w-3" />
+                              </button>
+                            )}
+                          </div>
+                          <span
+                            data-testid={`duration-end-date-${item.id}`}
+                            className="whitespace-nowrap text-[9px] leading-3 text-muted-foreground"
+                            aria-label={`Debt ending date for ${item.name}`}
+                          >
+                            {endingDateLabel(item, draft, now)}
+                          </span>
                         </div>
                         <span id={`duration-help-${item.id}`} className="sr-only" aria-live="polite">
                           {invalidDraft ? "Enter a whole number from 1 to 12,000." : item.issue ??

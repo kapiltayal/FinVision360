@@ -7,6 +7,7 @@ export interface ExposureItem {
   balance: number;
   apr: number | null;
   monthlyPayment: number | null;
+  maturityDate: string | null;
   monthsRemaining: number | null;
   durationSource: "override" | "maturity" | "payment" | "unknown" | "paid";
   issue: string | null;
@@ -32,6 +33,7 @@ export function buildExposure(
       balance: rawBalance ?? 0,
       apr: nonNegativeNumber(liability.interestRate),
       monthlyPayment: nonNegativeNumber(liability.minimumPayment),
+      maturityDate: liability.maturityDate,
       monthsRemaining: null,
       durationSource: "unknown",
       issue: null,

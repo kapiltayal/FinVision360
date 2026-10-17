@@ -42,6 +42,7 @@ test("rendered timeline preserves exact width, proportional thickness, APR tones
     row(2, { name: "Medium APR loan", balance: "500.17", interestRate: "6", maturityDate: maturityAfter(6) }),
     row(3, { name: "Low APR loan", balance: "10", interestRate: "5.99", maturityDate: maturityAfter(3) }),
     row(4, { name: "Upper yellow boundary", interestRate: "15" }),
+    row(5, { name: "Payment-estimated loan", balance: "500.17", interestRate: "6", minimumPayment: "500", maturityDate: null }),
   ]);
   for (const label of ["Highest APR First", "Smallest Balance First", "Longest Duration First"]) assert.ok(html.includes(label));
   assert.ok(html.includes("width:100%;height:100px"));
@@ -53,6 +54,10 @@ test("rendered timeline preserves exact width, proportional thickness, APR tones
   assert.ok(html.includes('aria-label="Liability totals"'));
   assert.ok(html.includes("Total interest owed"));
   assert.ok(html.includes("Total interest:"));
+  assert.ok(html.includes(">Months left</span>"));
+  assert.match(html, /data-testid="duration-end-date-1"[^>]*aria-label="Debt ending date for High APR loan"[^>]*>Ends [A-Z][a-z]{2} 1, \d{4}/);
+  assert.match(html, /data-testid="duration-end-date-2"[^>]*>Ends [A-Z][a-z]{2} 1, \d{4}/);
+  assert.match(html, /data-testid="duration-end-date-5"[^>]*>Est\. end [A-Z][a-z]{2} \d{4}/);
   assert.ok(html.includes("Estimated over the remaining duration at the current APR"));
   assert.ok(!html.includes("Estimated interest this month"));
   assert.ok(html.includes("Estimated over the displayed duration at the current APR"));
@@ -82,6 +87,7 @@ test("unknown duration remains named without a fabricated bar; unknown APR is di
   assert.ok(html.includes("APR unknown"));
   assert.ok(html.includes("Estimate unavailable without a usable APR and payoff duration"));
   assert.ok(html.includes("Add a duration to place on timeline"));
+  assert.ok(html.includes("Add months for date"));
   assert.ok(html.includes("excludes 1 debt without a usable APR or duration."));
   assert.ok(!html.includes('data-testid="liability-map-bar-1"'));
 });
@@ -89,6 +95,7 @@ test("unknown duration remains named without a fabricated bar; unknown APR is di
 test("zero balance has a paid-off status rather than a timeline bar", () => {
   const html = render([row(1, { balance: "0" })]);
   assert.ok(html.includes("No balance remaining"));
+  assert.ok(html.includes("Paid off"));
   assert.ok(!html.includes('data-testid="liability-map-bar-1"'));
 });
 
