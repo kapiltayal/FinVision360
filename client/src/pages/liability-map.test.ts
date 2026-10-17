@@ -99,6 +99,18 @@ test("zero balance has a paid-off status rather than a timeline bar", () => {
   assert.ok(!html.includes('data-testid="liability-map-bar-1"'));
 });
 
+test("unknown APR is excluded while an explicit zero APR remains a zero-interest estimate", () => {
+  const html = render([
+    row(1, { name: "Unknown APR loan", interestRate: null }),
+    row(2, { name: "Explicit zero APR loan", interestRate: "0", maturityDate: null }),
+  ]);
+  assert.ok(html.includes("APR unknown"));
+  assert.ok(html.includes("excludes 1 debt without a usable APR or duration."));
+  assert.ok(html.includes("Estimate unavailable without a usable APR and payoff duration"));
+  assert.ok(html.includes("0.00%"));
+  assert.ok(html.includes("$0.00"));
+});
+
 test("empty liabilities render a functional link to the liabilities input page", () => {
   const html = render([]);
   assert.ok(html.includes("No liabilities to map yet"));

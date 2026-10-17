@@ -567,14 +567,12 @@ export async function registerRoutes(
     if (category !== undefined && !await hasValidCategory("liability", category)) {
       return res.status(400).json({ message: "Invalid category" });
     }
-    const parsedInterestRate = interestRate === undefined
-      ? { value: undefined as string | null | undefined }
-      : parseOptionalInterestRate(interestRate);
+    const parsedInterestRate = parseOptionalInterestRate(interestRate);
     if ("error" in parsedInterestRate) return res.status(400).json({ message: parsedInterestRate.error });
     const parsedMaturityDate = optionalIsoDate(maturityDate);
     if (parsedMaturityDate.error) return res.status(400).json({ message: parsedMaturityDate.error });
     const updated = await storage.updateLiability(id, userId, {
-      name, category, balance, interestRate: parsedInterestRate.value, minimumPayment,
+      name, category, balance, interestRate: interestRate === undefined ? undefined : parsedInterestRate.value, minimumPayment,
       maturityDate: parsedMaturityDate.value, institution, notes,
     });
     if (!updated) return res.status(404).json({ message: "Liability not found" });

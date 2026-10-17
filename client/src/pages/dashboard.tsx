@@ -317,9 +317,9 @@ function StackedRateBar({
           <div key={i} className="flex items-center gap-1.5 min-w-0">
             <div className="h-2 w-2 rounded-sm shrink-0" style={{ backgroundColor: colors[i % colors.length] }} />
             <span className="text-[10px] text-muted-foreground truncate max-w-[110px]">{item.name}</span>
-            {item.rate > 0 && (
-              <span className="text-[10px] font-semibold text-foreground whitespace-nowrap">{item.rate.toFixed(2)}%</span>
-            )}
+            <span className="text-[10px] font-semibold text-foreground whitespace-nowrap">
+              {item.rate === null ? "APR unknown" : `${item.rate.toFixed(2)}%`}
+            </span>
           </div>
         ))}
       </div>
@@ -994,7 +994,7 @@ export default function DashboardPage() {
                 data={interestPaidBySource}
                 colors={INTEREST_PAID_COLORS}
                 label="Interest Paid"
-                emptyText="No interest-bearing liabilities"
+                emptyText="No known interest-bearing liabilities"
                 testId="chart-interest-paid"
                 accentColor="red"
                 weightedAvgRate={weightedLiabilityRate}

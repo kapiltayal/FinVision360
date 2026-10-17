@@ -187,6 +187,8 @@ function LiabilityForm({
           <Input
             data-testid="input-liability-rate"
             type="number"
+            min="0"
+            max="999.99"
             step="0.01"
             value={form.interestRate}
             onChange={(e) => setForm({ ...form, interestRate: e.target.value })}
