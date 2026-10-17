@@ -5,6 +5,19 @@ import { buildBudgetClose } from "./budget-history";
 
 export class CloseWindowError extends Error {}
 
+/** Copy rates verbatim: NULL is unknown, while an explicit zero stays zero. */
+export async function snapshotAccountHistory(client: PoolClient, now: Date) {
+  const { rowCount: assetsSnapshotted } = await client.query(
+    `INSERT INTO asset_history (user_id,asset_id,name,category,value,interest_rate,institution,notes,snapshot_at)
+     SELECT user_id,id,name,category,value,interest_rate,institution,notes,$1 FROM assets`, [now],
+  );
+  const { rowCount: liabilitiesSnapshotted } = await client.query(
+    `INSERT INTO liability_history (user_id,liability_id,name,category,balance,interest_rate,minimum_payment,maturity_date,institution,notes,snapshot_at)
+     SELECT user_id,id,name,category,balance,interest_rate,minimum_payment,maturity_date,institution,notes,$1 FROM liabilities`, [now],
+  );
+  return { assetsSnapshotted, liabilitiesSnapshotted };
+}
+
 // Called within one transaction: every history table and the success marker
 // commit together, or none do. The lock serializes concurrent cron retries.
 export async function monthlyBackupTransaction(client: PoolClient, now = new Date()) {
@@ -19,14 +32,7 @@ export async function monthlyBackupTransaction(client: PoolClient, now = new Dat
   if (now.getUTCDate() !== 1) {
     throw new CloseWindowError("The monthly close must be captured on the first UTC day of the following month. No historical snapshot was created from current data.");
   }
-  const { rowCount: assetsSnapshotted } = await client.query(
-    `INSERT INTO asset_history (user_id,asset_id,name,category,value,interest_rate,institution,notes,snapshot_at)
-     SELECT user_id,id,name,category,value,interest_rate,institution,notes,$1 FROM assets`, [now],
-  );
-  const { rowCount: liabilitiesSnapshotted } = await client.query(
-    `INSERT INTO liability_history (user_id,liability_id,name,category,balance,interest_rate,minimum_payment,maturity_date,institution,notes,snapshot_at)
-     SELECT user_id,id,name,category,balance,interest_rate,minimum_payment,maturity_date,institution,notes,$1 FROM liabilities`, [now],
-  );
+  const { assetsSnapshotted, liabilitiesSnapshotted } = await snapshotAccountHistory(client, now);
   const { rows: goals } = await client.query("SELECT *, target_date::text AS target_date FROM user_goals");
   for (const goal of goals) {
     const required = monthlySavingsRequired(Number(goal.target_amount), Number(goal.current_amount), goal.target_date, now);
