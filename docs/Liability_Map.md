@@ -17,6 +17,9 @@ It does not introduce another debt store or change saved liability records.
 - Summary totals appear unboxed at the top of the timeline. Total interest owed
   is an estimate using the current balance and APR, amortized over the displayed
   remaining duration; debts without a usable APR or duration are excluded.
+- Each liability row shows its own estimated total interest using the same
+  assumptions. Rows without enough APR or duration data show the estimate as
+  unavailable, and the bar tooltip repeats the amount.
 - Future saved maturity dates take precedence. Without a maturity date,
   duration is estimated using constant APR and monthly payment amortization.
   Zero APR uses balance divided by payment. Estimates assume no fees, new

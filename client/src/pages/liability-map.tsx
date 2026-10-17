@@ -223,7 +223,8 @@ export default function LiabilityMapPage() {
                   const hasBar = item.durationSource !== "unknown" && item.durationSource !== "paid" && duration !== null && duration > 0;
                   const widthPercent = hasBar ? (duration / maxMonths) * 100 : 0;
                   const barHeight = hasBar ? getBarHeight(item.balance, maxBalance) : 0;
-                  const rowHeight = Math.max(40, barHeight + 12);
+                  const rowInterest = estimateRemainingInterest(item);
+                  const rowHeight = Math.max(48, barHeight + 12);
                   return (
                     <div key={item.id} data-testid={`liability-map-row-${item.id}`} className={`grid grid-cols-[280px_minmax(720px,1fr)] border-b last:border-b-0 ${index % 2 ? "bg-muted/[0.08]" : "bg-background"}`} style={{ height: `${rowHeight}px` }}>
                       <div className="flex min-w-0 items-center gap-2 px-4 py-1 sm:px-5">
@@ -237,6 +238,15 @@ export default function LiabilityMapPage() {
                           <span aria-hidden="true">·</span>
                           <span className={item.apr === null ? "" : item.apr > 15 ? "text-red-600 dark:text-red-400" : item.apr >= 6 ? "text-yellow-700 dark:text-yellow-400" : "text-emerald-700 dark:text-emerald-400"}>
                             {item.apr === null ? "APR unknown" : formatPercent(item.apr)}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1 whitespace-nowrap text-[10px] leading-3 text-muted-foreground">
+                          <span>Total interest:</span>
+                          <span
+                            className="font-medium text-foreground/80"
+                            title={rowInterest === null ? "Estimate unavailable without a usable APR and payoff duration" : "Estimated over the remaining duration at the current APR"}
+                          >
+                            {rowInterest === null ? "Unavailable" : formatCurrencyFull(rowInterest)}
                           </span>
                         </div>
                         </div>
@@ -292,7 +302,7 @@ export default function LiabilityMapPage() {
                                 type="button"
                                 className={`relative z-[1] block shrink-0 rounded-r-md rounded-l-[3px] border before:absolute before:inset-x-0 before:top-1/2 before:h-full before:min-h-6 before:-translate-y-1/2 before:content-[''] transition-[filter,transform] duration-150 hover:brightness-105 focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${toneClasses(item.apr)}`}
                                 style={{ width: `${widthPercent}%`, height: `${barHeight}px` }}
-                                aria-label={`${item.name}, balance ${formatCurrencyFull(item.balance)}, APR ${item.apr === null ? "unknown" : formatPercent(item.apr)}, ${monthDurationLabel(duration)}, source ${item.durationSource}`}
+                                aria-label={`${item.name}, balance ${formatCurrencyFull(item.balance)}, total interest ${rowInterest === null ? "unavailable" : formatCurrencyFull(rowInterest)}, APR ${item.apr === null ? "unknown" : formatPercent(item.apr)}, ${monthDurationLabel(duration)}, source ${item.durationSource}`}
                                 data-testid={`liability-map-bar-${item.id}`}
                               >
                                 <span className="sr-only">Debt exposure duration: {monthDurationLabel(duration)}</span>
@@ -301,6 +311,7 @@ export default function LiabilityMapPage() {
                             <TooltipContent side="top" align="start" className="max-w-xs space-y-1 text-xs">
                               <p className="font-semibold">{item.name}</p>
                               <p>Balance: {formatCurrencyFull(item.balance)}</p>
+                              <p>Total interest: {rowInterest === null ? "Unavailable" : formatCurrencyFull(rowInterest)}</p>
                               <p>APR: {item.apr === null ? "Unknown" : formatPercent(item.apr)}</p>
                               <p>Months remaining: {monthDurationLabel(duration)}</p>
                               <p>Source: {item.durationSource}</p>

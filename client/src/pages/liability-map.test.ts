@@ -49,9 +49,11 @@ test("rendered timeline preserves exact width, proportional thickness, APR tones
   assert.ok(html.includes("width:25%;height:5px"));
   assert.match(html, /data-testid="liability-map-row-1" class="grid [^"]+" style="height:112px"/);
   assert.match(html, /data-testid="liability-map-row-2" class="grid [^"]+" style="height:62px"/);
-  assert.match(html, /data-testid="liability-map-row-3" class="grid [^"]+" style="height:40px"/);
+  assert.match(html, /data-testid="liability-map-row-3" class="grid [^"]+" style="height:48px"/);
   assert.ok(html.includes('aria-label="Liability totals"'));
   assert.ok(html.includes("Total interest owed"));
+  assert.ok(html.includes("Total interest:"));
+  assert.ok(html.includes("Estimated over the remaining duration at the current APR"));
   assert.ok(!html.includes("Estimated interest this month"));
   assert.ok(html.includes("Estimated over the displayed duration at the current APR"));
   assert.match(html, /bg-red-500/);
@@ -61,7 +63,8 @@ test("rendered timeline preserves exact width, proportional thickness, APR tones
     const bar = html.match(new RegExp(`<button[^>]*data-testid="liability-map-bar-${id}"[^>]*>`))?.[0];
     assert.ok(bar?.includes(color), `APR severity is correct for debt ${id}`);
   }
-  assert.ok(html.includes("High APR loan, balance $1,000.34, APR 15.01%, 12 months"));
+  assert.ok(html.includes("High APR loan, balance $1,000.34, total interest $"));
+  assert.ok(html.includes("APR 15.01%, 12 months, source maturity"));
   assert.ok(html.includes('aria-pressed="true"'));
   assert.ok(html.includes('data-testid="liability-map-bar-1"'));
   assert.ok(html.indexOf("High APR loan") < html.indexOf("Upper yellow boundary"));
@@ -77,6 +80,7 @@ test("unknown duration remains named without a fabricated bar; unknown APR is di
   const html = render([row(1, { maturityDate: null, interestRate: null })]);
   assert.ok(html.includes("Debt 1"));
   assert.ok(html.includes("APR unknown"));
+  assert.ok(html.includes("Estimate unavailable without a usable APR and payoff duration"));
   assert.ok(html.includes("Add a duration to place on timeline"));
   assert.ok(html.includes("excludes 1 debt without a usable APR or duration."));
   assert.ok(!html.includes('data-testid="liability-map-bar-1"'));
