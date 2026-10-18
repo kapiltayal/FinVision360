@@ -22,7 +22,6 @@ import {
   type RetirementProjection,
 } from "@/components/retirement-net-worth-projection";
 import { RetirementIncomeExpenseProjection } from "@/components/retirement-income-expense-projection";
-import { RetirementAccountSelection } from "@/components/retirement-account-selection";
 
 const MAX_AGE = 125;
 
@@ -334,7 +333,6 @@ export default function RetirementPlannerPage() {
 
           <CardContent className="p-4 sm:p-5">
             <TabsContent value="net-worth" className="mt-0 space-y-5">
-              <RetirementAccountSelection projection="net-worth" />
               {projectionLoading || !retirementProjection ? (
                 <div className="rounded-xl border px-4 py-12 text-center text-sm text-muted-foreground">
                   Calculating your retirement projection...
@@ -363,7 +361,6 @@ export default function RetirementPlannerPage() {
             </TabsContent>
 
             <TabsContent value="income-expenses" className="mt-0 space-y-5">
-              <RetirementAccountSelection projection="income-expense" />
               <RetirementIncomeExpenseProjection />
             </TabsContent>
           </CardContent>

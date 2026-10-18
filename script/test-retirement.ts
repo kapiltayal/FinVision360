@@ -11,7 +11,7 @@ function run(command: string, args: string[]) {
 }
 const dir = mkdtempSync(join(tmpdir(), "retirement-tests-"));
 try {
-  run("npx", ["tsx", "--test", "server/retirement-account-inclusion.test.ts", "server/retirement-account-inclusion.integration.test.ts"]);
+  run("npx", ["tsx", "--test", "server/retirement-account-inclusion.test.ts", "server/retirement-inclusion-display.test.ts", "server/retirement-account-inclusion.integration.test.ts"]);
   const output = join(dir, "ui.cjs");
   run("npx", ["esbuild", "client/src/components/retirement-account-selection.test.tsx", "--bundle", "--platform=node",
     "--format=cjs", "--jsx=automatic", '--define:import.meta.env.MODE="development"',

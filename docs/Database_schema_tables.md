@@ -60,6 +60,8 @@ This is a code-based reference for the PostgreSQL tables used by FinVision360. I
 
 These preferences affect only the Retirement Planner. They do not edit account balances, global Net Worth selections, budgets, goal funding, or historical snapshots. Income/Expense filters its own account inputs, independently of Net Worth preferences; existing cash-flow eligibility rules still apply. Manual projection-only entries, Social Security, pensions, and expected-expense settings are unchanged. The additive table migration runs through the application's normal development and published startup bootstrap before dependent APIs are registered.
 
+Account inclusion is controlled by checkboxes beside the existing account rows, not a separate selector. Projection responses retain excluded rows with `included: false` and zero contribution so they can be re-included; totals and assumptions still use only included accounts. `excludedAccountCount` drives the notice above each projection. Ordinary assets and debts paid off before retirement remain selectable in Income/Expense as explicitly non-contributing rows, without inventing income or payments.
+
 ### Bank rates and Plaid connections
 
 | Table | Purpose | Columns (PostgreSQL name and type) | Keys and constraints |

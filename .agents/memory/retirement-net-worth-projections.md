@@ -26,3 +26,9 @@ Account inclusion is an independent scenario choice for each Retirement Planner 
 **Why:** A user may omit an illiquid asset from a net-worth scenario while still needing to model its associated cash-flow commitments. Cross-coupling the selections would silently change a different scenario.
 
 **How to apply:** Default new accounts to included, persist each projection's choice separately, and build each projection from its own selected inputs.
+
+The user wants inclusion checkboxes beside the existing account rows, not a separate account-management section. Keep unchecked accounts visible and show the number excluded above the calculation.
+
+**Why:** A separate selector takes unnecessary space; removing unchecked rows would also remove the user's way to re-include them.
+
+**How to apply:** Keep presentation rows distinct from calculation inputs, including accounts that currently have no cash-flow contribution. Excluded rows must not contribute to totals or missing-input callouts.

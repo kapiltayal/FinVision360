@@ -11,16 +11,20 @@ import { Switch } from "@/components/ui/switch";
 import { formatCurrency } from "@/lib/format";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { InlineAccountInclusion, ProjectionExclusionNotice } from "@/components/retirement-account-selection";
 
 export type CashflowItem = {
   id: string;
   projectionEntryId?: number;
-  source: "social-security" | "pension" | "retirement-account" | "expected-expenses" | "debt-payment" | "projection-only";
+  source: "social-security" | "pension" | "retirement-account" | "expected-expenses" | "debt-payment" | "asset-account" | "projection-only";
   name: string;
   monthlyAmount: number;
   details: string | null;
   isProjectionOnly: boolean;
   assetId?: number;
+  liabilityId?: number;
+  included?: boolean;
+  nonContributing?: boolean;
   projectedBalance?: number;
   withdrawalRate?: number;
   isPretaxRetirementAccount?: boolean;
@@ -38,6 +42,7 @@ type Projection = {
   income: CashflowItem[];
   expenses: CashflowItem[];
   assumptions: Assumption[];
+  excludedAccountCount: number;
 };
 type EntryForm = { kind: "income" | "expense"; name: string; amount: string; notes: string };
 
@@ -83,11 +88,23 @@ function EntryDialog({ open, onOpenChange, initial, kind, onSubmit, saving }: {
 function CashflowRow({ item, onEdit, onDelete }: { item: CashflowItem; onEdit: () => void; onDelete: () => void }) {
   const style = tone(item.source);
   const Icon = style.icon;
+  const inclusion = item.source === "debt-payment" && item.liabilityId !== undefined
+    ? { id: item.liabilityId, kind: "liability" as const }
+    : (item.source === "retirement-account" || item.source === "asset-account") && item.assetId !== undefined
+      ? { id: item.assetId, kind: "asset" as const }
+      : null;
+  const included = item.included !== false;
   return (
-    <div className="group flex items-start gap-3 border-b border-current/10 px-4 py-3 last:border-b-0">
+    <div className={`group flex items-start gap-3 border-b border-current/10 px-4 py-3 last:border-b-0 ${included ? "" : "opacity-60"}`}>
       <div className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${style.bg} ${style.color}`}><Icon className="h-4 w-4" /></div>
-      <div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold">{item.name}</p><p className="mt-0.5 text-xs text-muted-foreground">{item.details || (item.isProjectionOnly ? "Projection-only estimate" : "Included in your retirement projection")}</p></div>
-      <div className="flex shrink-0 items-center gap-1"><span className={`text-sm font-bold tabular-nums ${style.color}`}>{money(item.monthlyAmount)}</span>{item.isProjectionOnly && <span className="ml-1 flex"><Button size="icon" variant="ghost" className="h-7 w-7" onClick={onEdit} aria-label={`Edit ${item.name}`}><Pencil className="h-3.5 w-3.5" /></Button><Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={onDelete} aria-label={`Delete ${item.name}`}><Trash2 className="h-3.5 w-3.5" /></Button></span>}</div>
+      <div className="min-w-0 flex-1">
+        <div className="flex min-w-0 items-center gap-2">
+          {inclusion && <InlineAccountInclusion accountId={inclusion.id} kind={inclusion.kind} projection="income-expense" included={included} accountName={item.name} />}
+          <p className="truncate text-sm font-semibold">{item.name}</p>
+        </div>
+        <p className="mt-0.5 text-xs text-muted-foreground">{item.nonContributing ? "No direct retirement cash-flow contribution or paid-off debt" : item.details || (item.isProjectionOnly ? "Projection-only estimate" : "Included in your retirement projection")}</p>
+      </div>
+      <div className="flex shrink-0 items-center gap-1"><span className={`text-sm font-bold tabular-nums ${included ? style.color : "text-muted-foreground"}`}>{included ? money(item.monthlyAmount) : "Excluded"}</span>{item.isProjectionOnly && <span className="ml-1 flex"><Button size="icon" variant="ghost" className="h-7 w-7" onClick={onEdit} aria-label={`Edit ${item.name}`}><Pencil className="h-3.5 w-3.5" /></Button><Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={onDelete} aria-label={`Delete ${item.name}`}><Trash2 className="h-3.5 w-3.5" /></Button></span>}</div>
     </div>
   );
 }
@@ -101,15 +118,20 @@ function RetirementAccountRow({ item, onSave, onEarlyWithdrawalAccessChange, sav
 }) {
   const [rate, setRate] = useState(item.withdrawalRate ?? 4);
   useEffect(() => setRate(item.withdrawalRate ?? 4), [item.withdrawalRate]);
+  const included = item.included !== false;
   const save = () => {
     if (item.assetId !== undefined && rate !== item.withdrawalRate) onSave(item.assetId, rate);
   };
-  return <div className="border-t border-teal-200/50 px-4 py-3 first:border-t-0 dark:border-teal-900/60">
+  return <div className={`border-t border-teal-200/50 px-4 py-3 first:border-t-0 dark:border-teal-900/60 ${included ? "" : "opacity-60"}`}>
     <div className="flex items-center gap-3">
       <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"><PiggyBank className="h-4 w-4" /></div>
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-semibold">{item.name}</p>
+        <div className="flex min-w-0 items-center gap-2">
+          {item.assetId !== undefined && <InlineAccountInclusion accountId={item.assetId} kind="asset" projection="income-expense" included={included} accountName={item.name} />}
+          <p className="truncate text-sm font-semibold">{item.name}</p>
+        </div>
         <p className="text-xs text-muted-foreground">Projected balance: {formatCurrency(item.projectedBalance ?? 0)}</p>
+        {item.nonContributing && <p className="text-xs text-muted-foreground">No direct retirement cash-flow contribution</p>}
         {item.isEarlyWithdrawalLocked && <p className="mt-1 flex items-center gap-1 text-xs font-medium text-amber-700 dark:text-amber-300"><Lock className="h-3 w-3" />Locked before age 59½</p>}
         {item.canOverrideEarlyWithdrawalLock && item.earlyWithdrawalUnlocked && <p className="mt-1 flex items-center gap-1 text-xs font-medium text-amber-700 dark:text-amber-300"><Unlock className="h-3 w-3" />Unlocked for this projection</p>}
         {item.canOverrideEarlyWithdrawalLock && item.assetId !== undefined && (
@@ -118,7 +140,7 @@ function RetirementAccountRow({ item, onSave, onEarlyWithdrawalAccessChange, sav
               id={`early-withdrawal-access-${item.assetId}`}
               size="sm"
               checked={Boolean(item.earlyWithdrawalUnlocked)}
-              disabled={savingEarlyWithdrawalAccess}
+              disabled={savingEarlyWithdrawalAccess || !included}
               onCheckedChange={(unlocked) => onEarlyWithdrawalAccessChange(item.assetId!, unlocked)}
               aria-label={item.earlyWithdrawalUnlocked ? `Relock ${item.name}` : `Unlock ${item.name} for projection`}
               data-testid={`switch-early-withdrawal-access-${item.assetId}`}
@@ -129,7 +151,7 @@ function RetirementAccountRow({ item, onSave, onEarlyWithdrawalAccessChange, sav
           </div>
         )}
       </div>
-      <div className="text-right"><p className="text-sm font-bold tabular-nums text-emerald-700 dark:text-emerald-300">{money(item.monthlyAmount)}</p><p className="text-[11px] text-muted-foreground">gross withdrawal</p></div>
+      <div className="text-right"><p className={`text-sm font-bold tabular-nums ${included ? "text-emerald-700 dark:text-emerald-300" : "text-muted-foreground"}`}>{included ? money(item.monthlyAmount) : "Excluded"}</p>{included && <p className="text-[11px] text-muted-foreground">gross withdrawal</p>}</div>
     </div>
     <div className="mt-3 space-y-1.5">
       <div className="flex items-center justify-between gap-3">
@@ -150,7 +172,7 @@ function RetirementAccountRow({ item, onSave, onEarlyWithdrawalAccessChange, sav
           setRate(nextRate);
           if (item.assetId !== undefined && nextRate !== item.withdrawalRate) onSave(item.assetId, nextRate);
         }}
-        disabled={saving}
+        disabled={saving || !included}
         className="py-1"
       />
     </div>
@@ -165,7 +187,7 @@ function RetirementAccountsSection({ items, onSave, savingAssetId, onEarlyWithdr
   savingEarlyWithdrawalAssetId: number | null;
 }) {
   const [open, setOpen] = useState(false);
-  const total = items.reduce((sum, item) => sum + item.monthlyAmount, 0);
+  const total = items.reduce((sum, item) => sum + (item.included === false ? 0 : item.monthlyAmount), 0);
   return <div className="border-b border-teal-200/60 bg-emerald-50/30 dark:border-teal-900/60 dark:bg-emerald-950/10">
     <button type="button" className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-emerald-50/70 dark:hover:bg-emerald-950/20" onClick={() => setOpen(!open)} aria-expanded={open}>
       <span className="flex items-center gap-2"><ChevronDown className={`h-4 w-4 transition-transform ${open ? "rotate-180" : ""}`} /><span><span className="block text-sm font-semibold">Retirement accounts</span><span className="block text-xs text-muted-foreground">{items.length ? `${items.length} account${items.length === 1 ? "" : "s"} · 4% default` : "No retirement accounts found"}</span></span></span>
@@ -173,6 +195,20 @@ function RetirementAccountsSection({ items, onSave, savingAssetId, onEarlyWithdr
     </button>
     {open && <div className="border-t border-teal-200/60 dark:border-teal-900/60">
       {items.length ? items.map((item) => <RetirementAccountRow key={item.id} item={item} onSave={onSave} saving={savingAssetId === item.assetId} onEarlyWithdrawalAccessChange={onEarlyWithdrawalAccessChange} savingEarlyWithdrawalAccess={savingEarlyWithdrawalAssetId === item.assetId} />) : <p className="px-4 py-4 text-sm text-muted-foreground">Add an asset in the Retirement &amp; Tax-Advantaged category to estimate withdrawals here.</p>}
+    </div>}
+  </div>;
+}
+
+function AssetAccountsSection({ items }: { items: CashflowItem[] }) {
+  const [open, setOpen] = useState(false);
+  const total = items.reduce((sum, item) => sum + (item.included === false ? 0 : item.monthlyAmount), 0);
+  return <div className="border-b border-slate-200/70 bg-slate-50/40 dark:border-slate-800 dark:bg-slate-900/20">
+    <button type="button" className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-slate-100/60 dark:hover:bg-slate-900/40" onClick={() => setOpen(!open)} aria-expanded={open}>
+      <span className="flex items-center gap-2"><ChevronDown className={`h-4 w-4 transition-transform ${open ? "rotate-180" : ""}`} /><span><span className="block text-sm font-semibold">Other asset accounts</span><span className="block text-xs text-muted-foreground">{items.length} account{items.length === 1 ? "" : "s"}</span></span></span>
+      <span className="text-sm font-bold tabular-nums text-muted-foreground">{money(total)}</span>
+    </button>
+    {open && <div className="border-t border-slate-200/70 dark:border-slate-800">
+      {items.map((item) => <CashflowRow key={item.id} item={item} onEdit={() => undefined} onDelete={() => undefined} />)}
     </div>}
   </div>;
 }
@@ -193,7 +229,7 @@ function PensionIncomeSection({ items }: { items: CashflowItem[] }) {
 
 function DebtPaymentsSection({ items }: { items: CashflowItem[] }) {
   const [open, setOpen] = useState(false);
-  const total = items.reduce((sum, item) => sum + item.monthlyAmount, 0);
+  const total = items.reduce((sum, item) => sum + (item.included === false ? 0 : item.monthlyAmount), 0);
   return <div className="border-b border-rose-200/60 bg-rose-50/30 dark:border-rose-900/60 dark:bg-rose-950/10">
     <button type="button" className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-rose-50/70 dark:hover:bg-rose-950/20" onClick={() => setOpen(!open)} aria-expanded={open}>
       <span className="flex items-center gap-2">
@@ -221,7 +257,8 @@ function Column({ kind, items, onAdd, onEdit, onDelete, expected, onExpectedChan
   const retirementAccounts = items.filter((item) => item.source === "retirement-account");
   const pensionIncome = items.filter((item) => item.source === "pension");
   const debtPayments = items.filter((item) => item.source === "debt-payment");
-  const displayItems = items.filter((item) => item.source !== "expected-expenses" && item.source !== "retirement-account" && item.source !== "pension" && item.source !== "debt-payment");
+  const assetAccounts = items.filter((item) => item.source === "asset-account");
+  const displayItems = items.filter((item) => item.source !== "expected-expenses" && item.source !== "retirement-account" && item.source !== "pension" && item.source !== "debt-payment" && item.source !== "asset-account");
   return (
     <section className={`overflow-hidden rounded-2xl border ${income ? "border-teal-200/80 dark:border-teal-900" : "border-amber-200/80 dark:border-amber-900"}`}>
       <header className={`flex items-center justify-between border-b px-4 py-3 ${income ? "bg-teal-50/70 dark:bg-teal-950/20" : "bg-amber-50/70 dark:bg-amber-950/20"}`}>
@@ -230,12 +267,13 @@ function Column({ kind, items, onAdd, onEdit, onDelete, expected, onExpectedChan
       </header>
       <div className="bg-background">
         {income && onWithdrawalRateChange && onEarlyWithdrawalAccessChange && <RetirementAccountsSection items={retirementAccounts} onSave={onWithdrawalRateChange} savingAssetId={savingWithdrawalAssetId ?? null} onEarlyWithdrawalAccessChange={onEarlyWithdrawalAccessChange} savingEarlyWithdrawalAssetId={savingEarlyWithdrawalAssetId ?? null} />}
+        {income && assetAccounts.length > 0 && <AssetAccountsSection items={assetAccounts} />}
         {income && <PensionIncomeSection items={pensionIncome} />}
         {!income && expected !== undefined && onExpectedChange && <div className="border-b bg-amber-50/40 px-4 py-3 dark:bg-amber-950/10">
           <div className="flex items-center gap-3"><div className="h-8 w-8 shrink-0 rounded-lg bg-amber-500/10" /><div className="min-w-0 flex-1"><p className="text-sm font-semibold">Expected lifestyle expenses</p><p className="text-xs text-muted-foreground">Your editable spending baseline</p></div><div className="flex items-center"><span className="text-sm font-bold text-amber-700 dark:text-amber-300">$</span><Input className="h-8 w-24 border-amber-300/70 bg-background text-right font-semibold tabular-nums" type="number" min="0" step="1" value={expected} onChange={(e) => onExpectedChange(Number(e.target.value) || 0)} onBlur={onExpectedBlur} disabled={savingExpected} /><span className="ml-1 text-xs font-medium text-amber-700 dark:text-amber-300">/mo</span></div></div>
         </div>}
         {!income && debtPayments.length > 0 && <DebtPaymentsSection items={debtPayments} />}
-        {displayItems.length === 0 && income && retirementAccounts.length === 0 ? <div className="px-4 py-8 text-center text-sm text-muted-foreground">No projected income yet.</div> : displayItems.map((item) => (
+        {displayItems.length === 0 && income && retirementAccounts.length === 0 && pensionIncome.length === 0 && assetAccounts.length === 0 ? <div className="px-4 py-8 text-center text-sm text-muted-foreground">No projected income yet.</div> : displayItems.map((item) => (
           <CashflowRow key={item.id} item={item} onEdit={() => onEdit(item)} onDelete={() => onDelete(item)} />
         ))}
       </div>
@@ -312,6 +350,7 @@ export function RetirementIncomeExpenseProjection() {
   const openAdd = (kind: "income" | "expense") => { setEditing(null); setDraftKind(kind); setDialogOpen(true); };
   const openEdit = (item: CashflowItem, kind: "income" | "expense") => { setEditing(item); setDraftKind(kind); setDialogOpen(true); };
   return <div className="space-y-5">
+    <ProjectionExclusionNotice count={data.excludedAccountCount ?? 0} />
     <div className="rounded-2xl border border-slate-200/80 bg-gradient-to-br from-slate-50 via-teal-50/60 to-amber-50/60 px-5 py-6 shadow-sm dark:border-slate-800 dark:from-slate-950 dark:via-teal-950/20 dark:to-amber-950/20">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">At age {data.retirementAge}</p><h2 className="mt-1 text-xl font-bold tracking-tight">Your retirement monthly picture</h2></div><div className="text-left sm:text-right"><p className="text-xs text-muted-foreground">{surplus >= 0 ? "Monthly surplus" : "Monthly shortfall"}</p><p className={`text-3xl font-bold tabular-nums ${surplus >= 0 ? "text-teal-700 dark:text-teal-300" : "text-rose-700 dark:text-rose-300"}`}>{money(Math.abs(surplus))}</p></div></div>
       <div className="mt-5 grid grid-cols-2 divide-x rounded-xl border bg-background/70 sm:grid-cols-3"><div className="p-3"><p className="text-xs text-muted-foreground">Total income</p><p className="mt-1 text-lg font-bold tabular-nums text-teal-700 dark:text-teal-300">{money(data.totalMonthlyIncome)}</p></div><div className="p-3 pl-4"><p className="text-xs text-muted-foreground">Total expenses</p><p className="mt-1 text-lg font-bold tabular-nums text-amber-700 dark:text-amber-300">{money(data.totalMonthlyExpenses)}</p></div><div className="col-span-2 border-t p-3 sm:col-span-1 sm:border-l sm:border-t-0 sm:pl-4"><p className="text-xs text-muted-foreground">Income coverage</p><p className="mt-1 text-lg font-bold tabular-nums">{data.totalMonthlyExpenses ? `${Math.round(data.totalMonthlyIncome / data.totalMonthlyExpenses * 100)}%` : "—"}</p></div></div>

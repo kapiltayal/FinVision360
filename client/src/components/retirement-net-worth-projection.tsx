@@ -8,6 +8,7 @@ import { Slider } from "@/components/ui/slider";
 import { Textarea } from "@/components/ui/textarea";
 import { formatCurrency } from "@/lib/format";
 import { groupedBookCategories, type BookCategory } from "@/lib/book-categories";
+import { InlineAccountInclusion, ProjectionExclusionNotice } from "@/components/retirement-account-selection";
 
 export type RetirementProjectionAsset = {
   id: string | number;
@@ -22,6 +23,7 @@ export type RetirementProjectionAsset = {
   rateSource: "override" | "account" | "asset-type-default" | "projection-only";
   institution?: string | null;
   isProjectionOnly?: boolean;
+  included?: boolean;
   details?: string | null;
 };
 
@@ -41,6 +43,7 @@ export type RetirementProjectionLiability = {
   message?: string | null;
   institution?: string | null;
   isProjectionOnly?: boolean;
+  included?: boolean;
 };
 
 export type RetirementProjection = {
@@ -52,6 +55,7 @@ export type RetirementProjection = {
   assets: RetirementProjectionAsset[];
   liabilities: RetirementProjectionLiability[];
   assumptions: RetirementProjectionAssumption[];
+  excludedAccountCount: number;
 };
 
 export type RetirementProjectionAssumption = {
@@ -89,6 +93,7 @@ function AssetRow({ asset, actions }: { asset: RetirementProjectionAsset; action
   const [rate, setRate] = useState(asset.returnRate);
   const [savingRate, setSavingRate] = useState(false);
   useEffect(() => setRate(asset.returnRate), [asset.returnRate]);
+  const included = asset.included !== false;
 
   if (asset.isProjectionOnly) {
     return (
@@ -125,14 +130,19 @@ function AssetRow({ asset, actions }: { asset: RetirementProjectionAsset; action
   }
 
   return (
-    <div className="rounded-lg border bg-background p-3">
+    <div className={`rounded-lg border bg-background p-3 ${included ? "" : "opacity-60"}`}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="truncate text-sm font-semibold">{asset.name}</p>
+          <div className="flex min-w-0 items-center gap-2">
+            {asset.sourceAssetId != null && (
+              <InlineAccountInclusion accountId={asset.sourceAssetId} kind="asset" projection="net-worth" included={included} accountName={asset.name} />
+            )}
+            <p className="truncate text-sm font-semibold">{asset.name}</p>
+          </div>
           <p className="truncate text-xs text-muted-foreground">{asset.institution || "Asset account"}</p>
         </div>
-        <p className="shrink-0 text-sm font-bold tabular-nums text-emerald-700 dark:text-emerald-300">
-          {formatCurrency(asset.projectedValue)}
+        <p className={`shrink-0 text-sm font-bold tabular-nums ${included ? "text-emerald-700 dark:text-emerald-300" : "text-muted-foreground"}`}>
+          {included ? formatCurrency(asset.projectedValue) : "Excluded"}
         </p>
       </div>
       <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
@@ -147,7 +157,7 @@ function AssetRow({ asset, actions }: { asset: RetirementProjectionAsset; action
           value={[rate]}
           markFormatter={(value) => `${Number(value.toFixed(1))}%`}
           onValueChange={([nextRate]) => setRate(nextRate)}
-          disabled={savingRate}
+          disabled={savingRate || !included}
           onValueCommit={async ([nextRate]) => {
             setSavingRate(true);
             try {
@@ -167,7 +177,7 @@ function AssetRow({ asset, actions }: { asset: RetirementProjectionAsset; action
             size="sm"
             variant="ghost"
             className="h-8 shrink-0 px-2 text-xs"
-            disabled={savingRate}
+            disabled={savingRate || !included}
             onClick={async () => {
               setSavingRate(true);
               try {
@@ -186,19 +196,25 @@ function AssetRow({ asset, actions }: { asset: RetirementProjectionAsset; action
 }
 
 function LiabilityRow({ liability, actions }: { liability: RetirementProjectionLiability; actions: ProjectionActions }) {
+  const included = liability.included !== false;
   const paidOff = liability.status === "paid-off" || liability.projectedBalance <= 0;
   return (
-    <div className="rounded-lg border bg-background p-3">
+    <div className={`rounded-lg border bg-background p-3 ${included ? "" : "opacity-60"}`}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="truncate text-sm font-semibold">{liability.name}</p>
+          <div className="flex min-w-0 items-center gap-2">
+            {liability.sourceLiabilityId != null && (
+              <InlineAccountInclusion accountId={liability.sourceLiabilityId} kind="liability" projection="net-worth" included={included} accountName={liability.name} />
+            )}
+            <p className="truncate text-sm font-semibold">{liability.name}</p>
+          </div>
           <p className="truncate text-xs text-muted-foreground">
             {liability.isProjectionOnly ? "Projection-only liability at retirement" : liability.institution || "Liability account"}
           </p>
         </div>
         <div className="text-right">
-          <p className={`text-sm font-bold tabular-nums ${paidOff ? "text-emerald-700 dark:text-emerald-300" : "text-rose-700 dark:text-rose-300"}`}>
-            {paidOff ? "Paid off" : formatCurrency(liability.projectedBalance)}
+          <p className={`text-sm font-bold tabular-nums ${!included ? "text-muted-foreground" : paidOff ? "text-emerald-700 dark:text-emerald-300" : "text-rose-700 dark:text-rose-300"}`}>
+            {!included ? "Excluded" : paidOff ? "Paid off" : formatCurrency(liability.projectedBalance)}
           </p>
           {liability.isProjectionOnly && (
             <div className="mt-1 flex justify-end gap-1">
@@ -291,7 +307,7 @@ function ProjectionGroup({
                 <span className="truncate">{parent}</span>
                 <span className="text-xs text-muted-foreground">({parentEntries.length})</span>
               </span>
-              <span className="text-sm font-semibold tabular-nums">{formatCurrency(parentEntries.reduce((sum, entry) => sum + amount(entry), 0))}</span>
+              <span className="text-sm font-semibold tabular-nums">{formatCurrency(parentEntries.reduce((sum, entry) => sum + (entry.included === false ? 0 : amount(entry)), 0))}</span>
             </button>
             {isOpen && Array.from(categories.entries()).sort(([a], [b]) => a.localeCompare(b)).map(([category, categoryEntries]) => {
               const key = `${parent}\u0000${category}`;
@@ -300,7 +316,7 @@ function ProjectionGroup({
                 <div key={key} className="border-t bg-muted/20">
                   <button type="button" className="flex w-full items-center justify-between gap-3 px-7 py-2.5 text-left text-sm hover:bg-muted/40" onClick={() => toggle(openCategories, key, setOpenCategories)}>
                     <span className="flex items-center gap-2"><ChevronDown className={`h-3.5 w-3.5 transition-transform ${categoryOpen ? "rotate-180" : ""}`} />{category}</span>
-                    <span className="text-xs font-semibold tabular-nums">{formatCurrency(categoryEntries.reduce((sum, entry) => sum + amount(entry), 0))}</span>
+                    <span className="text-xs font-semibold tabular-nums">{formatCurrency(categoryEntries.reduce((sum, entry) => sum + (entry.included === false ? 0 : amount(entry)), 0))}</span>
                   </button>
                   {categoryOpen && (
                     <div className="space-y-2 border-t px-4 py-3 sm:px-7">
@@ -490,6 +506,7 @@ export function RetirementNetWorthProjection({
 
   return (
     <div className="space-y-5">
+      <ProjectionExclusionNotice count={projection.excludedAccountCount ?? 0} />
       <div className="rounded-2xl border bg-gradient-to-br from-slate-50 via-blue-50/60 to-emerald-50/60 px-5 py-7 text-center shadow-sm dark:from-slate-950 dark:via-blue-950/20 dark:to-emerald-950/20">
         <p className="text-sm font-medium text-muted-foreground">Projected Net Worth at Age {projection.retirementAge}</p>
         <p className="mt-1 text-4xl font-bold tracking-tight sm:text-5xl">{formatCurrency(projection.projectedNetWorth)}</p>

@@ -39,6 +39,7 @@ import {
 import { buildRetirementNetWorthProjection } from "./retirement-projection";
 import { getRetirementAccountPreferences, registerRetirementAccountInclusionRoutes } from "./retirement-account-inclusion";
 import { includedRetirementAccounts } from "@shared/retirement-account-inclusion";
+import { netWorthWithAccountControls, cashflowWithAccountControls } from "./retirement-inclusion-display";
 import { buildRetirementIncomeExpenseProjection, isPretaxRetirementAccountCategory } from "./retirement-income-expense-projection";
 import { parseOptionalInterestRate } from "./liability-apr";
 import { AllocationError, allocationAccounts, moneyCents, saveAllocation, withFundingLock } from "./goal-allocation";
@@ -673,17 +674,24 @@ export async function registerRoutes(
       getRetirementAccountPreferences(userId),
     ]);
 
-    res.json(buildRetirementNetWorthProjection({
+    const inputs = {
       retirementAge: settings?.retirementAge ?? 65,
       currentAge: ageFromDateOfBirth(req.user.dateOfBirth),
       dateOfBirth: req.user.dateOfBirth ?? null,
-      assets: includedRetirementAccounts(userAssets, preferences, "asset", "net-worth"),
-      liabilities: includedRetirementAccounts(userLiabilities, preferences, "liability", "net-worth"),
+      assets: userAssets,
+      liabilities: userLiabilities,
       assetTypes,
       liabilityTypes,
       assetOverrides: overrides,
       projectionEntries: entries,
-    }));
+    };
+    const all = buildRetirementNetWorthProjection(inputs);
+    const selected = buildRetirementNetWorthProjection({
+      ...inputs,
+      assets: includedRetirementAccounts(userAssets, preferences, "asset", "net-worth"),
+      liabilities: includedRetirementAccounts(userLiabilities, preferences, "liability", "net-worth"),
+    });
+    res.json(netWorthWithAccountControls(selected, all));
   });
 
   app.get("/api/retirement/income-expense-projection", requireAuth, async (req: any, res) => {
@@ -705,20 +713,26 @@ export async function registerRoutes(
     ]);
 
     const retirementAge = plannerSettings?.retirementAge ?? 65;
-    const netWorthProjection = buildRetirementNetWorthProjection({
+    const accountInputs = {
       retirementAge,
       currentAge: ageFromDateOfBirth(req.user.dateOfBirth),
       dateOfBirth: req.user.dateOfBirth ?? null,
-      assets: includedRetirementAccounts(userAssets, preferences, "asset", "income-expense"),
-      liabilities: includedRetirementAccounts(userLiabilities, preferences, "liability", "income-expense"),
+      assets: userAssets,
+      liabilities: userLiabilities,
       assetTypes,
       liabilityTypes,
       assetOverrides: overrides,
       projectionEntries,
+    };
+    const allAccounts = buildRetirementNetWorthProjection(accountInputs);
+    const netWorthProjection = buildRetirementNetWorthProjection({
+      ...accountInputs,
+      assets: includedRetirementAccounts(userAssets, preferences, "asset", "income-expense"),
+      liabilities: includedRetirementAccounts(userLiabilities, preferences, "liability", "income-expense"),
     });
     const [savedIncomeExpenseSettings] = incomeExpenseSettings;
 
-    res.json(buildRetirementIncomeExpenseProjection({
+    const cashflowInputs = {
       retirementAge,
       socialSecurity: {
         fraMonthlyBenefit: socialSecurity?.fraMonthlyBenefit ?? null,
@@ -730,7 +744,12 @@ export async function registerRoutes(
       withdrawalRates,
       expectedMonthlyExpenses: savedIncomeExpenseSettings?.expectedMonthlyExpenses ?? 0,
       projectionEntries: incomeExpenseEntries,
-    }));
+    };
+    const selected = buildRetirementIncomeExpenseProjection(cashflowInputs);
+    const all = buildRetirementIncomeExpenseProjection({
+      ...cashflowInputs, projectedAssets: allAccounts.assets, projectedLiabilities: allAccounts.liabilities,
+    });
+    res.json(cashflowWithAccountControls(selected, all, allAccounts, netWorthProjection));
   });
 
   app.put("/api/retirement/withdrawal-rate/:assetId", requireAuth, async (req: any, res) => {

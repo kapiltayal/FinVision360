@@ -64,11 +64,17 @@ test("retirement inclusion persists, protects ownership, and changes only its se
 
     assert.equal((await choice(asset.id, "asset", "net-worth", false)).code, 200);
     const withoutAsset = await netWorth();
-    assert.equal(withoutAsset.assets.length, 0);
+    assert.equal(withoutAsset.assets.length, 1, "excluded accounts remain visible for re-inclusion");
+    assert.equal(withoutAsset.assets[0].included, false);
+    assert.equal(withoutAsset.assets[0].projectedValue, 0);
+    assert.equal(withoutAsset.excludedAccountCount, 1);
     assert.ok(withoutAsset.projectedNetWorth < beforeNetWorth.projectedNetWorth);
     assert.equal((await cashflow()).totalMonthlyIncome, beforeCashflow.totalMonthlyIncome);
     assert.equal((await choice(asset.id, "asset", "income-expense", false)).code, 200);
-    assert.equal((await cashflow()).totalMonthlyIncome, 0);
+    const withoutIncome = await cashflow();
+    assert.equal(withoutIncome.totalMonthlyIncome, 0);
+    assert.equal(withoutIncome.income.find((row: any) => row.assetId === asset.id).included, false);
+    assert.equal(withoutIncome.excludedAccountCount, 1);
     await choice(asset.id, "asset", "net-worth", true);
     assert.equal((await netWorth()).assets.length, 1);
     const saved = (await accounts()).find((row) => row.kind === "asset");
@@ -76,10 +82,17 @@ test("retirement inclusion persists, protects ownership, and changes only its se
     assert.equal(saved.incomeExpenseIncluded, false, "a save only changes its own projection flag");
 
     await choice(debt.id, "liability", "income-expense", false);
-    assert.equal((await cashflow()).totalMonthlyExpenses, 0);
+    const withoutExpenses = await cashflow();
+    assert.equal(withoutExpenses.totalMonthlyExpenses, 0);
+    assert.equal(withoutExpenses.expenses.find((row: any) => row.liabilityId === debt.id).included, false);
+    assert.equal(withoutExpenses.excludedAccountCount, 2);
     assert.equal((await netWorth()).liabilities.length, 1);
     await choice(debt.id, "liability", "net-worth", false);
-    assert.equal((await netWorth()).liabilities.length, 0);
+    const withoutDebt = await netWorth();
+    assert.equal(withoutDebt.liabilities.length, 1);
+    assert.equal(withoutDebt.liabilities[0].included, false);
+    assert.equal(withoutDebt.liabilities[0].projectedBalance, 0);
+    assert.equal(withoutDebt.excludedAccountCount, 1);
     await choice(asset.id, "asset", "income-expense", true);
     await Promise.all([
       choice(asset.id, "asset", "net-worth", false),
@@ -92,6 +105,7 @@ test("retirement inclusion persists, protects ownership, and changes only its se
     await choice(asset.id, "asset", "income-expense", true);
     assert.equal((await cashflow()).totalMonthlyIncome, beforeCashflow.totalMonthlyIncome);
     assert.equal((await netWorth()).assets.length, 1);
+    assert.equal((await netWorth()).assets[0].included, true);
     const otherView = (await call("get", `${base}account-inclusion`, other)).body.accounts;
     assert.equal(otherView.length, 1);
     assert.equal(otherView[0].id, foreign.id);
