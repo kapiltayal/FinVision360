@@ -34,6 +34,7 @@ import logoPath from "@assets/FinVision360_Logo_H_(transparent)_1776714495394.pn
 import { useTheme } from "@/components/theme-provider";
 import { useLogout } from "@/hooks/use-auth";
 import { HoneypotField, isHoneypotFilled } from "@/components/honeypot-field";
+import { LandingDashboardCarousel } from "@/components/landing-dashboard-carousel";
 import { SIGNUP_DISCOVERY_SOURCES } from "@shared/signup-discovery";
 import {
   DropdownMenu,
@@ -579,51 +580,7 @@ export default function LandingPage() {
           </>
         )}
 
-        {/* Mock dashboard preview */}
-        <div className="mt-14 relative mx-auto max-w-4xl">
-          <div className="rounded-lg border bg-card shadow-lg p-4 text-left">
-            <div className="flex items-center gap-2 mb-4">
-              <div className="h-3 w-3 rounded-full bg-red-400" />
-              <div className="h-3 w-3 rounded-full bg-yellow-400" />
-              <div className="h-3 w-3 rounded-full bg-emerald-400" />
-              <span className="ml-2 text-xs text-muted-foreground">Net Worth</span>
-            </div>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-              {[
-                { label: "Net Worth", value: "$421,300", color: "text-emerald-500" },
-                { label: "Total Assets", value: "$732,300", color: "text-[#1C91D4]" },
-                { label: "Total Liabilities", value: "$311,000", color: "text-red-500" },
-                { label: "Interest Spread", value: "+3.21%", color: "text-violet-500" },
-              ].map((stat) => (
-                <div key={stat.label} className="rounded-md bg-muted/80 p-3">
-                  <p className="text-xs text-muted-foreground">{stat.label}</p>
-                  <p className={`text-base font-bold ${stat.color}`}>{stat.value}</p>
-                </div>
-              ))}
-            </div>
-            <div className="grid grid-cols-3 gap-3">
-              <div className="col-span-2 rounded-md bg-muted/80 p-3 h-24 flex items-end gap-1">
-                {[40, 55, 45, 70, 65, 80, 72, 85, 90, 88, 95, 100].map((h, i) => (
-                  <div
-                    key={i}
-                    className="flex-1 rounded-sm bg-primary/60"
-                    style={{ height: `${h}%` }}
-                  />
-                ))}
-              </div>
-              <div className="rounded-md bg-muted/80 p-3 h-24 flex items-center justify-center">
-                <div className="relative h-14 w-14">
-                  <svg viewBox="0 0 36 36" className="h-14 w-14 -rotate-90">
-                    <circle cx="18" cy="18" r="13" fill="none" stroke="hsl(var(--muted))" strokeWidth="4" />
-                    <circle cx="18" cy="18" r="13" fill="none" stroke="hsl(var(--chart-1))" strokeWidth="4" strokeDasharray="50 82" />
-                    <circle cx="18" cy="18" r="13" fill="none" stroke="hsl(var(--chart-2))" strokeWidth="4" strokeDasharray="20 82" strokeDashoffset="-50" />
-                    <circle cx="18" cy="18" r="13" fill="none" stroke="hsl(var(--chart-3))" strokeWidth="4" strokeDasharray="12 82" strokeDashoffset="-70" />
-                  </svg>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+        <LandingDashboardCarousel />
       </section>
 
       {/* Features */}
