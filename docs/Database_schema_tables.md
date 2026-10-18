@@ -83,6 +83,24 @@ This is a code-based reference for the PostgreSQL tables used by FinVision360. I
 
 ### Budget planning and close snapshots
 
+#### Goal allocation funding model
+
+`user_goals.current_amount` now holds **legacy funding only**: the previously entered amount is preserved without assigning an assumed account. New goals start at zero; create/edit APIs no longer accept manual progress. The `goal_funding` SQL view exposes the original goal fields with `current_amount = legacy funding + SUM(goal_allocations.amount)`, plus `legacy_amount` and `allocated_amount`. Goals, live budgets, and new month-close snapshots read this derived total. The view is read-only through the app.
+
+| Table | Purpose | Columns (PostgreSQL name and type) | Keys and constraints |
+| --- | --- | --- | --- |
+| `goal_allocations` | Planning earmarks from checking, savings, and cash assets to goals; never transfers money or changes account balances. | `id SERIAL` (PK)<br>`user_id VARCHAR` (not null)<br>`asset_id INTEGER` (not null)<br>`goal_id INTEGER` (not null)<br>`amount NUMERIC(12,2)` (not null, positive)<br>`updated_at TIMESTAMP` (not null, default current time) | FKs to `users.id`, `assets.id`, and `user_goals.id`, all `ON DELETE CASCADE`; unique `(user_id, asset_id, goal_id)`; check `amount > 0`. |
+
+- Ownership is derived from the authenticated user for every allocation read and mutation. Source account and goal ownership are checked before saving.
+- Saves serialize by user with a transaction advisory lock; source rows are locked while availability and goal target are checked. Amounts are validated in cents.
+- Increasing allocations must fit both account availability and goal remaining target. A legacy mapping reduces the stored legacy amount by the same amount added to the account link, so total funding stays unchanged. Partial mappings are supported.
+- Balance drops retain allocations and expose deficits. Users may reduce or release links, but cannot increase an over-allocated account. If a linked account changes to an ineligible category, its existing links stay visible and can be reduced or removed.
+- Deleting a linked account or goal requires explicit confirmation through the API before cascades release allocations. Legacy funding is independent of account deletion.
+- Bank disconnection uses the same funding lock and an atomic local deletion transaction. Disconnect requests with allocations require `confirmAllocations=true`; the confirmation explains the goal-funding impact. Successful disconnects refresh goal, allocation, and budget data; balance sync refreshes allocation availability.
+- Live unsaved budget suggestions use the combined funded amount. Explicit saved amounts, including zero, remain authoritative. Allocation operations never create income or expense transactions or saved budget rows.
+- New `user_goals_history` and `budget_month_closes` snapshots capture combined funding and the savings requirement at close. Existing history is not changed, and historical reads never consult live allocations.
+- The additive table and funding view are initialized before dependent routes in both development and published server startup by `server/goal-allocation.ts`.
+
 | Table | Purpose | Columns (PostgreSQL name and type) | Keys and constraints |
 | --- | --- | --- | --- |
 | `budget_plans` | Editable per-user monthly plan line items. `plan_key` identifies the category or entity represented by the amount. | `id SERIAL` (PK)<br>`user_id VARCHAR` (not null)<br>`month DATE` (not null; normalized to plan month)<br>`plan_key VARCHAR(250)` (not null)<br>`planned_amount NUMERIC(12,2)` (not null, default `0`)<br>`entity_metadata JSONB` (optional `{ name, category }` metadata)<br>`created_at TIMESTAMP` (not null, default current time)<br>`updated_at TIMESTAMP` (not null, default current time) | FK `user_id → users.id` (`ON DELETE CASCADE`); unique index `budget_plans_user_month_key_unique` on `(user_id, month, plan_key)`; check `planned_amount >= 0`. |

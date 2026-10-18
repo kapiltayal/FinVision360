@@ -1,4 +1,4 @@
-import { sql } from "drizzle-orm";
+import { getTableColumns, sql } from "drizzle-orm";
 import type { db } from "./db";
 import { userGoals, userGoalsHistory, type UserGoal } from "@shared/schema";
 import { monthlySavingsRequired } from "@shared/goal-monthly-savings";
@@ -31,7 +31,12 @@ export async function snapshotUserGoals(
   database: Pick<typeof db, "select" | "insert" | "delete">,
   today = new Date(),
 ) {
-  const goals = await database.select().from(userGoals);
+  const goals = await database.select({
+    ...getTableColumns(userGoals),
+    currentAmount: sql<string>`(${userGoals.currentAmount} + COALESCE(
+      (SELECT SUM(amount) FROM goal_allocations a
+       WHERE a.goal_id=${userGoals.id} AND a.user_id=${userGoals.userId}),0))::numeric(12,2)`,
+  }).from(userGoals);
   if (goals.length > 0) {
     await database.insert(userGoalsHistory).values(buildGoalHistoryRows(goals, today));
   }

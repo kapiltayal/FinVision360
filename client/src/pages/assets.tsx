@@ -18,6 +18,7 @@ import { formatCurrency, formatPercent } from "@/lib/format";
 import { getKnownAssetRate, summarizeAssetRates } from "@/lib/asset-rates";
 import { type BookCategory, categoryLabel, categoryParent, groupedBookCategories, groupedBookEntries } from "@/lib/book-categories";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
 type AssetSortKey = "parentCategory" | "category" | "name" | "institution" | "value" | "rate";
 type SortDirection = "asc" | "desc";
@@ -86,6 +87,9 @@ function AssetForm({
     mutationFn: (data: any) => apiRequest("POST", "/api/assets", data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/assets"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/goals"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/goal-allocations"] });
+      queryClient.invalidateQueries({ predicate: (query) => String(query.queryKey[0] ?? "").startsWith("/api/budget-plan") });
       queryClient.invalidateQueries({ queryKey: ["/api/retirement/income-expense-projection"] });
       toast({ title: "Asset created" });
       onUpdated?.();
@@ -98,6 +102,9 @@ function AssetForm({
     mutationFn: (data: any) => apiRequest("PATCH", `/api/assets/${asset!.id}`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/assets"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/goals"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/goal-allocations"] });
+      queryClient.invalidateQueries({ predicate: (query) => String(query.queryKey[0] ?? "").startsWith("/api/budget-plan") });
       queryClient.invalidateQueries({ queryKey: ["/api/retirement/income-expense-projection"] });
       toast({ title: "Asset updated" });
       onUpdated?.();
@@ -216,6 +223,7 @@ function AssetForm({
 
 export default function AssetsPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [deleteAssetId, setDeleteAssetId] = useState<number | null>(null);
   const [editingAsset, setEditingAsset] = useState<Asset | undefined>();
   const [openCategory, setOpenCategory] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"cards" | "table">("cards");
@@ -228,17 +236,26 @@ export default function AssetsPage() {
   const { data: assets = [], isLoading: assetsLoading } = useQuery<Asset[]>({ queryKey: ["/api/assets"] });
   const { data: categories = [], isLoading: categoriesLoading } = useQuery<BookCategory[]>({ queryKey: ["/api/assets/categories"] });
   const { data: plaidData } = useQuery<{ accounts: PlaidAccount[]; items: any[] }>({ queryKey: ["/api/plaid/accounts"] });
+  const { data: goalAllocationData } = useQuery<{ allocations: { id: number; assetId: number; goalId: number; amount: string }[]; goals: { id: number; title: string }[] }>({ queryKey: ["/api/goal-allocations"] });
+  const selectedDeleteAsset = assets.find((asset) => asset.id === deleteAssetId);
+  const linkedAllocations = (goalAllocationData?.allocations ?? []).filter((allocation) => allocation.assetId === deleteAssetId);
+  const linkedGoalNames = linkedAllocations.map((allocation) => goalAllocationData?.goals.find((goal) => goal.id === allocation.goalId)?.title).filter(Boolean);
   const plaidLinkedAssetIds = new Set((plaidData?.accounts ?? []).map((a) => a.linkedAssetId).filter(Boolean));
 
   const deleteMutation = useMutation({
-    mutationFn: (id: number) => apiRequest("DELETE", `/api/assets/${id}`),
+    mutationFn: (id: number) => apiRequest("DELETE", `/api/assets/${id}?confirmAllocations=true`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/assets"] });
       queryClient.invalidateQueries({ queryKey: ["/api/plaid/accounts"] });
       queryClient.invalidateQueries({ queryKey: ["/api/retirement/income-expense-projection"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/goals"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/goal-allocations"] });
+      queryClient.invalidateQueries({ predicate: (query) => String(query.queryKey[0] ?? "").startsWith("/api/budget-plan") });
       toast({ title: "Asset deleted" });
+      setDeleteAssetId(null);
       markUpdated();
     },
+    onError: (error: Error) => toast({ title: "Could not delete asset", description: error.message, variant: "destructive" }),
   });
 
   const totalValue = assets.reduce((sum, a) => sum + parseFloat(a.value || "0"), 0);
@@ -302,6 +319,9 @@ export default function AssetsPage() {
     queryClient.invalidateQueries({ queryKey: ["/api/assets"] });
     queryClient.invalidateQueries({ queryKey: ["/api/plaid/accounts"] });
     queryClient.invalidateQueries({ queryKey: ["/api/retirement/income-expense-projection"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/goals"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/goal-allocations"] });
+    queryClient.invalidateQueries({ predicate: (query) => String(query.queryKey[0] ?? "").startsWith("/api/budget-plan") });
     markUpdated();
   };
 
@@ -509,7 +529,7 @@ export default function AssetsPage() {
                           <Pencil className="h-4 w-4" />
                           <span className="sr-only">Edit {asset.name}</span>
                         </Button>
-                        <Button size="icon" variant="ghost" onClick={() => deleteMutation.mutate(asset.id)} data-testid={`button-table-delete-asset-${asset.id}`}>
+                         <Button size="icon" variant="ghost" onClick={() => setDeleteAssetId(asset.id)} data-testid={`button-table-delete-asset-${asset.id}`}>
                           <Trash2 className="h-4 w-4" />
                           <span className="sr-only">Delete {asset.name}</span>
                         </Button>
@@ -593,7 +613,7 @@ export default function AssetsPage() {
                                       <Button size="icon" variant="ghost" onClick={() => openEdit(asset)} data-testid={`button-edit-asset-${asset.id}`}>
                                         <Pencil className="h-4 w-4" />
                                       </Button>
-                                      <Button size="icon" variant="ghost" onClick={() => deleteMutation.mutate(asset.id)} data-testid={`button-delete-asset-${asset.id}`}>
+                                       <Button size="icon" variant="ghost" onClick={() => setDeleteAssetId(asset.id)} data-testid={`button-delete-asset-${asset.id}`}>
                                         <Trash2 className="h-4 w-4" />
                                       </Button>
                                     </div>
@@ -623,6 +643,26 @@ export default function AssetsPage() {
           })}
         </Card>
       )}
+      <AlertDialog open={deleteAssetId !== null} onOpenChange={(open) => { if (!open) setDeleteAssetId(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete {selectedDeleteAsset?.name ?? "this asset"}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {linkedAllocations.length > 0
+                ? `This account is linked to ${linkedAllocations.length} goal allocation${linkedAllocations.length === 1 ? "" : "s"}${linkedGoalNames.length ? ` (${linkedGoalNames.join(", ")})` : ""}. Deleting it will release those allocations and change goal funding totals.`
+                : "This permanently removes the asset from your financial picture."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-rose-600 hover:bg-rose-700"
+              disabled={deleteMutation.isPending}
+              onClick={() => deleteAssetId !== null && deleteMutation.mutate(deleteAssetId)}
+            >{deleteMutation.isPending ? "Deleting…" : "Delete asset"}</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

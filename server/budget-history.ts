@@ -211,7 +211,7 @@ export async function buildBudgetClose(client: PoolClient, userId: string, perio
     "SELECT id,name,category,balance,minimum_payment FROM liabilities WHERE user_id=$1 ORDER BY id", [userId],
   );
   const { rows: goals } = await client.query(
-    "SELECT id,title,category,target_amount,current_amount,target_date::text FROM user_goals WHERE user_id=$1 ORDER BY id", [userId],
+    "SELECT id,title,category,target_amount,current_amount,target_date::text FROM goal_funding WHERE user_id=$1 ORDER BY id", [userId],
   );
   const plans = await transactionPlanDefaults(client, userId, period);
   const add = (planKey: string, amount: number, entityMetadata: BudgetPlanLine["entityMetadata"] = null) =>

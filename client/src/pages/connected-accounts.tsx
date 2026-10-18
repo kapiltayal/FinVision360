@@ -233,6 +233,7 @@ export default function ConnectedAccountsPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/assets"] });
       queryClient.invalidateQueries({ queryKey: ["/api/liabilities"] });
       toast({ title: "Synced!", description: "Balances have been updated." });
+      queryClient.invalidateQueries({ queryKey: ["/api/goal-allocations"] });
       setSyncingId(null);
     },
     onError: (error, itemId) => {
@@ -256,11 +257,14 @@ export default function ConnectedAccountsPage() {
   });
 
   const disconnectMutation = useMutation({
-    mutationFn: (id: number) => apiRequest("DELETE", `/api/plaid/items/${id}`),
+    mutationFn: (id: number) => apiRequest("DELETE", `/api/plaid/items/${id}?confirmAllocations=true`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/plaid/accounts"] });
       queryClient.invalidateQueries({ queryKey: ["/api/assets"] });
       queryClient.invalidateQueries({ queryKey: ["/api/liabilities"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/goals"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/goal-allocations"] });
+      queryClient.invalidateQueries({ predicate: (query) => String(query.queryKey[0] ?? "").startsWith("/api/budget-plan") });
       toast({ title: "Disconnected", description: "Bank connection and synced entries removed." });
     },
     onError: () => {
@@ -398,7 +402,7 @@ export default function ConnectedAccountsPage() {
                       <AlertDialogHeader>
                         <AlertDialogTitle>Disconnect {item.institutionName}?</AlertDialogTitle>
                         <AlertDialogDescription>
-                          This will remove all synced account data for this institution. Your manually entered assets and liabilities will not be affected.
+                          This removes the connection and its linked asset and liability entries. Any goal allocations from those accounts will be released, reducing goal funding and changing unsaved budget suggestions. Legacy goal funding and historical budgets remain unchanged. Other, unlinked assets and liabilities will not be affected. No money is moved.
                         </AlertDialogDescription>
                       </AlertDialogHeader>
                       <AlertDialogFooter>

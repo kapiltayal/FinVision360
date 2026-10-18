@@ -680,6 +680,7 @@ export const userGoals = pgTable("user_goals", {
   title: varchar("title", { length: 200 }).notNull(),
   category: varchar("category", { length: 50 }).notNull().default("custom"),
   targetAmount: numeric("target_amount", { precision: 12, scale: 2 }).notNull(),
+  // Legacy, unmapped funding only. Read goal_funding for the full funded amount.
   currentAmount: numeric("current_amount", { precision: 12, scale: 2 }).notNull().default("0"),
   targetDate: date("target_date"),
   notes: text("notes"),
@@ -689,6 +690,18 @@ export const userGoals = pgTable("user_goals", {
 
 export type UserGoal = typeof userGoals.$inferSelect;
 export type InsertUserGoal = typeof userGoals.$inferInsert;
+
+export const goalAllocations = pgTable("goal_allocations", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  assetId: integer("asset_id").notNull().references(() => assets.id, { onDelete: "cascade" }),
+  goalId: integer("goal_id").notNull().references(() => userGoals.id, { onDelete: "cascade" }),
+  amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  pairUnique: uniqueIndex("goal_allocations_user_pair_unique").on(table.userId, table.assetId, table.goalId),
+  positiveAmount: check("goal_allocations_amount_check", sql`${table.amount} > 0`),
+}));
 
 export const userGoalsHistory = pgTable("user_goals_history", {
   id: serial("id").primaryKey(),

@@ -498,7 +498,7 @@ export function registerFinanceTrackerRoutes(app: Express) {
         ),
         pool.query(
           `SELECT id, title, category, target_amount, current_amount, target_date
-           FROM user_goals
+           FROM goal_funding
            WHERE user_id = $1
            ORDER BY target_date NULLS LAST, title`,
           [userId],

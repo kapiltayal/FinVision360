@@ -33,7 +33,7 @@ export async function monthlyBackupTransaction(client: PoolClient, now = new Dat
     throw new CloseWindowError("The monthly close must be captured on the first UTC day of the following month. No historical snapshot was created from current data.");
   }
   const { assetsSnapshotted, liabilitiesSnapshotted } = await snapshotAccountHistory(client, now);
-  const { rows: goals } = await client.query("SELECT *, target_date::text AS target_date FROM user_goals");
+  const { rows: goals } = await client.query("SELECT *, target_date::text AS target_date FROM goal_funding");
   for (const goal of goals) {
     const required = monthlySavingsRequired(Number(goal.target_amount), Number(goal.current_amount), goal.target_date, now);
     await client.query(

@@ -698,12 +698,13 @@ export class DatabaseStorage implements IStorage {
 
   async getUserGoals(userId: string): Promise<UserGoal[]> {
     const result = await pool.query(
-      `SELECT * FROM user_goals WHERE user_id = $1 ORDER BY created_at DESC`,
+      `SELECT * FROM goal_funding WHERE user_id = $1 ORDER BY created_at DESC`,
       [userId]
     );
     return result.rows.map((r: any) => ({
       id: r.id, userId: r.user_id, title: r.title, category: r.category,
       targetAmount: r.target_amount, currentAmount: r.current_amount,
+      legacyAmount: r.legacy_amount, allocatedAmount: r.allocated_amount,
       targetDate: r.target_date, notes: r.notes,
       createdAt: r.created_at, updatedAt: r.updated_at,
     })) as UserGoal[];

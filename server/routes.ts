@@ -39,6 +39,8 @@ import {
 import { buildRetirementNetWorthProjection } from "./retirement-projection";
 import { buildRetirementIncomeExpenseProjection, isPretaxRetirementAccountCategory } from "./retirement-income-expense-projection";
 import { parseOptionalInterestRate } from "./liability-apr";
+import { AllocationError, allocationAccounts, moneyCents, saveAllocation, withFundingLock } from "./goal-allocation";
+import { deletePlaidConnection } from "./plaid-disconnect";
 
 const MAX_PENSION_AMOUNT = 9_999_999_999_999.99;
 const MAX_SOCIAL_SECURITY_MONTHLY_BENEFIT = 99_999_999.99;
@@ -517,9 +519,19 @@ export async function registerRoutes(
   app.delete("/api/assets/:id", requireAuth, async (req, res) => {
     const userId = (req.user as any).id;
     const id = parseInt(req.params.id);
-    const deleted = await storage.deleteAsset(id, userId);
-    if (!deleted) return res.status(404).json({ message: "Asset not found" });
-    res.status(204).send();
+    try {
+      await withFundingLock(pool, userId, async (client) => {
+        const { rows: [asset] } = await client.query("SELECT id FROM assets WHERE id=$1 AND user_id=$2 FOR UPDATE", [id, userId]);
+        if (!asset) throw new AllocationError("Asset not found", 404);
+        const { rowCount } = await client.query("SELECT id FROM goal_allocations WHERE asset_id=$1 AND user_id=$2", [id, userId]);
+        if (rowCount && req.query.confirmAllocations !== "true") throw new AllocationError("Deleting this account releases its goal allocations. Please confirm.", 409);
+        await client.query("UPDATE plaid_accounts SET linked_asset_id=NULL WHERE linked_asset_id=$1 AND user_id=$2", [id, userId]);
+        await client.query("DELETE FROM assets WHERE id=$1 AND user_id=$2", [id, userId]);
+      });
+      res.status(204).send();
+    } catch (error) {
+      res.status(error instanceof AllocationError ? error.status : 500).json({ message: error instanceof AllocationError ? error.message : "Failed to delete account" });
+    }
   });
 
   app.get("/api/liabilities", requireAuth, async (req, res) => {
@@ -1839,24 +1851,16 @@ Include a year-by-year overview, useful milestones, a conservative/base/optimist
     try {
       const userId = (req.user as any).id;
       const id = parseInt(req.params.id);
-      const items = await storage.getPlaidItems(userId);
-      const item = items.find((i) => i.id === id);
-      if (!item) return res.status(404).json({ message: "Item not found" });
+      const accessToken = await deletePlaidConnection(pool, userId, id, req.query.confirmAllocations === "true");
 
       try {
         const plaid = getPlaidClient();
-        await plaid.itemRemove({ access_token: item.accessToken });
+        await plaid.itemRemove({ access_token: accessToken });
       } catch (_) {}
 
-      const linkedAccounts = await storage.getPlaidAccountsByItem(id);
-      for (const a of linkedAccounts) {
-        if (a.linkedAssetId) await storage.deleteAsset(a.linkedAssetId, userId);
-        if (a.linkedLiabilityId) await storage.deleteLiability(a.linkedLiabilityId, userId);
-      }
-      await storage.deletePlaidAccountsByItem(id);
-      await storage.deletePlaidItem(id, userId);
       res.status(204).send();
     } catch (err: any) {
+      if (err instanceof AllocationError) return res.status(err.status).json({ message: err.message });
       logRouteFailure(req, err);
       res.status(500).json({ message: "Failed to disconnect account" });
     }
@@ -1948,6 +1952,40 @@ Include a year-by-year overview, useful milestones, a conservative/base/optimist
 
   // ── User Goals ──────────────────────────────────────────────────────────────
 
+  app.get("/api/goal-allocations", requireAuth, async (req, res) => {
+    try {
+      const userId = req.user!.id;
+      const [accounts, goals, { rows: allocations }] = await Promise.all([
+        allocationAccounts(pool, userId), storage.getUserGoals(userId),
+        pool.query('SELECT id,asset_id AS "assetId",goal_id AS "goalId",amount FROM goal_allocations WHERE user_id=$1 ORDER BY id', [userId]),
+      ]);
+      res.json({ accounts, goals, allocations });
+    } catch (error) {
+      logRouteFailure(req, error);
+      res.status(500).json({ message: "Failed to load goal allocations" });
+    }
+  });
+
+  app.post("/api/goal-allocations", requireAuth, async (req, res) => {
+    try {
+      res.json(await saveAllocation(pool, req.user!.id, req.body));
+    } catch (error) {
+      if (!(error instanceof AllocationError)) logRouteFailure(req, error);
+      res.status(error instanceof AllocationError ? error.status : 500).json({ message: error instanceof AllocationError ? error.message : "Failed to save allocation" });
+    }
+  });
+
+  app.delete("/api/goal-allocations/:id", requireAuth, async (req, res) => {
+    try {
+      const deleted = await withFundingLock(pool, req.user!.id, async (client) =>
+        client.query("DELETE FROM goal_allocations WHERE id=$1 AND user_id=$2 RETURNING id", [req.params.id, req.user!.id]));
+      if (!deleted.rowCount) return res.status(404).json({ message: "Allocation not found" });
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ message: "Failed to remove allocation" });
+    }
+  });
+
   app.get("/api/goals", requireAuth, async (req, res) => {
     try {
       const goals = await storage.getUserGoals(req.user!.id);
@@ -1958,22 +1996,25 @@ Include a year-by-year overview, useful milestones, a conservative/base/optimist
   });
 
   app.post("/api/goals", requireAuth, async (req, res) => {
-    const { title, category, targetAmount, currentAmount, targetDate, notes } = req.body;
-    if (!title) {
+    const { title, category, targetAmount, targetDate, notes } = req.body;
+    if (typeof title !== "string" || !title.trim() || title.length > 200) {
       return res.status(400).json({ message: "title is required" });
     }
     try {
+      if (moneyCents(targetAmount) === 0) throw new AllocationError("Target must be greater than zero.");
+      if (req.body.currentAmount !== undefined) throw new AllocationError("Manage funding in Goal Allocation.");
       const goal = await storage.createUserGoal({
         userId: req.user!.id,
         title,
         category: category || "custom",
         targetAmount: String(targetAmount ?? 0),
-        currentAmount: String(currentAmount ?? 0),
+        currentAmount: "0",
         targetDate: targetDate || null,
         notes: notes || null,
       });
       return res.status(201).json(goal);
     } catch (err: any) {
+      if (err instanceof AllocationError) return res.status(err.status).json({ message: err.message });
       logRouteFailure(req, err);
       return res.status(500).json({ message: "Failed to create goal" });
     }
@@ -1983,18 +2024,26 @@ Include a year-by-year overview, useful milestones, a conservative/base/optimist
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ message: "Invalid id" });
     try {
-      const { title, category, targetAmount, currentAmount, targetDate, notes } = req.body;
-      const updated = await storage.updateUserGoal(id, req.user!.id, {
-        ...(title !== undefined && { title }),
-        ...(category !== undefined && { category }),
-        ...(targetAmount !== undefined && { targetAmount: String(targetAmount) }),
-        ...(currentAmount !== undefined && { currentAmount: String(currentAmount) }),
-        ...(targetDate !== undefined && { targetDate }),
-        ...(notes !== undefined && { notes }),
+      const { title, category, targetAmount, targetDate, notes } = req.body;
+      if (req.body.currentAmount !== undefined) throw new AllocationError("Manage funding in Goal Allocation.");
+      if (title !== undefined && (typeof title !== "string" || !title.trim() || title.length > 200)) throw new AllocationError("Enter a valid title.");
+      const updated = await withFundingLock(pool, req.user!.id, async (client) => {
+        const { rows: [goal] } = await client.query("SELECT * FROM goal_funding WHERE id=$1 AND user_id=$2", [id, req.user!.id]);
+        if (!goal) throw new AllocationError("Goal not found", 404);
+        if (targetAmount !== undefined && (moneyCents(targetAmount) === 0 || moneyCents(targetAmount) < moneyCents(goal.current_amount))) {
+          throw new AllocationError("Target cannot be below existing funding. Release allocations first.");
+        }
+        const { rows: [row] } = await client.query(`
+          UPDATE user_goals SET title=$3,category=$4,target_amount=$5,target_date=$6,notes=$7,updated_at=NOW()
+          WHERE id=$1 AND user_id=$2 RETURNING id`, [id, req.user!.id, title ?? goal.title, category ?? goal.category,
+          targetAmount ?? goal.target_amount, targetDate === undefined ? goal.target_date : targetDate || null,
+          notes === undefined ? goal.notes : notes]);
+        return row;
       });
       if (!updated) return res.status(404).json({ message: "Goal not found" });
       return res.json(updated);
     } catch (err) {
+      if (err instanceof AllocationError) return res.status(err.status).json({ message: err.message });
       return res.status(500).json({ message: "Failed to update goal" });
     }
   });
@@ -2003,9 +2052,16 @@ Include a year-by-year overview, useful milestones, a conservative/base/optimist
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ message: "Invalid id" });
     try {
-      await storage.deleteUserGoal(id, req.user!.id);
+      await withFundingLock(pool, req.user!.id, async (client) => {
+        const { rows: [goal] } = await client.query("SELECT id FROM user_goals WHERE id=$1 AND user_id=$2 FOR UPDATE", [id, req.user!.id]);
+        if (!goal) throw new AllocationError("Goal not found", 404);
+        const { rowCount } = await client.query("SELECT id FROM goal_allocations WHERE goal_id=$1 AND user_id=$2", [id, req.user!.id]);
+        if (rowCount && req.query.confirmAllocations !== "true") throw new AllocationError("Deleting this goal releases its account allocations. Please confirm.", 409);
+        await client.query("DELETE FROM user_goals WHERE id=$1 AND user_id=$2", [id, req.user!.id]);
+      });
       return res.status(204).send();
     } catch (err) {
+      if (err instanceof AllocationError) return res.status(err.status).json({ message: err.message });
       return res.status(500).json({ message: "Failed to delete goal" });
     }
   });

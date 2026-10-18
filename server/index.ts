@@ -4,6 +4,7 @@ import { serveStatic } from "./static";
 import { createServer } from "http";
 import { pool } from "./db";
 import { ensureTransactionImportSchema } from "./transaction-import-schema";
+import { ensureGoalAllocationSchema } from "./goal-allocation";
 import { createApiRequestLogger, formatSafeApiError, getSafeApiRoutePath } from "./api-logging";
 
 const app = express();
@@ -171,6 +172,7 @@ app.use(createApiRequestLogger((message) => log(message)));
     const { seedDatabase } = await import("./seed");
     await seedDatabase().catch((e) => console.error(formatSafeApiError("Development seed initialization", e)));
   }
+  await ensureGoalAllocationSchema(pool);
   await registerRoutes(httpServer, app);
 
   app.use((err: any, req: Request, res: Response, next: NextFunction) => {

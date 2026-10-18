@@ -25,3 +25,4 @@
 - [Styling compatibility](styling-compatibility.md) — security-driven toolchain upgrades preserve the existing design; avoid token collisions and focus-accessibility regressions.
 - [Feedback sender policy](feedback-email-policy.md) — use the FinVision360 sender domain, not the older FinQuest domain; save feedback before notifying.
 - [Unknown account rates](unknown-liability-apr.md) — missing asset returns and debt APRs are unknown; only explicit zero means 0%. Do not infer the intent of legacy zeros.
+- [Goal allocation policy](goal-account-allocation-policy.md) — preserve legacy funding, show account deficits without redistribution, and keep allocations separate from cash flow.
