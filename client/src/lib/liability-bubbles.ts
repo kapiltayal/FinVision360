@@ -56,6 +56,28 @@ export function getBubbleAxisTicks(input: BubbleCamera, maxMonths: number, maxAp
   };
 }
 
+/** CSS-pixel tooltip placement beside a sphere, with edge flipping and containment. */
+export function getBubbleTooltipPosition(
+  anchor: { x: number; y: number; radius: number },
+  viewport: { width: number; height: number },
+  tooltip: { width: number; height: number },
+) {
+  const width = Math.max(0, finite(viewport.width, 0));
+  const height = Math.max(0, finite(viewport.height, 0));
+  const boxWidth = Math.max(0, finite(tooltip.width, 0));
+  const boxHeight = Math.max(0, finite(tooltip.height, 0));
+  const margin = Math.min(8, width / 2, height / 2);
+  const radius = Math.max(0, finite(anchor.radius, 0));
+  const x = finite(anchor.x, width / 2);
+  const y = finite(anchor.y, height / 2);
+  let left = x + radius + 12;
+  if (left + boxWidth > width - margin) left = x - radius - 12 - boxWidth;
+  return {
+    left: clamp(left, margin, Math.max(margin, width - boxWidth - margin)),
+    top: clamp(y - boxHeight / 2, margin, Math.max(margin, height - boxHeight - margin)),
+  };
+}
+
 /** Zoom around the pointer (or plot center) rather than making the scene jump. */
 export function zoomBubbleCamera(input: BubbleCamera, zoom: number, anchor?: { x: number; y: number }): BubbleCamera {
   const camera = clampBubbleCamera(input);

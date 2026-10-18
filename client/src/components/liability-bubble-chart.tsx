@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useRef, useState, type PointerEvent } from "react";
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type PointerEvent } from "react";
 import { Home, Minus, Plus } from "lucide-react";
 import { formatCurrencyFull, formatPercent } from "@/lib/format";
 import type { ExposureItem } from "@/lib/liability-map";
@@ -9,6 +9,7 @@ import {
   clampBubbleCamera,
   DEFAULT_BUBBLE_CAMERA,
   getBubbleAxisTicks,
+  getBubbleTooltipPosition,
   projectBubblePoint,
   zoomBubbleCamera,
   type BubbleCamera,
@@ -19,6 +20,7 @@ const fmtNumber = (value: number, digits = 0) =>
   Number.isFinite(value) ? new Intl.NumberFormat("en-US", { maximumFractionDigits: digits }).format(value) : "—";
 const isWithinPlot = (x: number, y: number) =>
   x >= BUBBLE_PLOT.left && x <= BUBBLE_PLOT.right && y >= BUBBLE_PLOT.top && y <= BUBBLE_PLOT.bottom;
+const useTooltipLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
 
 function aprColor(apr: number | null) {
   if (apr === null) return { fill: "url(#bubble-unknown)", stroke: "var(--bubble-unknown-stroke)" };
@@ -48,6 +50,8 @@ export function LiabilityBubbleChart({ items }: { items: ExposureItem[] }) {
   const [hoveredId, setHoveredId] = useState<number | null>(null);
   const chartRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
+  const tooltipRef = useRef<HTMLDivElement>(null);
+  const [tooltipPosition, setTooltipPosition] = useState<{ left: number; top: number } | null>(null);
   const cameraRef = useRef(camera);
   const pointersRef = useRef(new Map<number, { x: number; y: number }>());
   const gestureRef = useRef<{ id: number; x: number; y: number; distance?: number } | null>(null);
@@ -168,10 +172,72 @@ export function LiabilityBubbleChart({ items }: { items: ExposureItem[] }) {
     screen: projectBubblePoint(point.position, camera),
   })).sort((a, b) => b.point.radius - a.point.radius), [scene.points, camera]);
   const selectedPoint = scene.points.find(({ item }) => item.id === (hoveredId ?? selectedId));
+  const selectedProjection = projected.find(({ point }) => point.item.id === selectedPoint?.item.id);
   const tooltipItem = selectedPoint?.item;
   const tooltipInterest = selectedPoint?.interest ?? null;
+  const tooltipRadius = selectedProjection ? Math.max(4, selectedProjection.point.radius * selectedProjection.screen.scale) : 0;
+  const showTooltip = Boolean(
+    tooltipItem && selectedProjection &&
+    isWithinPlot(selectedProjection.screen.x, selectedProjection.screen.y),
+  );
   const axisTicks = getBubbleAxisTicks(camera, scene.maxMonths, scene.maxApr);
   const plotAvailable = scene.points.length > 0;
+
+  useTooltipLayoutEffect(() => {
+    if (!showTooltip || !selectedProjection) {
+      setTooltipPosition((current) => current === null ? current : null);
+      return;
+    }
+    const chart = chartRef.current;
+    const svg = svgRef.current;
+    const tooltip = tooltipRef.current;
+    if (!chart || !svg || !tooltip) return;
+
+    const updatePosition = () => {
+      const matrix = svg.getScreenCTM();
+      const chartBounds = chart.getBoundingClientRect();
+      const tooltipBounds = tooltip.getBoundingClientRect();
+      if (!matrix || chartBounds.width <= 0 || chartBounds.height <= 0 || tooltipBounds.width <= 0 || tooltipBounds.height <= 0) return;
+
+      const svgCenter = svg.createSVGPoint();
+      svgCenter.x = selectedProjection.screen.x;
+      svgCenter.y = selectedProjection.screen.y;
+      const screenCenter = svgCenter.matrixTransform(matrix);
+      const radiusX = Math.hypot(matrix.a * tooltipRadius, matrix.b * tooltipRadius);
+      const radiusY = Math.hypot(matrix.c * tooltipRadius, matrix.d * tooltipRadius);
+      const next = getBubbleTooltipPosition(
+        {
+          x: screenCenter.x - chartBounds.left,
+          y: screenCenter.y - chartBounds.top,
+          radius: Math.max(radiusX, radiusY),
+        },
+        { width: chartBounds.width, height: chartBounds.height },
+        { width: tooltipBounds.width, height: tooltipBounds.height },
+      );
+      setTooltipPosition((current) =>
+        current && Math.abs(current.left - next.left) < 0.25 && Math.abs(current.top - next.top) < 0.25
+          ? current
+          : next,
+      );
+    };
+
+    updatePosition();
+    const resizeObserver = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(updatePosition);
+    resizeObserver?.observe(chart);
+    resizeObserver?.observe(tooltip);
+    window.addEventListener("resize", updatePosition);
+    return () => {
+      resizeObserver?.disconnect();
+      window.removeEventListener("resize", updatePosition);
+    };
+  }, [
+    showTooltip,
+    tooltipItem,
+    selectedProjection?.screen.x,
+    selectedProjection?.screen.y,
+    selectedProjection?.screen.scale,
+    tooltipRadius,
+  ]);
 
   return (
     <section className="liability-bubble-card" aria-label="Two-axis liability bubble chart with 3D-styled spheres">
@@ -223,8 +289,8 @@ export function LiabilityBubbleChart({ items }: { items: ExposureItem[] }) {
         .bubble-node { cursor: pointer; outline: none; }
         .bubble-node:focus-visible { stroke-width: 4; filter: brightness(1.13); }
         .bubble-tooltip {
-          position: absolute; z-index: 5; min-width: 220px; max-width: min(270px, 78%);
-          top: 12px; right: 12px; border: 1px solid hsl(var(--border));
+          position: absolute; z-index: 5; width: min(270px, calc(100% - 16px)); box-sizing: border-box;
+          border: 1px solid hsl(var(--border));
           border-radius: 8px; padding: 9px 11px; color: hsl(var(--foreground));
           background: hsl(var(--popover)); box-shadow: 0 8px 24px hsl(var(--foreground) / .13);
           font-size: 11px; line-height: 1.55; pointer-events: none;
@@ -243,7 +309,6 @@ export function LiabilityBubbleChart({ items }: { items: ExposureItem[] }) {
           .liability-bubble-toolbar > div:last-child { width: 100%; }
           .bubble-axes text { font-size: 18px; }
           .bubble-ticks text { font-size: 20px; }
-          .bubble-tooltip { position: relative; top: auto; right: auto; min-width: 0; max-width: none; margin: 8px 12px; }
         }
       `}</style>
       <div className="liability-bubble-toolbar">
@@ -373,9 +438,15 @@ export function LiabilityBubbleChart({ items }: { items: ExposureItem[] }) {
         </svg>
         {tooltipItem && (
           <div
+            ref={tooltipRef}
             className="bubble-tooltip"
             role="status"
             aria-live="polite"
+            style={{
+              left: tooltipPosition?.left ?? 0,
+              top: tooltipPosition?.top ?? 0,
+              visibility: tooltipPosition ? "visible" : "hidden",
+            }}
           >
             <p className="mb-1.5 max-w-[220px] truncate font-semibold" title={tooltipItem.name}>{tooltipItem.name}{tooltipItem.durationSource === "paid" && <span className="ml-1.5 text-[10px] font-medium text-emerald-700">Paid off</span>}</p>
             {tooltipRows(tooltipItem, tooltipInterest).map(([label, value]) => <p key={label} className="flex justify-between gap-4"><span className="text-muted-foreground">{label}</span><span className="text-right font-medium">{value}</span></p>)}

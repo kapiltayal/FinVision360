@@ -1,11 +1,26 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildBubbleScene, BUBBLE_PLOT, clampBubbleCamera, DEFAULT_BUBBLE_CAMERA, getBubbleAxisTicks, projectBubblePoint, zoomBubbleCamera } from "./liability-bubbles";
+import { buildBubbleScene, BUBBLE_PLOT, clampBubbleCamera, DEFAULT_BUBBLE_CAMERA, getBubbleAxisTicks, getBubbleTooltipPosition, projectBubblePoint, zoomBubbleCamera } from "./liability-bubbles";
 import { estimateRemainingInterest, type ExposureItem } from "./liability-map";
 
 const debt = (id: number, change: Partial<ExposureItem> = {}): ExposureItem => ({
   id, name: `Loan ${id}`, balance: 10000, apr: 8, monthlyPayment: 500, maturityDate: null,
   monthsRemaining: 24, durationSource: "override", issue: null, ...change,
+});
+
+test("tooltips follow bubble centers, prefer the right side, flip left at the edge, and stay contained", () => {
+  const viewport = { width: 960, height: 560 };
+  const tooltip = { width: 270, height: 140 };
+  assert.deepEqual(getBubbleTooltipPosition({ x: 300, y: 250, radius: 20 }, viewport, tooltip), { left: 332, top: 180 });
+  assert.deepEqual(getBubbleTooltipPosition({ x: 850, y: 250, radius: 20 }, viewport, tooltip), { left: 548, top: 180 });
+  assert.equal(getBubbleTooltipPosition({ x: 300, y: 1, radius: 20 }, viewport, tooltip).top, 8);
+  assert.equal(getBubbleTooltipPosition({ x: 300, y: 559, radius: 20 }, viewport, tooltip).top, 412);
+  const mobile = getBubbleTooltipPosition({ x: 160, y: 90, radius: 12 },
+    { width: 320, height: 187 }, { width: 270, height: 140 });
+  assert.ok(mobile.left >= 8 && mobile.left + 270 <= 312);
+  assert.ok(mobile.top >= 8 && mobile.top + 140 <= 179);
+  const moved = getBubbleTooltipPosition({ x: 350, y: 280, radius: 20 }, viewport, tooltip);
+  assert.deepEqual(moved, { left: 382, top: 210 });
 });
 
 test("two bubble axes encode duration and APR, with interest in details and area proportional to balance", () => {
