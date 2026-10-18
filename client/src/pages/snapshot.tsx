@@ -422,16 +422,6 @@ export default function SnapshotPage() {
               tooltip={`Net return on assets uses known asset return rates and liability APRs only.${assetRateSummary.unknownRateCount > 0 ? ` It excludes ${assetRateSummary.unknownRateCount} assets with unknown return rates.` : ""}${liabilityRateSummary.unknownRateCount > 0 ? ` It excludes ${liabilityRateSummary.unknownRateCount} ${liabilityRateSummary.unknownRateCount === 1 ? "debt" : "debts"} with unknown APR.` : ""}`}
             />
           </div>
-          {assetRateSummary.unknownRateCount > 0 && (
-            <p className="mt-2 text-[11px] text-muted-foreground">
-              Return estimate excludes {assetRateSummary.unknownRateCount} {assetRateSummary.unknownRateCount === 1 ? "asset" : "assets"} with unknown rates.
-            </p>
-          )}
-          {liabilityRateSummary.unknownRateCount > 0 && (
-            <p className="mt-2 text-[11px] text-muted-foreground">
-              Interest estimate excludes {liabilityRateSummary.unknownRateCount} {liabilityRateSummary.unknownRateCount === 1 ? "debt" : "debts"} with unknown APR.
-            </p>
-          )}
         </SnapshotCard>
 
         {/* ── Income & Expenses ── */}
