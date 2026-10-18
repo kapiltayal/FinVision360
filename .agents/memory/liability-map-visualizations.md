@@ -12,3 +12,7 @@ The Liability Map's Gantt and bubble views are two presentations of the same pla
 Axes, axis titles, and tick positions must remain stationary during pan and zoom; only the interior plot changes. Recompute tick values from the visible range and clip bubbles to the plot boundary.
 
 **Why:** The user explicitly corrected the moving-axis behavior; navigation should change the data viewport, not move the coordinate frame.
+
+On initial load/reset, each nonzero axis maximum is 105% of its highest plotted value. Gantt-only sorting controls must not appear in Bubble view.
+
+**Why:** The user requested 5% upper headroom and clarified that row-order sorting does not apply to a scatter/bubble plot.

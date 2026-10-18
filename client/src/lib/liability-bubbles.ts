@@ -88,8 +88,11 @@ export function buildBubbleScene(items: ExposureItem[]) {
     const interest = estimateRemainingInterest(item);
     candidates.push({ item, interest: interest !== null && Number.isFinite(interest) && interest >= 0 ? interest : null });
   }
-  const maxMonths = Math.max(1, ...candidates.map(({ item }) => item.monthsRemaining!));
-  const maxApr = Math.max(1, ...candidates.map(({ item }) => item.apr!));
+  const highestMonths = Math.max(0, ...candidates.map(({ item }) => item.monthsRemaining!));
+  const highestApr = Math.max(0, ...candidates.map(({ item }) => item.apr!));
+  // Initial/reset domains have exactly 5% headroom; empty/zero-only axes need a usable span.
+  const maxMonths = highestMonths > 0 ? highestMonths * 1.05 : 1;
+  const maxApr = highestApr > 0 ? highestApr * 1.05 : 1;
   const maxBalance = Math.max(0, ...candidates.map(({ item }) => item.balance));
   const points: BubblePoint[] = candidates.map(({ item, interest }) => ({
     item, interest,

@@ -195,7 +195,7 @@ export default function LiabilityMapPage() {
                   <Button type="button" size="sm" variant={mapView === "bubbles" ? "secondary" : "ghost"} aria-pressed={mapView === "bubbles"} onClick={() => setMapView("bubbles")} className={`h-8 px-3 text-xs ${mapView === "bubbles" ? "shadow-sm" : "text-muted-foreground"}`}>Bubbles</Button>
                 </div>
               </div>
-              <div className="flex flex-wrap gap-1 rounded-lg border bg-background p-1" role="group" aria-label="Sort liabilities">
+              {mapView === "gantt" && <div className="flex flex-wrap gap-1 rounded-lg border bg-background p-1" role="group" aria-label="Sort liabilities">
                 {sortOptions.map((option) => (
                   <Button
                     key={option.value}
@@ -210,7 +210,7 @@ export default function LiabilityMapPage() {
                     {option.label}
                   </Button>
                 ))}
-              </div>
+              </div>}
             </div>
 
             <div className="flex flex-wrap items-center justify-between gap-3 border-b bg-background px-4 py-3 sm:px-5">

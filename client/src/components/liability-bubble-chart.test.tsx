@@ -22,6 +22,9 @@ test("two-axis chart keeps spherical shading, pan, zoom, reset and keyboard cont
   assert.ok(!html.includes(">Rotate<"));
   assert.ok(!html.toLowerCase().includes("orbit"));
   assert.ok(!html.includes("NaN"));
+  for (const label of ["Highest APR First", "Smallest Balance First", "Longest Duration First"]) {
+    assert.ok(!html.includes(label), "Gantt-only sorting is not part of the bubble chart");
+  }
 });
 
 test("accessible spheres retain exact debt data and render small debts above larger overlapping spheres", () => {

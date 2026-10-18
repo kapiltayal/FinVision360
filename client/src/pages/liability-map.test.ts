@@ -86,6 +86,8 @@ test("Liability Map offers both views and preserves the default Gantt with its e
   assert.ok(html.includes('aria-label="Liability map view"'));
   assert.ok(html.includes(">Gantt</button>"));
   assert.ok(html.includes(">Bubbles</button>"));
+  assert.ok(html.includes('aria-label="Sort liabilities"'));
+  for (const label of ["Highest APR First", "Smallest Balance First", "Longest Duration First"]) assert.ok(html.includes(label));
   assert.ok(html.includes('data-testid="liability-map-bar-1"'));
   assert.ok(html.includes('aria-label="Planning duration in months for Debt 1"'));
   assert.ok(!html.includes('aria-label="Two-axis liability bubble chart with 3D-styled spheres"'));
