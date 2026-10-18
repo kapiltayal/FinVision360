@@ -449,7 +449,7 @@ export default function LiabilitiesPage() {
                   {formatCurrency(annualInterestOwed)} <span className="text-sm font-semibold">({weightedRate === null ? "APR unknown" : formatPercent(weightedRate)})</span>
                 </p>
                 {unknownRateCount > 0 && (
-                  <p className="mt-0.5 text-[10px] text-muted-foreground">
+                  <p className="mt-0.5 text-[9px] text-muted-foreground">
                     Excludes {unknownRateCount} {unknownRateCount === 1 ? "debt" : "debts"} with unknown APR
                   </p>
                 )}

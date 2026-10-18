@@ -425,7 +425,7 @@ export default function AssetsPage() {
                   {weightedRate === null ? "Unknown" : <>{formatCurrency(annualInterestEarned)} <span className="text-sm font-semibold">({formatPercent(weightedRate)})</span></>}
                 </p>
                 {rateSummary.unknownRateCount > 0 && (
-                  <p className="text-xs text-muted-foreground">Excludes {rateSummary.unknownRateCount} {rateSummary.unknownRateCount === 1 ? "asset" : "assets"} with unknown rates</p>
+                  <p className="text-[9px] text-muted-foreground">Excludes {rateSummary.unknownRateCount} {rateSummary.unknownRateCount === 1 ? "asset" : "assets"} with unknown rates</p>
                 )}
               </div>
             </div>

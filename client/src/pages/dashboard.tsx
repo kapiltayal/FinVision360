@@ -773,11 +773,11 @@ export default function DashboardPage() {
             <div className="mt-1 space-y-0.5 text-xs text-muted-foreground">
               <p>Earning {formatCurrency(earnedAnnual)} ({weightedAssetRate === null ? "rate unknown" : `${weightedAssetRate.toFixed(2)}%`})</p>
               {assetRateSummary.unknownRateCount > 0 && (
-                <p>Excludes {assetRateSummary.unknownRateCount} {assetRateSummary.unknownRateCount === 1 ? "asset" : "assets"} with unknown rates</p>
+                <p className="text-[9px]">Excludes {assetRateSummary.unknownRateCount} {assetRateSummary.unknownRateCount === 1 ? "asset" : "assets"} with unknown rates</p>
               )}
               <p>Paying {formatCurrency(paidAnnual)} ({weightedLiabilityRate === null ? "APR unknown" : `${weightedLiabilityRate.toFixed(2)}%`})</p>
               {liabilityRateSummary.unknownRateCount > 0 && (
-                <p>Excludes {liabilityRateSummary.unknownRateCount} {liabilityRateSummary.unknownRateCount === 1 ? "debt" : "debts"} with unknown APR</p>
+                <p className="text-[9px]">Excludes {liabilityRateSummary.unknownRateCount} {liabilityRateSummary.unknownRateCount === 1 ? "debt" : "debts"} with unknown APR</p>
               )}
             </div>
           }
