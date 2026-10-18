@@ -66,6 +66,8 @@ Account inclusion is controlled by checkboxes beside the existing account rows, 
 
 Custom Net Worth and Income/Expense display rows expose `configuredAmount` so editing an excluded row uses the actual saved value, never its zero calculation contribution. Cash-flow rows also expose `inclusionKind` / `inclusionId` for the shared checkbox API. Excluding an item removes it from calculations and associated callouts, but not from the list or future edits.
 
+The exclusion notice lists excluded names. `POST /api/retirement/account-inclusion/reset` accepts only `{projection: "net-worth" | "income-expense"}` and atomically re-includes that user's physical and custom/built-in items for the selected projection. The other projection, saved amounts, and other users' preferences are unchanged.
+
 ### Bank rates and Plaid connections
 
 | Table | Purpose | Columns (PostgreSQL name and type) | Keys and constraints |

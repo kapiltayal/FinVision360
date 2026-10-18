@@ -516,7 +516,11 @@ export function RetirementNetWorthProjection({
 
   return (
     <div className="space-y-5">
-      <ProjectionExclusionNotice count={projection.excludedAccountCount ?? 0} />
+      <ProjectionExclusionNotice
+        count={projection.excludedAccountCount ?? 0}
+        names={[...projection.assets, ...projection.liabilities].filter((entry) => entry.included === false).map((entry) => entry.name)}
+        projection="net-worth"
+      />
       <div className="rounded-2xl border bg-gradient-to-br from-slate-50 via-blue-50/60 to-emerald-50/60 px-5 py-7 text-center shadow-sm dark:from-slate-950 dark:via-blue-950/20 dark:to-emerald-950/20">
         <p className="text-sm font-medium text-muted-foreground">Projected Net Worth at Age {projection.retirementAge}</p>
         <p className="mt-1 text-4xl font-bold tracking-tight sm:text-5xl">{formatCurrency(projection.projectedNetWorth)}</p>

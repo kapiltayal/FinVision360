@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { includedRetirementAccounts, retirementAccountInclusionSchema, type RetirementAccountPreference } from "../shared/retirement-account-inclusion";
+import { includedRetirementAccounts, retirementAccountInclusionSchema, resetRetirementAccountInclusionSchema, type RetirementAccountPreference } from "../shared/retirement-account-inclusion";
 
 test("new accounts are included by default and preference filtering never mutates source accounts", () => {
   const accounts = [{ id: 1, balance: 100 }, { id: 2, balance: 200 }];
@@ -12,6 +12,15 @@ test("new accounts are included by default and preference filtering never mutate
   assert.deepEqual(includedRetirementAccounts(accounts, saved, "asset", "net-worth"), [accounts[1]]);
   assert.equal(accounts.length, 2);
   assert.equal(accounts[0].balance, 100);
+});
+
+test("reset requests must explicitly select one projection and cannot supply another user's identity", () => {
+  for (const projection of ["net-worth", "income-expense"]) {
+    assert.ok(resetRetirementAccountInclusionSchema.safeParse({ projection }).success);
+  }
+  for (const body of [{}, { projection: "all" }, { projection: null }, { projection: "net-worth", userId: "other" }]) {
+    assert.equal(resetRetirementAccountInclusionSchema.safeParse(body).success, false);
+  }
 });
 
 test("Net Worth and Income/Expense selections are independent and asset/debt IDs cannot collide", () => {

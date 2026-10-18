@@ -1,6 +1,7 @@
 import { useMutation, useMutationState } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { Button } from "@/components/ui/button";
 
 export type RetirementAccountInclusionKind =
   | "asset"
@@ -81,14 +82,62 @@ export function InlineAccountInclusion({
   );
 }
 
-export function ProjectionExclusionNotice({ count }: { count: number }) {
+export function ProjectionExclusionNotice({
+  count,
+  names,
+  projection,
+}: {
+  count: number;
+  names: string[];
+  projection: ProjectionKind;
+}) {
+  const projectionLabel = projection === "net-worth" ? "Net worth" : "Income & expenses";
+  const { toast } = useToast();
+  const pendingRequests = useMutationState({
+    filters: { mutationKey: inclusionMutationKey, status: "pending" },
+  });
+  const resetInclusion = useMutation({
+    mutationKey: inclusionMutationKey,
+    mutationFn: () =>
+      apiRequest("POST", "/api/retirement/account-inclusion/reset", { projection }),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["/api/retirement/net-worth-projection"] }),
+        queryClient.invalidateQueries({ queryKey: ["/api/retirement/income-expense-projection"] }),
+        queryClient.invalidateQueries({ queryKey: ["/api/retirement/account-inclusion"] }),
+      ]);
+    },
+    onError: (error: Error) =>
+      toast({
+        title: "Could not reset projection selections",
+        description: error.message,
+        variant: "destructive",
+      }),
+  });
   if (count <= 0) return null;
+
   return (
-    <p
+    <div
       className="rounded-lg border border-amber-300/70 bg-amber-50/70 px-3 py-2 text-xs font-medium text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200"
       role="status"
     >
-      {count} {count === 1 ? "account has" : "accounts have"} been excluded from the calculations.
-    </p>
+      <span className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <span className="min-w-0">
+          <span className="block">{count} {count === 1 ? "account has" : "accounts have"} been excluded from the calculations.</span>
+          {names.length > 0 && <span className="mt-1 block break-words font-normal">Excluded: {names.join(", ")}</span>}
+        </span>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          className="h-7 shrink-0 self-start px-2 text-xs sm:self-center"
+          disabled={pendingRequests.length > 0}
+          aria-label={`Include all items in the ${projectionLabel} projection`}
+          onClick={() => resetInclusion.mutate()}
+        >
+          {resetInclusion.isPending ? "Resetting…" : "Reset"}
+        </Button>
+      </span>
+    </div>
   );
 }

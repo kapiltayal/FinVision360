@@ -49,11 +49,37 @@ test("custom accounts, pensions, Social Security and the expense baseline all ha
   }
 });
 
+function renderNotice(count: number, names: string[] = [], projection: "net-worth" | "income-expense" = "net-worth") {
+  const client = new QueryClient({ defaultOptions: { mutations: { gcTime: Infinity } } });
+  try {
+    return renderToStaticMarkup(<QueryClientProvider client={client}>
+      <ProjectionExclusionNotice count={count} names={names} projection={projection} />
+    </QueryClientProvider>);
+  } finally { client.clear(); }
+}
+
 test("top exclusion notice stays hidden when everything is included and reports exact counts", () => {
-  assert.equal(renderToStaticMarkup(<ProjectionExclusionNotice count={0} />), "");
-  const one = renderToStaticMarkup(<ProjectionExclusionNotice count={1} />);
+  assert.equal(renderNotice(0), "");
+  const one = renderNotice(1, ["IRA"]);
   assert.ok(one.includes("1 account has been excluded from the calculations."));
   assert.ok(one.includes('role="status"'));
-  const many = renderToStaticMarkup(<ProjectionExclusionNotice count={12} />);
+  const many = renderNotice(12);
   assert.ok(many.includes("12 accounts have been excluded from the calculations."));
+});
+
+test("notice names each excluded account and provides a reset scoped to its projection", () => {
+  const netWorth = renderNotice(3, ["IRA", "Custom savings", "Savings & Cash"]);
+  assert.ok(netWorth.includes("Excluded: IRA, Custom savings, Savings &amp; Cash"));
+  assert.ok(netWorth.includes(">Reset</button>"));
+  assert.ok(netWorth.includes('aria-label="Include all items in the Net worth projection"'));
+  const income = renderNotice(2, ["Pension", "Custom income"], "income-expense");
+  assert.ok(income.includes("Excluded: Pension, Custom income"));
+  assert.ok(income.includes('aria-label="Include all items in the Income &amp; expenses projection"'));
+});
+
+test("notice escapes account text and does not merge separate accounts sharing a name", () => {
+  const html = renderNotice(3, ["Savings", "Savings", "<script>bad()</script>"]);
+  assert.ok(html.includes("Savings, Savings"));
+  assert.ok(html.includes("&lt;script&gt;bad()&lt;/script&gt;"));
+  assert.ok(!html.includes("<script>"));
 });

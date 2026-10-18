@@ -32,3 +32,9 @@ The user wants inclusion checkboxes beside every existing account or item, inclu
 **Why:** A separate selector takes unnecessary space; removing unchecked rows would also remove the user's way to re-include them.
 
 **How to apply:** Keep presentation rows distinct from calculation inputs, including custom items and accounts that currently have no cash-flow contribution. Excluded rows must not contribute to totals or missing-input callouts. Preserve original saved amounts for editing; a zero excluded contribution must never overwrite an item's configured value.
+
+The exclusion notice names every excluded item. Its Reset action re-includes all items in the active projection only; it does not reset financial assumptions or the other projection's scenario.
+
+**Why:** Net Worth and Income/Expense are independent scenarios. A compact reset should undo exclusions in the view the user is looking at, without silently discarding choices elsewhere.
+
+**How to apply:** Reset physical and custom/built-in items together, scope updates to the authenticated user and current projection, and clear the notice only after refreshed results show no exclusions.

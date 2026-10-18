@@ -1,8 +1,8 @@
 import type { Express, RequestHandler } from "express";
 import type { Pool } from "pg";
-import { and, eq } from "drizzle-orm";
-import { assets, liabilities, retirementAccountProjectionPreferences as preferences } from "@shared/schema";
-import { retirementAccountInclusionSchema, type RetirementAccountInclusionInput } from "@shared/retirement-account-inclusion";
+import { and, eq, inArray } from "drizzle-orm";
+import { assets, liabilities, retirementAccountProjectionPreferences as preferences, retirementProjectionItemPreferences as itemPreferences } from "@shared/schema";
+import { retirementAccountInclusionSchema, resetRetirementAccountInclusionSchema, type RetirementAccountInclusionInput } from "@shared/retirement-account-inclusion";
 import { db } from "./db";
 import { storage } from "./storage";
 import { getRetirementItemPreferences, saveRetirementItemInclusion } from "./retirement-item-inclusion";
@@ -57,6 +57,19 @@ export function getRetirementAccountPreferences(userId: string) {
   return db.select().from(preferences).where(eq(preferences.userId, userId));
 }
 
+/** Reset the user's active scenario atomically, without changing the other view. */
+export async function resetRetirementAccountInclusion(userId: string, projection: RetirementAccountInclusionInput["projection"]) {
+  await db.transaction(async (tx) => {
+    const field = projection === "net-worth" ? "netWorthIncluded" : "incomeExpenseIncluded";
+    await tx.update(preferences).set({ [field]: true, updatedAt: new Date() }).where(eq(preferences.userId, userId));
+    const kinds = projection === "net-worth" ? ["net-worth-entry"]
+      : ["income-expense-entry", "pension", "social-security", "expected-expenses"];
+    await tx.update(itemPreferences).set({ included: true, updatedAt: new Date() }).where(and(
+      eq(itemPreferences.userId, userId), inArray(itemPreferences.kind, kinds),
+    ));
+  });
+}
+
 /** Ownership check and upsert share a transaction; only the requested flag changes. */
 export async function saveRetirementAccountInclusion(userId: string, input: RetirementAccountInclusionInput) {
   if (input.kind !== "asset" && input.kind !== "liability") return saveRetirementItemInclusion(userId, input);
@@ -85,6 +98,13 @@ export async function saveRetirementAccountInclusion(userId: string, input: Reti
 }
 
 export function registerRetirementAccountInclusionRoutes(app: Express, requireAuth: RequestHandler) {
+  app.post("/api/retirement/account-inclusion/reset", requireAuth, async (req, res) => {
+    const parsed = resetRetirementAccountInclusionSchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ message: "Choose a valid retirement projection to reset." });
+    await resetRetirementAccountInclusion((req.user as { id: string }).id, parsed.data.projection);
+    res.json({ success: true });
+  });
+
   app.get("/api/retirement/account-inclusion", requireAuth, async (req, res) => {
     const userId = (req.user as { id: string }).id;
     const [userAssets, userLiabilities, saved, items] = await Promise.all([

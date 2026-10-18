@@ -184,9 +184,27 @@ test("retirement inclusion persists, protects ownership, and changes only its se
     const edited = (await netWorth()).assets.find((row: any) => row.projectionEntryId === customAsset.id);
     assert.equal(edited.included, false, "editing a custom account preserves its exclusion");
     assert.equal(edited.configuredAmount, 12000);
-    for (const item of cases) await choice(item.id, item.kind, item.projection, true);
-    await choice(0, "social-security", "income-expense", true);
-    await choice(0, "expected-expenses", "income-expense", true);
+    await choice(asset.id, "asset", "net-worth", false);
+    await choice(asset.id, "asset", "income-expense", false);
+    for (const projection of ["net-worth", "income-expense"]) {
+      await call("put", `${base}account-inclusion`, other, { accountId: foreign.id, kind: "asset", projection, included: false });
+    }
+    assert.equal((await netWorth()).excludedAccountCount, 3);
+    assert.equal((await cashflow()).excludedAccountCount, 7);
+    assert.equal((await call("post", `${base}account-inclusion/reset`, owner, { projection: "net-worth" })).code, 200);
+    assert.equal((await netWorth()).excludedAccountCount, 0);
+    assert.equal((await cashflow()).excludedAccountCount, 7, "reset does not change the other projection");
+    assert.equal((await accounts()).find((row) => row.kind === "asset").incomeExpenseIncluded, false);
+    assert.equal((await call("post", `${base}account-inclusion/reset`, owner, { projection: "income-expense" })).code, 200);
+    assert.equal((await cashflow()).excludedAccountCount, 0);
+    assert.equal((await netWorth()).excludedAccountCount, 0);
+    const untouchedOther = (await call("get", `${base}account-inclusion`, other)).body.accounts[0];
+    assert.equal(untouchedOther.netWorthIncluded, false, "reset never changes another user's choices");
+    assert.equal(untouchedOther.incomeExpenseIncluded, false);
+    assert.equal((await call("post", `${base}account-inclusion/reset`, owner, { projection: "net-worth" })).code, 200, "reset is idempotent");
+    for (const body of [{}, { projection: "all" }, { projection: "net-worth", userId: other }]) {
+      assert.equal((await call("post", `${base}account-inclusion/reset`, owner, body)).code, 400);
+    }
     assert.equal((await cashflow()).totalMonthlyIncome, cashflowBaseline.totalMonthlyIncome);
     assert.equal((await cashflow()).totalMonthlyExpenses, cashflowBaseline.totalMonthlyExpenses);
     assert.equal((await netWorth()).projectedNetWorth, customBaseline.projectedNetWorth + 2000);

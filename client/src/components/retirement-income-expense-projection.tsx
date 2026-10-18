@@ -357,7 +357,11 @@ export function RetirementIncomeExpenseProjection() {
   const openAdd = (kind: "income" | "expense") => { setEditing(null); setDraftKind(kind); setDialogOpen(true); };
   const openEdit = (item: CashflowItem, kind: "income" | "expense") => { setEditing(item); setDraftKind(kind); setDialogOpen(true); };
   return <div className="space-y-5">
-    <ProjectionExclusionNotice count={data.excludedAccountCount ?? 0} />
+     <ProjectionExclusionNotice
+       count={data.excludedAccountCount ?? 0}
+       names={[...data.income, ...data.expenses].filter((item) => item.included === false).map((item) => item.name)}
+       projection="income-expense"
+     />
     <div className="rounded-2xl border border-slate-200/80 bg-gradient-to-br from-slate-50 via-teal-50/60 to-amber-50/60 px-5 py-6 shadow-sm dark:border-slate-800 dark:from-slate-950 dark:via-teal-950/20 dark:to-amber-950/20">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">At age {data.retirementAge}</p><h2 className="mt-1 text-xl font-bold tracking-tight">Your retirement monthly picture</h2></div><div className="text-left sm:text-right"><p className="text-xs text-muted-foreground">{surplus >= 0 ? "Monthly surplus" : "Monthly shortfall"}</p><p className={`text-3xl font-bold tabular-nums ${surplus >= 0 ? "text-teal-700 dark:text-teal-300" : "text-rose-700 dark:text-rose-300"}`}>{money(Math.abs(surplus))}</p></div></div>
       <div className="mt-5 grid grid-cols-2 divide-x rounded-xl border bg-background/70 sm:grid-cols-3"><div className="p-3"><p className="text-xs text-muted-foreground">Total income</p><p className="mt-1 text-lg font-bold tabular-nums text-teal-700 dark:text-teal-300">{money(data.totalMonthlyIncome)}</p></div><div className="p-3 pl-4"><p className="text-xs text-muted-foreground">Total expenses</p><p className="mt-1 text-lg font-bold tabular-nums text-amber-700 dark:text-amber-300">{money(data.totalMonthlyExpenses)}</p></div><div className="col-span-2 border-t p-3 sm:col-span-1 sm:border-l sm:border-t-0 sm:pl-4"><p className="text-xs text-muted-foreground">Income coverage</p><p className="mt-1 text-lg font-bold tabular-nums">{data.totalMonthlyExpenses ? `${Math.round(data.totalMonthlyIncome / data.totalMonthlyExpenses * 100)}%` : "—"}</p></div></div>

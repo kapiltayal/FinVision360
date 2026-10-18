@@ -1,5 +1,9 @@
 import { z } from "zod";
 
+export const resetRetirementAccountInclusionSchema = z.object({
+  projection: z.enum(["net-worth", "income-expense"]),
+}).strict();
+
 export const retirementAccountInclusionSchema = z.object({
   kind: z.enum(["asset", "liability", "net-worth-entry", "income-expense-entry", "pension", "social-security", "expected-expenses"]),
   accountId: z.number().int().nonnegative().max(2147483647),
