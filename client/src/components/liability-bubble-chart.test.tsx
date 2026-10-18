@@ -39,6 +39,24 @@ test("accessible spheres retain exact debt data and render small debts above lar
   assert.ok(locations[0] < locations[1] && locations[1] < locations[2]);
 });
 
+test("fixed coordinate frame stays outside the clipped bubble viewport", () => {
+  const html = renderToStaticMarkup(<LiabilityBubbleChart items={[debt(1)]} />);
+  const clipId = html.match(/<clipPath id="([^"]+-plot-clip)"/)?.[1];
+  assert.ok(clipId, "the plot has a unique clipping boundary");
+  assert.ok(html.includes('<rect x="112" y="88" width="712" height="356"'));
+  const contentStart = html.indexOf(`<g clip-path="url(#${clipId})">`);
+  const bubbleStart = html.indexOf('data-bubble-select="true"');
+  const axesStart = html.indexOf('<g class="bubble-axes">');
+  assert.ok(contentStart >= 0 && contentStart < bubbleStart && bubbleStart < axesStart);
+  const axes = html.slice(axesStart, html.indexOf("</g>", axesStart));
+  assert.ok(axes.includes('d="M112,444 L824,444"'));
+  assert.ok(axes.includes('d="M112,444 L112,88"'));
+  assert.ok(!axes.includes("clip-path"));
+  const second = renderToStaticMarkup(<LiabilityBubbleChart items={[debt(2, { apr: 40, monthsRemaining: 300 })]} />);
+  const secondAxesStart = second.indexOf('<g class="bubble-axes">');
+  assert.equal(second.slice(secondAxesStart, second.indexOf("</g>", secondAxesStart)), axes);
+});
+
 test("unknown inputs and paid-off debts remain disclosed rather than becoming zero-axis bubbles", () => {
   const html = renderToStaticMarkup(<LiabilityBubbleChart items={[
     debt(1, { name: "Unknown APR", apr: null }), debt(2, { name: "Unknown duration", monthsRemaining: null }),

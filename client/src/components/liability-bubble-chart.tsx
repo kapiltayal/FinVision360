@@ -3,10 +3,12 @@ import { Home, Minus, Plus } from "lucide-react";
 import { formatCurrencyFull, formatPercent } from "@/lib/format";
 import type { ExposureItem } from "@/lib/liability-map";
 import {
+  BUBBLE_PLOT,
   BUBBLE_VIEWBOX,
   buildBubbleScene,
   clampBubbleCamera,
   DEFAULT_BUBBLE_CAMERA,
+  getBubbleAxisTicks,
   projectBubblePoint,
   zoomBubbleCamera,
   type BubbleCamera,
@@ -15,6 +17,8 @@ import {
 
 const fmtNumber = (value: number, digits = 0) =>
   Number.isFinite(value) ? new Intl.NumberFormat("en-US", { maximumFractionDigits: digits }).format(value) : "—";
+const isWithinPlot = (x: number, y: number) =>
+  x >= BUBBLE_PLOT.left && x <= BUBBLE_PLOT.right && y >= BUBBLE_PLOT.top && y <= BUBBLE_PLOT.bottom;
 
 function aprColor(apr: number | null) {
   if (apr === null) return { fill: "url(#bubble-unknown)", stroke: "var(--bubble-unknown-stroke)" };
@@ -81,8 +85,9 @@ export function LiabilityBubbleChart({ items }: { items: ExposureItem[] }) {
     const element = chartRef.current;
     if (!element) return;
     const onWheel = (event: WheelEvent) => {
-      event.preventDefault();
       const anchor = toViewPoint(event.clientX, event.clientY);
+      if (!isWithinPlot(anchor.x, anchor.y)) return;
+      event.preventDefault();
       const current = cameraRef.current;
       updateCamera(zoomBubbleCamera(current, current.zoom * (event.deltaY < 0 ? 1.12 : 1 / 1.12), anchor));
     };
@@ -92,7 +97,7 @@ export function LiabilityBubbleChart({ items }: { items: ExposureItem[] }) {
 
   const zoomBy = (factor: number) => {
     const current = cameraRef.current;
-    updateCamera(zoomBubbleCamera(current, current.zoom * factor, { x: BUBBLE_VIEWBOX.width / 2, y: BUBBLE_VIEWBOX.height / 2 }));
+    updateCamera(zoomBubbleCamera(current, current.zoom * factor));
   };
   const reset = () => {
     pointersRef.current.clear();
@@ -125,8 +130,9 @@ export function LiabilityBubbleChart({ items }: { items: ExposureItem[] }) {
 
   const onPointerDown = (event: PointerEvent<HTMLDivElement>) => {
     if (event.target instanceof Element && event.target.closest("[data-bubble-select]")) return;
-    event.currentTarget.setPointerCapture(event.pointerId);
     const point = toViewPoint(event.clientX, event.clientY);
+    if (!isWithinPlot(point.x, point.y)) return;
+    event.currentTarget.setPointerCapture(event.pointerId);
     pointersRef.current.set(event.pointerId, point);
     gestureRef.current = { id: event.pointerId, ...point };
   };
@@ -164,9 +170,7 @@ export function LiabilityBubbleChart({ items }: { items: ExposureItem[] }) {
   const selectedPoint = scene.points.find(({ item }) => item.id === (hoveredId ?? selectedId));
   const tooltipItem = selectedPoint?.item;
   const tooltipInterest = selectedPoint?.interest ?? null;
-  const tickMonths = scene.maxMonths > 0 ? [0, scene.maxMonths / 2, scene.maxMonths] : [0, 1, 2];
-  const tickApr = scene.maxApr > 0 ? [0, scene.maxApr / 2, scene.maxApr] : [0, 1, 2];
-  const axisPoint = (x: number, y: number) => projectBubblePoint({ x, y }, camera);
+  const axisTicks = getBubbleAxisTicks(camera, scene.maxMonths, scene.maxApr);
   const plotAvailable = scene.points.length > 0;
 
   return (
@@ -237,7 +241,6 @@ export function LiabilityBubbleChart({ items }: { items: ExposureItem[] }) {
         @media (max-width: 520px) {
           .liability-bubble-toolbar { align-items: flex-start; }
           .liability-bubble-toolbar > div:last-child { width: 100%; }
-          .liability-bubble-plot svg { min-height: 220px; }
           .bubble-axes text { font-size: 18px; }
           .bubble-ticks text { font-size: 20px; }
           .bubble-tooltip { position: relative; top: auto; right: auto; min-width: 0; max-width: none; margin: 8px 12px; }
@@ -264,7 +267,7 @@ export function LiabilityBubbleChart({ items }: { items: ExposureItem[] }) {
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
-        onLostPointerCapture={() => { pointersRef.current.clear(); gestureRef.current = null; }}
+        onLostPointerCapture={(event) => { pointersRef.current.delete(event.pointerId); gestureRef.current = null; }}
         role="group"
         aria-label="Interactive two-axis liability bubble chart with shaded spheres. Horizontal axis is months remaining; vertical axis is APR. Use arrow keys to pan, plus and minus to zoom, and Home to reset."
         tabIndex={0}
@@ -288,77 +291,85 @@ export function LiabilityBubbleChart({ items }: { items: ExposureItem[] }) {
             <radialGradient id={`${defsId}-paid`} cx="33%" cy="28%" r="72%">
               <stop offset="0%" stopColor="#e1f7eb" /><stop offset="100%" stopColor="#749c82" />
             </radialGradient>
+            <clipPath id={`${defsId}-plot-clip`} clipPathUnits="userSpaceOnUse">
+              <rect
+                x={BUBBLE_PLOT.left}
+                y={BUBBLE_PLOT.top}
+                width={BUBBLE_PLOT.right - BUBBLE_PLOT.left}
+                height={BUBBLE_PLOT.bottom - BUBBLE_PLOT.top}
+              />
+            </clipPath>
             <filter id={`${defsId}-shadow`} x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="3" /></filter>
           </defs>
-          <g className="bubble-grid">
-            {[-1, 0, 1].map((x) => {
-              const a = axisPoint(x, -1);
-              const b = axisPoint(x, 1);
-              return <path key={`v-${x}`} d={`M${a.x},${a.y} L${b.x},${b.y}`} />;
-            })}
-            {[-1, 0, 1].map((y) => {
-              const a = axisPoint(-1, y);
-              const b = axisPoint(1, y);
-              return <path key={`h-${y}`} d={`M${a.x},${a.y} L${b.x},${b.y}`} />;
+          <rect
+            x={BUBBLE_PLOT.left}
+            y={BUBBLE_PLOT.top}
+            width={BUBBLE_PLOT.right - BUBBLE_PLOT.left}
+            height={BUBBLE_PLOT.bottom - BUBBLE_PLOT.top}
+            fill="hsl(var(--muted) / .12)"
+          />
+          <g clipPath={`url(#${defsId}-plot-clip)`}>
+            <g className="bubble-grid">
+              {axisTicks.x.map((tick, index) => (
+                <path key={`x-${index}`} d={`M${tick.position},${BUBBLE_PLOT.top} L${tick.position},${BUBBLE_PLOT.bottom}`} />
+              ))}
+              {axisTicks.y.map((tick, index) => (
+                <path key={`y-${index}`} d={`M${BUBBLE_PLOT.left},${tick.position} L${BUBBLE_PLOT.right},${tick.position}`} />
+              ))}
+            </g>
+            {projected.map(({ point, screen }) => {
+              const color = aprColor(point.item.apr);
+              const radius = Math.max(4, point.radius * screen.scale);
+              const isSelected = selectedId === point.item.id || hoveredId === point.item.id;
+              const isPaid = point.item.durationSource === "paid";
+              return (
+                <g key={point.item.id} data-bubble-select="true" className="bubble-point-group">
+                  <circle cx={screen.x + 2} cy={screen.y + radius * 0.57} r={radius * 0.76} fill="currentColor" opacity="0.12" filter={`url(#${defsId}-shadow)`} />
+                  <circle
+                    cx={screen.x} cy={screen.y} r={radius}
+                    fill={isPaid ? `url(#${defsId}-paid)` : color.fill.replace("bubble-", `${defsId}-`)}
+                    stroke={isPaid ? "var(--bubble-paid-stroke)" : color.stroke}
+                    strokeWidth={isSelected ? 3 : 1.5}
+                    strokeDasharray={isPaid ? "4 3" : undefined}
+                    tabIndex={0}
+                    role="button"
+                    aria-label={`${pointLabel(point)}${isPaid ? ", paid off" : ""}`}
+                    onMouseEnter={() => setHoveredId(point.item.id)}
+                    onMouseLeave={() => setHoveredId(null)}
+                    onFocus={() => setHoveredId(point.item.id)}
+                    onBlur={() => setHoveredId(null)}
+                    onClick={(event) => { event.stopPropagation(); setSelectedId((current) => current === point.item.id ? null : point.item.id); }}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setSelectedId((current) => current === point.item.id ? null : point.item.id); }
+                    }}
+                    className="bubble-node"
+                  >
+                    <title>{`${pointLabel(point)}${isPaid ? " · paid off" : ""}`}</title>
+                  </circle>
+                  <circle cx={screen.x - radius * 0.28} cy={screen.y - radius * 0.34} r={Math.max(1.5, radius * 0.13)} fill="rgba(255,255,255,.64)" pointerEvents="none" />
+                </g>
+              );
             })}
           </g>
           <g className="bubble-axes">
-            {[
-              [axisPoint(-1, -1), axisPoint(1, -1), "X · MONTHS REMAINING"],
-              [axisPoint(-1, -1), axisPoint(-1, 1), "Y · APR %"],
-            ].map(([from, to, label]) => {
-              const start = from as ReturnType<typeof projectBubblePoint>;
-              const end = to as ReturnType<typeof projectBubblePoint>;
-              const labelText = label as string;
-              const midX = (start.x + end.x) / 2;
-              const midY = (start.y + end.y) / 2;
-              const xLabel = labelText.startsWith("X");
-              return <g key={labelText}><path d={`M${start.x},${start.y} L${end.x},${end.y}`} /><text x={xLabel ? midX : start.x - 60} y={xLabel ? midY + 38 : midY} textAnchor="middle" transform={xLabel ? undefined : `rotate(-90 ${start.x - 60} ${midY})`}>{labelText}</text></g>;
-            })}
+            <path d={`M${BUBBLE_PLOT.left},${BUBBLE_PLOT.bottom} L${BUBBLE_PLOT.right},${BUBBLE_PLOT.bottom}`} />
+            <path d={`M${BUBBLE_PLOT.left},${BUBBLE_PLOT.bottom} L${BUBBLE_PLOT.left},${BUBBLE_PLOT.top}`} />
+            <text x={(BUBBLE_PLOT.left + BUBBLE_PLOT.right) / 2} y={BUBBLE_PLOT.bottom + 42} textAnchor="middle">X · MONTHS REMAINING</text>
+            <text
+              x={32}
+              y={(BUBBLE_PLOT.top + BUBBLE_PLOT.bottom) / 2}
+              textAnchor="middle"
+              transform={`rotate(-90 32 ${(BUBBLE_PLOT.top + BUBBLE_PLOT.bottom) / 2})`}
+            >Y · APR %</text>
           </g>
           <g className="bubble-ticks">
-            {tickMonths.map((_, index) => {
-              const p = axisPoint(-1 + (index / (tickMonths.length - 1)) * 2, -1);
-              return <text key={`m-${index}`} x={p.x} y={p.y + 19} textAnchor="middle">{fmtNumber(scene.maxMonths * index / 2)} mo</text>;
-            })}
-            {tickApr.map((_, index) => {
-              const p = axisPoint(-1, -1 + (index / (tickApr.length - 1)) * 2);
-              return <text key={`a-${index}`} x={p.x - 12} y={p.y + 4} textAnchor="end">{fmtNumber(scene.maxApr * index / 2, 1)}%</text>;
-            })}
+            {axisTicks.x.map((tick, index) => (
+              <text key={`x-${index}`} x={tick.position} y={BUBBLE_PLOT.bottom + 19} textAnchor="middle">{fmtNumber(tick.value, 2)} mo</text>
+            ))}
+            {axisTicks.y.map((tick, index) => (
+              <text key={`y-${index}`} x={BUBBLE_PLOT.left - 12} y={tick.position + 4} textAnchor="end">{fmtNumber(tick.value, 2)}%</text>
+            ))}
           </g>
-          {projected.map(({ point, screen }) => {
-            const color = aprColor(point.item.apr);
-            const radius = Math.max(4, point.radius * screen.scale);
-            const isSelected = selectedId === point.item.id || hoveredId === point.item.id;
-            const isPaid = point.item.durationSource === "paid";
-            return (
-              <g key={point.item.id} data-bubble-select="true" className="bubble-point-group">
-                <circle cx={screen.x + 2} cy={screen.y + radius * 0.57} r={radius * 0.76} fill="currentColor" opacity="0.12" filter={`url(#${defsId}-shadow)`} />
-                <circle
-                  cx={screen.x} cy={screen.y} r={radius}
-                  fill={isPaid ? `url(#${defsId}-paid)` : color.fill.replace("bubble-", `${defsId}-`)}
-                  stroke={isPaid ? "var(--bubble-paid-stroke)" : color.stroke}
-                  strokeWidth={isSelected ? 3 : 1.5}
-                  strokeDasharray={isPaid ? "4 3" : undefined}
-                  tabIndex={0}
-                  role="button"
-                  aria-label={`${pointLabel(point)}${isPaid ? ", paid off" : ""}`}
-                  onMouseEnter={() => setHoveredId(point.item.id)}
-                  onMouseLeave={() => setHoveredId(null)}
-                  onFocus={() => setHoveredId(point.item.id)}
-                  onBlur={() => setHoveredId(null)}
-                  onClick={(event) => { event.stopPropagation(); setSelectedId((current) => current === point.item.id ? null : point.item.id); }}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setSelectedId((current) => current === point.item.id ? null : point.item.id); }
-                  }}
-                  className="bubble-node"
-                >
-                  <title>{`${pointLabel(point)}${isPaid ? " · paid off" : ""}`}</title>
-                </circle>
-                <circle cx={screen.x - radius * 0.28} cy={screen.y - radius * 0.34} r={Math.max(1.5, radius * 0.13)} fill="rgba(255,255,255,.64)" pointerEvents="none" />
-              </g>
-            );
-          })}
         </svg>
         {tooltipItem && (
           <div

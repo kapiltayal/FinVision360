@@ -36,6 +36,26 @@ export function projectBubblePoint(position: BubblePosition, input: BubbleCamera
   };
 }
 
+/** Screen-space axes remain fixed; labels invert the data viewport transformation. */
+export function getBubbleAxisTicks(input: BubbleCamera, maxMonths: number, maxApr: number) {
+  const camera = clampBubbleCamera(input);
+  const width = BUBBLE_PLOT.right - BUBBLE_PLOT.left;
+  const height = BUBBLE_PLOT.bottom - BUBBLE_PLOT.top;
+  const ratios = [0, 0.25, 0.5, 0.75, 1];
+  return {
+    x: ratios.map((ratio) => {
+      const position = BUBBLE_PLOT.left + width * ratio;
+      const normalized = (position - centerX - camera.panX) / (width / 2 * camera.zoom);
+      return { position, value: (normalized + 1) / 2 * maxMonths };
+    }),
+    y: ratios.map((ratio) => {
+      const position = BUBBLE_PLOT.bottom - height * ratio;
+      const normalized = (centerY + camera.panY - position) / (height / 2 * camera.zoom);
+      return { position, value: (normalized + 1) / 2 * maxApr };
+    }),
+  };
+}
+
 /** Zoom around the pointer (or plot center) rather than making the scene jump. */
 export function zoomBubbleCamera(input: BubbleCamera, zoom: number, anchor?: { x: number; y: number }): BubbleCamera {
   const camera = clampBubbleCamera(input);

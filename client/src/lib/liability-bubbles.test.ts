@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildBubbleScene, BUBBLE_PLOT, clampBubbleCamera, DEFAULT_BUBBLE_CAMERA, projectBubblePoint, zoomBubbleCamera } from "./liability-bubbles";
+import { buildBubbleScene, BUBBLE_PLOT, clampBubbleCamera, DEFAULT_BUBBLE_CAMERA, getBubbleAxisTicks, projectBubblePoint, zoomBubbleCamera } from "./liability-bubbles";
 import { estimateRemainingInterest, type ExposureItem } from "./liability-map";
 
 const debt = (id: number, change: Partial<ExposureItem> = {}): ExposureItem => ({
@@ -65,6 +65,27 @@ test("different interest totals do not add a third spatial coordinate or move eq
   const scene = buildBubbleScene([debt(1), debt(2, { balance: 2500 })]);
   assert.notEqual(scene.points[0].interest, scene.points[1].interest);
   assert.deepEqual(scene.points[0].position, scene.points[1].position);
+});
+
+test("axis screen positions remain fixed while pan and zoom change the visible data range", () => {
+  const initial = getBubbleAxisTicks(DEFAULT_BUBBLE_CAMERA, 120, 24);
+  const camera = { zoom: 2, panX: 71, panY: -35 };
+  const moved = getBubbleAxisTicks(camera, 120, 24);
+  assert.deepEqual(moved.x.map((tick) => tick.position), initial.x.map((tick) => tick.position));
+  assert.deepEqual(moved.y.map((tick) => tick.position), initial.y.map((tick) => tick.position));
+  assert.deepEqual(initial.x.map((tick) => tick.value), [0, 30, 60, 90, 120]);
+  assert.deepEqual(initial.y.map((tick) => tick.value), [0, 6, 12, 18, 24]);
+  assert.equal(moved.x[4].value - moved.x[0].value, 60);
+  assert.equal(moved.y[4].value - moved.y[0].value, 12);
+  for (const tick of moved.x) {
+    const point = projectBubblePoint({ x: tick.value / 120 * 2 - 1, y: 0 }, camera);
+    assert.ok(Math.abs(point.x - tick.position) < 1e-8);
+  }
+  for (const tick of moved.y) {
+    const point = projectBubblePoint({ x: 0, y: tick.value / 24 * 2 - 1 }, camera);
+    assert.ok(Math.abs(point.y - tick.position) < 1e-8);
+  }
+  assert.deepEqual(getBubbleAxisTicks(DEFAULT_BUBBLE_CAMERA, 120, 24), initial);
 });
 
 test("zoom preserves pointer anchoring, and camera state is bounded and recoverable by reset defaults", () => {
