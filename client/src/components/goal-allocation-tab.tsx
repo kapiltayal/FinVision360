@@ -151,7 +151,7 @@ export function GoalAllocationTab({ onAddGoal }: { onAddGoal: () => void }) {
         setDraggingAssetId(null);
         if (Number.isInteger(id) && accountById.has(id)) openEditor(id, goal.id);
       }}
-      className={`rounded-xl border bg-card p-4 shadow-sm transition-colors ${draggingAssetId !== null ? "border-primary/60 bg-primary/[0.035] ring-1 ring-primary/15" : "hover:border-primary/35"}`}
+      className={`rounded-lg border bg-card p-3 shadow-sm transition-colors ${draggingAssetId !== null ? "border-primary/60 bg-primary/[0.035] ring-1 ring-primary/15" : "hover:border-primary/35"}`}
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
@@ -165,18 +165,18 @@ export function GoalAllocationTab({ onAddGoal }: { onAddGoal: () => void }) {
           if (first) openEditor(first.id, goal.id);
         }} aria-label={`Assign account funds to ${goal.title}`}><Plus className="mr-1.5 h-3.5 w-3.5" /> Assign</Button>
       </div>
-      <Progress value={pct} className="mt-3 h-1.5" />
-      <div className="mt-3 grid grid-cols-1 gap-2 rounded-lg bg-muted/35 p-3 text-xs sm:grid-cols-3">
+      <Progress value={pct} className="mt-2 h-1" />
+      <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 rounded-md bg-muted/35 px-2.5 py-2 text-xs sm:grid-cols-3">
         <div><p className="text-muted-foreground">Account allocations</p><p className="mt-0.5 font-semibold">{formatCurrency(allocated)}</p></div>
         <div><p className="text-muted-foreground">Legacy funding</p><p className="mt-0.5 font-semibold text-amber-700">{formatCurrency(legacy)}</p></div>
         <div><p className="text-muted-foreground">{remaining > 0 ? "Remaining target" : "Target status"}</p><p className="mt-0.5 font-semibold">{remaining > 0 ? formatCurrency(remaining) : "Fully funded"}</p></div>
       </div>
-      <div className="mt-3 space-y-2">
-        {goalLinks.length === 0 ? <p className="rounded-lg bg-muted/45 px-3 py-2 text-xs text-muted-foreground">No account links yet. Assign cash to see it here.</p> :
+      <div className="mt-2 space-y-1">
+        {goalLinks.length === 0 ? <p className="text-xs text-muted-foreground">No account links yet. Assign cash to see it here.</p> :
           goalLinks.map((link) => {
             const account = accountById.get(link.assetId);
             if (!account) return null;
-            return <div key={link.id} className="flex items-center justify-between gap-2 rounded-lg bg-muted/40 px-3 py-2">
+            return <div key={link.id} className="flex items-center justify-between gap-2 rounded-md bg-muted/40 px-2 py-1">
               <div className="flex min-w-0 items-center gap-2"><Link2 className="h-3.5 w-3.5 shrink-0 text-primary" /><span className="truncate text-sm">{account.name}</span></div>
               <div className="flex items-center gap-1.5"><span className="whitespace-nowrap text-sm font-semibold">{formatCurrency(link.amount)}</span>
                 <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEditor(link.assetId, goal.id)} aria-label={`Edit ${account.name} allocation for ${goal.title}`}><span className="text-xs">Edit</span></Button>
@@ -190,21 +190,21 @@ export function GoalAllocationTab({ onAddGoal }: { onAddGoal: () => void }) {
   }
 
   return (
-    <section className="space-y-6" aria-label="Goal allocation">
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <Card className="border-primary/15 bg-primary/[0.035]"><CardContent className="p-5">
+    <section className="space-y-4" aria-label="Goal allocation">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <Card className="border-primary/15 bg-primary/[0.035]"><CardContent className="px-4 py-3">
           <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">Unassigned cash</p>
-          <p className="mt-2 text-2xl font-semibold tracking-tight">{formatCurrency(totalAvailable)}</p>
+          <p className="mt-1 text-xl font-semibold tracking-tight">{formatCurrency(totalAvailable)}</p>
           <p className="mt-1 text-xs text-muted-foreground">Available across eligible accounts</p>
         </CardContent></Card>
-        <Card><CardContent className="p-5">
+        <Card><CardContent className="px-4 py-3">
           <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">Earmarked for goals</p>
-          <p className="mt-2 text-2xl font-semibold tracking-tight">{formatCurrency(totalAllocated)}</p>
+          <p className="mt-1 text-xl font-semibold tracking-tight">{formatCurrency(totalAllocated)}</p>
           <p className="mt-1 text-xs text-muted-foreground">Still held in your accounts</p>
         </CardContent></Card>
-        <Card><CardContent className="p-5">
+        <Card><CardContent className="px-4 py-3">
           <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">Connected goals</p>
-          <p className="mt-2 text-2xl font-semibold tracking-tight">{data.goals.length}</p>
+          <p className="mt-1 text-xl font-semibold tracking-tight">{data.goals.length}</p>
           <p className="mt-1 text-xs text-muted-foreground">Including goals already reached</p>
         </CardContent></Card>
       </div>
@@ -233,8 +233,8 @@ export function GoalAllocationTab({ onAddGoal }: { onAddGoal: () => void }) {
         </CardContent></Card>
       )}
       {data.goals.length > 0 && (
-        <div className="grid gap-6 xl:grid-cols-[minmax(280px,0.72fr)_minmax(0,1.6fr)]">
-          <section aria-labelledby="alloc-accounts-heading" className="space-y-3">
+        <div className="grid gap-y-6 lg:grid-cols-[minmax(250px,0.8fr)_minmax(0,1.4fr)] lg:gap-x-12 xl:gap-x-16">
+          <section aria-labelledby="alloc-accounts-heading" className="min-w-0 space-y-3">
             <div className="flex items-center justify-between">
               <div><h3 id="alloc-accounts-heading" className="font-semibold">Your accounts</h3><p className="text-xs text-muted-foreground">Drag one onto a goal to assign cash</p></div>
               <Badge variant="secondary">{data.accounts.length}</Badge>
@@ -247,7 +247,7 @@ export function GoalAllocationTab({ onAddGoal }: { onAddGoal: () => void }) {
                   draggable
                   onDragStart={(event) => { event.dataTransfer.setData("text/plain", String(account.id)); setDraggingAssetId(account.id); }}
                   onDragEnd={() => setDraggingAssetId(null)}
-                  className={`rounded-xl border bg-card p-4 shadow-sm transition-opacity ${draggingAssetId === account.id ? "opacity-50" : "hover:border-primary/35"}`}
+                  className={`rounded-lg border bg-card p-3 shadow-sm transition-opacity ${draggingAssetId === account.id ? "opacity-50" : "hover:border-primary/35"}`}
                   aria-label={`${account.name}, ${formatCurrency(account.value)} total, ${formatCurrency(account.unallocatedAmount)} unallocated`}
                 >
                   <div className="flex items-start justify-between gap-3">
@@ -257,7 +257,7 @@ export function GoalAllocationTab({ onAddGoal }: { onAddGoal: () => void }) {
                       <p className="mt-0.5 text-sm font-semibold tabular-nums">{formatCurrency(account.value)}</p>
                     </div>
                   </div>
-                  <div className="mt-3 grid grid-cols-2 gap-2 border-t pt-3 text-xs">
+                  <div className="mt-2 grid grid-cols-2 gap-2 border-t pt-2 text-xs">
                     <div><p className="text-muted-foreground">Unallocated</p><p className={`mt-0.5 font-semibold ${deficit > 0 ? "text-rose-600" : ""}`}>{formatCurrency(account.unallocatedAmount)}</p></div>
                     <div className="text-right"><p className="text-muted-foreground">Assigned</p><p className="mt-0.5 font-semibold">{formatCurrency(account.allocatedAmount)}</p></div>
                   </div>
@@ -267,7 +267,7 @@ export function GoalAllocationTab({ onAddGoal }: { onAddGoal: () => void }) {
             </div>
           </section>
 
-          <section aria-labelledby="alloc-goals-heading" className="space-y-3">
+          <section aria-labelledby="alloc-goals-heading" className="min-w-0 space-y-3">
             <div className="flex items-center justify-between">
               <div><h3 id="alloc-goals-heading" className="font-semibold">Goals &amp; allocations</h3><p className="text-xs text-muted-foreground">Change or release any connection at any time</p></div>
               <ArrowRight className="hidden h-4 w-4 text-muted-foreground sm:block" />

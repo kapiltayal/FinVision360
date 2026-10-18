@@ -541,7 +541,9 @@ export default function GoalsPage() {
         </>
       )}
 
-      {/* Add / Edit dialog */}
+      </div>}
+
+      {/* Dialogs stay mounted regardless of the selected tab. */}
       <Dialog open={dialogOpen} onOpenChange={(o) => { setDialogOpen(o); if (!o) setEditGoal(null); }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -638,7 +640,6 @@ export default function GoalsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-      </div>}
     </div>
   );
 }
