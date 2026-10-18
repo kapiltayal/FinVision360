@@ -188,14 +188,14 @@ export default function LiabilityMapPage() {
                 Estimated over the displayed duration at the current APR; excludes {excludedInterestCount} {excludedInterestCount === 1 ? "debt" : "debts"} without a usable APR or duration.
               </p>
             </div>
-            <div className="flex flex-col gap-4 border-b bg-muted/20 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+            {mapView === "gantt" && <div className="flex flex-col gap-4 border-b bg-muted/20 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
               <div className="flex flex-wrap items-center gap-3">
                 <div>
                   <h2 className="font-semibold">Exposure matrix</h2>
-                  <p className="mt-0.5 text-xs text-muted-foreground">{mapView === "gantt" ? "Each bar shares one calendar scale; height reflects balance." : "Compare remaining months and APR; circle area reflects balance."}</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">Each bar shares one calendar scale; height reflects balance.</p>
                 </div>
               </div>
-              {mapView === "gantt" && <div className="flex flex-wrap gap-1 rounded-lg border bg-background p-1" role="group" aria-label="Sort liabilities">
+              <div className="flex flex-wrap gap-1 rounded-lg border bg-background p-1" role="group" aria-label="Sort liabilities">
                 {sortOptions.map((option) => (
                   <Button
                     key={option.value}
@@ -210,8 +210,8 @@ export default function LiabilityMapPage() {
                     {option.label}
                   </Button>
                 ))}
-              </div>}
-            </div>
+              </div>
+            </div>}
 
             {mapView === "gantt" && <div className="flex flex-wrap items-center justify-between gap-3 border-b bg-background px-4 py-3 sm:px-5">
               <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs" aria-label="APR color legend">

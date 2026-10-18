@@ -20,7 +20,9 @@ test("flat two-axis bubbles retain one legend, pan, zoom, reset and keyboard con
   assert.ok(!html.includes("radialGradient"));
   assert.ok(!html.includes("feGaussianBlur"));
   assert.equal((html.match(/aria-label="Bubble chart legend"/g) ?? []).length, 1);
-  assert.ok(html.indexOf('aria-label="Bubble chart legend"') < html.indexOf('class="liability-bubble-toolbar"'));
+  assert.ok(html.includes("Debt landscape"));
+  assert.ok(html.includes("/ two-axis view"));
+  assert.ok(html.indexOf('class="liability-bubble-toolbar"') < html.indexOf('aria-label="Bubble chart legend"'));
   assert.ok(!html.includes("3D-styled"));
   assert.ok(!html.includes("Z · REMAINING INTEREST"));
   assert.ok(!html.includes(">Rotate<"));

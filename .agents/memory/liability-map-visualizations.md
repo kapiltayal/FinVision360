@@ -26,3 +26,9 @@ Bubble tooltips belong next to the hovered or selected bubble, not in a fixed co
 Place the view toggle at the right of the balance/interest summary, and show only the active view's legend.
 
 **Why:** The user wants the switch above the chart and identified duplicated legends in Bubble view.
+
+Bubble view uses its own “Debt landscape / two-axis view” heading and zoom/reset controls; do not also show the Gantt-only “Exposure matrix” heading there.
+
+**Why:** The user asked for the Bubble chart to replace the Exposure matrix section rather than display both headers.
+
+**How to apply:** Keep Exposure matrix and its sorting controls exclusive to Gantt. In Bubble view, show the Debt landscape heading before its single Bubble legend.

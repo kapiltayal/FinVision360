@@ -87,6 +87,7 @@ test("Liability Map offers both views and preserves the default Gantt with its e
   const viewTogglePosition = html.indexOf('aria-label="Liability map view"');
   assert.ok(viewTogglePosition > html.indexOf('aria-label="Liability totals"'));
   assert.ok(viewTogglePosition < html.indexOf("Exposure matrix"), "view toggle belongs in totals, above the chart header");
+  assert.ok(html.includes("Exposure matrix"), "Gantt view retains its exposure header");
   assert.equal((html.match(/aria-label="APR color legend"/g) ?? []).length, 1);
   assert.ok(html.includes(">Gantt</button>"));
   assert.ok(html.includes(">Bubbles</button>"));
