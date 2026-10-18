@@ -23,10 +23,10 @@ const isWithinPlot = (x: number, y: number) =>
 const useTooltipLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
 
 function aprColor(apr: number | null) {
-  if (apr === null) return { fill: "#94a3b8", stroke: "#64748b" };
-  if (apr > 15) return { fill: "#ef4444", stroke: "#b91c1c" };
-  if (apr >= 6) return { fill: "#facc15", stroke: "#a16207" };
-  return { fill: "#10b981", stroke: "#047857" };
+  if (apr === null) return "#94a3b8";
+  if (apr > 15) return "#ef4444";
+  if (apr >= 6) return "#facc15";
+  return "#10b981";
 }
 
 function pointLabel(point: BubblePoint) {
@@ -275,7 +275,7 @@ export function LiabilityBubbleChart({ items }: { items: ExposureItem[] }) {
         .bubble-axes text { fill: hsl(var(--muted-foreground)); font: 600 10px ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .08em; }
         .bubble-ticks text { fill: hsl(var(--muted-foreground)); font: 10px ui-monospace, SFMono-Regular, Menlo, monospace; }
         .bubble-node { cursor: pointer; outline: none; }
-        .bubble-node:focus-visible { stroke: hsl(var(--foreground)); stroke-width: 3; }
+        .bubble-node:focus-visible { opacity: .75; }
         .bubble-tooltip {
           position: absolute; z-index: 5; width: min(270px, calc(100% - 16px)); box-sizing: border-box;
           border: 1px solid hsl(var(--border));
@@ -364,14 +364,12 @@ export function LiabilityBubbleChart({ items }: { items: ExposureItem[] }) {
             {projected.map(({ point, screen }) => {
               const color = aprColor(point.item.apr);
               const radius = Math.max(4, point.radius * screen.scale);
-              const isSelected = selectedId === point.item.id || hoveredId === point.item.id;
               return (
                 <g key={point.item.id} data-bubble-select="true" className="bubble-point-group">
                   <circle
                     cx={screen.x} cy={screen.y} r={radius}
-                    fill={color.fill}
-                    stroke={isSelected ? "hsl(var(--foreground))" : color.stroke}
-                    strokeWidth={isSelected ? 2.75 : 1.25}
+                    fill={color}
+                    stroke="none"
                     tabIndex={0}
                     role="button"
                     aria-label={pointLabel(point)}

@@ -35,6 +35,10 @@ test("flat circles retain exact debt data and render small debts above larger ov
   const items = [debt(1), debt(2, { balance: 500.17, apr: 8, monthsRemaining: 24 }), debt(3, { apr: 0, monthsRemaining: 6 })];
   const html = renderToStaticMarkup(<LiabilityBubbleChart items={items} />);
   assert.equal((html.match(/<circle /g) ?? []).length, items.length, "each debt has one flat circle without highlights or shadow circles");
+  for (const circle of html.match(/<circle [^>]+>/g) ?? []) {
+    assert.ok(circle.includes('stroke="none"'), "bubbles have no outlines");
+    assert.ok(!circle.includes("stroke-width"));
+  }
   for (const item of items) {
     assert.ok(html.includes(`${item.name}, balance ${formatCurrencyFull(item.balance)}`));
     assert.ok(html.includes(`total remaining interest ${formatCurrencyFull(estimateRemainingInterest(item)!)}`));

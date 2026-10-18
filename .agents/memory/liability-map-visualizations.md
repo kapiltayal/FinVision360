@@ -9,7 +9,7 @@ The Liability Map's Gantt and bubble views are two presentations of the same pla
 
 **How to apply:** Reuse the shared exposure and amortized-interest calculations. The user explicitly clarified that the chart must have ONLY TWO axes: remaining months (X) and APR (Y), with bubble area representing balance (minimum visible size disclosed). Use flat 2D circles, not shaded spheres, a Z axis, perspective, or orbit controls. Remaining interest belongs in debt details, not a spatial axis. Keep unavailable axis measurements out of plotted coordinates and explain why those debts are unplotted, without removing them from portfolio totals.
 
-**Why:** After trying 3D-styled bubbles, the user explicitly requested 2D because the shading was not adding value.
+**Why:** After trying 3D-styled bubbles, the user explicitly requested 2D because the shading was not adding value. They subsequently requested no bubble outlines, including selection outlines; use non-border keyboard focus feedback.
 
 Axes, axis titles, and tick positions must remain stationary during pan and zoom; only the interior plot changes. Recompute tick values from the visible range and clip bubbles to the plot boundary.
 
