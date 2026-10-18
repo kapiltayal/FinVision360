@@ -85,7 +85,11 @@ test("unknown inputs and paid-off debts remain disclosed rather than becoming ze
   assert.ok(html.includes("Not shown in the plot"));
   for (const name of ["Unknown APR", "Unknown duration", "Paid loan"]) assert.ok(html.includes(name));
   assert.ok(html.includes("Unknown APR or duration is never treated as zero."));
-  assert.ok(html.includes("Paid off — no remaining balance."));
+  assert.ok(html.includes("(Balance $1,000.34 · APR unknown · Months 12)"));
+  assert.ok(html.includes("(Balance $1,000.34 · APR 20.00% · Months unknown)"));
+  assert.ok(html.includes("(Balance $0.00 · APR 20.00% · Months 0 — paid off)"));
+  assert.ok(!html.includes("Missing usable"));
+  assert.ok(!html.includes("rounded-sm bg-background/70"));
   assert.ok(!html.includes('class="bubble-node"'));
 });
 

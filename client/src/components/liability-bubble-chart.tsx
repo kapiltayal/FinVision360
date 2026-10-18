@@ -441,13 +441,12 @@ export function LiabilityBubbleChart({ items }: { items: ExposureItem[] }) {
           <div className="rounded-md border border-amber-800/15 bg-amber-500/[0.055] p-3">
             <p className="text-xs font-semibold">Not shown in the plot</p>
             <p className="mb-2 mt-0.5 text-[11px] text-muted-foreground">Update APRs in Manage liabilities or planning durations in Gantt. Unknown APR or duration is never treated as zero. Paid-off debts remain listed without a bubble.</p>
-            <ul className="grid gap-1.5 sm:grid-cols-2" aria-label="Liabilities missing inputs for the bubble chart">
-              {scene.unplotted.map(({ item, reason }) => (
-                <li key={item.id} className="rounded-sm bg-background/70 px-2.5 py-2 text-xs">
+            <ul className="space-y-1" aria-label="Liabilities missing inputs for the bubble chart">
+              {scene.unplotted.map(({ item }) => (
+                <li key={item.id} className="text-xs leading-relaxed">
                   <span className="font-medium">{item.name}</span>
-                  <span className="ml-1 text-muted-foreground">— {reason}</span>
-                  <span className="mt-1 block text-[10px] text-muted-foreground">
-                    Balance {formatCurrencyFull(item.balance)} · APR {item.apr === null ? "unknown" : formatPercent(item.apr)} · Months {item.durationSource === "paid" ? "paid off" : item.monthsRemaining === null ? "unknown" : item.monthsRemaining}
+                  <span className="ml-1 text-muted-foreground">
+                    {`(Balance ${formatCurrencyFull(item.balance)} · APR ${item.apr === null ? "unknown" : formatPercent(item.apr)} · Months ${item.durationSource === "paid" ? "0 — paid off" : item.monthsRemaining === null ? "unknown" : item.monthsRemaining})`}
                   </span>
                 </li>
               ))}
