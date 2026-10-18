@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Link } from "wouter";
+import { accountAllocationColor, GoalAllocationConnections } from "./goal-allocation-connections";
 
 type AllocationGoal = {
   id: number; title: string; category: string; targetAmount: string; currentAmount: string;
@@ -143,7 +144,7 @@ export function GoalAllocationTab({ onAddGoal }: { onAddGoal: () => void }) {
       : money(goal.allocatedAmount);
     const remaining = Math.max(0, target - total);
     const pct = target ? Math.min(100, total / target * 100) : 0;
-    return <article key={goal.id}
+    return <article key={goal.id} data-allocation-goal={goal.id}
       onDragOver={(event) => { if (draggingAssetId !== null) event.preventDefault(); }}
       onDrop={(event) => {
         event.preventDefault();
@@ -176,8 +177,11 @@ export function GoalAllocationTab({ onAddGoal }: { onAddGoal: () => void }) {
           goalLinks.map((link) => {
             const account = accountById.get(link.assetId);
             if (!account) return null;
-            return <div key={link.id} className="flex items-center justify-between gap-2 rounded-md bg-muted/40 px-2 py-1">
-              <div className="flex min-w-0 items-center gap-2"><Link2 className="h-3.5 w-3.5 shrink-0 text-primary" /><span className="truncate text-sm">{account.name}</span></div>
+            return <div key={link.id} data-allocation-row={link.id} className="flex items-center justify-between gap-2 rounded-md bg-muted/40 px-2 py-1">
+              <div className="flex min-w-0 items-center gap-2">
+                <span aria-hidden="true" className="h-2.5 w-2.5 shrink-0 rounded-full ring-2 ring-background" style={{ backgroundColor: accountAllocationColor(link.assetId) }} />
+                <Link2 className="h-3.5 w-3.5 shrink-0 text-primary" /><span className="truncate text-sm">{account.name}</span>
+              </div>
               <div className="flex items-center gap-1.5"><span className="whitespace-nowrap text-sm font-semibold">{formatCurrency(link.amount)}</span>
                 <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEditor(link.assetId, goal.id)} aria-label={`Edit ${account.name} allocation for ${goal.title}`}><span className="text-xs">Edit</span></Button>
                 <Button variant="ghost" size="icon" className="h-8 w-8 text-rose-600 hover:text-rose-700" onClick={() => setRemoveId(link.id)} aria-label={`Remove ${account.name} allocation from ${goal.title}`}><Trash2 className="h-3.5 w-3.5" /></Button>
@@ -233,7 +237,8 @@ export function GoalAllocationTab({ onAddGoal }: { onAddGoal: () => void }) {
         </CardContent></Card>
       )}
       {data.goals.length > 0 && (
-        <div className="grid gap-y-6 lg:grid-cols-[minmax(250px,0.8fr)_minmax(0,1.4fr)] lg:gap-x-12 xl:gap-x-16">
+        <GoalAllocationConnections allocations={data.allocations}>
+          <div className="grid gap-y-6 lg:grid-cols-[minmax(250px,0.85fr)_minmax(0,1.15fr)] lg:gap-x-24 xl:gap-x-32">
           <section aria-labelledby="alloc-accounts-heading" className="min-w-0 space-y-3">
             <div className="flex items-center justify-between">
               <div><h3 id="alloc-accounts-heading" className="font-semibold">Your accounts</h3><p className="text-xs text-muted-foreground">Drag one onto a goal to assign cash</p></div>
@@ -244,6 +249,7 @@ export function GoalAllocationTab({ onAddGoal }: { onAddGoal: () => void }) {
                 const deficit = money(account.deficitAmount);
                 return <article
                   key={account.id}
+                  data-allocation-account={account.id}
                   draggable
                   onDragStart={(event) => { event.dataTransfer.setData("text/plain", String(account.id)); setDraggingAssetId(account.id); }}
                   onDragEnd={() => setDraggingAssetId(null)}
@@ -251,7 +257,10 @@ export function GoalAllocationTab({ onAddGoal }: { onAddGoal: () => void }) {
                   aria-label={`${account.name}, ${formatCurrency(account.value)} total, ${formatCurrency(account.unallocatedAmount)} unallocated`}
                 >
                   <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0"><p className="truncate font-medium">{account.name}</p><p className="mt-0.5 truncate text-xs text-muted-foreground">{account.institution || account.category}</p></div>
+                    <div className="flex min-w-0 items-start gap-2">
+                      <span aria-hidden="true" className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full ring-2 ring-background" style={{ backgroundColor: accountAllocationColor(account.id) }} />
+                      <div className="min-w-0"><p className="truncate font-medium">{account.name}</p><p className="mt-0.5 truncate text-xs text-muted-foreground">{account.institution || account.category}</p></div>
+                    </div>
                     <div className="shrink-0 text-right">
                       <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Total balance</p>
                       <p className="mt-0.5 text-sm font-semibold tabular-nums">{formatCurrency(account.value)}</p>
@@ -285,7 +294,8 @@ export function GoalAllocationTab({ onAddGoal }: { onAddGoal: () => void }) {
               <div className="space-y-3 border-t p-3 sm:p-4">{completedGoals.map(renderGoal)}</div>
             </details>}
           </section>
-        </div>
+          </div>
+        </GoalAllocationConnections>
       )}
 
       <Dialog open={!!editor} onOpenChange={(open) => { if (!open) setEditor(null); }}>

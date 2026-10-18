@@ -4,6 +4,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Router } from "wouter";
 import { GoalAllocationTab } from "./goal-allocation-tab";
+import { accountAllocationColor } from "./goal-allocation-connections";
 
 function render(data: unknown) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } });
@@ -28,8 +29,17 @@ test("allocation workspace exposes balances, legacy funding, completed goals and
   assert.ok(html.includes("Assign account funds to House"));
   assert.ok(html.includes("Edit Checking allocation for House"));
   assert.ok(html.includes("Remove Checking allocation from House"));
+  assert.ok(html.includes('data-allocation-account="1"'));
+  assert.ok(html.includes('data-allocation-row="1"'));
+  assert.ok(html.includes(`background-color:${accountAllocationColor(1)}`));
   assert.match(html, /legacy/i);
   assert.ok(html.includes("not a transfer"));
+});
+
+test("account relationship colors are deterministic and distinct across accounts", () => {
+  assert.equal(accountAllocationColor(17), accountAllocationColor(17));
+  assert.notEqual(accountAllocationColor(17), accountAllocationColor(18));
+  assert.notEqual(accountAllocationColor(18), accountAllocationColor(19));
 });
 
 test("empty state gives a direct way to add a goal", () => {
