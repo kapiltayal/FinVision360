@@ -188,11 +188,11 @@ export default function LiabilityMapPage() {
               <div className="flex flex-wrap items-center gap-3">
                 <div>
                   <h2 className="font-semibold">Exposure matrix</h2>
-                  <p className="mt-0.5 text-xs text-muted-foreground">{mapView === "gantt" ? "Each bar shares one calendar scale; height reflects balance." : "Orbit the debt landscape across time, APR, and remaining interest."}</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">{mapView === "gantt" ? "Each bar shares one calendar scale; height reflects balance." : "Compare remaining months and APR with shaded, balance-sized spheres."}</p>
                 </div>
                 <div className="inline-flex rounded-lg border bg-background p-1" role="group" aria-label="Liability map view">
                   <Button type="button" size="sm" variant={mapView === "gantt" ? "secondary" : "ghost"} aria-pressed={mapView === "gantt"} onClick={() => setMapView("gantt")} className={`h-8 px-3 text-xs ${mapView === "gantt" ? "shadow-sm" : "text-muted-foreground"}`}>Gantt</Button>
-                  <Button type="button" size="sm" variant={mapView === "bubbles" ? "secondary" : "ghost"} aria-pressed={mapView === "bubbles"} onClick={() => setMapView("bubbles")} className={`h-8 px-3 text-xs ${mapView === "bubbles" ? "shadow-sm" : "text-muted-foreground"}`}>3D Bubbles</Button>
+                  <Button type="button" size="sm" variant={mapView === "bubbles" ? "secondary" : "ghost"} aria-pressed={mapView === "bubbles"} onClick={() => setMapView("bubbles")} className={`h-8 px-3 text-xs ${mapView === "bubbles" ? "shadow-sm" : "text-muted-foreground"}`}>Bubbles</Button>
                 </div>
               </div>
               <div className="flex flex-wrap gap-1 rounded-lg border bg-background p-1" role="group" aria-label="Sort liabilities">

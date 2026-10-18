@@ -1,7 +1,7 @@
 import { useEffect, useId, useMemo, useRef, useState, type PointerEvent } from "react";
-import { Home, Minus, Move, Plus, Rotate3D } from "lucide-react";
+import { Home, Minus, Plus } from "lucide-react";
 import { formatCurrencyFull, formatPercent } from "@/lib/format";
-import { estimateRemainingInterest, type ExposureItem } from "@/lib/liability-map";
+import type { ExposureItem } from "@/lib/liability-map";
 import {
   BUBBLE_VIEWBOX,
   buildBubbleScene,
@@ -13,11 +13,8 @@ import {
   type BubblePoint,
 } from "@/lib/liability-bubbles";
 
-type InteractionMode = "pan" | "rotate";
-
 const fmtNumber = (value: number, digits = 0) =>
   Number.isFinite(value) ? new Intl.NumberFormat("en-US", { maximumFractionDigits: digits }).format(value) : "—";
-const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 
 function aprColor(apr: number | null) {
   if (apr === null) return { fill: "url(#bubble-unknown)", stroke: "var(--bubble-unknown-stroke)" };
@@ -43,7 +40,6 @@ function tooltipRows(item: ExposureItem, interest: number | null) {
 export function LiabilityBubbleChart({ items }: { items: ExposureItem[] }) {
   const scene = useMemo(() => buildBubbleScene(items), [items]);
   const [camera, setCamera] = useState<BubbleCamera>(() => ({ ...DEFAULT_BUBBLE_CAMERA }));
-  const [mode, setMode] = useState<InteractionMode>("pan");
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [hoveredId, setHoveredId] = useState<number | null>(null);
   const chartRef = useRef<HTMLDivElement>(null);
@@ -153,8 +149,7 @@ export function LiabilityBubbleChart({ items }: { items: ExposureItem[] }) {
     const dx = point.x - previous.x;
     const dy = point.y - previous.y;
     const current = cameraRef.current;
-    if (mode === "pan") updateCamera({ ...current, panX: current.panX + dx, panY: current.panY + dy });
-    else updateCamera({ ...current, yaw: current.yaw + dx * 0.008, pitch: clamp(current.pitch + dy * 0.006, -1.15, 1.15) });
+    updateCamera({ ...current, panX: current.panX + dx, panY: current.panY + dy });
   };
   const onPointerUp = (event: PointerEvent<HTMLDivElement>) => {
     pointersRef.current.delete(event.pointerId);
@@ -165,21 +160,17 @@ export function LiabilityBubbleChart({ items }: { items: ExposureItem[] }) {
   const projected = useMemo(() => scene.points.map((point) => ({
     point,
     screen: projectBubblePoint(point.position, camera),
-  })).sort((a, b) => b.screen.depth - a.screen.depth), [scene.points, camera]);
+  })).sort((a, b) => b.point.radius - a.point.radius), [scene.points, camera]);
   const selectedPoint = scene.points.find(({ item }) => item.id === (hoveredId ?? selectedId));
   const tooltipItem = selectedPoint?.item;
-  const tooltipInterest = selectedPoint?.interest ?? (tooltipItem ? estimateRemainingInterest(tooltipItem) : null);
-  const tooltipPosition = selectedPoint ? projectBubblePoint(selectedPoint.position, camera) : null;
+  const tooltipInterest = selectedPoint?.interest ?? null;
   const tickMonths = scene.maxMonths > 0 ? [0, scene.maxMonths / 2, scene.maxMonths] : [0, 1, 2];
   const tickApr = scene.maxApr > 0 ? [0, scene.maxApr / 2, scene.maxApr] : [0, 1, 2];
-  const tickInterest = scene.maxInterest > 0 ? [0, scene.maxInterest / 2, scene.maxInterest] : [0, 1, 2];
-  const axisX = (value: number) => projectBubblePoint({ x: value, y: -1, z: -1 }, camera);
-  const axisY = (value: number) => projectBubblePoint({ x: -1, y: value, z: -1 }, camera);
-  const axisZ = (value: number) => projectBubblePoint({ x: -1, y: -1, z: value }, camera);
+  const axisPoint = (x: number, y: number) => projectBubblePoint({ x, y }, camera);
   const plotAvailable = scene.points.length > 0;
 
   return (
-    <section className="liability-bubble-card" aria-label="Three-dimensional liability bubble chart">
+    <section className="liability-bubble-card" aria-label="Two-axis liability bubble chart with 3D-styled spheres">
       <style>{`
         .liability-bubble-card {
           --bubble-high-stroke: #8f302a;
@@ -203,14 +194,7 @@ export function LiabilityBubbleChart({ items }: { items: ExposureItem[] }) {
           flex-wrap: wrap; padding: 12px 16px; border-bottom: 1px solid hsl(var(--border) / .7);
           background: hsl(var(--muted) / .2);
         }
-        .bubble-tool-button {
-          display: inline-flex; align-items: center; justify-content: center; gap: 6px;
-          min-height: 30px; border-radius: 5px; padding: 0 9px; font-size: 11px;
-          color: hsl(var(--muted-foreground)); transition: color .15s, background-color .15s;
-        }
-        .bubble-tool-button:hover { color: hsl(var(--foreground)); }
-        .bubble-tool-button.is-active { color: hsl(var(--primary)); background: hsl(var(--primary) / .1); box-shadow: 0 1px 2px hsl(var(--foreground) / .08); }
-        .bubble-tool-button:focus-visible, .bubble-icon-button:focus-visible, .bubble-detail-chip:focus-visible {
+        .bubble-icon-button:focus-visible, .bubble-detail-chip:focus-visible {
           outline: 2px solid hsl(var(--ring)); outline-offset: 2px;
         }
         .bubble-icon-button {
@@ -261,42 +245,33 @@ export function LiabilityBubbleChart({ items }: { items: ExposureItem[] }) {
       `}</style>
       <div className="liability-bubble-toolbar">
         <div className="min-w-0">
-          <p className="text-sm font-semibold">Debt landscape <span className="font-normal text-muted-foreground">/ 3D view</span></p>
-          <p className="mt-0.5 text-[11px] text-muted-foreground">Bubble area follows balance; the smallest bubble is enlarged to remain visible. Switch to Gantt to adjust planning durations.</p>
+          <p className="text-sm font-semibold">Debt landscape <span className="font-normal text-muted-foreground">/ two-axis view</span></p>
+          <p className="mt-0.5 text-[11px] text-muted-foreground">Shaded spheres add visual depth; the plot itself is months vs APR. Switch to Gantt to adjust planning durations.</p>
         </div>
         <div className="flex flex-wrap items-center gap-1.5">
-          <div className="inline-flex rounded-md border bg-background p-0.5" role="group" aria-label="Chart interaction mode">
-            <button type="button" onClick={() => setMode("pan")} aria-pressed={mode === "pan"} className={`bubble-tool-button ${mode === "pan" ? "is-active" : ""}`} title="Pan mode: drag to move the view">
-              <Move className="h-3.5 w-3.5" /> <span>Pan</span>
-            </button>
-            <button type="button" onClick={() => setMode("rotate")} aria-pressed={mode === "rotate"} className={`bubble-tool-button ${mode === "rotate" ? "is-active" : ""}`} title="Rotate mode: drag to orbit the 3D view">
-              <Rotate3D className="h-3.5 w-3.5" /> <span>Rotate</span>
-            </button>
-          </div>
           <button type="button" className="bubble-icon-button" onClick={() => zoomBy(1.18)} aria-label="Zoom in" title="Zoom in"><Plus className="h-4 w-4" /></button>
           <button type="button" className="bubble-icon-button" onClick={() => zoomBy(1 / 1.18)} aria-label="Zoom out" title="Zoom out"><Minus className="h-4 w-4" /></button>
           <button type="button" className="bubble-icon-button" onClick={reset} aria-label="Reset chart view" title="Reset view"><Home className="h-4 w-4" /></button>
         </div>
       </div>
       <p className="border-b border-border/70 px-4 py-2 text-[11px] text-muted-foreground sm:px-5">
-        {mode === "pan" ? "Drag to pan · wheel or pinch to zoom · select a bubble for details." : "Drag to orbit · wheel or pinch to zoom · select a bubble for details."}
-        {" "}Keyboard: arrows pan, +/− zoom, Home or 0 reset.
+        Drag to pan · wheel or pinch to zoom · select a bubble for details. Keyboard: arrows pan, +/− zoom, Home or 0 reset.
       </p>
       <div
         ref={chartRef}
-        className={`liability-bubble-plot ${mode === "pan" ? "cursor-grab active:cursor-grabbing" : "cursor-crosshair"}`}
+        className="liability-bubble-plot cursor-grab active:cursor-grabbing"
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
         onLostPointerCapture={() => { pointersRef.current.clear(); gestureRef.current = null; }}
         role="group"
-        aria-label="Interactive 3D debt chart. Use arrow keys to pan, plus and minus to zoom, and Home to reset."
+        aria-label="Interactive two-axis liability bubble chart with shaded spheres. Horizontal axis is months remaining; vertical axis is APR. Use arrow keys to pan, plus and minus to zoom, and Home to reset."
         tabIndex={0}
         style={{ touchAction: "none" }}
       >
-        {!plotAvailable && <div className="absolute inset-0 z-10 flex items-center justify-center px-6 text-center text-sm text-muted-foreground">No liabilities have complete balance, APR, and remaining duration inputs to plot yet.</div>}
-        <svg ref={svgRef} viewBox={`0 0 ${BUBBLE_VIEWBOX.width} ${BUBBLE_VIEWBOX.height}`} className="block h-auto w-full select-none" role="img" aria-label="Perspective chart of liability balance, remaining months, APR, and estimated interest">
+        {!plotAvailable && <div className="absolute inset-0 z-10 flex items-center justify-center px-6 text-center text-sm text-muted-foreground">No debts have usable balance, APR, and remaining duration to plot yet.</div>}
+        <svg ref={svgRef} viewBox={`0 0 ${BUBBLE_VIEWBOX.width} ${BUBBLE_VIEWBOX.height}`} className="block h-auto w-full select-none" role="group" aria-label="Orthogonal bubble chart. X axis: months remaining. Y axis: APR percent. Sphere size: current balance.">
           <defs>
             <radialGradient id={`${defsId}-high`} cx="33%" cy="28%" r="72%">
               <stop offset="0%" stopColor="#ffd1c7" /><stop offset="30%" stopColor="#ef6558" /><stop offset="100%" stopColor="#972d31" />
@@ -316,45 +291,39 @@ export function LiabilityBubbleChart({ items }: { items: ExposureItem[] }) {
             <filter id={`${defsId}-shadow`} x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="3" /></filter>
           </defs>
           <g className="bubble-grid">
-            {[0, 0.5, 1].map((ratio) => {
-              const a = projectBubblePoint({ x: -1 + ratio * 2, y: -1, z: -1 }, camera);
-              const b = projectBubblePoint({ x: -1 + ratio * 2, y: 1, z: -1 }, camera);
-              const c = projectBubblePoint({ x: -1, y: -1 + ratio * 2, z: -1 }, camera);
-              const d = projectBubblePoint({ x: 1, y: -1 + ratio * 2, z: -1 }, camera);
-              return <g key={ratio}><path d={`M${a.x},${a.y} L${b.x},${b.y}`} /><path d={`M${c.x},${c.y} L${d.x},${d.y}`} /></g>;
+            {[-1, 0, 1].map((x) => {
+              const a = axisPoint(x, -1);
+              const b = axisPoint(x, 1);
+              return <path key={`v-${x}`} d={`M${a.x},${a.y} L${b.x},${b.y}`} />;
             })}
-            {[-1, 0, 1].map((value) => {
-              const a = projectBubblePoint({ x: -1, y: value, z: -1 }, camera);
-              const b = projectBubblePoint({ x: -1, y: value, z: 1 }, camera);
-              return <path key={`z-${value}`} d={`M${a.x},${a.y} L${b.x},${b.y}`} />;
+            {[-1, 0, 1].map((y) => {
+              const a = axisPoint(-1, y);
+              const b = axisPoint(1, y);
+              return <path key={`h-${y}`} d={`M${a.x},${a.y} L${b.x},${b.y}`} />;
             })}
           </g>
           <g className="bubble-axes">
             {[
-              [projectBubblePoint({ x: -1, y: -1, z: -1 }, camera), projectBubblePoint({ x: 1, y: -1, z: -1 }, camera), "X · MONTHS LEFT"],
-              [projectBubblePoint({ x: -1, y: -1, z: -1 }, camera), projectBubblePoint({ x: -1, y: 1, z: -1 }, camera), "Y · APR %"],
-              [projectBubblePoint({ x: -1, y: -1, z: -1 }, camera), projectBubblePoint({ x: -1, y: -1, z: 1 }, camera), "Z · REMAINING INTEREST"],
-            ].map(([from, to, label], index) => {
+              [axisPoint(-1, -1), axisPoint(1, -1), "X · MONTHS REMAINING"],
+              [axisPoint(-1, -1), axisPoint(-1, 1), "Y · APR %"],
+            ].map(([from, to, label]) => {
               const start = from as ReturnType<typeof projectBubblePoint>;
               const end = to as ReturnType<typeof projectBubblePoint>;
               const labelText = label as string;
               const midX = (start.x + end.x) / 2;
               const midY = (start.y + end.y) / 2;
-              return <g key={labelText}><path d={`M${start.x},${start.y} L${end.x},${end.y}`} /><text x={midX + (index === 2 ? -18 : 8)} y={midY + (index === 1 ? -12 : 18)}>{labelText}</text></g>;
+              const xLabel = labelText.startsWith("X");
+              return <g key={labelText}><path d={`M${start.x},${start.y} L${end.x},${end.y}`} /><text x={xLabel ? midX : start.x - 60} y={xLabel ? midY + 38 : midY} textAnchor="middle" transform={xLabel ? undefined : `rotate(-90 ${start.x - 60} ${midY})`}>{labelText}</text></g>;
             })}
           </g>
           <g className="bubble-ticks">
             {tickMonths.map((_, index) => {
-              const p = axisX(-1 + (index / (tickMonths.length - 1)) * 2);
-              return <text key={`m-${index}`} x={p.x} y={p.y + 19} textAnchor="middle">{fmtNumber(index === 0 ? 0 : scene.maxMonths * index / 2)} mo</text>;
+              const p = axisPoint(-1 + (index / (tickMonths.length - 1)) * 2, -1);
+              return <text key={`m-${index}`} x={p.x} y={p.y + 19} textAnchor="middle">{fmtNumber(scene.maxMonths * index / 2)} mo</text>;
             })}
             {tickApr.map((_, index) => {
-              const p = axisY(-1 + (index / (tickApr.length - 1)) * 2);
+              const p = axisPoint(-1, -1 + (index / (tickApr.length - 1)) * 2);
               return <text key={`a-${index}`} x={p.x - 12} y={p.y + 4} textAnchor="end">{fmtNumber(scene.maxApr * index / 2, 1)}%</text>;
-            })}
-            {tickInterest.map((_, index) => {
-              const p = axisZ(-1 + (index / (tickInterest.length - 1)) * 2);
-              return <text key={`i-${index}`} x={p.x - 9} y={p.y + 4} textAnchor="end">{formatCurrencyFull(scene.maxInterest * index / 2)}</text>;
             })}
           </g>
           {projected.map(({ point, screen }) => {
@@ -391,7 +360,7 @@ export function LiabilityBubbleChart({ items }: { items: ExposureItem[] }) {
             );
           })}
         </svg>
-        {tooltipItem && tooltipPosition && (
+        {tooltipItem && (
           <div
             className="bubble-tooltip"
             role="status"
