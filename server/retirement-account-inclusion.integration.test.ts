@@ -17,7 +17,7 @@ test("retirement inclusion persists, protects ownership, and changes only its se
     app[method] = (path: string, ...callbacks: Function[]) => handlers.set(`${method} ${path}`, callbacks);
   }
   await registerRoutes(createServer(), app);
-  async function call(method: string, path: string, userId = owner, body: any = {}) {
+  async function call(method: string, path: string, userId = owner, body: any = {}, params: Record<string, string> = {}) {
     const callbacks = handlers.get(`${method} ${path}`)!;
     assert.ok(callbacks);
     assert.equal(callbacks[0], requireAuth, "projection/account preferences require authentication");
@@ -25,9 +25,10 @@ test("retirement inclusion persists, protects ownership, and changes only its se
       code: 200, body: undefined,
       status(code: number) { this.code = code; return this; },
       json(body: unknown) { this.body = body; return this; },
+      send() { return this; },
     };
     // Handler ownership verification after identity validation; not a JWT/sign-in test.
-    await callbacks[callbacks.length - 1]({ user: { id: userId, dateOfBirth: "1980-01-01" }, body, query: {} }, response);
+    await callbacks[callbacks.length - 1]({ user: { id: userId, dateOfBirth: "1980-01-01" }, body, query: {}, params }, response);
     return response;
   }
   try {
@@ -117,6 +118,84 @@ test("retirement inclusion persists, protects ownership, and changes only its se
     const { rows: [count] } = await pool.query(
       "SELECT count(*) FROM retirement_account_projection_preferences WHERE user_id=$1 AND liability_id IS NOT NULL", [owner]);
     assert.equal(Number(count.count), 0, "deleting an account cleans up its preferences");
+
+    const { rows: customNetWorth } = await pool.query(
+      `INSERT INTO retirement_projection_entries(user_id,kind,name,parent_category,category,amount)
+       VALUES($1,'asset','Custom asset','Cash','Cash',10000),($1,'liability','Custom debt','Debt','Loan',2000) RETURNING id,kind`, [owner]);
+    const { rows: customCashflow } = await pool.query(
+      `INSERT INTO retirement_income_expense_entries(user_id,kind,name,amount)
+       VALUES($1,'income','Custom income',500),($1,'expense','Custom expense',200) RETURNING id,kind`, [owner]);
+    const { rows: pensionRows } = await pool.query(
+      `INSERT INTO retirement_pensions(user_id,name,amount,start_age)
+       VALUES($1,'Test pension',100,60),($1,'Later pension',200,75) RETURNING id,name`, [owner]);
+    await pool.query("INSERT INTO social_security_settings(user_id,fra_monthly_benefit) VALUES($1,1000)", [owner]);
+    await pool.query("INSERT INTO retirement_income_expense_settings(user_id,expected_monthly_expenses) VALUES($1,400)", [owner]);
+    const customBaseline = await netWorth(), cashflowBaseline = await cashflow();
+    assert.equal(customBaseline.excludedAccountCount, 0);
+    assert.equal(cashflowBaseline.excludedAccountCount, 0);
+    assert.ok(cashflowBaseline.income.some((row: any) => row.inclusionKind === "pension" && row.name === "Later pension" && row.monthlyAmount === 0));
+    for (const entry of customNetWorth) {
+      assert.equal((await choice(entry.id, "net-worth-entry", "net-worth", false)).code, 200);
+      const view = await netWorth();
+      const row = [...view.assets, ...view.liabilities].find((row: any) => row.projectionEntryId === entry.id);
+      assert.equal(row.included, false);
+      assert.equal(row.configuredAmount, entry.kind === "asset" ? 10000 : 2000);
+    }
+    const excludedCustom = await netWorth();
+    assert.equal(excludedCustom.projectedNetWorth, customBaseline.projectedNetWorth - 10000 + 2000);
+    assert.equal(excludedCustom.excludedAccountCount, 2);
+    assert.equal((await cashflow()).totalMonthlyIncome, cashflowBaseline.totalMonthlyIncome, "custom Net Worth selections do not change cash flow");
+    for (const entry of customCashflow) {
+      assert.equal((await choice(entry.id, "income-expense-entry", "income-expense", false)).code, 200);
+    }
+    for (const pension of pensionRows) await choice(pension.id, "pension", "income-expense", false);
+    await choice(0, "social-security", "income-expense", false);
+    await choice(0, "expected-expenses", "income-expense", false);
+    const excludedCashflow = await cashflow();
+    assert.equal(excludedCashflow.excludedAccountCount, 6);
+    assert.equal(excludedCashflow.totalMonthlyIncome, beforeCashflow.totalMonthlyIncome);
+    assert.equal(excludedCashflow.totalMonthlyExpenses, 0);
+    assert.equal(excludedCashflow.expectedMonthlyExpenses, 400, "excluding the baseline never erases its saved value");
+    assert.equal(excludedCashflow.income.find((row: any) => row.inclusionKind === "income-expense-entry").configuredAmount, 500);
+    assert.equal(excludedCashflow.expenses.find((row: any) => row.inclusionKind === "income-expense-entry").configuredAmount, 200);
+    assert.ok(!excludedCashflow.assumptions.some((row: any) => ["Social Security", "Expected lifestyle expenses", "Test pension", "Custom income", "Custom expense"].includes(row.name)));
+    const savedItems = (await call("get", `${base}account-inclusion`)).body.items;
+    assert.equal(savedItems.filter((row: any) => !row.included).length, 8);
+    assert.equal((await call("get", `${base}account-inclusion`, other)).body.items.length, 0);
+    const cases = [
+      ...customNetWorth.map((row) => ({ id: row.id, kind: "net-worth-entry", projection: "net-worth" })),
+      ...customCashflow.map((row) => ({ id: row.id, kind: "income-expense-entry", projection: "income-expense" })),
+      ...pensionRows.map((row) => ({ id: row.id, kind: "pension", projection: "income-expense" })),
+    ];
+    for (const item of cases) {
+      assert.equal((await call("put", `${base}account-inclusion`, other, {
+        accountId: item.id, kind: item.kind, projection: item.projection, included: true,
+      })).code, 404, "another user cannot change a custom item or pension");
+    }
+    assert.equal((await choice(customNetWorth[0].id, "net-worth-entry", "income-expense", true)).code, 400);
+    assert.equal((await choice(1, "social-security", "income-expense", false)).code, 400);
+    assert.equal((await choice(0, "pension", "income-expense", false)).code, 400);
+    const customAsset = customNetWorth.find((row) => row.kind === "asset")!;
+    const [validCategory] = (await call("get", "/api/asset-categories")).body;
+    assert.ok(validCategory, "use an actual category accepted by the existing entry editor");
+    assert.equal((await call("patch", `${base}projection-entries/:id`, owner, {
+      kind: "asset", name: "Edited custom asset", parentCategory: validCategory.parentCategory, category: validCategory.category, amount: "12000", notes: "",
+    }, { id: String(customAsset.id) })).code, 200);
+    const edited = (await netWorth()).assets.find((row: any) => row.projectionEntryId === customAsset.id);
+    assert.equal(edited.included, false, "editing a custom account preserves its exclusion");
+    assert.equal(edited.configuredAmount, 12000);
+    for (const item of cases) await choice(item.id, item.kind, item.projection, true);
+    await choice(0, "social-security", "income-expense", true);
+    await choice(0, "expected-expenses", "income-expense", true);
+    assert.equal((await cashflow()).totalMonthlyIncome, cashflowBaseline.totalMonthlyIncome);
+    assert.equal((await cashflow()).totalMonthlyExpenses, cashflowBaseline.totalMonthlyExpenses);
+    assert.equal((await netWorth()).projectedNetWorth, customBaseline.projectedNetWorth + 2000);
+    // Excluded custom-item preferences are removed with the deleted source item.
+    await choice(customAsset.id, "net-worth-entry", "net-worth", false);
+    assert.equal((await call("delete", `${base}projection-entries/:id`, owner, {}, { id: String(customAsset.id) })).code, 204);
+    assert.ok(!(await call("get", `${base}account-inclusion`)).body.items.some(
+      (row: any) => row.kind === "net-worth-entry" && row.itemId === customAsset.id,
+    ));
   } finally {
     await pool.query("DELETE FROM users WHERE id = ANY($1::varchar[])", [[owner, other]]);
     await pool.end();

@@ -40,6 +40,8 @@ import { buildRetirementNetWorthProjection } from "./retirement-projection";
 import { getRetirementAccountPreferences, registerRetirementAccountInclusionRoutes } from "./retirement-account-inclusion";
 import { includedRetirementAccounts } from "@shared/retirement-account-inclusion";
 import { netWorthWithAccountControls, cashflowWithAccountControls } from "./retirement-inclusion-display";
+import { getRetirementItemPreferences, deleteRetirementItemPreference } from "./retirement-item-inclusion";
+import { retirementItemIncluded } from "@shared/retirement-account-inclusion";
 import { buildRetirementIncomeExpenseProjection, isPretaxRetirementAccountCategory } from "./retirement-income-expense-projection";
 import { parseOptionalInterestRate } from "./liability-apr";
 import { AllocationError, allocationAccounts, moneyCents, saveAllocation, withFundingLock } from "./goal-allocation";
@@ -663,7 +665,7 @@ export async function registerRoutes(
 
   app.get("/api/retirement/net-worth-projection", requireAuth, async (req: any, res) => {
     const userId = req.user.id;
-    const [settings, userAssets, userLiabilities, assetTypes, liabilityTypes, overrides, entries, preferences] = await Promise.all([
+    const [settings, userAssets, userLiabilities, assetTypes, liabilityTypes, overrides, entries, preferences, itemPreferences] = await Promise.all([
       storage.getRetirementPlannerSettings(userId),
       storage.getAssets(userId),
       storage.getLiabilities(userId),
@@ -672,6 +674,7 @@ export async function registerRoutes(
       db.select().from(retirementAssetProjectionOverrides).where(eq(retirementAssetProjectionOverrides.userId, userId)),
       db.select().from(retirementProjectionEntries).where(eq(retirementProjectionEntries.userId, userId)),
       getRetirementAccountPreferences(userId),
+      getRetirementItemPreferences(userId),
     ]);
 
     const inputs = {
@@ -690,13 +693,14 @@ export async function registerRoutes(
       ...inputs,
       assets: includedRetirementAccounts(userAssets, preferences, "asset", "net-worth"),
       liabilities: includedRetirementAccounts(userLiabilities, preferences, "liability", "net-worth"),
+      projectionEntries: entries.filter((row) => retirementItemIncluded(itemPreferences, "net-worth-entry", row.id)),
     });
     res.json(netWorthWithAccountControls(selected, all));
   });
 
   app.get("/api/retirement/income-expense-projection", requireAuth, async (req: any, res) => {
     const userId = req.user.id;
-    const [plannerSettings, userAssets, userLiabilities, assetTypes, liabilityTypes, overrides, projectionEntries, pensions, socialSecurity, incomeExpenseSettings, incomeExpenseEntries, withdrawalRates, preferences] = await Promise.all([
+    const [plannerSettings, userAssets, userLiabilities, assetTypes, liabilityTypes, overrides, projectionEntries, pensions, socialSecurity, incomeExpenseSettings, incomeExpenseEntries, withdrawalRates, preferences, itemPreferences] = await Promise.all([
       storage.getRetirementPlannerSettings(userId),
       storage.getAssets(userId),
       storage.getLiabilities(userId),
@@ -710,6 +714,7 @@ export async function registerRoutes(
       db.select().from(retirementIncomeExpenseEntries).where(eq(retirementIncomeExpenseEntries.userId, userId)),
       db.select().from(retirementAccountWithdrawalRates).where(eq(retirementAccountWithdrawalRates.userId, userId)),
       getRetirementAccountPreferences(userId),
+      getRetirementItemPreferences(userId),
     ]);
 
     const retirementAge = plannerSettings?.retirementAge ?? 65;
@@ -745,11 +750,17 @@ export async function registerRoutes(
       expectedMonthlyExpenses: savedIncomeExpenseSettings?.expectedMonthlyExpenses ?? 0,
       projectionEntries: incomeExpenseEntries,
     };
-    const selected = buildRetirementIncomeExpenseProjection(cashflowInputs);
+    const selected = buildRetirementIncomeExpenseProjection({
+      ...cashflowInputs,
+      includeSocialSecurity: retirementItemIncluded(itemPreferences, "social-security", 0),
+      includeExpectedExpenses: retirementItemIncluded(itemPreferences, "expected-expenses", 0),
+      pensions: pensions.filter((row) => retirementItemIncluded(itemPreferences, "pension", row.id)),
+      projectionEntries: incomeExpenseEntries.filter((row) => retirementItemIncluded(itemPreferences, "income-expense-entry", row.id)),
+    });
     const all = buildRetirementIncomeExpenseProjection({
       ...cashflowInputs, projectedAssets: allAccounts.assets, projectedLiabilities: allAccounts.liabilities,
     });
-    res.json(cashflowWithAccountControls(selected, all, allAccounts, netWorthProjection));
+    res.json(cashflowWithAccountControls(selected, all, allAccounts, netWorthProjection, itemPreferences, pensions));
   });
 
   app.put("/api/retirement/withdrawal-rate/:assetId", requireAuth, async (req: any, res) => {
@@ -862,6 +873,7 @@ export async function registerRoutes(
       eq(retirementIncomeExpenseEntries.userId, req.user.id),
     )).returning({ id: retirementIncomeExpenseEntries.id });
     if (deleted.length === 0) return res.status(404).json({ message: "Income or expense entry not found" });
+    await deleteRetirementItemPreference(req.user.id, "income-expense-entry", id);
     res.status(204).send();
   });
 
@@ -943,6 +955,7 @@ export async function registerRoutes(
       eq(retirementProjectionEntries.userId, req.user.id),
     )).returning({ id: retirementProjectionEntries.id });
     if (deleted.length === 0) return res.status(404).json({ message: "Projection entry not found" });
+    await deleteRetirementItemPreference(req.user.id, "net-worth-entry", id);
     res.status(204).send();
   });
 
@@ -979,6 +992,7 @@ export async function registerRoutes(
     if (!Number.isInteger(id)) return res.status(400).json({ message: "Invalid pension id" });
 
     await storage.deleteRetirementPension(id, (req.user as any).id);
+    await deleteRetirementItemPreference((req.user as any).id, "pension", id);
     res.status(204).send();
   });
 

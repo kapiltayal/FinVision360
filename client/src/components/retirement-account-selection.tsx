@@ -2,14 +2,21 @@ import { useMutation, useMutationState } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
-type AccountKind = "asset" | "liability";
+export type RetirementAccountInclusionKind =
+  | "asset"
+  | "liability"
+  | "net-worth-entry"
+  | "income-expense-entry"
+  | "pension"
+  | "social-security"
+  | "expected-expenses";
 type ProjectionKind = "net-worth" | "income-expense";
 
 const inclusionMutationKey = ["/api/retirement/account-inclusion"];
 
 type InlineAccountInclusionProps = {
   accountId: number;
-  kind: AccountKind;
+  kind: RetirementAccountInclusionKind;
   projection: ProjectionKind;
   included: boolean;
   accountName: string;
@@ -49,7 +56,16 @@ export function InlineAccountInclusion({
       }),
   });
   const projectionLabel = projection === "net-worth" ? "Net worth" : "Income & expenses";
-  const label = `${included ? "Exclude" : "Include"} ${kind} ${accountName} ${
+  const kindLabel: Record<RetirementAccountInclusionKind, string> = {
+    asset: "asset account",
+    liability: "liability account",
+    "net-worth-entry": "custom net worth entry",
+    "income-expense-entry": "custom income or expense",
+    pension: "pension",
+    "social-security": "Social Security",
+    "expected-expenses": "expected lifestyle expenses",
+  };
+  const label = `${included ? "Exclude" : "Include"} ${kindLabel[kind]} ${accountName} ${
     included ? "from" : "in"
   } the ${projectionLabel} projection`;
 

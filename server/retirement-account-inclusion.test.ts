@@ -37,3 +37,13 @@ test("inclusion requests require explicit boolean, positive integer account ID, 
     assert.equal(retirementAccountInclusionSchema.safeParse({ ...valid, ...invalid }).success, false);
   }
 });
+
+test("custom inclusion kinds enforce their own view and distinguish built-in IDs from saved entries", () => {
+  for (const kind of ["net-worth-entry", "income-expense-entry", "pension", "social-security", "expected-expenses"] as const) {
+    const builtin = kind === "social-security" || kind === "expected-expenses";
+    const value = { kind, accountId: builtin ? 0 : 1, projection: kind === "net-worth-entry" ? "net-worth" : "income-expense", included: false };
+    assert.ok(retirementAccountInclusionSchema.safeParse(value).success);
+    assert.equal(retirementAccountInclusionSchema.safeParse({ ...value, accountId: builtin ? 1 : 0 }).success, false);
+    assert.equal(retirementAccountInclusionSchema.safeParse({ ...value, projection: value.projection === "net-worth" ? "income-expense" : "net-worth" }).success, false);
+  }
+});

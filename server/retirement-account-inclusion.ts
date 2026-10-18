@@ -5,6 +5,7 @@ import { assets, liabilities, retirementAccountProjectionPreferences as preferen
 import { retirementAccountInclusionSchema, type RetirementAccountInclusionInput } from "@shared/retirement-account-inclusion";
 import { db } from "./db";
 import { storage } from "./storage";
+import { getRetirementItemPreferences, saveRetirementItemInclusion } from "./retirement-item-inclusion";
 
 /** Additive migration used by development and published application bootstrap. */
 export async function ensureRetirementAccountInclusionSchema(pool: Pool) {
@@ -28,6 +29,20 @@ export async function ensureRetirementAccountInclusionSchema(pool: Pool) {
         ON retirement_account_projection_preferences(user_id, asset_id);
       CREATE UNIQUE INDEX IF NOT EXISTS retirement_account_preferences_user_liability_unique
         ON retirement_account_projection_preferences(user_id, liability_id);
+      CREATE TABLE IF NOT EXISTS retirement_projection_item_preferences (
+        id SERIAL PRIMARY KEY,
+        user_id VARCHAR NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        kind TEXT NOT NULL,
+        item_id INTEGER NOT NULL,
+        included BOOLEAN NOT NULL DEFAULT TRUE,
+        updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+        CONSTRAINT retirement_item_preferences_kind_id CHECK (
+          (kind IN ('social-security', 'expected-expenses') AND item_id = 0)
+          OR (kind IN ('net-worth-entry', 'income-expense-entry', 'pension') AND item_id > 0)
+        )
+      );
+      CREATE UNIQUE INDEX IF NOT EXISTS retirement_item_preferences_user_kind_item_unique
+        ON retirement_projection_item_preferences(user_id, kind, item_id);
     `);
     await client.query("COMMIT");
   } catch (error) {
@@ -44,6 +59,7 @@ export function getRetirementAccountPreferences(userId: string) {
 
 /** Ownership check and upsert share a transaction; only the requested flag changes. */
 export async function saveRetirementAccountInclusion(userId: string, input: RetirementAccountInclusionInput) {
+  if (input.kind !== "asset" && input.kind !== "liability") return saveRetirementItemInclusion(userId, input);
   return db.transaction(async (tx) => {
     const [account] = input.kind === "asset"
       ? await tx.select({ id: assets.id }).from(assets)
@@ -71,8 +87,8 @@ export async function saveRetirementAccountInclusion(userId: string, input: Reti
 export function registerRetirementAccountInclusionRoutes(app: Express, requireAuth: RequestHandler) {
   app.get("/api/retirement/account-inclusion", requireAuth, async (req, res) => {
     const userId = (req.user as { id: string }).id;
-    const [userAssets, userLiabilities, saved] = await Promise.all([
-      storage.getAssets(userId), storage.getLiabilities(userId), getRetirementAccountPreferences(userId),
+    const [userAssets, userLiabilities, saved, items] = await Promise.all([
+      storage.getAssets(userId), storage.getLiabilities(userId), getRetirementAccountPreferences(userId), getRetirementItemPreferences(userId),
     ]);
     const byAsset = new Map(saved.filter((row) => row.assetId !== null).map((row) => [row.assetId, row]));
     const byLiability = new Map(saved.filter((row) => row.liabilityId !== null).map((row) => [row.liabilityId, row]));
@@ -87,7 +103,7 @@ export function registerRetirementAccountInclusionRoutes(app: Express, requireAu
         netWorthIncluded: byLiability.get(account.id)?.netWorthIncluded ?? true,
         incomeExpenseIncluded: byLiability.get(account.id)?.incomeExpenseIncluded ?? true,
       })),
-    ] });
+    ], items });
   });
 
   app.put("/api/retirement/account-inclusion", requireAuth, async (req, res) => {

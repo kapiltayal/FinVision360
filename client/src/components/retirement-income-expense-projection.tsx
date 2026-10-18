@@ -11,7 +11,7 @@ import { Switch } from "@/components/ui/switch";
 import { formatCurrency } from "@/lib/format";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { InlineAccountInclusion, ProjectionExclusionNotice } from "@/components/retirement-account-selection";
+import { InlineAccountInclusion, ProjectionExclusionNotice, type RetirementAccountInclusionKind } from "@/components/retirement-account-selection";
 
 export type CashflowItem = {
   id: string;
@@ -24,6 +24,9 @@ export type CashflowItem = {
   assetId?: number;
   liabilityId?: number;
   included?: boolean;
+  inclusionKind?: RetirementAccountInclusionKind;
+  inclusionId?: number;
+  configuredAmount?: number;
   nonContributing?: boolean;
   projectedBalance?: number;
   withdrawalRate?: number;
@@ -88,7 +91,9 @@ function EntryDialog({ open, onOpenChange, initial, kind, onSubmit, saving }: {
 function CashflowRow({ item, onEdit, onDelete }: { item: CashflowItem; onEdit: () => void; onDelete: () => void }) {
   const style = tone(item.source);
   const Icon = style.icon;
-  const inclusion = item.source === "debt-payment" && item.liabilityId !== undefined
+  const inclusion = item.inclusionKind && item.inclusionId !== undefined
+    ? { id: item.inclusionId, kind: item.inclusionKind }
+    : item.source === "debt-payment" && item.liabilityId !== undefined
     ? { id: item.liabilityId, kind: "liability" as const }
     : (item.source === "retirement-account" || item.source === "asset-account") && item.assetId !== undefined
       ? { id: item.assetId, kind: "asset" as const }
@@ -102,7 +107,7 @@ function CashflowRow({ item, onEdit, onDelete }: { item: CashflowItem; onEdit: (
           {inclusion && <InlineAccountInclusion accountId={inclusion.id} kind={inclusion.kind} projection="income-expense" included={included} accountName={item.name} />}
           <p className="truncate text-sm font-semibold">{item.name}</p>
         </div>
-        <p className="mt-0.5 text-xs text-muted-foreground">{item.nonContributing ? "No direct retirement cash-flow contribution or paid-off debt" : item.details || (item.isProjectionOnly ? "Projection-only estimate" : "Included in your retirement projection")}</p>
+        <p className="mt-0.5 text-xs text-muted-foreground">{item.details || (item.nonContributing ? "No direct retirement cash-flow contribution" : item.isProjectionOnly ? "Projection-only estimate" : "Included in your retirement projection")}</p>
       </div>
       <div className="flex shrink-0 items-center gap-1"><span className={`text-sm font-bold tabular-nums ${included ? style.color : "text-muted-foreground"}`}>{included ? money(item.monthlyAmount) : "Excluded"}</span>{item.isProjectionOnly && <span className="ml-1 flex"><Button size="icon" variant="ghost" className="h-7 w-7" onClick={onEdit} aria-label={`Edit ${item.name}`}><Pencil className="h-3.5 w-3.5" /></Button><Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={onDelete} aria-label={`Delete ${item.name}`}><Trash2 className="h-3.5 w-3.5" /></Button></span>}</div>
     </div>
@@ -215,7 +220,7 @@ function AssetAccountsSection({ items }: { items: CashflowItem[] }) {
 
 function PensionIncomeSection({ items }: { items: CashflowItem[] }) {
   const [open, setOpen] = useState(false);
-  const total = items.reduce((sum, item) => sum + item.monthlyAmount, 0);
+  const total = items.reduce((sum, item) => sum + (item.included === false ? 0 : item.monthlyAmount), 0);
   return <div className="border-b border-teal-200/60 bg-teal-50/30 dark:border-teal-900/60 dark:bg-teal-950/10">
     <button type="button" className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-teal-50/70 dark:hover:bg-teal-950/20" onClick={() => setOpen(!open)} aria-expanded={open}>
       <span className="flex items-center gap-2"><ChevronDown className={`h-4 w-4 transition-transform ${open ? "rotate-180" : ""}`} /><span><span className="block text-sm font-semibold">Pension income</span><span className="block text-xs text-muted-foreground">{items.length ? `${items.length} pension${items.length === 1 ? "" : "s"}` : "No pension income found"}</span></span></span>
@@ -258,6 +263,7 @@ function Column({ kind, items, onAdd, onEdit, onDelete, expected, onExpectedChan
   const pensionIncome = items.filter((item) => item.source === "pension");
   const debtPayments = items.filter((item) => item.source === "debt-payment");
   const assetAccounts = items.filter((item) => item.source === "asset-account");
+  const expectedItem = items.find((item) => item.source === "expected-expenses");
   const displayItems = items.filter((item) => item.source !== "expected-expenses" && item.source !== "retirement-account" && item.source !== "pension" && item.source !== "debt-payment" && item.source !== "asset-account");
   return (
     <section className={`overflow-hidden rounded-2xl border ${income ? "border-teal-200/80 dark:border-teal-900" : "border-amber-200/80 dark:border-amber-900"}`}>
@@ -269,8 +275,9 @@ function Column({ kind, items, onAdd, onEdit, onDelete, expected, onExpectedChan
         {income && onWithdrawalRateChange && onEarlyWithdrawalAccessChange && <RetirementAccountsSection items={retirementAccounts} onSave={onWithdrawalRateChange} savingAssetId={savingWithdrawalAssetId ?? null} onEarlyWithdrawalAccessChange={onEarlyWithdrawalAccessChange} savingEarlyWithdrawalAssetId={savingEarlyWithdrawalAssetId ?? null} />}
         {income && assetAccounts.length > 0 && <AssetAccountsSection items={assetAccounts} />}
         {income && <PensionIncomeSection items={pensionIncome} />}
-        {!income && expected !== undefined && onExpectedChange && <div className="border-b bg-amber-50/40 px-4 py-3 dark:bg-amber-950/10">
-          <div className="flex items-center gap-3"><div className="h-8 w-8 shrink-0 rounded-lg bg-amber-500/10" /><div className="min-w-0 flex-1"><p className="text-sm font-semibold">Expected lifestyle expenses</p><p className="text-xs text-muted-foreground">Your editable spending baseline</p></div><div className="flex items-center"><span className="text-sm font-bold text-amber-700 dark:text-amber-300">$</span><Input className="h-8 w-24 border-amber-300/70 bg-background text-right font-semibold tabular-nums" type="number" min="0" step="1" value={expected} onChange={(e) => onExpectedChange(Number(e.target.value) || 0)} onBlur={onExpectedBlur} disabled={savingExpected} /><span className="ml-1 text-xs font-medium text-amber-700 dark:text-amber-300">/mo</span></div></div>
+        {!income && expected !== undefined && onExpectedChange && <div className={`border-b bg-amber-50/40 px-4 py-3 dark:bg-amber-950/10 ${expectedItem?.included === false ? "opacity-60" : ""}`}>
+          <div className="flex items-center gap-3"><div className="h-8 w-8 shrink-0 rounded-lg bg-amber-500/10" /><div className="min-w-0 flex-1"><div className="flex min-w-0 items-center gap-2"><InlineAccountInclusion accountId={0} kind="expected-expenses" projection="income-expense" included={expectedItem?.included !== false} accountName="Expected lifestyle expenses" /><p className="text-sm font-semibold">Expected lifestyle expenses</p></div><p className="text-xs text-muted-foreground">Your editable spending baseline</p></div><div className="flex items-center"><span className="text-sm font-bold text-amber-700 dark:text-amber-300">$</span><Input className="h-8 w-24 border-amber-300/70 bg-background text-right font-semibold tabular-nums" type="number" min="0" step="1" value={expected} onChange={(e) => onExpectedChange(Number(e.target.value) || 0)} onBlur={onExpectedBlur} disabled={savingExpected || expectedItem?.included === false} /><span className="ml-1 text-xs font-medium text-amber-700 dark:text-amber-300">/mo</span></div></div>
+          {expectedItem?.included === false && <p className="mt-2 pl-11 text-xs font-medium text-muted-foreground">Excluded</p>}
         </div>}
         {!income && debtPayments.length > 0 && <DebtPaymentsSection items={debtPayments} />}
         {displayItems.length === 0 && income && retirementAccounts.length === 0 && pensionIncome.length === 0 && assetAccounts.length === 0 ? <div className="px-4 py-8 text-center text-sm text-muted-foreground">No projected income yet.</div> : displayItems.map((item) => (
@@ -360,6 +367,6 @@ export function RetirementIncomeExpenseProjection() {
       <Column kind="expense" items={grouped.expenses} expected={expected ?? data.expectedMonthlyExpenses} onExpectedChange={(value) => { setExpected(value); setExpectedDirty(true); }} onExpectedBlur={() => { if (expected !== null) settingsMutation.mutate(expected); }} savingExpected={settingsMutation.isPending} onAdd={() => openAdd("expense")} onEdit={(item) => openEdit(item, "expense")} onDelete={(item) => { if (window.confirm(`Remove ${item.name} from your projection?`)) deleteMutation.mutate(item); }} />
     </div>
     <Assumptions assumptions={data.assumptions || []} />
-    <EntryDialog open={dialogOpen} onOpenChange={setDialogOpen} kind={draftKind} saving={entryMutation.isPending} initial={editing ? { kind: draftKind, name: editing.name, amount: String(editing.monthlyAmount), notes: editing.details || "" } : null} onSubmit={(form) => entryMutation.mutate(form)} />
+     <EntryDialog open={dialogOpen} onOpenChange={setDialogOpen} kind={draftKind} saving={entryMutation.isPending} initial={editing ? { kind: draftKind, name: editing.name, amount: String(editing.configuredAmount ?? editing.monthlyAmount), notes: editing.details || "" } : null} onSubmit={(form) => entryMutation.mutate(form)} />
   </div>;
 }

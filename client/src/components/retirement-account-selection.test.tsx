@@ -2,14 +2,14 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { InlineAccountInclusion, ProjectionExclusionNotice } from "./retirement-account-selection";
+import { InlineAccountInclusion, ProjectionExclusionNotice, type RetirementAccountInclusionKind } from "./retirement-account-selection";
 
-function renderCheckbox(projection: "net-worth" | "income-expense", included: boolean, kind: "asset" | "liability") {
+function renderCheckbox(projection: "net-worth" | "income-expense", included: boolean, kind: RetirementAccountInclusionKind) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { gcTime: Infinity } } });
   try {
     return renderToStaticMarkup(
       <QueryClientProvider client={client}>
-        <InlineAccountInclusion projection={projection} included={included} kind={kind} accountId={1} accountName="Test account" />
+        <InlineAccountInclusion projection={projection} included={included} kind={kind} accountId={kind === "social-security" || kind === "expected-expenses" ? 0 : 1} accountName="Test account" />
       </QueryClientProvider>,
     );
   } finally { client.clear(); }
@@ -21,8 +21,8 @@ test("account controls use compact accessible checkboxes instead of separate man
   assert.ok(included.includes('type="checkbox"'));
   assert.ok(included.includes('checked=""'));
   assert.ok(!excluded.includes('checked=""'), "excluded accounts remain unchecked and can be restored");
-  assert.ok(included.includes("Exclude asset Test account from the Net worth projection"));
-  assert.ok(excluded.includes("Include asset Test account in the Net worth projection"));
+  assert.ok(included.includes("Exclude asset account Test account from the Net worth projection"));
+  assert.ok(excluded.includes("Include asset account Test account in the Net worth projection"));
   assert.ok(!included.includes("Manage accounts"));
   assert.ok(!included.includes("Accounts in this projection"));
   assert.ok(!included.includes('role="switch"'));
@@ -30,11 +30,23 @@ test("account controls use compact accessible checkboxes instead of separate man
 
 test("checkbox labels scope their changes to the correct projection and account kind", () => {
   assert.ok(renderCheckbox("income-expense", false, "liability").includes(
-    "Include liability Test account in the Income &amp; expenses projection",
+    "Include liability account Test account in the Income &amp; expenses projection",
   ));
   assert.ok(renderCheckbox("income-expense", true, "asset").includes(
-    "Exclude asset Test account from the Income &amp; expenses projection",
+    "Exclude asset account Test account from the Income &amp; expenses projection",
   ));
+});
+
+test("custom accounts, pensions, Social Security and the expense baseline all have restorable checkboxes", () => {
+  for (const kind of ["net-worth-entry", "income-expense-entry", "pension", "social-security", "expected-expenses"] as const) {
+    const projection = kind === "net-worth-entry" ? "net-worth" : "income-expense";
+    const included = renderCheckbox(projection, true, kind);
+    const excluded = renderCheckbox(projection, false, kind);
+    assert.ok(included.includes('type="checkbox"') && included.includes('checked=""'));
+    assert.ok(excluded.includes('type="checkbox"') && !excluded.includes('checked=""'));
+    assert.ok(!excluded.includes("disabled="), "unchecked custom entries remain available to re-include");
+    assert.ok(excluded.includes('aria-label="Include'));
+  }
 });
 
 test("top exclusion notice stays hidden when everything is included and reports exact counts", () => {

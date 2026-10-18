@@ -67,3 +67,62 @@ test("cashflow controls cover ordinary savings and paid-off debts without invent
   assert.equal(restored.totalMonthlyIncome, full.totalMonthlyIncome);
   assert.equal(restored.totalMonthlyExpenses, full.totalMonthlyExpenses);
 });
+
+test("custom Net Worth assets and liabilities can be excluded without losing their editable amounts", () => {
+  const all = buildRetirementNetWorthProjection({
+    ...inputs, projectionEntries: [...inputs.projectionEntries,
+      { id: 2, kind: "liability", name: "Custom future debt", parentCategory: "Debt", category: "Loan", amount: "200", notes: null }],
+  });
+  const selected = buildRetirementNetWorthProjection({ ...inputs, projectionEntries: [] });
+  const response = netWorthWithAccountControls(selected, all);
+  assert.equal(response.excludedAccountCount, 2);
+  const asset = response.assets.find((row) => row.isProjectionOnly)!;
+  const debt = response.liabilities.find((row) => row.isProjectionOnly)!;
+  assert.equal(asset.included, false);
+  assert.equal(asset.configuredAmount, 500);
+  assert.equal(asset.projectedValue, 0);
+  assert.equal(debt.included, false);
+  assert.equal(debt.configuredAmount, 200);
+  assert.equal(debt.projectedBalance, 0);
+  assert.equal(response.projectedNetWorth, selected.projectedNetWorth);
+  assert.equal(response.assets.reduce((sum, row) => sum + row.projectedValue, 0), selected.projectedAssetTotal);
+});
+
+test("all custom cashflow and benefit sources retain checkboxes and saved values when excluded", () => {
+  const accounts = buildRetirementNetWorthProjection(inputs);
+  const source: Parameters<typeof buildRetirementIncomeExpenseProjection>[0] = {
+    retirementAge: 65, projectedAssets: accounts.assets, projectedLiabilities: accounts.liabilities,
+    socialSecurity: { fraMonthlyBenefit: "1000", dateOfBirth: "1980-01-01" },
+    pensions: [{ id: 1, name: "Pension", amount: "200", frequency: "monthly", startAge: 60, notes: null }],
+    withdrawalRates: [], expectedMonthlyExpenses: "50",
+    projectionEntries: [
+      { id: 1, kind: "income", name: "Rent", amount: "500", notes: null },
+      { id: 2, kind: "expense", name: "Travel", amount: "100", notes: null },
+    ],
+  };
+  const all = buildRetirementIncomeExpenseProjection(source);
+  const selected = buildRetirementIncomeExpenseProjection({
+    ...source, projectionEntries: [], pensions: [], includeSocialSecurity: false, includeExpectedExpenses: false,
+  });
+  const preferences = [
+    { kind: "income-expense-entry", itemId: 1, included: false },
+    { kind: "income-expense-entry", itemId: 2, included: false },
+    { kind: "pension", itemId: 1, included: false },
+    { kind: "social-security", itemId: 0, included: false },
+    { kind: "expected-expenses", itemId: 0, included: false },
+  ];
+  const response = cashflowWithAccountControls(selected, all, accounts, accounts, preferences);
+  assert.equal(response.excludedAccountCount, 5);
+  assert.equal(response.expectedMonthlyExpenses, 50);
+  const rows = [...response.income, ...response.expenses];
+  for (const preference of preferences) {
+    const row = rows.find((row) => row.inclusionKind === preference.kind && row.inclusionId === preference.itemId)!;
+    assert.ok(row, `${preference.kind} must remain selectable`);
+    assert.equal(row.included, false);
+    assert.equal(row.monthlyAmount, 0);
+    assert.ok(row.configuredAmount! > 0);
+  }
+  assert.equal(response.income.reduce((sum, row) => sum + row.monthlyAmount, 0), selected.totalMonthlyIncome);
+  assert.equal(response.expenses.reduce((sum, row) => sum + row.monthlyAmount, 0), selected.totalMonthlyExpenses);
+  assert.deepEqual(response.assumptions, selected.assumptions);
+});

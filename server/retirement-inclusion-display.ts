@@ -1,5 +1,6 @@
 import type { buildRetirementNetWorthProjection } from "./retirement-projection";
 import type { buildRetirementIncomeExpenseProjection, CashflowItem } from "./retirement-income-expense-projection";
+import { retirementItemIncluded, type RetirementAccountInclusionInput, type RetirementItemPreference } from "../shared/retirement-account-inclusion";
 
 type NetWorth = ReturnType<typeof buildRetirementNetWorthProjection>;
 type Cashflow = ReturnType<typeof buildRetirementIncomeExpenseProjection>;
@@ -8,32 +9,33 @@ type DisplayCashflow = Omit<CashflowItem, "source"> & {
   liabilityId?: number;
   included?: boolean;
   nonContributing?: boolean;
+  configuredAmount?: number;
+  inclusionKind?: RetirementAccountInclusionInput["kind"];
+  inclusionId?: number;
 };
 
 /** Keep deselected accounts available to re-check without adding them to calculations. */
 export function netWorthWithAccountControls(selected: NetWorth, all: NetWorth) {
   const assets = new Set(selected.assets.filter((row) => !row.isProjectionOnly).map((row) => row.sourceAssetId));
   const debts = new Set(selected.liabilities.filter((row) => !row.isProjectionOnly).map((row) => row.sourceLiabilityId));
-  const excludedAccountCount = all.assets.filter((row) => !row.isProjectionOnly && !assets.has(row.sourceAssetId)).length
-    + all.liabilities.filter((row) => !row.isProjectionOnly && !debts.has(row.sourceLiabilityId)).length;
-  return {
-    ...selected,
-    assets: all.assets.map((row) => {
-      if (row.isProjectionOnly) return row;
-      const included = assets.has(row.sourceAssetId);
-      return { ...row, included, projectedValue: included ? row.projectedValue : 0 };
-    }),
-    liabilities: all.liabilities.map((row) => {
-      if (row.isProjectionOnly) return row;
-      const included = debts.has(row.sourceLiabilityId);
-      return { ...row, included, projectedBalance: included ? row.projectedBalance : 0 };
-    }),
-    excludedAccountCount,
-  };
+  const customAssets = new Set(selected.assets.filter((row) => row.isProjectionOnly).map((row) => row.projectionEntryId));
+  const customDebts = new Set(selected.liabilities.filter((row) => row.isProjectionOnly).map((row) => row.projectionEntryId));
+  const displayAssets = all.assets.map((row) => {
+    const included = row.isProjectionOnly ? customAssets.has(row.projectionEntryId) : assets.has(row.sourceAssetId);
+    return { ...row, included, configuredAmount: row.isProjectionOnly ? row.projectedValue : undefined, projectedValue: included ? row.projectedValue : 0 };
+  });
+  const displayDebts = all.liabilities.map((row) => {
+    const included = row.isProjectionOnly ? customDebts.has(row.projectionEntryId) : debts.has(row.sourceLiabilityId);
+    return { ...row, included, configuredAmount: row.isProjectionOnly ? row.projectedBalance : undefined, projectedBalance: included ? row.projectedBalance : 0 };
+  });
+  return { ...selected, assets: displayAssets, liabilities: displayDebts,
+    excludedAccountCount: [...displayAssets, ...displayDebts].filter((row) => !row.included).length };
 }
 
 export function cashflowWithAccountControls(
   selected: Cashflow, all: Cashflow, allAccounts: NetWorth, selectedAccounts: NetWorth,
+  preferences: RetirementItemPreference[] = [],
+  pensions: { id: number; name: string; startAge: number }[] = [],
 ) {
   const assets = new Set(selectedAccounts.assets.filter((row) => !row.isProjectionOnly).map((row) => row.sourceAssetId));
   const debts = new Set(selectedAccounts.liabilities.filter((row) => !row.isProjectionOnly).map((row) => row.sourceLiabilityId));
@@ -64,8 +66,34 @@ export function cashflowWithAccountControls(
       nonContributing: true, details: "Paid off before retirement; no payment projected.",
     });
   }
-  return {
-    ...selected, income, expenses,
-    excludedAccountCount: [...income, ...expenses].filter((row) => row.included === false).length,
-  };
+  // Keep currently zero/non-contributing benefit rows selectable too.
+  if (!income.some((row) => row.source === "social-security")) {
+    income.push({ id: "social-security", source: "social-security", name: "Social Security",
+      monthlyAmount: 0, isProjectionOnly: false, details: "No usable benefit is currently configured." });
+  }
+  for (const pension of pensions) {
+    if (income.some((row) => row.id === `pension-${pension.id}`)) continue;
+    income.push({ id: `pension-${pension.id}`, source: "pension", name: pension.name,
+      monthlyAmount: 0, isProjectionOnly: false, nonContributing: true,
+      details: `Benefits start at age ${pension.startAge}; no income is projected at retirement.` });
+  }
+  function decorate(row: DisplayCashflow): DisplayCashflow {
+    let kind: RetirementAccountInclusionInput["kind"];
+    let id: number;
+    if (row.assetId !== undefined) { kind = "asset"; id = row.assetId; }
+    else if (row.liabilityId !== undefined) { kind = "liability"; id = row.liabilityId; }
+    else if (row.source === "projection-only") { kind = "income-expense-entry"; id = row.projectionEntryId!; }
+    else if (row.source === "pension") { kind = "pension"; id = Number(row.id.replace("pension-", "")); }
+    else if (row.source === "social-security") { kind = "social-security"; id = 0; }
+    else if (row.source === "expected-expenses") { kind = "expected-expenses"; id = 0; }
+    else return row;
+    const included = kind === "asset" || kind === "liability" ? row.included !== false
+      : retirementItemIncluded(preferences, kind, id);
+    return { ...row, inclusionKind: kind, inclusionId: id, included,
+      configuredAmount: row.monthlyAmount, monthlyAmount: included ? row.monthlyAmount : 0 };
+  }
+  const displayIncome = income.map(decorate), displayExpenses = expenses.map(decorate);
+  return { ...selected, income: displayIncome, expenses: displayExpenses,
+    expectedMonthlyExpenses: all.expectedMonthlyExpenses,
+    excludedAccountCount: [...displayIncome, ...displayExpenses].filter((row) => row.included === false).length };
 }

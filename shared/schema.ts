@@ -380,6 +380,21 @@ export const insertRetirementAccountWithdrawalRateSchema = createInsertSchema(re
 export type InsertRetirementAccountWithdrawalRate = z.infer<typeof insertRetirementAccountWithdrawalRateSchema>;
 export type RetirementAccountWithdrawalRate = typeof retirementAccountWithdrawalRates.$inferSelect;
 
+export const retirementProjectionItemPreferences = pgTable("retirement_projection_item_preferences", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  kind: text("kind").notNull(),
+  itemId: integer("item_id").notNull(),
+  included: boolean("included").notNull().default(true),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("retirement_item_preferences_user_kind_item_unique").on(table.userId, table.kind, table.itemId),
+  check("retirement_item_preferences_kind_id", sql`(
+    (${table.kind} IN ('social-security', 'expected-expenses') AND ${table.itemId} = 0)
+    OR (${table.kind} IN ('net-worth-entry', 'income-expense-entry', 'pension') AND ${table.itemId} > 0)
+  )`),
+]);
+
 export const retirementAccountProjectionPreferences = pgTable("retirement_account_projection_preferences", {
   id: serial("id").primaryKey(),
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),

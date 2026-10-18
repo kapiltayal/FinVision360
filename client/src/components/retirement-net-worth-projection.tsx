@@ -19,6 +19,7 @@ export type RetirementProjectionAsset = {
   category: string;
   currentValue: number;
   projectedValue: number;
+  configuredAmount?: number;
   returnRate: number;
   rateSource: "override" | "account" | "asset-type-default" | "projection-only";
   institution?: string | null;
@@ -36,6 +37,7 @@ export type RetirementProjectionLiability = {
   category: string;
   currentBalance: number;
   projectedBalance: number;
+  configuredAmount?: number;
   interestRate: number;
   minimumPayment: number;
   maturityDate?: string | null;
@@ -97,16 +99,21 @@ function AssetRow({ asset, actions }: { asset: RetirementProjectionAsset; action
 
   if (asset.isProjectionOnly) {
     return (
-      <div className="rounded-lg border bg-background p-3">
+      <div className={`rounded-lg border bg-background p-3 ${included ? "" : "opacity-60"}`}>
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="truncate text-sm font-semibold">{asset.name}</p>
+            <div className="flex min-w-0 items-center gap-2">
+              {asset.projectionEntryId != null && (
+                <InlineAccountInclusion accountId={asset.projectionEntryId} kind="net-worth-entry" projection="net-worth" included={included} accountName={asset.name} />
+              )}
+              <p className="truncate text-sm font-semibold">{asset.name}</p>
+            </div>
             <p className="text-xs text-muted-foreground">Projection-only asset at retirement</p>
             {asset.details && <p className="mt-1 text-xs text-muted-foreground">{asset.details}</p>}
           </div>
           <div className="text-right">
-            <p className="text-sm font-bold tabular-nums text-emerald-700 dark:text-emerald-300">
-              {formatCurrency(asset.projectedValue)}
+            <p className={`text-sm font-bold tabular-nums ${included ? "text-emerald-700 dark:text-emerald-300" : "text-muted-foreground"}`}>
+              {included ? formatCurrency(asset.projectedValue) : "Excluded"}
             </p>
             <div className="mt-1 flex justify-end gap-1">
               <Button size="icon" variant="ghost" onClick={() => void actions.onSaveEntry(asset.projectionEntryId!, {
@@ -114,7 +121,7 @@ function AssetRow({ asset, actions }: { asset: RetirementProjectionAsset; action
                 name: asset.name,
                 parentCategory: asset.parentCategory,
                 category: asset.category,
-                amount: String(asset.projectedValue),
+                amount: String(asset.configuredAmount ?? asset.projectedValue),
                 notes: asset.details || "",
               })}>
                 <Pencil className="h-3.5 w-3.5" />
@@ -206,6 +213,9 @@ function LiabilityRow({ liability, actions }: { liability: RetirementProjectionL
             {liability.sourceLiabilityId != null && (
               <InlineAccountInclusion accountId={liability.sourceLiabilityId} kind="liability" projection="net-worth" included={included} accountName={liability.name} />
             )}
+            {liability.isProjectionOnly && liability.projectionEntryId != null && (
+              <InlineAccountInclusion accountId={liability.projectionEntryId} kind="net-worth-entry" projection="net-worth" included={included} accountName={liability.name} />
+            )}
             <p className="truncate text-sm font-semibold">{liability.name}</p>
           </div>
           <p className="truncate text-xs text-muted-foreground">
@@ -223,7 +233,7 @@ function LiabilityRow({ liability, actions }: { liability: RetirementProjectionL
                 name: liability.name,
                 parentCategory: liability.parentCategory,
                 category: liability.category,
-                amount: String(liability.projectedBalance),
+                amount: String(liability.configuredAmount ?? liability.projectedBalance),
                 notes: liability.message || "",
               })}>
                 <Pencil className="h-3.5 w-3.5" />

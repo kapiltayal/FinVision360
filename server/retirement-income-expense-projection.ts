@@ -140,6 +140,8 @@ function monthlyPensionAmount(amount: number, frequency: string): number {
 
 export function buildRetirementIncomeExpenseProjection(input: {
   retirementAge: number;
+  includeSocialSecurity?: boolean;
+  includeExpectedExpenses?: boolean;
   socialSecurity: SocialSecurityInput | null | undefined;
   pensions: PensionInput[];
   projectedAssets: ProjectedAssetInput[];
@@ -162,6 +164,7 @@ export function buildRetirementIncomeExpenseProjection(input: {
   const assumptions: Assumption[] = [];
   const retirementAge = Number.isFinite(input.retirementAge) ? input.retirementAge : 65;
 
+  if (input.includeSocialSecurity !== false) {
   const fraBenefit = numberValue(input.socialSecurity?.fraMonthlyBenefit);
   const birthYear = birthYearFromDateOfBirth(input.socialSecurity?.dateOfBirth);
   if (!input.socialSecurity || fraBenefit <= 0) {
@@ -213,6 +216,8 @@ export function buildRetirementIncomeExpenseProjection(input: {
         "Amounts are treated as gross monthly benefits with no tax or cost-of-living adjustment.",
       ],
     });
+  }
+
   }
 
   for (const pension of input.pensions) {
@@ -302,6 +307,7 @@ export function buildRetirementIncomeExpenseProjection(input: {
   }
 
   const expectedMonthlyExpenses = Math.max(0, numberValue(input.expectedMonthlyExpenses));
+  if (input.includeExpectedExpenses !== false) {
   expenses.push({
     id: "expected-expenses",
     source: "expected-expenses",
@@ -318,6 +324,8 @@ export function buildRetirementIncomeExpenseProjection(input: {
       "No inflation adjustment is applied.",
     ],
   });
+
+  }
 
   for (const liability of input.projectedLiabilities) {
     if (liability.isProjectionOnly || liability.projectedBalance <= 0) continue;

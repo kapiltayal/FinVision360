@@ -27,8 +27,8 @@ Account inclusion is an independent scenario choice for each Retirement Planner 
 
 **How to apply:** Default new accounts to included, persist each projection's choice separately, and build each projection from its own selected inputs.
 
-The user wants inclusion checkboxes beside the existing account rows, not a separate account-management section. Keep unchecked accounts visible and show the number excluded above the calculation.
+The user wants inclusion checkboxes beside every existing account or item, including custom projection-only assets/debts, custom income/expenses and benefit rows—not a separate account-management section. Keep unchecked items visible and show the number excluded above the calculation.
 
 **Why:** A separate selector takes unnecessary space; removing unchecked rows would also remove the user's way to re-include them.
 
-**How to apply:** Keep presentation rows distinct from calculation inputs, including accounts that currently have no cash-flow contribution. Excluded rows must not contribute to totals or missing-input callouts.
+**How to apply:** Keep presentation rows distinct from calculation inputs, including custom items and accounts that currently have no cash-flow contribution. Excluded rows must not contribute to totals or missing-input callouts. Preserve original saved amounts for editing; a zero excluded contribution must never overwrite an item's configured value.
