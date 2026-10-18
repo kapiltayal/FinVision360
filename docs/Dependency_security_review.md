@@ -36,6 +36,18 @@ The application already uses the official vendor tarball for **xlsx 0.20.3**, no
 
 The fresh workspace scanner still reports these two entries, but `npm audit` reports zero findings and the installed vendor build is beyond both source-advisory affected ranges. They were not suppressed or concealed. The patched vendor version remains intentionally installed: downgrading to npm's 0.18.5 would reintroduce the vulnerabilities, while replacing the parser with an XLSX-only library would remove existing legacy XLS import support.
 
+### SheetJS re-verification — 2026-10-18 (UTC)
+
+The two findings were rechecked against the live GitHub Advisory API. Its affected ranges remain `< 0.19.3` and `< 0.20.2`, respectively. `npm ls xlsx --all` and the runtime both report only 0.20.3. A fresh download streamed from the official vendor URL has the same SHA-512 integrity as the lockfile:
+
+```
+sha512-oLDq3jw7AcLqKWH2AhCpVTZl8mf6X2YReP+Neh0SJUzV/BdZYjth94tG5toiMB1PPrYtxOCfaoUCkvtuH+3AJA==
+```
+
+A fresh dependency scan still reports exactly these two findings with an unbounded `introduced: "0"` range; `npm audit` reports zero vulnerabilities. No dependency downgrade, parser replacement, package alias, or scanner suppression was applied. There is no vulnerable version to patch for these two advisories in the installed tree.
+
+Run `npm run test:spreadsheet-security` to check the advisory floors for every locked SheetJS copy, runtime/manifest/lockfile agreement, and the vendor source/integrity metadata, alongside the account and transaction import regressions (including XLS and XLSX). This is an offline regression check against these two reviewed advisories, not a substitute for future security scans or a live tarball integrity comparison.
+
 ## Build-tooling advisory removed with an approved styling upgrade
 
 **GHSA-vfj7-8cjw-p6xm** in `braces@3.0.3` has no published patch. The user approved upgrading the styling tools rather than leaving the build-only dependency in place.
