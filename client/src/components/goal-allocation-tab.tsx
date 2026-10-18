@@ -238,7 +238,7 @@ export function GoalAllocationTab({ onAddGoal }: { onAddGoal: () => void }) {
       )}
       {data.goals.length > 0 && (
         <GoalAllocationConnections allocations={data.allocations}>
-          <div className="grid gap-y-6 lg:grid-cols-[220px_minmax(0,1fr)] lg:gap-x-32 xl:grid-cols-[240px_minmax(0,1fr)] xl:gap-x-48">
+          <div className="grid gap-y-6 lg:grid-cols-[220px_minmax(0,1fr)] lg:gap-x-48 xl:grid-cols-[240px_minmax(0,1fr)] xl:gap-x-72">
           <section aria-labelledby="alloc-accounts-heading" className="min-w-0 space-y-3">
             <div className="flex items-center justify-between">
               <div><h3 id="alloc-accounts-heading" className="font-semibold">Your accounts</h3><p className="text-xs text-muted-foreground">Drag one onto a goal to assign cash</p></div>
