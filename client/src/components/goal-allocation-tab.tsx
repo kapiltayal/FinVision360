@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { AlertCircle, ArrowDown, ArrowRight, Banknote, Check, Link2, Loader2, Plus, Trash2 } from "lucide-react";
+import { AlertCircle, ArrowDown, ArrowRight, Banknote, Check, ClipboardList, Link2, Loader2, Plus, Trash2 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { formatCurrency } from "@/lib/format";
 import { useToast } from "@/hooks/use-toast";
@@ -216,7 +216,7 @@ export function GoalAllocationTab({ onAddGoal }: { onAddGoal: () => void }) {
           <p className="mt-1 max-w-2xl text-sm text-muted-foreground">Earmark cash already in your accounts—no transfers, no new buckets. Drag an account to a goal, or use the assign button.</p>
         </div>
         <div className="flex items-center gap-2 self-start rounded-full border bg-background px-3 py-1.5 text-xs text-muted-foreground sm:self-auto">
-          <Link2 className="h-3.5 w-3.5 text-primary" /> Allocation is a plan, not a transfer
+          <ClipboardList className="h-3.5 w-3.5 text-primary" aria-hidden="true" /> Allocation is a plan, not a transfer
         </div>
       </div>
 
