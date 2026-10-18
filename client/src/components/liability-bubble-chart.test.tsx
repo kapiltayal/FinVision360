@@ -11,13 +11,17 @@ const debt = (id: number, change: Partial<ExposureItem> = {}): ExposureItem => (
   monthsRemaining: 12, durationSource: "override", issue: null, ...change,
 });
 
-test("two-axis chart keeps spherical shading, pan, zoom, reset and keyboard controls without orbit", () => {
+test("flat two-axis bubbles retain one legend, pan, zoom, reset and keyboard controls without shading", () => {
   const html = renderToStaticMarkup(<LiabilityBubbleChart items={[debt(1)]} />);
   for (const label of ["Drag to pan", 'aria-label="Zoom in"', 'aria-label="Zoom out"',
     'aria-label="Reset chart view"', "X · MONTHS REMAINING", "Y · APR %",
-    "Keyboard: arrows pan", "pinch to zoom", "Bubble size = balance"]) assert.ok(html.includes(label), label);
+    "Keyboard: arrows pan", "pinch to zoom", "Circle area = balance"]) assert.ok(html.includes(label), label);
   assert.ok(html.includes('viewBox="0 0 960 560"'));
-  assert.ok(html.includes("radialGradient"));
+  assert.ok(!html.includes("radialGradient"));
+  assert.ok(!html.includes("feGaussianBlur"));
+  assert.equal((html.match(/aria-label="Bubble chart legend"/g) ?? []).length, 1);
+  assert.ok(html.indexOf('aria-label="Bubble chart legend"') < html.indexOf('class="liability-bubble-toolbar"'));
+  assert.ok(!html.includes("3D-styled"));
   assert.ok(!html.includes("Z · REMAINING INTEREST"));
   assert.ok(!html.includes(">Rotate<"));
   assert.ok(!html.toLowerCase().includes("orbit"));
@@ -27,9 +31,10 @@ test("two-axis chart keeps spherical shading, pan, zoom, reset and keyboard cont
   }
 });
 
-test("accessible spheres retain exact debt data and render small debts above larger overlapping spheres", () => {
+test("flat circles retain exact debt data and render small debts above larger overlapping bubbles", () => {
   const items = [debt(1), debt(2, { balance: 500.17, apr: 8, monthsRemaining: 24 }), debt(3, { apr: 0, monthsRemaining: 6 })];
   const html = renderToStaticMarkup(<LiabilityBubbleChart items={items} />);
+  assert.equal((html.match(/<circle /g) ?? []).length, items.length, "each debt has one flat circle without highlights or shadow circles");
   for (const item of items) {
     assert.ok(html.includes(`${item.name}, balance ${formatCurrencyFull(item.balance)}`));
     assert.ok(html.includes(`total remaining interest ${formatCurrencyFull(estimateRemainingInterest(item)!)}`));
@@ -73,14 +78,14 @@ test("unknown inputs and paid-off debts remain disclosed rather than becoming ze
   assert.ok(!html.includes('class="bubble-node"'));
 });
 
-test("empty charts are safe and repeated charts have distinct sphere-gradient identifiers", () => {
+test("empty charts are safe and repeated charts have distinct plot-clipping identifiers", () => {
   const empty = renderToStaticMarkup(<LiabilityBubbleChart items={[]} />);
   assert.ok(empty.includes("No debts have usable"));
   const html = renderToStaticMarkup(<div>
     <LiabilityBubbleChart items={[debt(1, { name: "<script>unsafe</script>" })]} />
     <LiabilityBubbleChart items={[debt(2)]} />
   </div>);
-  const ids = Array.from(html.matchAll(/radialGradient id="([^"]+)-high"/g), (match) => match[1]);
+  const ids = Array.from(html.matchAll(/<clipPath id="([^"]+-plot-clip)"/g), (match) => match[1]);
   assert.equal(ids.length, 2);
   assert.notEqual(ids[0], ids[1]);
   assert.ok(!html.includes("<script>unsafe</script>"));

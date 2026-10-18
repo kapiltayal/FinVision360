@@ -25,7 +25,7 @@ export function clampBubbleCamera(camera: BubbleCamera): BubbleCamera {
   };
 }
 
-/** Two perpendicular data axes; only the spheres' shading is three-dimensional. */
+/** Two perpendicular data axes with viewport pan and zoom. */
 export function projectBubblePoint(position: BubblePosition, input: BubbleCamera) {
   const camera = clampBubbleCamera(input);
   const x = finite(position.x, 0), y = finite(position.y, 0);
@@ -56,7 +56,7 @@ export function getBubbleAxisTicks(input: BubbleCamera, maxMonths: number, maxAp
   };
 }
 
-/** CSS-pixel tooltip placement beside a sphere, with edge flipping and containment. */
+/** CSS-pixel tooltip placement beside a bubble, with edge flipping and containment. */
 export function getBubbleTooltipPosition(
   anchor: { x: number; y: number; radius: number },
   viewport: { width: number; height: number },

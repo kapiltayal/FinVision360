@@ -84,13 +84,17 @@ test("header matches the shared Assets and Liabilities page-header height", () =
 test("Liability Map offers both views and preserves the default Gantt with its editable durations", () => {
   const html = render([row(1)]);
   assert.ok(html.includes('aria-label="Liability map view"'));
+  const viewTogglePosition = html.indexOf('aria-label="Liability map view"');
+  assert.ok(viewTogglePosition > html.indexOf('aria-label="Liability totals"'));
+  assert.ok(viewTogglePosition < html.indexOf("Exposure matrix"), "view toggle belongs in totals, above the chart header");
+  assert.equal((html.match(/aria-label="APR color legend"/g) ?? []).length, 1);
   assert.ok(html.includes(">Gantt</button>"));
   assert.ok(html.includes(">Bubbles</button>"));
   assert.ok(html.includes('aria-label="Sort liabilities"'));
   for (const label of ["Highest APR First", "Smallest Balance First", "Longest Duration First"]) assert.ok(html.includes(label));
   assert.ok(html.includes('data-testid="liability-map-bar-1"'));
   assert.ok(html.includes('aria-label="Planning duration in months for Debt 1"'));
-  assert.ok(!html.includes('aria-label="Two-axis liability bubble chart with 3D-styled spheres"'));
+  assert.ok(!html.includes('class="liability-bubble-card"'));
 });
 
 test("unknown duration remains named without a fabricated bar; unknown APR is disclosed", () => {

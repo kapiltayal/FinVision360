@@ -23,10 +23,10 @@ const isWithinPlot = (x: number, y: number) =>
 const useTooltipLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
 
 function aprColor(apr: number | null) {
-  if (apr === null) return { fill: "url(#bubble-unknown)", stroke: "var(--bubble-unknown-stroke)" };
-  if (apr > 15) return { fill: "url(#bubble-high)", stroke: "var(--bubble-high-stroke)" };
-  if (apr >= 6) return { fill: "url(#bubble-medium)", stroke: "var(--bubble-medium-stroke)" };
-  return { fill: "url(#bubble-low)", stroke: "var(--bubble-low-stroke)" };
+  if (apr === null) return { fill: "#94a3b8", stroke: "#64748b" };
+  if (apr > 15) return { fill: "#ef4444", stroke: "#b91c1c" };
+  if (apr >= 6) return { fill: "#facc15", stroke: "#a16207" };
+  return { fill: "#10b981", stroke: "#047857" };
 }
 
 function pointLabel(point: BubblePoint) {
@@ -240,24 +240,12 @@ export function LiabilityBubbleChart({ items }: { items: ExposureItem[] }) {
   ]);
 
   return (
-    <section className="liability-bubble-card" aria-label="Two-axis liability bubble chart with 3D-styled spheres">
+    <section className="liability-bubble-card" aria-label="Two-axis liability bubble chart">
       <style>{`
         .liability-bubble-card {
-          --bubble-high-stroke: #8f302a;
-          --bubble-medium-stroke: #89651d;
-          --bubble-low-stroke: #27654e;
-          --bubble-unknown-stroke: #46525d;
-          --bubble-paid-stroke: #397451;
           overflow: hidden;
           color: hsl(var(--foreground));
           background: hsl(var(--card));
-        }
-        .dark .liability-bubble-card {
-          --bubble-high-stroke: #ffb3a4;
-          --bubble-medium-stroke: #f5d876;
-          --bubble-low-stroke: #96e0b8;
-          --bubble-unknown-stroke: #d2d7dc;
-          --bubble-paid-stroke: #9fe1b7;
         }
         .liability-bubble-toolbar {
           display: flex; align-items: center; justify-content: space-between; gap: 12px;
@@ -287,7 +275,7 @@ export function LiabilityBubbleChart({ items }: { items: ExposureItem[] }) {
         .bubble-axes text { fill: hsl(var(--muted-foreground)); font: 600 10px ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .08em; }
         .bubble-ticks text { fill: hsl(var(--muted-foreground)); font: 10px ui-monospace, SFMono-Regular, Menlo, monospace; }
         .bubble-node { cursor: pointer; outline: none; }
-        .bubble-node:focus-visible { stroke-width: 4; filter: brightness(1.13); }
+        .bubble-node:focus-visible { stroke: hsl(var(--foreground)); stroke-width: 3; }
         .bubble-tooltip {
           position: absolute; z-index: 5; width: min(270px, calc(100% - 16px)); box-sizing: border-box;
           border: 1px solid hsl(var(--border));
@@ -311,10 +299,17 @@ export function LiabilityBubbleChart({ items }: { items: ExposureItem[] }) {
           .bubble-ticks text { font-size: 20px; }
         }
       `}</style>
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-2 border-b border-border/70 bg-background px-4 py-3 text-[11px] text-muted-foreground sm:px-5" aria-label="Bubble chart legend">
+        <span className="font-semibold uppercase tracking-wider">APR</span>
+        <span className="inline-flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-full bg-red-500" /> &gt;15%</span>
+        <span className="inline-flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-full bg-yellow-400" /> 6–15%</span>
+        <span className="inline-flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-full bg-emerald-500" /> &lt;6%</span>
+        <span className="ml-auto">Circle area = balance · minimum visible size shown</span>
+      </div>
       <div className="liability-bubble-toolbar">
         <div className="min-w-0">
           <p className="text-sm font-semibold">Debt landscape <span className="font-normal text-muted-foreground">/ two-axis view</span></p>
-          <p className="mt-0.5 text-[11px] text-muted-foreground">Shaded spheres add visual depth; the plot itself is months vs APR. Switch to Gantt to adjust planning durations.</p>
+          <p className="mt-0.5 text-[11px] text-muted-foreground">Months remaining vs APR; circle area reflects balance. Switch to Gantt to adjust planning durations.</p>
         </div>
         <div className="flex flex-wrap items-center gap-1.5">
           <button type="button" className="bubble-icon-button" onClick={() => zoomBy(1.18)} aria-label="Zoom in" title="Zoom in"><Plus className="h-4 w-4" /></button>
@@ -334,28 +329,13 @@ export function LiabilityBubbleChart({ items }: { items: ExposureItem[] }) {
         onPointerCancel={onPointerUp}
         onLostPointerCapture={(event) => { pointersRef.current.delete(event.pointerId); gestureRef.current = null; }}
         role="group"
-        aria-label="Interactive two-axis liability bubble chart with shaded spheres. Horizontal axis is months remaining; vertical axis is APR. Use arrow keys to pan, plus and minus to zoom, and Home to reset."
+        aria-label="Interactive two-axis liability bubble chart. Horizontal axis is months remaining; vertical axis is APR. Circle area represents balance. Use arrow keys to pan, plus and minus to zoom, and Home to reset."
         tabIndex={0}
         style={{ touchAction: "none" }}
       >
         {!plotAvailable && <div className="absolute inset-0 z-10 flex items-center justify-center px-6 text-center text-sm text-muted-foreground">No debts have usable balance, APR, and remaining duration to plot yet.</div>}
-        <svg ref={svgRef} viewBox={`0 0 ${BUBBLE_VIEWBOX.width} ${BUBBLE_VIEWBOX.height}`} className="block h-auto w-full select-none" role="group" aria-label="Orthogonal bubble chart. X axis: months remaining. Y axis: APR percent. Sphere size: current balance.">
+        <svg ref={svgRef} viewBox={`0 0 ${BUBBLE_VIEWBOX.width} ${BUBBLE_VIEWBOX.height}`} className="block h-auto w-full select-none" role="group" aria-label="Orthogonal bubble chart. X axis: months remaining. Y axis: APR percent. Circle area: current balance.">
           <defs>
-            <radialGradient id={`${defsId}-high`} cx="33%" cy="28%" r="72%">
-              <stop offset="0%" stopColor="#ffd1c7" /><stop offset="30%" stopColor="#ef6558" /><stop offset="100%" stopColor="#972d31" />
-            </radialGradient>
-            <radialGradient id={`${defsId}-medium`} cx="33%" cy="28%" r="72%">
-              <stop offset="0%" stopColor="#fff6c6" /><stop offset="32%" stopColor="#e9bd49" /><stop offset="100%" stopColor="#9b6e20" />
-            </radialGradient>
-            <radialGradient id={`${defsId}-low`} cx="33%" cy="28%" r="72%">
-              <stop offset="0%" stopColor="#c9f5df" /><stop offset="32%" stopColor="#4bad82" /><stop offset="100%" stopColor="#21634e" />
-            </radialGradient>
-            <radialGradient id={`${defsId}-unknown`} cx="33%" cy="28%" r="72%">
-              <stop offset="0%" stopColor="#e5e8eb" /><stop offset="34%" stopColor="#9aa4ae" /><stop offset="100%" stopColor="#4c5863" />
-            </radialGradient>
-            <radialGradient id={`${defsId}-paid`} cx="33%" cy="28%" r="72%">
-              <stop offset="0%" stopColor="#e1f7eb" /><stop offset="100%" stopColor="#749c82" />
-            </radialGradient>
             <clipPath id={`${defsId}-plot-clip`} clipPathUnits="userSpaceOnUse">
               <rect
                 x={BUBBLE_PLOT.left}
@@ -364,7 +344,6 @@ export function LiabilityBubbleChart({ items }: { items: ExposureItem[] }) {
                 height={BUBBLE_PLOT.bottom - BUBBLE_PLOT.top}
               />
             </clipPath>
-            <filter id={`${defsId}-shadow`} x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="3" /></filter>
           </defs>
           <rect
             x={BUBBLE_PLOT.left}
@@ -386,19 +365,16 @@ export function LiabilityBubbleChart({ items }: { items: ExposureItem[] }) {
               const color = aprColor(point.item.apr);
               const radius = Math.max(4, point.radius * screen.scale);
               const isSelected = selectedId === point.item.id || hoveredId === point.item.id;
-              const isPaid = point.item.durationSource === "paid";
               return (
                 <g key={point.item.id} data-bubble-select="true" className="bubble-point-group">
-                  <circle cx={screen.x + 2} cy={screen.y + radius * 0.57} r={radius * 0.76} fill="currentColor" opacity="0.12" filter={`url(#${defsId}-shadow)`} />
                   <circle
                     cx={screen.x} cy={screen.y} r={radius}
-                    fill={isPaid ? `url(#${defsId}-paid)` : color.fill.replace("bubble-", `${defsId}-`)}
-                    stroke={isPaid ? "var(--bubble-paid-stroke)" : color.stroke}
-                    strokeWidth={isSelected ? 3 : 1.5}
-                    strokeDasharray={isPaid ? "4 3" : undefined}
+                    fill={color.fill}
+                    stroke={isSelected ? "hsl(var(--foreground))" : color.stroke}
+                    strokeWidth={isSelected ? 2.75 : 1.25}
                     tabIndex={0}
                     role="button"
-                    aria-label={`${pointLabel(point)}${isPaid ? ", paid off" : ""}`}
+                    aria-label={pointLabel(point)}
                     onMouseEnter={() => setHoveredId(point.item.id)}
                     onMouseLeave={() => setHoveredId(null)}
                     onFocus={() => setHoveredId(point.item.id)}
@@ -409,9 +385,8 @@ export function LiabilityBubbleChart({ items }: { items: ExposureItem[] }) {
                     }}
                     className="bubble-node"
                   >
-                    <title>{`${pointLabel(point)}${isPaid ? " · paid off" : ""}`}</title>
+                    <title>{pointLabel(point)}</title>
                   </circle>
-                  <circle cx={screen.x - radius * 0.28} cy={screen.y - radius * 0.34} r={Math.max(1.5, radius * 0.13)} fill="rgba(255,255,255,.64)" pointerEvents="none" />
                 </g>
               );
             })}
@@ -448,19 +423,10 @@ export function LiabilityBubbleChart({ items }: { items: ExposureItem[] }) {
               visibility: tooltipPosition ? "visible" : "hidden",
             }}
           >
-            <p className="mb-1.5 max-w-[220px] truncate font-semibold" title={tooltipItem.name}>{tooltipItem.name}{tooltipItem.durationSource === "paid" && <span className="ml-1.5 text-[10px] font-medium text-emerald-700">Paid off</span>}</p>
+            <p className="mb-1.5 max-w-[220px] truncate font-semibold" title={tooltipItem.name}>{tooltipItem.name}</p>
             {tooltipRows(tooltipItem, tooltipInterest).map(([label, value]) => <p key={label} className="flex justify-between gap-4"><span className="text-muted-foreground">{label}</span><span className="text-right font-medium">{value}</span></p>)}
           </div>
         )}
-      </div>
-      <div className="flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-border/70 px-4 py-3 text-[11px] text-muted-foreground sm:px-5">
-        <span className="font-semibold uppercase tracking-wider">Bubble color · APR</span>
-        <span className="inline-flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-full bg-red-500" /> &gt;15%</span>
-        <span className="inline-flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-full bg-yellow-400" /> 6–15%</span>
-        <span className="inline-flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-full bg-emerald-500" /> &lt;6%</span>
-        <span className="inline-flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-full bg-slate-400" /> Unknown APR</span>
-        <span className="inline-flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-full border border-dashed border-emerald-700 bg-emerald-100" /> Paid off</span>
-        <span className="ml-auto">Bubble size = balance · minimum size shown</span>
       </div>
       <div className="border-t border-border/70 px-4 py-3 sm:px-5">
         <div className="mb-2 flex items-baseline justify-between gap-3">

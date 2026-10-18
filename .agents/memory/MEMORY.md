@@ -28,4 +28,4 @@
 - [Goal allocation policy](goal-account-allocation-policy.md) — preserve legacy funding, show account deficits without redistribution, and keep allocations separate from cash flow.
 - [JSX instrumentation](jsx-instrumentation.md) — explicit React.Fragment elements receive unsupported metadata props in development; use a contents wrapper for keyed groups.
 - [React Query SSR errors](react-query-ssr-errors.md) — cached error-state fixtures need retryOnMount disabled to render errors rather than a fresh loading state.
-- [Liability Map views](liability-map-visualizations.md) — bubble chart has only two axes with 3D-styled spheres; pan/zoom and view changes never alter calculations.
+- [Liability Map views](liability-map-visualizations.md) — flat 2D bubbles use only two axes; pan/zoom and view changes never alter calculations.

@@ -171,7 +171,7 @@ export default function LiabilityMapPage() {
       ) : (
         <>
           <Card className="overflow-hidden border-border/75 shadow-sm">
-            <div className="flex flex-wrap items-baseline gap-x-8 gap-y-2 border-b bg-background px-4 py-3 sm:px-5" aria-label="Liability totals">
+            <div className="flex flex-wrap items-center gap-x-8 gap-y-2 border-b bg-background px-4 py-3 sm:px-5" aria-label="Liability totals">
               <p className="flex items-baseline gap-2">
                 <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Current balance</span>
                 <span className="text-lg font-semibold tracking-tight">{formatCurrency(totalBalance)}</span>
@@ -180,6 +180,10 @@ export default function LiabilityMapPage() {
                 <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Total interest owed</span>
                 <span className="text-lg font-semibold tracking-tight">{formatCurrency(totalInterestOwed)}</span>
               </p>
+              <div className="ml-auto inline-flex shrink-0 rounded-lg border bg-background p-1" role="group" aria-label="Liability map view">
+                <Button type="button" size="sm" variant={mapView === "gantt" ? "secondary" : "ghost"} aria-pressed={mapView === "gantt"} onClick={() => setMapView("gantt")} className={`h-8 px-3 text-xs ${mapView === "gantt" ? "shadow-sm" : "text-muted-foreground"}`}>Gantt</Button>
+                <Button type="button" size="sm" variant={mapView === "bubbles" ? "secondary" : "ghost"} aria-pressed={mapView === "bubbles"} onClick={() => setMapView("bubbles")} className={`h-8 px-3 text-xs ${mapView === "bubbles" ? "shadow-sm" : "text-muted-foreground"}`}>Bubbles</Button>
+              </div>
               <p className="basis-full text-xs text-muted-foreground">
                 Estimated over the displayed duration at the current APR; excludes {excludedInterestCount} {excludedInterestCount === 1 ? "debt" : "debts"} without a usable APR or duration.
               </p>
@@ -188,11 +192,7 @@ export default function LiabilityMapPage() {
               <div className="flex flex-wrap items-center gap-3">
                 <div>
                   <h2 className="font-semibold">Exposure matrix</h2>
-                  <p className="mt-0.5 text-xs text-muted-foreground">{mapView === "gantt" ? "Each bar shares one calendar scale; height reflects balance." : "Compare remaining months and APR with shaded, balance-sized spheres."}</p>
-                </div>
-                <div className="inline-flex rounded-lg border bg-background p-1" role="group" aria-label="Liability map view">
-                  <Button type="button" size="sm" variant={mapView === "gantt" ? "secondary" : "ghost"} aria-pressed={mapView === "gantt"} onClick={() => setMapView("gantt")} className={`h-8 px-3 text-xs ${mapView === "gantt" ? "shadow-sm" : "text-muted-foreground"}`}>Gantt</Button>
-                  <Button type="button" size="sm" variant={mapView === "bubbles" ? "secondary" : "ghost"} aria-pressed={mapView === "bubbles"} onClick={() => setMapView("bubbles")} className={`h-8 px-3 text-xs ${mapView === "bubbles" ? "shadow-sm" : "text-muted-foreground"}`}>Bubbles</Button>
+                  <p className="mt-0.5 text-xs text-muted-foreground">{mapView === "gantt" ? "Each bar shares one calendar scale; height reflects balance." : "Compare remaining months and APR; circle area reflects balance."}</p>
                 </div>
               </div>
               {mapView === "gantt" && <div className="flex flex-wrap gap-1 rounded-lg border bg-background p-1" role="group" aria-label="Sort liabilities">
@@ -213,7 +213,7 @@ export default function LiabilityMapPage() {
               </div>}
             </div>
 
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b bg-background px-4 py-3 sm:px-5">
+            {mapView === "gantt" && <div className="flex flex-wrap items-center justify-between gap-3 border-b bg-background px-4 py-3 sm:px-5">
               <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs" aria-label="APR color legend">
                 <span className="font-medium text-muted-foreground">APR</span>
                 <span className="inline-flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-sm bg-red-500" /> &gt;15%</span>
@@ -221,7 +221,7 @@ export default function LiabilityMapPage() {
                 <span className="inline-flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-sm bg-emerald-500" /> &lt;6%</span>
                 <span className="inline-flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-sm border bg-muted" /> Unknown</span>
               </div>
-            </div>
+            </div>}
 
             {mapView === "bubbles" ? <LiabilityBubbleChart items={sortedExposure} /> : <div className="overflow-x-auto overscroll-x-contain" tabIndex={0} aria-label="Horizontally scrollable liability exposure timeline">
               <div className="min-w-[1000px]" style={{ width: "100%" }}>
