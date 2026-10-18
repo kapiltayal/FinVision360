@@ -1,5 +1,5 @@
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type PointerEvent } from "react";
-import { Home, Minus, Plus } from "lucide-react";
+import { RotateCcw, Minus, Plus } from "lucide-react";
 import { formatCurrencyFull, formatPercent } from "@/lib/format";
 import type { ExposureItem } from "@/lib/liability-map";
 import {
@@ -307,7 +307,7 @@ export function LiabilityBubbleChart({ items }: { items: ExposureItem[] }) {
         <div className="flex flex-wrap items-center gap-1.5">
           <button type="button" className="bubble-icon-button" onClick={() => zoomBy(1.18)} aria-label="Zoom in" title="Zoom in"><Plus className="h-4 w-4" /></button>
           <button type="button" className="bubble-icon-button" onClick={() => zoomBy(1 / 1.18)} aria-label="Zoom out" title="Zoom out"><Minus className="h-4 w-4" /></button>
-          <button type="button" className="bubble-icon-button" onClick={reset} aria-label="Reset chart view" title="Reset view"><Home className="h-4 w-4" /></button>
+          <button type="button" className="bubble-icon-button" onClick={reset} aria-label="Reset chart view" title="Reset view"><RotateCcw className="h-4 w-4" /></button>
         </div>
       </div>
       <div className="flex flex-wrap items-center gap-x-5 gap-y-2 border-b border-border/70 bg-background px-4 py-3 text-xs sm:px-5" aria-label="Bubble chart legend">
