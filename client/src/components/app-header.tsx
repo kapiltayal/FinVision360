@@ -350,8 +350,11 @@ export function AppHeader() {
                       }}
                     >
                       {item.tabs.map((tab) => (
+                        <div key={tab.title} className="contents">
+                        {tab.url === "/liability-map" && (
+                          <DropdownMenuSeparator data-testid="separator-nav-liabilities-liability-map" />
+                        )}
                         <DropdownMenuItem
-                          key={tab.title}
                           asChild
                           data-testid={`${testId}-${tab.testId ?? tab.title.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`}
                         >
@@ -364,6 +367,7 @@ export function AppHeader() {
                             {isTabActive(tab) && <span className="text-primary">✓</span>}
                           </Link>
                         </DropdownMenuItem>
+                        </div>
                       ))}
                     </DropdownMenuSubContent>
                   </DropdownMenuSub>
