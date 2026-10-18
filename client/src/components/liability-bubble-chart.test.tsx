@@ -13,15 +13,20 @@ const debt = (id: number, change: Partial<ExposureItem> = {}): ExposureItem => (
 
 test("flat two-axis bubbles retain one legend, pan, zoom, reset and keyboard controls without shading", () => {
   const html = renderToStaticMarkup(<LiabilityBubbleChart items={[debt(1)]} />);
-  for (const label of ["Drag to pan", 'aria-label="Zoom in"', 'aria-label="Zoom out"',
+  for (const label of ['aria-label="Zoom in"', 'aria-label="Zoom out"',
     'aria-label="Reset chart view"', "X · MONTHS REMAINING", "Y · APR %",
-    "Keyboard: arrows pan", "pinch to zoom", "Circle area = balance"]) assert.ok(html.includes(label), label);
+    "Use arrow keys to pan", "Circle area = balance"]) assert.ok(html.includes(label), label);
   assert.ok(html.includes('viewBox="0 0 960 560"'));
   assert.ok(!html.includes("radialGradient"));
   assert.ok(!html.includes("feGaussianBlur"));
   assert.equal((html.match(/aria-label="Bubble chart legend"/g) ?? []).length, 1);
   assert.ok(html.includes("Debt landscape"));
-  assert.ok(html.includes("/ two-axis view"));
+  assert.ok(!html.includes("/ two-axis view"));
+  assert.ok(!html.includes("Drag to pan"));
+  assert.ok(!html.includes("Keyboard: arrows pan"));
+  assert.ok(html.includes('<h2 class="font-semibold">Debt landscape</h2>'));
+  assert.ok(html.includes('<p class="mt-0.5 text-xs text-muted-foreground">Months remaining vs APR;'));
+  assert.match(html, /class="[^"]*\btext-xs\b[^"]*" aria-label="Bubble chart legend"/);
   assert.ok(html.indexOf('class="liability-bubble-toolbar"') < html.indexOf('aria-label="Bubble chart legend"'));
   assert.ok(!html.includes("3D-styled"));
   assert.ok(!html.includes("Z · REMAINING INTEREST"));

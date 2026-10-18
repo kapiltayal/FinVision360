@@ -27,7 +27,7 @@ Place the view toggle at the right of the balance/interest summary, and show onl
 
 **Why:** The user wants the switch above the chart and identified duplicated legends in Bubble view.
 
-Bubble view uses its own “Debt landscape / two-axis view” heading and zoom/reset controls; do not also show the Gantt-only “Exposure matrix” heading there.
+Bubble view uses its own “Debt landscape” heading and zoom/reset controls; do not also show the Gantt-only “Exposure matrix” heading there.
 
 **Why:** The user asked for the Bubble chart to replace the Exposure matrix section rather than display both headers.
 

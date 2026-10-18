@@ -301,8 +301,8 @@ export function LiabilityBubbleChart({ items }: { items: ExposureItem[] }) {
       `}</style>
       <div className="liability-bubble-toolbar">
         <div className="min-w-0">
-          <p className="text-sm font-semibold">Debt landscape <span className="font-normal text-muted-foreground">/ two-axis view</span></p>
-          <p className="mt-0.5 text-[11px] text-muted-foreground">Months remaining vs APR; circle area reflects balance. Switch to Gantt to adjust planning durations.</p>
+          <h2 className="font-semibold">Debt landscape</h2>
+          <p className="mt-0.5 text-xs text-muted-foreground">Months remaining vs APR; circle area reflects balance. Switch to Gantt to adjust planning durations.</p>
         </div>
         <div className="flex flex-wrap items-center gap-1.5">
           <button type="button" className="bubble-icon-button" onClick={() => zoomBy(1.18)} aria-label="Zoom in" title="Zoom in"><Plus className="h-4 w-4" /></button>
@@ -310,16 +310,13 @@ export function LiabilityBubbleChart({ items }: { items: ExposureItem[] }) {
           <button type="button" className="bubble-icon-button" onClick={reset} aria-label="Reset chart view" title="Reset view"><Home className="h-4 w-4" /></button>
         </div>
       </div>
-      <div className="flex flex-wrap items-center gap-x-5 gap-y-2 border-b border-border/70 bg-background px-4 py-3 text-[11px] text-muted-foreground sm:px-5" aria-label="Bubble chart legend">
-        <span className="font-semibold uppercase tracking-wider">APR</span>
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-2 border-b border-border/70 bg-background px-4 py-3 text-xs sm:px-5" aria-label="Bubble chart legend">
+        <span className="font-medium text-muted-foreground">APR</span>
         <span className="inline-flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-full bg-red-500" /> &gt;15%</span>
         <span className="inline-flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-full bg-yellow-400" /> 6–15%</span>
         <span className="inline-flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-full bg-emerald-500" /> &lt;6%</span>
         <span className="ml-auto">Circle area = balance · minimum visible size shown</span>
       </div>
-      <p className="border-b border-border/70 px-4 py-2 text-[11px] text-muted-foreground sm:px-5">
-        Drag to pan · wheel or pinch to zoom · select a bubble for details. Keyboard: arrows pan, +/− zoom, Home or 0 reset.
-      </p>
       <div
         ref={chartRef}
         className="liability-bubble-plot cursor-grab active:cursor-grabbing"
