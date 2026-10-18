@@ -20,3 +20,9 @@ Use a planning/notepad icon consistently to identify allocations, including indi
 **Why:** The user explicitly clarified that allocation represents a plan, not a transfer, and corrected inconsistent symbols between the legend and goal entries.
 
 **How to apply:** When adding allocation UI, keep its identifying symbols consistent across legends, cards, and allocation entries.
+
+The Goals tab is for adding and managing goals; Goals Allocation is for linking existing goals to physical accounts.
+
+**Why:** The user explicitly separated these responsibilities instead of showing goal-management controls above both tabs.
+
+**How to apply:** Keep the goal management header and its Add Goal action inside Goals. If allocation has no goals yet, its creation shortcut should take the user to Goals.

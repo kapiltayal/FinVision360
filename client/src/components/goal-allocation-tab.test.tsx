@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Router } from "wouter";
 import { GoalAllocationTab } from "./goal-allocation-tab";
 import { accountAllocationColor } from "./goal-allocation-connections";
+import GoalsPage from "../pages/goals";
 
 function render(data: unknown) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } });
@@ -47,6 +48,24 @@ test("account relationship colors are deterministic and distinct across accounts
 test("empty state gives a direct way to add a goal", () => {
   const html = render({ accounts: [], goals: [], allocations: [] });
   assert.ok(html.includes("Add a goal"));
+});
+
+test("Goals navigation comes first and goal management header is inside its panel", () => {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } });
+  client.setQueryData(["/api/goals"], []);
+  try {
+    const html = renderToStaticMarkup(<QueryClientProvider client={client}><GoalsPage /></QueryClientProvider>);
+    const tabs = html.indexOf('role="tablist"');
+    const panel = html.indexOf('id="goals-overview-panel"');
+    const header = html.indexOf("Goals &amp; Tracking");
+    const addButton = html.indexOf('data-testid="button-add-goal"');
+    assert.ok(tabs >= 0 && tabs < panel && panel < header && header < addButton);
+    assert.ok(html.includes("Goals Allocation"));
+    assert.ok(html.includes("lucide-target") && html.includes("lucide-clipboard-list"));
+    assert.ok(html.includes('class="space-y-6 md:space-y-8"'), "preserve spacing between Goals sections");
+  } finally {
+    client.clear();
+  }
 });
 
 test("goals and preserved legacy funding remain visible without an eligible account", () => {

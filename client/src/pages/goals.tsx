@@ -38,7 +38,7 @@ import {
 import {
   Plus, Target, Pencil, Trash2, TrendingUp, CheckCircle2,
   PiggyBank, Home, GraduationCap, Car, Plane, Briefcase,
-  ShieldCheck, BarChart3, Wallet, Calendar, Clock, Trophy, Landmark,
+  ShieldCheck, BarChart3, Wallet, Calendar, Clock, Trophy, Landmark, ClipboardList,
 } from "lucide-react";
 import { CurrencyInput } from "@/components/ui/currency-input";
 import { GoalAllocationTab } from "@/components/goal-allocation-tab";
@@ -245,8 +245,18 @@ export default function GoalsPage() {
   }
 
   return (
-    <div className="p-6 space-y-6 max-w-7xl mx-auto">
-      {/* Header */}
+    <div className="flex h-full flex-col overflow-hidden">
+      <div className="shrink-0 border-b bg-background">
+        <div className="flex items-center gap-1 overflow-x-auto px-4" role="tablist" aria-label="Goal views">
+          <button id="goals-overview-tab" type="button" role="tab" aria-controls="goals-overview-panel" aria-selected={activeTab === "overview"} onClick={() => setActiveTab("overview")} className={`flex items-center gap-2 whitespace-nowrap border-b-2 px-4 py-3 text-sm font-medium transition-colors ${activeTab === "overview" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:border-border hover:text-foreground"}`}><Target className="h-4 w-4" aria-hidden="true" />Goals</button>
+          <button id="goals-allocation-tab" type="button" role="tab" aria-controls="goals-allocation-panel" aria-selected={activeTab === "allocation"} onClick={() => setActiveTab("allocation")} className={`flex items-center gap-2 whitespace-nowrap border-b-2 px-4 py-3 text-sm font-medium transition-colors ${activeTab === "allocation" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:border-border hover:text-foreground"}`}><ClipboardList className="h-4 w-4" aria-hidden="true" />Goals Allocation</button>
+        </div>
+      </div>
+
+      <div className="min-h-0 flex-1 overflow-y-auto">
+      <div className="mx-auto max-w-7xl p-6">
+      {activeTab === "allocation" ? <div id="goals-allocation-panel" role="tabpanel" aria-labelledby="goals-allocation-tab"><GoalAllocationTab onAddGoal={() => { setActiveTab("overview"); openAdd(); }} /></div> : <div id="goals-overview-panel" role="tabpanel" aria-labelledby="goals-overview-tab" className="space-y-6 md:space-y-8">
+      {/* Goal creation and management belong to the Goals tab. */}
       <div className="flex items-center justify-between gap-4 flex-wrap page-header-gradient">
         <div>
           <h1 className="text-2xl font-bold">Goals &amp; Tracking</h1>
@@ -257,12 +267,6 @@ export default function GoalsPage() {
         </Button>
       </div>
 
-      <div className="flex gap-1 border-b" role="tablist" aria-label="Goal views">
-        <button id="goals-overview-tab" type="button" role="tab" aria-controls="goals-overview-panel" aria-selected={activeTab === "overview"} onClick={() => setActiveTab("overview")} className={`border-b-2 px-4 py-3 text-sm font-medium transition-colors ${activeTab === "overview" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}>Goals</button>
-        <button id="goals-allocation-tab" type="button" role="tab" aria-controls="goals-allocation-panel" aria-selected={activeTab === "allocation"} onClick={() => setActiveTab("allocation")} className={`border-b-2 px-4 py-3 text-sm font-medium transition-colors ${activeTab === "allocation" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}>Goal Allocation</button>
-      </div>
-
-      {activeTab === "allocation" ? <div id="goals-allocation-panel" role="tabpanel" aria-labelledby="goals-allocation-tab"><GoalAllocationTab onAddGoal={openAdd} /></div> : <div id="goals-overview-panel" role="tabpanel" aria-labelledby="goals-overview-tab" className="space-y-6 md:space-y-8">
       {/* Summary cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card className="stat-card-3d">
@@ -542,6 +546,8 @@ export default function GoalsPage() {
       )}
 
       </div>}
+      </div>
+      </div>
 
       {/* Dialogs stay mounted regardless of the selected tab. */}
       <Dialog open={dialogOpen} onOpenChange={(o) => { setDialogOpen(o); if (!o) setEditGoal(null); }}>
