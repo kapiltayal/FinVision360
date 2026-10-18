@@ -37,6 +37,7 @@ test("allocation workspace exposes balances, legacy funding, completed goals and
   assert.ok(!html.includes("lucide-link"), "allocation entries must not retain chain-link icons");
   assert.match(html, /legacy/i);
   assert.ok(html.includes("not a transfer"));
+  assert.ok(html.indexOf("Give every dollar a direction.") < html.indexOf("Unassigned cash"), "allocation header precedes the summary cards");
 });
 
 test("account relationship colors are deterministic and distinct across accounts", () => {
