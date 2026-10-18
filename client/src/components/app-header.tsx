@@ -72,7 +72,15 @@ const baseNavItems: NavigationItem[] = [
       { title: "Transactions", url: "/income-expenses/finance-tracker", matches: ["/finance-tracker"] },
     ],
   },
-  { title: "Goals & Tracking", url: "/goals", icon: Target, tabs: [] },
+  {
+    title: "Goals & Tracking",
+    url: "/goals",
+    icon: Target,
+    tabs: [
+      { title: "Goals", url: "/goals?tab=goals", default: true },
+      { title: "Goals Allocation", url: "/goals?tab=allocation" },
+    ],
+  },
   {
     title: "Retirement",
     url: "/retirement",

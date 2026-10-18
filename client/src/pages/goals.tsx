@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { useLocation, useSearch } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { formatCurrency } from "@/lib/format";
@@ -132,7 +133,14 @@ const EMPTY_FORM = {
 
 export default function GoalsPage() {
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState<"overview" | "allocation">("overview");
+  const [, setLocation] = useLocation();
+  const search = useSearch();
+  const activeTab = new URLSearchParams(search).get("tab") === "allocation" ? "allocation" : "overview";
+  function setActiveTab(tab: "overview" | "allocation") {
+    const params = new URLSearchParams(search);
+    params.set("tab", tab === "allocation" ? "allocation" : "goals");
+    setLocation(`/goals?${params.toString()}`);
+  }
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editGoal, setEditGoal] = useState<Goal | null>(null);
   const [deleteId, setDeleteId] = useState<number | null>(null);

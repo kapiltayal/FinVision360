@@ -55,7 +55,7 @@ test("Goals navigation comes first and goal management header is inside its pane
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } });
   client.setQueryData(["/api/goals"], []);
   try {
-    const html = renderToStaticMarkup(<QueryClientProvider client={client}><GoalsPage /></QueryClientProvider>);
+    const html = renderToStaticMarkup(<Router ssrPath="/goals"><QueryClientProvider client={client}><GoalsPage /></QueryClientProvider></Router>);
     const tabs = html.indexOf('role="tablist"');
     const panel = html.indexOf('id="goals-overview-panel"');
     const header = html.indexOf("Goals &amp; Tracking");
@@ -64,6 +64,29 @@ test("Goals navigation comes first and goal management header is inside its pane
     assert.ok(html.includes("Goals Allocation"));
     assert.ok(html.includes("lucide-target") && html.includes("lucide-clipboard-list"));
     assert.ok(html.includes('class="space-y-6 md:space-y-8"'), "preserve spacing between Goals sections");
+  } finally {
+    client.clear();
+  }
+});
+
+test("navigation deep links open their matching Goals panel", () => {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } });
+  client.setQueryData(["/api/goals"], []);
+  client.setQueryData(["/api/goal-allocations"], { accounts: [], goals: [], allocations: [] });
+  try {
+    for (const [url, allocation] of [
+      ["/goals", false],
+      ["/goals?tab=goals", false],
+      ["/goals?tab=allocation", true],
+      ["/goals?tab=invalid", false],
+    ] as const) {
+      const html = renderToStaticMarkup(<Router ssrPath={url}><QueryClientProvider client={client}><GoalsPage /></QueryClientProvider></Router>);
+      assert.equal(html.includes('id="goals-allocation-panel"'), allocation, url);
+      assert.equal(html.includes('id="goals-overview-panel"'), !allocation, url);
+      assert.equal(html.includes('data-testid="button-add-goal"'), !allocation, url);
+      const selectedTab = allocation ? "allocation" : "overview";
+      assert.match(html, new RegExp(`id="goals-${selectedTab}-tab"[^>]*aria-selected="true"`));
+    }
   } finally {
     client.clear();
   }
