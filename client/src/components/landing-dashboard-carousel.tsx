@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight, Pause, Play } from "lucide-react";
 
 type DashboardSlide = {
   label: string;
@@ -62,7 +61,6 @@ function DashboardPreview() {
 
 export function LandingDashboardCarousel() {
   const [activeIndex, setActiveIndex] = useState(0);
-  const [isPaused, setIsPaused] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
   const [reducedMotion, setReducedMotion] = useState(false);
@@ -77,12 +75,12 @@ export function LandingDashboardCarousel() {
   }, []);
 
   useEffect(() => {
-    if (isPaused || isHovered || isFocused || reducedMotion) return;
+    if (isHovered || isFocused || reducedMotion) return;
     const timer = window.setInterval(() => {
       setActiveIndex((current) => (current + 1) % slides.length);
     }, 6000);
     return () => window.clearInterval(timer);
-  }, [activeIndex, isPaused, isHovered, isFocused, reducedMotion]);
+  }, [activeIndex, isHovered, isFocused, reducedMotion]);
 
   const showPrevious = () => setActiveIndex((current) => (current - 1 + slides.length) % slides.length);
   const showNext = () => setActiveIndex((current) => (current + 1) % slides.length);
@@ -139,7 +137,7 @@ export function LandingDashboardCarousel() {
         )}
       </div>
 
-      <div className="mt-4 flex flex-wrap items-center justify-between gap-x-5 gap-y-3 px-1">
+      <div className="mt-4 flex items-center justify-center">
         <div className="flex items-center gap-1.5" aria-label="Choose a dashboard preview slide">
           {slides.map((slide, index) => (
             <button
@@ -161,36 +159,6 @@ export function LandingDashboardCarousel() {
           ))}
         </div>
 
-        <div className="flex items-center gap-2">
-          <span className="mr-1 hidden text-xs tabular-nums text-muted-foreground sm:inline" aria-hidden="true">
-            {String(activeIndex + 1).padStart(2, "0")} / {String(slides.length).padStart(2, "0")}
-          </span>
-          <button
-            type="button"
-            className="inline-flex h-9 w-9 items-center justify-center rounded-full border bg-card text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-            aria-label={isPaused ? "Play dashboard preview" : "Pause dashboard preview"}
-            aria-pressed={isPaused}
-            onClick={() => setIsPaused((paused) => !paused)}
-          >
-            {isPaused ? <Play className="h-4 w-4" aria-hidden="true" /> : <Pause className="h-4 w-4" aria-hidden="true" />}
-          </button>
-          <button
-            type="button"
-            className="inline-flex h-9 w-9 items-center justify-center rounded-full border bg-card text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-            aria-label="Previous dashboard preview slide"
-            onClick={showPrevious}
-          >
-            <ChevronLeft className="h-4 w-4" aria-hidden="true" />
-          </button>
-          <button
-            type="button"
-            className="inline-flex h-9 w-9 items-center justify-center rounded-full border bg-card text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-            aria-label="Next dashboard preview slide"
-            onClick={showNext}
-          >
-            <ChevronRight className="h-4 w-4" aria-hidden="true" />
-          </button>
-        </div>
       </div>
       <p className="sr-only" aria-live="polite" aria-atomic="true">
         Slide {activeIndex + 1} of {slides.length}: {currentSlide.label}
