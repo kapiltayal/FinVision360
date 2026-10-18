@@ -35,7 +35,12 @@ test("the styling dependency tree excludes unpatched glob parsers and keeps secu
     assert.ok(pkg.version && atLeast(pkg.version, minimum), `${name}@${pkg.version} is below ${minimum}`);
     seen.add(name);
   }
-  for (const name of Object.keys(floors)) assert.ok(seen.has(name), `missing checked dependency ${name}`);
+  // undici belonged only to the retired scraper. Check its floor if it
+  // returns transitively, but never require installing it for this test.
+  for (const name of Object.keys(floors).filter((name) => name !== "undici")) {
+    assert.ok(seen.has(name), `missing checked dependency ${name}`);
+  }
+  assert.ok(!lock.packages["node_modules/cheerio"], "the retired scraper dependency must not return");
 });
 
 test("legacy design utilities retain colors, shadows, blur and accessible focus outlines", async () => {

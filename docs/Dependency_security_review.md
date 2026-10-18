@@ -56,7 +56,7 @@ The subsequent 32-finding review included 31 findings already resolved by the pr
 | axios | 1.20.0 | 1.20.0 |
 | source-map-js | 1.2.2 | 1.2.2 |
 | brace-expansion | Removed | 2.1.7 on its former 2.x branch |
-| undici | 7.30.0 | 7.29.1 on the 7.x branch |
+| undici | Removed with the retired bank-rate scraper | 7.29.1 on the 7.x branch if reintroduced |
 | braces | Removed | No published patch |
 | multer | 2.4.0 | 2.4.0 |
 | dompurify | 3.4.17 | 3.4.16 |
@@ -70,6 +70,6 @@ The subsequent 32-finding review included 31 findings already resolved by the pr
 - Passed three additional styling-toolchain regressions covering patched dependency floors, preserved design values/forced-colors focus outlines, and CSS-variable class merging.
 - Passed PDF-table export and ZIP round-trip smoke checks.
 - Built the client and server successfully. Verified Pricing and Blog on desktop, Pricing on mobile, and the public signup disclaimer after restarting the application. The signup form behind that disclaimer and signed-in screens were not visually verified; authentication was not bypassed.
-- The full TypeScript check still reports the same 14 existing errors in unrelated integration scaffolding and the scraper.
+- The retired bank-rate scraper and its Cheerio dependency have been removed. The full TypeScript check still reports existing errors in unrelated integration scaffolding.
 
 `npm audit` reports **zero vulnerabilities**. The workspace scanner retains **only the two documented SheetJS false positives**; none of the 32 subsequent findings remains. This review does not suppress scanner results or claim protection against all future dependency risks.

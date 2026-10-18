@@ -79,7 +79,6 @@ Drizzle's schema source is `shared/schema.ts`, configured in `drizzle.config.ts`
 | `server/plaid.ts` | Plaid API client construction and configuration. |
 | `server/ai/provider.ts` | AI Advisor provider interface and request/response streaming behavior. |
 | `server/retirement-projection.ts`, `server/retirement-income-expense-projection.ts` | Retirement projection calculations. |
-| `server/scraper.ts` | Bank-rate scraping logic. |
 | `server/seed.ts`, `server/seed-data/` | Development seed data and category/type lists. |
 | `server/replit_integrations/` | Server-side Replit integrations, including chat storage. |
 | `server/*.test.ts` | Server-side test files for imports, duplicate detection, backup/history, and related behavior. |
@@ -172,7 +171,7 @@ For a protected request, the intended isolation path is:
 
 For example, asset queries use both `id` and `userId` for single-record operations in `server/storage.ts`; transaction and budget queries in `server/finance-tracker-routes.ts` bind the authenticated user ID as a SQL parameter. Client-supplied user IDs should not be used as the authority for these operations.
 
-Some tables contain shared/reference data (for example, category/type lists or bank-rate configuration), and administrator-only routes use `requireAdmin` instead of per-user ownership. Public contact-submission operations are also not user-owned records.
+Some tables contain shared/reference data (for example, category/type lists or manually maintained bank-rate institutions), and administrator-only routes use `requireAdmin` instead of per-user ownership. Public contact-submission operations are also not user-owned records. Bank rates are entered, edited, or uploaded by admins; there is no web scraper or automatic bank-rate retrieval.
 
 ### Important security boundary: no database RLS found
 

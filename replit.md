@@ -1,7 +1,7 @@
 # FinVision360 - Personal Finance Tracker
 
 ## Overview
-A comprehensive personal finance application that helps users track assets, liabilities, calculate net worth, plan for retirement, get AI-powered financial advice, and monitor real-time bank interest rates via a configurable web scraper.
+A comprehensive personal finance application that helps users track assets, liabilities, calculate net worth, plan for retirement, get AI-powered financial advice, and review administrator-maintained bank interest rates.
 
 ## Architecture
 - **Frontend**: React + TypeScript with Vite, TailwindCSS, shadcn/ui components
@@ -62,15 +62,12 @@ A comprehensive personal finance application that helps users track assets, liab
 
 ## Bank Rate Monitor (Admin Only)
 - Admin-only feature. Grant admin: `UPDATE users SET is_admin = true WHERE username = 'xxx'`
-- Two scrape modes: `html` (CSS selectors + cheerio) and `json` (dot-notation JSON path extraction)
-- Default configs: Ally Bank savings page (FDIC national average via HTML) + Bankrate HYSA comparison page (top market rates via HTML auto-detection)
-- Manual rate entry available for banks whose sites block scraping (403) or use JavaScript-rendered rates
-- Delete individual rate records from the history tab
-- Scraper (`server/scraper.ts`) auto-detects APY% patterns as a fallback when selectors find nothing
-- DB tables: `bank_configs` (scraper configs) and `bank_rates` (rate history)
+- Bank rates are maintained manually. Do not fetch bank websites, scrape rates, or add automatic rate-refresh jobs.
+- Admins can add, edit, delete, or upload rates from files using the Bank Rates page.
+- DB tables: `bank_configs` (institution grouping) and `bank_rates` (rate history).
+- Legacy `bank_url`, `selectors_json`, and `scraped_at` column names are retained for compatibility and existing data. New manual institutions use an empty URL and empty selectors; the UI labels the timestamp "Recorded At".
 
 ## Notes
 - The app runs on port 5000 (both API and frontend via Vite middleware in dev)
 - AI Advisor uses the centralized Replit-native AI provider. Keep provider/model configuration in that server utility rather than adding model identifiers or client setup to routes or UI.
 - Demo data is seeded automatically in development mode
-- Most major bank websites (Ally, Marcus, Discover) use JavaScript-rendered rates that can't be scraped via static HTML — use manual entry for specific bank APYs
