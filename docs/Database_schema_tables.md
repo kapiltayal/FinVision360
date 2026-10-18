@@ -52,6 +52,14 @@ This is a code-based reference for the PostgreSQL tables used by FinVision360. I
 | `retirement_pensions` | User-entered pension benefit assumptions. | `id SERIAL` (PK)<br>`user_id VARCHAR` (not null)<br>`name TEXT` (not null)<br>`amount NUMERIC(15,2)` (not null)<br>`frequency TEXT` (not null, default `"monthly"`)<br>`start_age INTEGER` (not null, default `65`)<br>`notes TEXT`<br>`created_at TIMESTAMP` (not null, default current time) | FK `user_id → users.id` (`ON DELETE CASCADE`). |
 | `social_security_settings` | User's Social Security benefit and life-age assumptions. | `id SERIAL` (PK)<br>`user_id VARCHAR` (not null)<br>`fra_monthly_benefit NUMERIC(10,2)` (default `2000`)<br>`expected_life_age INTEGER` (default `85`)<br>`updated_at TIMESTAMP` (not null, default current time) | `user_id` is unique; FK `user_id → users.id` (`ON DELETE CASCADE`). Check: `fra_monthly_benefit >= 0`. |
 
+### Retirement account inclusion
+
+| Table | Purpose | Columns | Constraints |
+| --- | --- | --- | --- |
+| `retirement_account_projection_preferences` | Per-user account inclusion, saved independently for Retirement Planner Net Worth and Income/Expense. | `id SERIAL` (PK)<br>`user_id VARCHAR` (not null)<br>`asset_id INTEGER` (nullable)<br>`liability_id INTEGER` (nullable)<br>`net_worth_included BOOLEAN` (not null, default `true`)<br>`income_expense_included BOOLEAN` (not null, default `true`)<br>`updated_at TIMESTAMP` (not null, default current time) | Exactly one account ID must be set. Unique `(user_id, asset_id)` and `(user_id, liability_id)`. User, asset, and liability FKs cascade on deletion. Accounts without preferences remain included. |
+
+These preferences affect only the Retirement Planner. They do not edit account balances, global Net Worth selections, budgets, goal funding, or historical snapshots. Income/Expense filters its own account inputs, independently of Net Worth preferences; existing cash-flow eligibility rules still apply. Manual projection-only entries, Social Security, pensions, and expected-expense settings are unchanged. The additive table migration runs through the application's normal development and published startup bootstrap before dependent APIs are registered.
+
 ### Bank rates and Plaid connections
 
 | Table | Purpose | Columns (PostgreSQL name and type) | Keys and constraints |

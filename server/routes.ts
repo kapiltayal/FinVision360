@@ -37,6 +37,8 @@ import {
   type Category, type IngestionKind, type RawRow,
 } from "./asset-liability-ingestion";
 import { buildRetirementNetWorthProjection } from "./retirement-projection";
+import { getRetirementAccountPreferences, registerRetirementAccountInclusionRoutes } from "./retirement-account-inclusion";
+import { includedRetirementAccounts } from "@shared/retirement-account-inclusion";
 import { buildRetirementIncomeExpenseProjection, isPretaxRetirementAccountCategory } from "./retirement-income-expense-projection";
 import { parseOptionalInterestRate } from "./liability-apr";
 import { AllocationError, allocationAccounts, moneyCents, saveAllocation, withFundingLock } from "./goal-allocation";
@@ -656,9 +658,11 @@ export async function registerRoutes(
     res.json(settings);
   });
 
+  registerRetirementAccountInclusionRoutes(app, requireAuth);
+
   app.get("/api/retirement/net-worth-projection", requireAuth, async (req: any, res) => {
     const userId = req.user.id;
-    const [settings, userAssets, userLiabilities, assetTypes, liabilityTypes, overrides, entries] = await Promise.all([
+    const [settings, userAssets, userLiabilities, assetTypes, liabilityTypes, overrides, entries, preferences] = await Promise.all([
       storage.getRetirementPlannerSettings(userId),
       storage.getAssets(userId),
       storage.getLiabilities(userId),
@@ -666,14 +670,15 @@ export async function registerRoutes(
       db.select().from(liabilitiesTypeList),
       db.select().from(retirementAssetProjectionOverrides).where(eq(retirementAssetProjectionOverrides.userId, userId)),
       db.select().from(retirementProjectionEntries).where(eq(retirementProjectionEntries.userId, userId)),
+      getRetirementAccountPreferences(userId),
     ]);
 
     res.json(buildRetirementNetWorthProjection({
       retirementAge: settings?.retirementAge ?? 65,
       currentAge: ageFromDateOfBirth(req.user.dateOfBirth),
       dateOfBirth: req.user.dateOfBirth ?? null,
-      assets: userAssets,
-      liabilities: userLiabilities,
+      assets: includedRetirementAccounts(userAssets, preferences, "asset", "net-worth"),
+      liabilities: includedRetirementAccounts(userLiabilities, preferences, "liability", "net-worth"),
       assetTypes,
       liabilityTypes,
       assetOverrides: overrides,
@@ -683,7 +688,7 @@ export async function registerRoutes(
 
   app.get("/api/retirement/income-expense-projection", requireAuth, async (req: any, res) => {
     const userId = req.user.id;
-    const [plannerSettings, userAssets, userLiabilities, assetTypes, liabilityTypes, overrides, projectionEntries, pensions, socialSecurity, incomeExpenseSettings, incomeExpenseEntries, withdrawalRates] = await Promise.all([
+    const [plannerSettings, userAssets, userLiabilities, assetTypes, liabilityTypes, overrides, projectionEntries, pensions, socialSecurity, incomeExpenseSettings, incomeExpenseEntries, withdrawalRates, preferences] = await Promise.all([
       storage.getRetirementPlannerSettings(userId),
       storage.getAssets(userId),
       storage.getLiabilities(userId),
@@ -696,6 +701,7 @@ export async function registerRoutes(
       db.select().from(retirementIncomeExpenseSettings).where(eq(retirementIncomeExpenseSettings.userId, userId)),
       db.select().from(retirementIncomeExpenseEntries).where(eq(retirementIncomeExpenseEntries.userId, userId)),
       db.select().from(retirementAccountWithdrawalRates).where(eq(retirementAccountWithdrawalRates.userId, userId)),
+      getRetirementAccountPreferences(userId),
     ]);
 
     const retirementAge = plannerSettings?.retirementAge ?? 65;
@@ -703,8 +709,8 @@ export async function registerRoutes(
       retirementAge,
       currentAge: ageFromDateOfBirth(req.user.dateOfBirth),
       dateOfBirth: req.user.dateOfBirth ?? null,
-      assets: userAssets,
-      liabilities: userLiabilities,
+      assets: includedRetirementAccounts(userAssets, preferences, "asset", "income-expense"),
+      liabilities: includedRetirementAccounts(userLiabilities, preferences, "liability", "income-expense"),
       assetTypes,
       liabilityTypes,
       assetOverrides: overrides,

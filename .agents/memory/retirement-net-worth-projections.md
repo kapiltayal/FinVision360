@@ -20,3 +20,9 @@ Liability projections must carry the current balance to retirement when required
 **Why:** Assuming zero interest or trusting a stale maturity date can understate retirement liabilities and overstate projected net worth.
 
 **How to apply:** Mark the account projection as unknown and retain its current balance when APR/payment information is insufficient or a maturity date has passed while a balance remains. A future maturity on or before retirement can support a paid-off result.
+
+Account inclusion is an independent scenario choice for each Retirement Planner projection. Excluding an account from retirement Net Worth must not implicitly exclude its withdrawal income or debt payment from Income/Expense, or change live balances, budgets, goal funding, or archives.
+
+**Why:** A user may omit an illiquid asset from a net-worth scenario while still needing to model its associated cash-flow commitments. Cross-coupling the selections would silently change a different scenario.
+
+**How to apply:** Default new accounts to included, persist each projection's choice separately, and build each projection from its own selected inputs.

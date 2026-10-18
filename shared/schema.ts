@@ -380,6 +380,20 @@ export const insertRetirementAccountWithdrawalRateSchema = createInsertSchema(re
 export type InsertRetirementAccountWithdrawalRate = z.infer<typeof insertRetirementAccountWithdrawalRateSchema>;
 export type RetirementAccountWithdrawalRate = typeof retirementAccountWithdrawalRates.$inferSelect;
 
+export const retirementAccountProjectionPreferences = pgTable("retirement_account_projection_preferences", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  assetId: integer("asset_id").references(() => assets.id, { onDelete: "cascade" }),
+  liabilityId: integer("liability_id").references(() => liabilities.id, { onDelete: "cascade" }),
+  netWorthIncluded: boolean("net_worth_included").notNull().default(true),
+  incomeExpenseIncluded: boolean("income_expense_included").notNull().default(true),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  userAssetUnique: uniqueIndex("retirement_account_preferences_user_asset_unique").on(table.userId, table.assetId),
+  userLiabilityUnique: uniqueIndex("retirement_account_preferences_user_liability_unique").on(table.userId, table.liabilityId),
+  oneAccount: check("retirement_account_preferences_one_account", sql`(${table.assetId} IS NOT NULL) <> (${table.liabilityId} IS NOT NULL)`),
+}));
+
 export const retirementAssetProjectionOverrides = pgTable("retirement_asset_projection_overrides", {
   id: serial("id").primaryKey(),
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),

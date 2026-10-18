@@ -5,6 +5,7 @@ import { createServer } from "http";
 import { pool } from "./db";
 import { ensureTransactionImportSchema } from "./transaction-import-schema";
 import { ensureGoalAllocationSchema } from "./goal-allocation";
+import { ensureRetirementAccountInclusionSchema } from "./retirement-account-inclusion";
 import { createApiRequestLogger, formatSafeApiError, getSafeApiRoutePath } from "./api-logging";
 
 const app = express();
@@ -120,6 +121,7 @@ app.use(createApiRequestLogger((message) => log(message)));
   // Both npm run dev and the published dist/index.cjs enter this bootstrap.
   // Apply additive import schema before registering endpoints that require it.
   await ensureTransactionImportSchema(pool);
+  await ensureRetirementAccountInclusionSchema(pool);
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS estate_beneficiaries (

@@ -27,3 +27,4 @@
 - [Unknown account rates](unknown-liability-apr.md) — missing asset returns and debt APRs are unknown; only explicit zero means 0%. Do not infer the intent of legacy zeros.
 - [Goal allocation policy](goal-account-allocation-policy.md) — preserve legacy funding, show account deficits without redistribution, and keep allocations separate from cash flow.
 - [JSX instrumentation](jsx-instrumentation.md) — explicit React.Fragment elements receive unsupported metadata props in development; use a contents wrapper for keyed groups.
+- [React Query SSR errors](react-query-ssr-errors.md) — cached error-state fixtures need retryOnMount disabled to render errors rather than a fresh loading state.
