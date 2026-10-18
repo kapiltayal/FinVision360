@@ -262,7 +262,7 @@ export default function GoalsPage() {
         <button id="goals-allocation-tab" type="button" role="tab" aria-controls="goals-allocation-panel" aria-selected={activeTab === "allocation"} onClick={() => setActiveTab("allocation")} className={`border-b-2 px-4 py-3 text-sm font-medium transition-colors ${activeTab === "allocation" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}>Goal Allocation</button>
       </div>
 
-      {activeTab === "allocation" ? <div id="goals-allocation-panel" role="tabpanel" aria-labelledby="goals-allocation-tab"><GoalAllocationTab onAddGoal={openAdd} /></div> : <div id="goals-overview-panel" role="tabpanel" aria-labelledby="goals-overview-tab">
+      {activeTab === "allocation" ? <div id="goals-allocation-panel" role="tabpanel" aria-labelledby="goals-allocation-tab"><GoalAllocationTab onAddGoal={openAdd} /></div> : <div id="goals-overview-panel" role="tabpanel" aria-labelledby="goals-overview-tab" className="space-y-6 md:space-y-8">
       {/* Summary cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card className="stat-card-3d">
