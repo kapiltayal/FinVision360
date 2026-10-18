@@ -1,5 +1,9 @@
 # Feedback email notifications
 
+Reviewed against repository code: **2026-10-18**. [Documentation index](README.md).
+
+This document describes the configured transport and historical DNS setup, not a fresh verification of live DNS, Resend account status, or inbox delivery.
+
 Authenticated feedback submissions (`POST /api/feedback`) are saved in the
 `feedback` table first. After a successful insert, the server sends a plain-text
 notification directly through the Resend API using this project's dedicated key.

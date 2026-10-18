@@ -1,5 +1,7 @@
 # Liability Map
 
+Reviewed against repository code: **2026-10-18**. [Documentation index](README.md).
+
 The authenticated `/liability-map` page is the tab after Liabilities within
 Net Worth. It reads all accounts from the existing user-scoped liabilities API.
 It does not introduce another debt store or change saved liability records.
@@ -35,10 +37,20 @@ It does not introduce another debt store or change saved liability records.
   is labeled “Months left.” Each row shows the saved maturity date when known,
   or an estimated ending month below the input; a missing duration prompts
   the user to add months.
-- Monthly interest is an estimate of current balance × APR ÷ 12, not lifetime
-  interest. Unknown APR accounts are explicitly excluded from that summary.
+- The header displays total interest owed, not an estimated-current-month interest card. It sums the available per-debt estimates; the note identifies how many debts could not be estimated. Unknown APR is never zero; an explicit zero APR can produce $0 total interest even without a known duration.
 - Avalanche, Snowball and Longest Duration sorting reorder the same debts
   without changing their values or the chart's time scale.
+
+## Bubble view
+
+- The Gantt/Bubbles toggle is right-aligned beside the balance/interest totals. Both views use the same debts and planning-duration overrides.
+- **Debt landscape** replaces the Gantt **Exposure matrix** header. It uses matching title/subtitle/legend typography and a single bubble legend; Gantt sorting is hidden.
+- The plot has two axes: remaining months (X) and APR (Y). Flat 2D circles have area proportional to balance, APR-severity fills, and no outlines.
+- Initial load and Reset use axis maximums 10% above the highest plotted months and APR, with nonzero fallback bounds where necessary.
+- Pan/zoom changes the plotted coordinate window inside fixed axes, not account data. Controls include zoom in/out and a reset-arrow icon; dragging, wheel/pinch and keyboard navigation are supported.
+- Details appear near the selected/hovered bubble, repositioned within chart bounds rather than pinned to a corner.
+- Accounts without usable duration/APR are omitted from the plot, not from debt balances. The compact “Not shown in the plot” list gives each name and parenthesized balance, APR and months; missing values are labeled unknown.
+- Update APRs through account management and temporary months in Gantt. Bubble interaction never edits saved accounts or interest assumptions.
 
 ## Verification
 
@@ -47,6 +59,8 @@ Calculation tests:
 ```sh
 npx tsx --test client/src/lib/liability-map.test.ts
 ```
+
+Run the complete model, Gantt, and bubble regression suite with `npm run test:liability-map`.
 
 Rendered-component tests use isolated in-memory query data, not sign-in bypasses:
 

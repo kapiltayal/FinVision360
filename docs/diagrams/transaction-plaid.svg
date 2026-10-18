@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="940" viewBox="0 0 800 940" role="img" aria-labelledby="title desc">
+  <title id="title">Plaid transactions: explicit import and refresh</title>
+  <desc id="desc">Seven steps from connected-account selection through owner checks, paginated fetching, filtering, deterministic categorization, per-row upserts, monthly recurring detection and result counts. Skipped rows and unavailable institutions are reported.</desc>
+  <defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10Z" fill="#2563eb"/></marker></defs>
+  <rect width="800" height="940" rx="20" fill="#f8fafc"/>
+  <g font-family="Arial, sans-serif" text-anchor="middle" fill="#0f172a">
+    <text x="400" y="36" font-size="21" font-weight="700">Plaid → filter and categorize → per-row database upsert</text>
+    <text x="400" y="60" font-size="13" fill="#475569">Explicit user import; access tokens remain on the server; no editable preview</text>
+    <g fill="none" stroke="#2563eb" stroke-width="2" marker-end="url(#arrow)">
+      <path d="M330 160V190"/><path d="M330 270V300"/><path d="M330 380V410"/>
+      <path d="M330 490V520"/><path d="M330 600V630"/><path d="M330 710V740"/>
+      <path d="M560 670H720V230H560"/>
+    </g>
+    <g stroke="#bfdbfe" fill="#ffffff">
+      <rect x="100" y="80" width="460" height="80" rx="12"/><rect x="100" y="190" width="460" height="80" rx="12"/>
+      <rect x="100" y="300" width="460" height="80" rx="12"/><rect x="100" y="410" width="460" height="80" rx="12"/>
+      <rect x="100" y="520" width="460" height="80" rx="12" fill="#eff6ff"/><rect x="100" y="630" width="460" height="80" rx="12"/>
+      <rect x="100" y="740" width="460" height="80" rx="12" fill="#dbeafe"/>
+    </g>
+    <g font-size="16" font-weight="700">
+      <text x="330" y="110">1. Select accounts/dates; validate ownership</text><text x="330" y="220">2. Fetch transactions in pages of 500</text>
+      <text x="330" y="330">3. Filter and normalize source rows</text><text x="330" y="440">4. Resolve canonical category; no AI</text>
+      <text x="330" y="550">5. Upsert each accepted transaction</text><text x="330" y="660">6. Continue selected pages / institutions</text>
+      <text x="330" y="770">7. Detect recurrence if data changed; summarize</text>
+    </g>
+    <g font-size="13" fill="#475569">
+      <text x="330" y="135">Authenticated user's stored Plaid institutions/accounts only</text>
+      <text x="330" y="245">Unavailable institution: report it and continue others</text>
+      <text x="330" y="355">Skip pending, transfers, non-USD and invalid data</text>
+      <text x="330" y="465">Preference → merchant → Plaid mapping → description rules</text>
+      <text x="330" y="575">Key: user + Plaid ID; protect user-edited classification</text>
+      <text x="330" y="685">No whole-import database transaction or upload receipt</text>
+      <text x="330" y="795">New / Updated / Skipped / Unavailable; refresh ledger</text>
+      <text x="635" y="418">More pages</text><text x="635" y="438">or institutions</text>
+      <text x="400" y="862">Unresolved categories are skipped; overlapping Plaid IDs update existing records.</text>
+      <text x="400" y="886">Unexpected database failure may leave earlier per-row writes committed.</text>
+      <text x="400" y="910">Similar manual or uploaded transactions are not merged by this ID-based path.</text>
+    </g>
+  </g>
+</svg>

@@ -2,6 +2,8 @@
 
 Reviewed: 2026-10-14 (UTC).
 
+Documentation reviewed: **2026-10-18**. The sections below retain dated audit evidence; this documentation update did not run a new dependency/security scan. [Documentation index](README.md).
+
 ## Manifest inventory
 
 A filesystem walk from the workspace root, pruning dependency, VCS, cache, and build directories, found:
@@ -16,7 +18,7 @@ The application's `npm audit fix --ignore-scripts` was run before and after addi
 | Package | Previously installed | Resolved version | Notes |
 |---|---|---|---|
 | browserslist | 4.24.2 | 4.29.3 | Patched floor for both reported advisories: 4.28.7. |
-| postcss-selector-parser | 6.1.2 (also 6.0.10) | 7.1.6 | Override covers Tailwind and Typography, including the newer flat-selector complexity advisory. No Tailwind major migration. |
+| postcss-selector-parser | 6.1.2 (also 6.0.10) | 7.1.6 | Override covers the selector complexity advisories. Tailwind was subsequently migrated to 4.3.3, as described below. |
 | qs | 6.15.3 | 6.16.0 | Both reported query-parser advisories fixed. |
 | fflate | 0.8.2 | 0.8.3 | ZIP64 infinite-loop fix. |
 | dompurify | 3.4.12 | 3.4.17 | Patched floor: 3.4.13. |

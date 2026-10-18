@@ -1,6 +1,6 @@
 # AI Lab: How Questions Become Responses
 
-*Implementation guide, verified against the application code on October 8, 2026.*
+*Implementation guide, reviewed against repository code on October 18, 2026.* [Documentation index](README.md).
 
 > **Short version:** The browser sends an authenticated request to the app server. The server loads a small, user-specific financial context, combines it with the question and safety instructions, sends that prompt to the configured model, streams the answer back, and saves the completed question and response in that user's AI Archives.
 
@@ -209,5 +209,8 @@ Archived responses are displayed through the four-section tab component. Ask Whi
 
 ## Related documentation
 
-- [Financial Transaction Ingestion and Processing](financial-transaction-ingestion.md)
-- [Historical Budget Plans](historical-budget-plan.md)
+- [Financial Transaction Ingestion and Processing](Transaction_ingestion_%26_processing.md)
+- [Budget Planning](Budget_Planning.md)
+- [Retirement Planner](Retirement_Planner.md)
+
+Retirement Planner account-exclusion preferences are not global account visibility rules. The advisor loads its own account context; do not assume excluding a planner row also removes it from an AI request. File categorization is a separate non-streaming JSON call described in the ingestion guide. These advisor requests do not use web scraping or Firecrawl.

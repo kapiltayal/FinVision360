@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="1020" viewBox="0 0 800 1020" role="img" aria-labelledby="title desc">
+  <title id="title">Uploaded transactions: preview, review and atomic save</title>
+  <desc id="desc">Eight steps from file validation to committed transactions and retry receipt. Preview is read-only. Invalid review or duplicate conflicts return to review; database failures roll back the whole batch.</desc>
+  <defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10Z" fill="#2563eb"/></marker></defs>
+  <rect width="800" height="1020" rx="20" fill="#f8fafc"/>
+  <g font-family="Arial, sans-serif" text-anchor="middle" fill="#0f172a">
+    <text x="400" y="36" font-size="21" font-weight="700">File upload → review → atomic database save</text>
+    <text x="400" y="60" font-size="13" fill="#475569">Server authenticates every request and owns the user identity</text>
+    <g fill="none" stroke="#2563eb" stroke-width="2" marker-end="url(#arrow)">
+      <path d="M330 160V190"/><path d="M330 270V300"/><path d="M330 380V410"/>
+      <path d="M330 490V520"/><path d="M330 600V630"/><path d="M330 710V740"/><path d="M330 820V850"/>
+      <path d="M560 560H660V450H560"/><path d="M560 670H710V450H560"/>
+    </g>
+    <g stroke="#bfdbfe" fill="#ffffff">
+      <rect x="100" y="80" width="460" height="80" rx="12"/><rect x="100" y="190" width="460" height="80" rx="12"/>
+      <rect x="100" y="300" width="460" height="80" rx="12"/><rect x="100" y="410" width="460" height="80" rx="12"/>
+      <rect x="100" y="520" width="460" height="80" rx="12"/><rect x="100" y="630" width="460" height="80" rx="12"/>
+      <rect x="100" y="740" width="460" height="80" rx="12" fill="#eff6ff"/><rect x="100" y="850" width="460" height="80" rx="12" fill="#dbeafe"/>
+    </g>
+    <g font-size="16" font-weight="700">
+      <text x="330" y="110">1. Validate and parse the file</text><text x="330" y="220">2. Suggest canonical categories</text>
+      <text x="330" y="330">3. Check duplicates; return preview</text><text x="330" y="440">4. User reviews, edits and selects rows</text>
+      <text x="330" y="550">5. Revalidate selected rows</text><text x="330" y="660">6. Begin transaction; lock and recheck</text>
+      <text x="330" y="770">7. Insert transactions + retry receipt</text><text x="330" y="880">8. Commit; return counts and refresh</text>
+    </g>
+    <g font-size="13" fill="#475569">
+      <text x="330" y="135">CSV / TSV / TXT / XLS / XLSX; maximum 500 rows</text>
+      <text x="330" y="245">Preference → file category → merchant → AI if unresolved</text>
+      <text x="330" y="355">Only this user's ledger; no transaction writes</text>
+      <text x="330" y="465">Unassigned allowed; stable source-ID repeats blocked</text>
+      <text x="330" y="575">Check row fields, categories and duplicate review freshness</text>
+      <text x="330" y="685">Duplicate conflict: roll back and return to review</text>
+      <text x="330" y="795">All selected rows and receipt succeed or all roll back</text>
+      <text x="330" y="905">Unchanged retry returns receipt, not duplicate inserts</text>
+      <text x="620" y="530" fill="#b45309">Invalid</text><text x="652" y="620" fill="#b45309">Conflict</text>
+      <text x="400" y="966">AI failure leaves categories reviewable. Final database failure saves no batch rows.</text>
+      <text x="400" y="990">Source fields stay authoritative; AI does not rewrite dates, amounts or row identities.</text>
+    </g>
+  </g>
+</svg>

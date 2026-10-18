@@ -1,6 +1,19 @@
-# Historical Budget Plans
+# Budget Planning and Historical Closes
 
 *How closed months are saved, displayed, and updated.*
+
+Reviewed against repository code: **2026-10-18**. [Documentation index](README.md).
+
+## Current-month planning and goal funding
+
+- Suggested amounts shown in an unsaved plan count toward the displayed plan totals; simply viewing a month does not save defaults.
+- Explicit saved plan values are authoritative, including a saved zero. Editing or copying a plan is distinct from loading suggestions.
+- Goal savings suggestions use combined funding: legacy goal progress plus account allocations. Allocating existing cash reduces the remaining goal requirement; it does not create income, expenses, transfers, or saved budget rows.
+- Removing an allocation can increase the live unsaved goal suggestion. Already saved plan amounts do not silently change.
+- Goal funding snapshots preserve combined funded amounts and the monthly savings requirement calculated at close; historical requirements are never recalculated from today's goals or allocations.
+- Retirement Planner inclusion preferences affect only projections, not budget inputs.
+
+See [Goal Allocation](Goal_Allocation.md) for account deficits, funding limits, legacy mapping, and deletion behavior.
 
 > **In short:** The plan is frozen for a historical month. Actuals are read from transactions each time that month is loaded, so editing a transaction can change historical actuals without changing the plan.
 
@@ -56,7 +69,7 @@ Historical income and living-expense rows do not show current trend, monthly-ave
 
 `budget_close_runs` has one row per period for the whole database. A success row means the backup job completed for all accounts in that run—not just one user's close. Therefore, a user-specific historical backfill should not add a global success row unless the status for every account can be verified.
 
-## Development-data note — October 8, 2026
+## Historical development-data note — October 8, 2026
 
 The development database has reconstructed `budget_month_closes` for the demo account for **October 2025–June 2026 and August–September 2026**. Those 11 rows use unique matching legacy debt-and-goal archives. **July 2026 is not closed** because its expected August 1 archive is missing. The corresponding `budget_close_runs` records were not backfilled because that table is global and the other development account's historical state could not be verified.
 
@@ -72,4 +85,4 @@ Some older demo goal-history rows had previously been populated by copying curre
 
 ## Related documentation
 
-- [AI Lab: How Questions Become Responses](ai-lab-response-flow.md)
+- [AI Lab: How Questions Become Responses](AI_Lab.md)

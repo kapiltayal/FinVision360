@@ -1,6 +1,6 @@
 # Financial Transaction Ingestion and Processing
 
-*Implementation guide, updated October 14, 2026.*
+*Implementation guide, reviewed against repository code on October 18, 2026.* [Documentation index](README.md).
 
 This guide covers the three ways transactions enter the Finance Tracker: user-uploaded files, transactions imported on request from Plaid-connected accounts, and transactions entered manually. It follows each path from the user's selection through validation, categorization, review or confirmation, and database persistence.
 
@@ -29,7 +29,23 @@ The key difference is that **file uploads are previewed and edited before saving
 
 The diagrams show the runtime path from the user's action to database writes. In particular, file preview and duplicate checks are read-only: transaction rows are inserted only after review and final validation.
 
+The visible flowcharts are repository-local SVG images, so they do not require a Mermaid plugin, JavaScript, or an external diagram service. Each has a numbered text equivalent for viewers that cannot display images. Expand **Editable Mermaid source** only when maintaining a diagram; keep its SVG and text steps in sync.
+
 ### Uploaded file: preview, review, and atomic save
+
+![Uploaded transaction flow: file validation, parsing, category suggestions, duplicate review, user edits, final validation, atomic database save and retry receipt.](diagrams/transaction-upload.svg)
+
+1. Authenticate, validate file type/signature/size, parse and normalize at most 500 nonblank rows.
+2. Suggest categories using user preference → valid file category → merchant profile → AI for unresolved rows.
+3. Check duplicates within this file and the user's ledger; return a read-only editable preview.
+4. User corrects fields, chooses Save rows, and explicitly confirms legitimate content matches. Stable-ID repeats cannot be saved.
+5. Validate selected rows and review freshness; invalid input returns to review without a write.
+6. Begin a database transaction, acquire the user lock, and repeat duplicate checks. A conflict rolls back the batch.
+7. Insert selected `transactions` and the `transaction_import_receipts` retry receipt together, then commit. Any insert failure rolls everything back.
+8. Return counts and refresh the ledger. An unchanged retry returns the receipt instead of inserting again.
+
+<details>
+<summary>Editable Mermaid source — uploaded files</summary>
 
 ```mermaid
 flowchart TD
@@ -52,9 +68,24 @@ flowchart TD
     O --> P["Commit and return import counts"]
 ```
 
+</details>
+
 AI-unavailable or unresolved categories remain editable; a valid reviewed transaction may be saved as `unassigned`. If a duplicate conflict appears during final save, nothing from that reviewed batch is committed.
 
 ### Plaid: connected-account import and refresh
+
+![Plaid transaction flow: select connected accounts and dates, verify ownership, fetch pages, filter and categorize, upsert rows while protecting user edits, detect eligible monthly recurrence and return results.](diagrams/transaction-plaid.svg)
+
+1. User chooses connected institution/accounts and dates; server authenticates and validates ownership/range.
+2. Fetch Plaid pages. Unavailable institutions are reported while others continue.
+3. Skip pending transactions, transfers, non-USD values and invalid rows.
+4. Normalize accepted rows; categorize using user preference → merchant profile → Plaid mapping → description rules. Skip unresolved categories; no AI call.
+5. Upsert `transactions` by `(user_id, plaid_transaction_id)`; retain explicitly edited category/parent/Need-Want.
+6. Continue all selected pages/institutions. Writes are per row, not one atomic whole-import transaction; an unexpected database error may leave earlier rows committed.
+7. If any rows changed, detect eligible monthly recurrence; return New/Updated/Skipped/Unavailable counts and refresh the ledger.
+
+<details>
+<summary>Editable Mermaid source — Plaid</summary>
 
 ```mermaid
 flowchart TD
@@ -87,9 +118,22 @@ flowchart TD
     R --> S
 ```
 
+</details>
+
 An import can report an institution as unavailable while continuing with the remaining selected institutions. Plaid data is written during the import; there is no editable per-transaction preview.
 
 ### Manual transaction: single-row creation
+
+![Manual transaction flow: enter fields, authenticate and validate, resolve a canonical category, insert one manual transaction and return it; invalid or unresolved input is rejected without insertion.](diagrams/transaction-manual.svg)
+
+1. User enters transaction details and optionally chooses a category.
+2. Authenticate and validate required fields, date and transaction type.
+3. Validate a supplied canonical category. Otherwise try user preference → merchant profile → description rules; no AI call.
+4. Reject invalid input or an unresolved category without inserting.
+5. Insert one `transactions` row with server-owned user ID and `source='manual'`; return the saved row.
+
+<details>
+<summary>Editable Mermaid source — manual entry</summary>
 
 ```mermaid
 flowchart TD
@@ -113,6 +157,8 @@ flowchart TD
     J --> M["Insert one transaction with source=manual"]
     M --> N["Return saved transaction"]
 ```
+
+</details>
 
 ## Common transaction record
 
@@ -432,5 +478,8 @@ The UI shows counts for **New**, **Updated**, **Skipped**, and **Unavailable**, 
 
 ## Related documentation
 
-- [AI Lab: How Questions Become Responses](ai-lab-response-flow.md) — AI request boundaries and response handling.
-- [Historical Budget Plans](historical-budget-plan.md) — how transaction data feeds historical budget actuals.
+- [AI Lab: How Questions Become Responses](AI_Lab.md) — AI request boundaries and response handling.
+- [Budget Planning](Budget_Planning.md) — how transaction data feeds historical budget actuals.
+- [Database schema](Database_schema_tables.md) — merchants, canonical categories, transaction identities and receipts.
+
+Bank-rate maintenance is separate from transaction ingestion. Bank rates are manually entered or uploaded by administrators; there is no bank-rate web scraping or Firecrawl step in any of these flows.

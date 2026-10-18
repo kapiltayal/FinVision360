@@ -1,8 +1,13 @@
 DNS records for finvision360.com — Resend feedback notifications
 
-CURRENT RECORDS FROM THE SEPARATE FINVISION360 RESEND ACCOUNT
+Documentation reviewed 2026-10-18. These are previously retrieved setup
+records, not a fresh live DNS/account verification. Check the separate
+FinVision360 Resend domain page before making DNS changes if records differ.
+See Resend_feedback_notifications.md for save-first behavior and limits.
+
+RECORDED SETUP FROM THE SEPARATE FINVISION360 RESEND ACCOUNT
 These replace the earlier records issued by the legacy shared account.
-The dedicated RESEND_API_KEY has been confirmed to access only finvision360.com.
+At setup, the dedicated RESEND_API_KEY was confirmed for the intended account.
 
 Add or correct these three records in the DNS provider for finvision360.com.
 Use TTL Auto (or the provider's default). Names are relative to finvision360.com.

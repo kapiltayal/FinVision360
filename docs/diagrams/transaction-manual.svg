@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="720" viewBox="0 0 800 720" role="img" aria-labelledby="title desc">
+  <title id="title">Manual transactions: validate, categorize and save</title>
+  <desc id="desc">User enters fields, server authenticates and validates, resolves a canonical category and inserts one manual transaction. Invalid fields or an unresolved category are rejected without a database write.</desc>
+  <defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10Z" fill="#2563eb"/></marker></defs>
+  <rect width="800" height="720" rx="20" fill="#f8fafc"/>
+  <g font-family="Arial, sans-serif" text-anchor="middle" fill="#0f172a">
+    <text x="400" y="36" font-size="21" font-weight="700">Manual entry → validate → one database insert</text>
+    <text x="400" y="60" font-size="13" fill="#475569">No file preview, AI call or reviewed-batch receipt</text>
+    <g fill="none" stroke="#2563eb" stroke-width="2" marker-end="url(#arrow)">
+      <path d="M330 160V190"/><path d="M330 270V300"/><path d="M330 380V410"/><path d="M330 490V520"/>
+      <path d="M560 230H740V630"/><path d="M560 340H740"/>
+    </g>
+    <g stroke="#bfdbfe" fill="#ffffff">
+      <rect x="100" y="80" width="460" height="80" rx="12"/><rect x="100" y="190" width="460" height="80" rx="12"/>
+      <rect x="100" y="300" width="460" height="80" rx="12"/><rect x="100" y="410" width="460" height="80" rx="12" fill="#eff6ff"/>
+      <rect x="100" y="520" width="460" height="80" rx="12" fill="#dbeafe"/>
+      <rect x="520" y="630" width="245" height="48" rx="10" fill="#fffbeb" stroke="#fcd34d"/>
+    </g>
+    <g font-size="16" font-weight="700">
+      <text x="330" y="110">1. Enter transaction details</text><text x="330" y="220">2. Authenticate and validate required fields</text>
+      <text x="330" y="330">3. Resolve a canonical category</text><text x="330" y="440">4. Insert one transaction</text>
+      <text x="330" y="550">5. Return saved record</text>
+      <text x="642" y="660" fill="#92400e">Reject — no insert</text>
+    </g>
+    <g font-size="13" fill="#475569">
+      <text x="330" y="135">Date, description, amount, type and optional category</text>
+      <text x="330" y="245">Server derives ownership from authenticated identity</text>
+      <text x="330" y="355">Selected category OR preference → merchant → rules</text>
+      <text x="330" y="465">Canonical parent / category / Need-Want; source = manual</text>
+      <text x="330" y="575">Persisted ID and timestamps returned to the client</text>
+      <text x="620" y="207" fill="#b45309">Invalid fields</text>
+      <text x="631" y="315" fill="#b45309">Invalid or</text><text x="631" y="331" fill="#b45309">unresolved category</text>
+    </g>
+  </g>
+</svg>

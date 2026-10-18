@@ -1,10 +1,14 @@
 # Database Tables, Keys, Columns, and Purpose
 
+Reviewed against repository code: **2026-10-18**. [Documentation index](README.md).
+
 This is a code-based reference for the PostgreSQL tables used by FinVision360. It covers the Drizzle declarations in `shared/schema.ts` and `shared/models/chat.ts`, along with tables and indexes initialized directly by the server. Column names below are PostgreSQL names; `camelCase` application properties are shown in parentheses where useful.
 
 > **Schema caveat:** this document describes the schema declared by the current application code, not a live introspection of a particular database. The running application connects to the PostgreSQL database in `DATABASE_URL`. Some tables/constraints are created or amended by startup SQL in `server/index.ts` and `server/transaction-import-schema.ts`; the live database can differ from Drizzle declarations if schema setup has not been applied. Verify changes against the app's actual database connection.
 
 ## Conventions and key types
+
+`users.discovery_source TEXT` is the nullable local-profile field for the required signup question “How did you find us?”. Signup sends the choice in Supabase metadata and profile provisioning/synchronization persists it locally. Nullable storage preserves older profiles; passwords are managed by Supabase, not this table.
 
 - `SERIAL` is an auto-incrementing integer identifier. `PK` means primary key; `FK` means foreign key.
 - `NUMERIC(p,s)` stores exact decimal values, commonly used for dollars and percentages. It is not a floating-point type.
@@ -19,7 +23,7 @@ This is a code-based reference for the PostgreSQL tables used by FinVision360. I
 
 | Table | Purpose | Columns (PostgreSQL name and type) | Keys and constraints |
 | --- | --- | --- | --- |
-| `users` | Local application profile linked to a Supabase Auth identity; parent record for most user-owned finance data. | `id VARCHAR` (PK, generated UUID string)<br>`full_name TEXT`<br>`email TEXT`<br>`is_admin BOOLEAN` (not null, default `false`)<br>`supabase_id TEXT`<br>`created_at TIMESTAMP` (not null, default current time)<br>`date_of_birth DATE`<br>`street_address TEXT`<br>`city TEXT`<br>`state TEXT`<br>`postal_code TEXT`<br>`country TEXT` (default `"USA"`) | PK `id`; unique `supabase_id`. Other user-owned tables commonly reference `users.id` with `ON DELETE CASCADE`. |
+| `users` | Local application profile linked to a Supabase Auth identity; parent record for most user-owned finance data. | `id VARCHAR` (PK, generated UUID string)<br>`full_name TEXT`<br>`email TEXT`<br>`discovery_source TEXT` (signup discovery choice; nullable for older profiles)<br>`is_admin BOOLEAN` (not null, default `false`)<br>`supabase_id TEXT`<br>`created_at TIMESTAMP` (not null, default current time)<br>`date_of_birth DATE`<br>`street_address TEXT`<br>`city TEXT`<br>`state TEXT`<br>`postal_code TEXT`<br>`country TEXT` (default `"USA"`) | PK `id`; unique `supabase_id`. Other user-owned tables commonly reference `users.id` with `ON DELETE CASCADE`. |
 | `assets` | User-entered or imported assets used for net-worth and retirement calculations. | `id SERIAL` (PK)<br>`user_id VARCHAR` (not null)<br>`name TEXT` (not null)<br>`category TEXT` (not null)<br>`value NUMERIC(15,2)` (not null)<br>`interest_rate NUMERIC(5,2)` (nullable; no default; `NULL` means unknown, while `0` means an explicit 0% return)<br>`institution TEXT`<br>`notes TEXT`<br>`created_at TIMESTAMP` (not null, default current time) | FK `user_id → users.id` (`ON DELETE CASCADE`). |
 | `liabilities` | User-entered or imported debts, balances, rates, and payment details. | `id SERIAL` (PK)<br>`user_id VARCHAR` (not null)<br>`name TEXT` (not null)<br>`category TEXT` (not null)<br>`balance NUMERIC(15,2)` (not null)<br>`interest_rate NUMERIC(5,2)` (nullable; no default; `NULL` means unknown, while `0` means an explicit 0% rate)<br>`minimum_payment NUMERIC(10,2)` (default `0`)<br>`maturity_date DATE`<br>`institution TEXT`<br>`notes TEXT`<br>`created_at TIMESTAMP` (not null, default current time) | FK `user_id → users.id` (`ON DELETE CASCADE`). |
 | `Asset_type_list` | Shared asset type/category hierarchy and projection return assumptions. | `id SERIAL` (PK)<br>`type TEXT` (not null)<br>`parent_category TEXT` (not null)<br>`category TEXT` (not null; application property `subCategory`)<br>`description TEXT` (not null)<br>`rate_of_return NUMERIC(10,8)` (not null)<br>`rate_of_return_inflation_adjusted NUMERIC(10,8)` (not null) | Unique index `asset_type_list_hierarchy_unique` on `(parent_category, category)`. |
@@ -145,7 +149,7 @@ The exclusion notice lists excluded names. `POST /api/retirement/account-inclusi
 
 The app uses a shared PostgreSQL database, not a separate database per user. Protected API routes validate a Supabase bearer token, map the Supabase identity to a local `users.id`, and are expected to scope user-owned SQL by that local ID. This is application-layer isolation: this repository does not declare PostgreSQL row-level-security policies. All new queries and mutations must derive the owner ID from the authenticated request, not from a client-supplied `user_id`.
 
-Sensitive columns include `plaid_items.access_token`, profile/contact fields, insurance policy details, transaction descriptions, and financial balances. Do not log or expose them unnecessarily. The API logger currently records JSON responses; see `docs/README_ARCHITECTURE.md` for the request and security model.
+Sensitive columns include `plaid_items.access_token`, profile/contact fields, insurance policy details, transaction descriptions, and financial balances. Do not log or expose them unnecessarily. The API logger records method, matched route template, status, and duration—not JSON bodies, concrete IDs, query strings, or tokens. Error summaries preserve safe type/code. See [Architecture](FinVision360_Architecture.md) for the request and security model.
 
 ## Schema implementation sources
 
@@ -153,6 +157,8 @@ Sensitive columns include `plaid_items.access_token`, profile/contact fields, in
 - `shared/models/chat.ts` defines `conversations` and `messages`.
 - `server/index.ts` creates or adjusts merchants, transactions, transaction history, AI history, estate planning tables, and supporting indexes/constraints during startup.
 - `server/transaction-import-schema.ts` adds upload identity columns/indexes and creates import receipts before routes are registered.
+- `server/goal-allocation.ts` initializes `goal_allocations` and the combined `goal_funding` view before dependent routes.
+- `server/retirement-account-inclusion.ts` and `server/retirement-item-inclusion.ts` initialize physical-account and custom/built-in projection preferences.
 - `server/db.ts` connects to PostgreSQL using `DATABASE_URL`.
 - `drizzle.config.ts` points Drizzle Kit at `shared/schema.ts`; `npm run db:push` runs the schema push command.
 
