@@ -112,9 +112,9 @@ export function buildBubbleScene(items: ExposureItem[]) {
   }
   const highestMonths = Math.max(0, ...candidates.map(({ item }) => item.monthsRemaining!));
   const highestApr = Math.max(0, ...candidates.map(({ item }) => item.apr!));
-  // Initial/reset domains have exactly 5% headroom; empty/zero-only axes need a usable span.
-  const maxMonths = highestMonths > 0 ? highestMonths * 1.05 : 1;
-  const maxApr = highestApr > 0 ? highestApr * 1.05 : 1;
+  // Initial/reset domains have exactly 10% headroom; empty/zero-only axes need a usable span.
+  const maxMonths = highestMonths > 0 ? highestMonths * 1.10 : 1;
+  const maxApr = highestApr > 0 ? highestApr * 1.10 : 1;
   const maxBalance = Math.max(0, ...candidates.map(({ item }) => item.balance));
   const points: BubblePoint[] = candidates.map(({ item, interest }) => ({
     item, interest,

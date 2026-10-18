@@ -13,9 +13,9 @@ Axes, axis titles, and tick positions must remain stationary during pan and zoom
 
 **Why:** The user explicitly corrected the moving-axis behavior; navigation should change the data viewport, not move the coordinate frame.
 
-On initial load/reset, each nonzero axis maximum is 105% of its highest plotted value. Gantt-only sorting controls must not appear in Bubble view.
+On initial load/reset, each nonzero axis maximum is 110% of its highest plotted value. Gantt-only sorting controls must not appear in Bubble view.
 
-**Why:** The user requested 5% upper headroom and clarified that row-order sorting does not apply to a scatter/bubble plot.
+**Why:** The user increased upper headroom from 5% to 10% and clarified that row-order sorting does not apply to a scatter/bubble plot.
 
 Bubble tooltips belong next to the hovered or selected sphere, not in a fixed corner. Convert SVG positions to CSS pixels, flip near edges, and update the anchor with pan/zoom and resizing.
 

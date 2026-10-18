@@ -28,9 +28,9 @@ test("two bubble axes encode duration and APR, with interest in details and area
   const scene = buildBubbleScene(items);
   assert.equal(scene.points.length, 3);
   assert.equal(scene.points[0].interest, estimateRemainingInterest(items[0]));
-  assert.ok(Math.abs(scene.points[0].position.x - (2 / 1.05 - 1)) < 1e-10);
-  assert.ok(Math.abs(scene.points[1].position.x - (1 / 1.05 - 1)) < 1e-10);
-  assert.ok(Math.abs(scene.points[1].position.y - (1 / 1.05 - 1)) < 1e-10);
+  assert.ok(Math.abs(scene.points[0].position.x - (2 / 1.10 - 1)) < 1e-10);
+  assert.ok(Math.abs(scene.points[1].position.x - (1 / 1.10 - 1)) < 1e-10);
+  assert.ok(Math.abs(scene.points[1].position.y - (1 / 1.10 - 1)) < 1e-10);
   assert.deepEqual(Object.keys(scene.points[0].position).sort(), ["x", "y"]);
   assert.equal(scene.points[0].radius, 42);
   assert.equal(scene.points[1].radius, 21);
@@ -39,17 +39,17 @@ test("two bubble axes encode duration and APR, with interest in details and area
   assert.equal(items[0].balance, 10000, "scene construction never modifies financial inputs");
 });
 
-test("initial and reset axis maxima are 5% above the plotted maxima, including APRs below 1%", () => {
+test("initial and reset axis maxima are 10% above the plotted maxima, including APRs below 1%", () => {
   const items = [debt(1), debt(2, { apr: 4, monthsRemaining: 12 })];
   const scene = buildBubbleScene(items);
-  assert.equal(scene.maxMonths, 24 * 1.05);
-  assert.equal(scene.maxApr, 8 * 1.05);
+  assert.equal(scene.maxMonths, 24 * 1.10);
+  assert.equal(scene.maxApr, 8 * 1.10);
   const ticks = getBubbleAxisTicks(DEFAULT_BUBBLE_CAMERA, scene.maxMonths, scene.maxApr);
   assert.equal(ticks.x[4].value, scene.maxMonths);
   assert.equal(ticks.y[4].value, scene.maxApr);
   const highestPoint = projectBubblePoint(scene.points[0].position, DEFAULT_BUBBLE_CAMERA);
   assert.ok(highestPoint.x < BUBBLE_PLOT.right && highestPoint.y > BUBBLE_PLOT.top);
-  assert.equal(buildBubbleScene([debt(1, { apr: 0.5 })]).maxApr, 0.5 * 1.05);
+  assert.equal(buildBubbleScene([debt(1, { apr: 0.5 })]).maxApr, 0.5 * 1.10);
   assert.equal(buildBubbleScene([debt(1, { apr: 0 })]).maxApr, 1);
   assert.equal(items[0].apr, 8);
   assert.equal(items[0].monthsRemaining, 24);
