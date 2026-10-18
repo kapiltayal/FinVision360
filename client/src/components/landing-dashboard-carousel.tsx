@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
+import useEmblaCarousel from "embla-carousel-react";
 
 type DashboardSlide = {
   label: string;
@@ -64,7 +65,7 @@ export function LandingDashboardCarousel() {
   const [isHovered, setIsHovered] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
   const [reducedMotion, setReducedMotion] = useState(false);
-  const rootRef = useRef<HTMLElement>(null);
+  const [viewportRef, carousel] = useEmblaCarousel({ loop: true, duration: 40 });
 
   useEffect(() => {
     const mediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -75,15 +76,27 @@ export function LandingDashboardCarousel() {
   }, []);
 
   useEffect(() => {
-    if (isHovered || isFocused || reducedMotion) return;
+    if (!carousel) return;
+    const updateActiveSlide = () => setActiveIndex(carousel.selectedScrollSnap());
+    updateActiveSlide();
+    carousel.on("select", updateActiveSlide);
+    carousel.on("reInit", updateActiveSlide);
+    return () => {
+      carousel.off("select", updateActiveSlide);
+      carousel.off("reInit", updateActiveSlide);
+    };
+  }, [carousel]);
+
+  useEffect(() => {
+    if (!carousel || isHovered || isFocused || reducedMotion) return;
     const timer = window.setInterval(() => {
-      setActiveIndex((current) => (current + 1) % slides.length);
+      carousel.scrollNext();
     }, 6000);
     return () => window.clearInterval(timer);
-  }, [activeIndex, isHovered, isFocused, reducedMotion]);
+  }, [carousel, activeIndex, isHovered, isFocused, reducedMotion]);
 
-  const showPrevious = () => setActiveIndex((current) => (current - 1 + slides.length) % slides.length);
-  const showNext = () => setActiveIndex((current) => (current + 1) % slides.length);
+  const showPrevious = () => carousel?.scrollPrev(reducedMotion);
+  const showNext = () => carousel?.scrollNext(reducedMotion);
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLElement>) => {
     if (event.altKey || event.ctrlKey || event.metaKey) return;
@@ -95,10 +108,10 @@ export function LandingDashboardCarousel() {
       showNext();
     } else if (event.key === "Home") {
       event.preventDefault();
-      setActiveIndex(0);
+      carousel?.scrollTo(0, reducedMotion);
     } else if (event.key === "End") {
       event.preventDefault();
-      setActiveIndex(slides.length - 1);
+      carousel?.scrollTo(slides.length - 1, reducedMotion);
     }
   };
 
@@ -106,7 +119,6 @@ export function LandingDashboardCarousel() {
 
   return (
     <section
-      ref={rootRef}
       className="mt-14 relative mx-auto max-w-4xl"
       role="region"
       aria-roledescription="carousel"
@@ -119,22 +131,29 @@ export function LandingDashboardCarousel() {
       }}
       onKeyDown={handleKeyDown}
     >
-      <div
-        key={activeIndex}
-        className="animate-in fade-in slide-in-from-right-2 duration-500 motion-reduce:animate-none"
-        role="group"
-        aria-roledescription="slide"
-        aria-label={`${activeIndex + 1} of ${slides.length}: ${currentSlide.label}`}
-      >
-        {currentSlide.src ? (
-          <img
-            className="block h-auto w-full rounded-lg border bg-card shadow-lg"
-            src={currentSlide.src}
-            alt={currentSlide.alt}
-          />
-        ) : (
-          <DashboardPreview />
-        )}
+      <div ref={viewportRef} className="overflow-hidden rounded-lg shadow-lg">
+        <div className="flex touch-pan-y">
+          {slides.map((slide, index) => (
+            <div
+              key={slide.label}
+              className="min-w-0 flex-[0_0_100%]"
+              role="group"
+              aria-roledescription="slide"
+              aria-label={`${index + 1} of ${slides.length}: ${slide.label}`}
+              aria-hidden={index !== activeIndex}
+            >
+              {slide.src ? (
+                <img
+                  className="block h-auto w-full rounded-lg border bg-card"
+                  src={slide.src}
+                  alt={slide.alt}
+                />
+              ) : (
+                <DashboardPreview />
+              )}
+            </div>
+          ))}
+        </div>
       </div>
 
       <div className="mt-4 flex items-center justify-center">
@@ -148,7 +167,7 @@ export function LandingDashboardCarousel() {
               }`}
               aria-label={`Show slide ${index + 1}: ${slide.label}`}
               aria-current={index === activeIndex ? "true" : undefined}
-              onClick={() => setActiveIndex(index)}
+              onClick={() => carousel?.scrollTo(index, reducedMotion)}
             >
               <span
                 className={`h-2 rounded-full transition-all duration-300 ${
@@ -160,7 +179,7 @@ export function LandingDashboardCarousel() {
         </div>
 
       </div>
-      <p className="sr-only" aria-live="polite" aria-atomic="true">
+      <p className="sr-only" aria-live={isHovered || isFocused || reducedMotion ? "polite" : "off"} aria-atomic="true">
         Slide {activeIndex + 1} of {slides.length}: {currentSlide.label}
       </p>
     </section>
