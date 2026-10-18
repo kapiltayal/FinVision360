@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { AlertCircle, ArrowRight, CreditCard, RotateCcw, Waves } from "lucide-react";
 import { type Liability } from "@shared/schema";
+import { LiabilityBubbleChart } from "@/components/liability-bubble-chart";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -64,6 +65,7 @@ function endingDateLabel(item: ExposureItem, draft: string | undefined, now: Dat
 export default function LiabilityMapPage() {
   const [now] = useState(() => new Date());
   const [sort, setSort] = useState<ExposureSort>("avalanche");
+  const [mapView, setMapView] = useState<"gantt" | "bubbles">("gantt");
   const [overrides, setOverrides] = useState<Record<number, number>>({});
   const [durationDrafts, setDurationDrafts] = useState<Record<number, string>>({});
   const {
@@ -183,9 +185,15 @@ export default function LiabilityMapPage() {
               </p>
             </div>
             <div className="flex flex-col gap-4 border-b bg-muted/20 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
-              <div>
-                <h2 className="font-semibold">Exposure matrix</h2>
-                <p className="mt-0.5 text-xs text-muted-foreground">Each bar shares one calendar scale; height reflects balance.</p>
+              <div className="flex flex-wrap items-center gap-3">
+                <div>
+                  <h2 className="font-semibold">Exposure matrix</h2>
+                  <p className="mt-0.5 text-xs text-muted-foreground">{mapView === "gantt" ? "Each bar shares one calendar scale; height reflects balance." : "Orbit the debt landscape across time, APR, and remaining interest."}</p>
+                </div>
+                <div className="inline-flex rounded-lg border bg-background p-1" role="group" aria-label="Liability map view">
+                  <Button type="button" size="sm" variant={mapView === "gantt" ? "secondary" : "ghost"} aria-pressed={mapView === "gantt"} onClick={() => setMapView("gantt")} className={`h-8 px-3 text-xs ${mapView === "gantt" ? "shadow-sm" : "text-muted-foreground"}`}>Gantt</Button>
+                  <Button type="button" size="sm" variant={mapView === "bubbles" ? "secondary" : "ghost"} aria-pressed={mapView === "bubbles"} onClick={() => setMapView("bubbles")} className={`h-8 px-3 text-xs ${mapView === "bubbles" ? "shadow-sm" : "text-muted-foreground"}`}>3D Bubbles</Button>
+                </div>
               </div>
               <div className="flex flex-wrap gap-1 rounded-lg border bg-background p-1" role="group" aria-label="Sort liabilities">
                 {sortOptions.map((option) => (
@@ -215,7 +223,7 @@ export default function LiabilityMapPage() {
               </div>
             </div>
 
-            <div className="overflow-x-auto overscroll-x-contain" tabIndex={0} aria-label="Horizontally scrollable liability exposure timeline">
+            {mapView === "bubbles" ? <LiabilityBubbleChart items={sortedExposure} /> : <div className="overflow-x-auto overscroll-x-contain" tabIndex={0} aria-label="Horizontally scrollable liability exposure timeline">
               <div className="min-w-[1000px]" style={{ width: "100%" }}>
                 <div className="grid grid-cols-[280px_minmax(720px,1fr)] border-b bg-muted/15">
                   <div className="flex items-end justify-between px-5 pb-3 pt-4 text-[11px] font-semibold uppercase tracking-[0.13em] text-muted-foreground">
@@ -370,15 +378,15 @@ export default function LiabilityMapPage() {
                   </div>
                 </div>
               </div>
-            </div>
+            </div>}
 
-            <div className="flex flex-col gap-2 border-t bg-muted/[0.12] px-4 py-3 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between sm:px-5">
+            {mapView === "gantt" && <div className="flex flex-col gap-2 border-t bg-muted/[0.12] px-4 py-3 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between sm:px-5">
               <p>Duration overrides live only in this session. They do not edit saved account details.</p>
               <p>Source follows saved maturity date or payment estimate unless overridden.</p>
-            </div>
-            <p className="border-t px-4 py-3 text-xs leading-relaxed text-muted-foreground sm:px-5">
+            </div>}
+            {mapView === "gantt" && <p className="border-t px-4 py-3 text-xs leading-relaxed text-muted-foreground sm:px-5">
               Payoff estimates assume constant APR and monthly payments, with no new borrowing or fees. Bar length shows time, not total interest paid.
-            </p>
+            </p>}
           </Card>
         </>
       )}

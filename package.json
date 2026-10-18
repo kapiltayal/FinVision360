@@ -11,6 +11,7 @@
     "test:budget": "tsx script/test-budget.ts",
     "test:goal-allocation": "tsx script/test-goal-allocation.ts",
     "test:retirement": "tsx script/test-retirement.ts",
+    "test:liability-map": "tsx script/test-liability-map.ts",
     "db:push": "drizzle-kit push",
     "db:seed-types": "tsx scripts/seed-asset-liability-types.ts"
   },

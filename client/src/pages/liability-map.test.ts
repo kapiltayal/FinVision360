@@ -81,6 +81,16 @@ test("header matches the shared Assets and Liabilities page-header height", () =
   assert.match(html, /class="relative flex min-h-\[76px\] flex-col justify-center/);
 });
 
+test("Liability Map offers both views and preserves the default Gantt with its editable durations", () => {
+  const html = render([row(1)]);
+  assert.ok(html.includes('aria-label="Liability map view"'));
+  assert.ok(html.includes(">Gantt</button>"));
+  assert.ok(html.includes(">3D Bubbles</button>"));
+  assert.ok(html.includes('data-testid="liability-map-bar-1"'));
+  assert.ok(html.includes('aria-label="Planning duration in months for Debt 1"'));
+  assert.ok(!html.includes('aria-label="Three-dimensional liability bubble chart"'));
+});
+
 test("unknown duration remains named without a fabricated bar; unknown APR is disclosed", () => {
   const html = render([row(1, { maturityDate: null, interestRate: null })]);
   assert.ok(html.includes("Debt 1"));
