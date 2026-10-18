@@ -50,6 +50,18 @@ A fresh dependency scan still reports exactly these two findings with an unbound
 
 Run `npm run test:spreadsheet-security` to check the advisory floors for every locked SheetJS copy, runtime/manifest/lockfile agreement, and the vendor source/integrity metadata, alongside the account and transaction import regressions (including XLS and XLSX). This is an offline regression check against these two reviewed advisories, not a substitute for future security scans or a live tarball integrity comparison.
 
+#### Repeated finding verification — 2026-10-18, 20:09 UTC
+
+The repeated dependency findings were independently checked again after the documentation refresh:
+
+- The live GitHub Advisory API still reports `< 0.19.3` and `< 0.20.2`; the installed tree contains only `xlsx@0.20.3`.
+- A new download from the lockfile's official vendor URL matches the SHA-512 above.
+- All 25 spreadsheet-security and asset/liability/transaction-import regressions pass.
+- A fresh `npm audit --json` reports zero vulnerabilities.
+- The workspace dependency scanner still reports exactly these two high findings with only `introduced: "0"` and no fixed bound, despite its own descriptions identifying the patched versions.
+
+No manifest or lockfile change is warranted for these two advisories. The findings remain visible as scanner false positives; they have not been suppressed. These checks cover the named dependency findings only, not a fresh SAST or privacy scan.
+
 ## Build-tooling advisory removed with an approved styling upgrade
 
 **GHSA-vfj7-8cjw-p6xm** in `braces@3.0.3` has no published patch. The user approved upgrading the styling tools rather than leaving the build-only dependency in place.
