@@ -32,6 +32,8 @@ test("allocation workspace exposes balances, legacy funding, completed goals and
   assert.ok(html.includes('data-allocation-account="1"'));
   assert.ok(html.includes('data-allocation-row="1"'));
   assert.ok(html.includes(`background-color:${accountAllocationColor(1)}`));
+  assert.ok(html.includes("lucide-clipboard-list"), "allocation entries and legend use planning icons");
+  assert.ok(!html.includes("lucide-link"), "allocation entries must not retain chain-link icons");
   assert.match(html, /legacy/i);
   assert.ok(html.includes("not a transfer"));
 });

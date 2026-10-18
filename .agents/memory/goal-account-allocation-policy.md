@@ -14,3 +14,9 @@ Goals below target are active; funded goals belong in a completed section but mu
 **Why:** These were explicit user decisions during planning; account sync must not change the user's earmarks without consent.
 
 **How to apply:** Allow reductions and releases even when an account is in deficit; account/goal deletions must explain and confirm allocation release. Allocations are not income or spending, and must not overwrite saved budget plans.
+
+Use a planning/notepad icon consistently to identify allocations, including individual goal funding entries, rather than a chain-link icon.
+
+**Why:** The user explicitly clarified that allocation represents a plan, not a transfer, and corrected inconsistent symbols between the legend and goal entries.
+
+**How to apply:** When adding allocation UI, keep its identifying symbols consistent across legends, cards, and allocation entries.

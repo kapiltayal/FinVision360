@@ -258,7 +258,7 @@ export default function GoalsPage() {
       </div>
 
       <div className="flex gap-1 border-b" role="tablist" aria-label="Goal views">
-        <button id="goals-overview-tab" type="button" role="tab" aria-controls="goals-overview-panel" aria-selected={activeTab === "overview"} onClick={() => setActiveTab("overview")} className={`border-b-2 px-4 py-3 text-sm font-medium transition-colors ${activeTab === "overview" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}>Overview</button>
+        <button id="goals-overview-tab" type="button" role="tab" aria-controls="goals-overview-panel" aria-selected={activeTab === "overview"} onClick={() => setActiveTab("overview")} className={`border-b-2 px-4 py-3 text-sm font-medium transition-colors ${activeTab === "overview" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}>Goals</button>
         <button id="goals-allocation-tab" type="button" role="tab" aria-controls="goals-allocation-panel" aria-selected={activeTab === "allocation"} onClick={() => setActiveTab("allocation")} className={`border-b-2 px-4 py-3 text-sm font-medium transition-colors ${activeTab === "allocation" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}>Goal Allocation</button>
       </div>
 

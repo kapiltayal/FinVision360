@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { AlertCircle, ArrowDown, ArrowRight, Banknote, Check, ClipboardList, Link2, Loader2, Plus, Trash2 } from "lucide-react";
+import { AlertCircle, ArrowDown, ArrowRight, Banknote, Check, ClipboardList, Loader2, Plus, Trash2 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { formatCurrency } from "@/lib/format";
 import { useToast } from "@/hooks/use-toast";
@@ -180,7 +180,7 @@ export function GoalAllocationTab({ onAddGoal }: { onAddGoal: () => void }) {
             return <div key={link.id} data-allocation-row={link.id} className="flex items-center justify-between gap-2 rounded-md bg-muted/40 px-2 py-1">
               <div className="flex min-w-0 items-center gap-2">
                 <span aria-hidden="true" className="h-2.5 w-2.5 shrink-0 rounded-full ring-2 ring-background" style={{ backgroundColor: accountAllocationColor(link.assetId) }} />
-                <Link2 className="h-3.5 w-3.5 shrink-0 text-primary" /><span className="truncate text-sm">{account.name}</span>
+                <ClipboardList className="h-3.5 w-3.5 shrink-0 text-primary" aria-hidden="true" /><span className="truncate text-sm">{account.name}</span>
               </div>
               <div className="flex items-center gap-1.5"><span className="whitespace-nowrap text-sm font-semibold">{formatCurrency(link.amount)}</span>
                 <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEditor(link.assetId, goal.id)} aria-label={`Edit ${account.name} allocation for ${goal.title}`}><span className="text-xs">Edit</span></Button>
@@ -238,7 +238,7 @@ export function GoalAllocationTab({ onAddGoal }: { onAddGoal: () => void }) {
       )}
       {data.goals.length > 0 && (
         <GoalAllocationConnections allocations={data.allocations}>
-          <div className="grid gap-y-6 lg:grid-cols-[minmax(250px,0.85fr)_minmax(0,1.15fr)] lg:gap-x-24 xl:gap-x-32">
+          <div className="grid gap-y-6 lg:grid-cols-[220px_minmax(0,1fr)] lg:gap-x-32 xl:grid-cols-[240px_minmax(0,1fr)] xl:gap-x-48">
           <section aria-labelledby="alloc-accounts-heading" className="min-w-0 space-y-3">
             <div className="flex items-center justify-between">
               <div><h3 id="alloc-accounts-heading" className="font-semibold">Your accounts</h3><p className="text-xs text-muted-foreground">Drag one onto a goal to assign cash</p></div>
@@ -276,7 +276,7 @@ export function GoalAllocationTab({ onAddGoal }: { onAddGoal: () => void }) {
             </div>
           </section>
 
-          <section aria-labelledby="alloc-goals-heading" className="min-w-0 space-y-3">
+          <section aria-labelledby="alloc-goals-heading" className="min-w-0 space-y-3 lg:max-w-lg">
             <div className="flex items-center justify-between">
               <div><h3 id="alloc-goals-heading" className="font-semibold">Goals &amp; allocations</h3><p className="text-xs text-muted-foreground">Change or release any connection at any time</p></div>
               <ArrowRight className="hidden h-4 w-4 text-muted-foreground sm:block" />
