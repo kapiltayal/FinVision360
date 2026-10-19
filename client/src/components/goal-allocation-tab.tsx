@@ -195,16 +195,18 @@ export function GoalAllocationTab({ onAddGoal }: { onAddGoal: () => void }) {
 
   return (
     <section className="space-y-4" aria-label="Goal allocation">
-      <div className="flex flex-col justify-between gap-3 border-b pb-4 sm:flex-row sm:items-end">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">A clearer way to save</p>
-          <h2 className="mt-1 text-xl font-semibold tracking-tight">Give every dollar a direction.</h2>
-          <p className="mt-1 max-w-2xl text-sm text-muted-foreground">Earmark cash already in your accounts—no transfers, no new buckets. Drag an account to a goal, or use the assign button.</p>
-        </div>
-        <div className="flex items-center gap-2 self-start rounded-full border bg-background px-3 py-1.5 text-xs text-muted-foreground sm:self-auto">
-          <ClipboardList className="h-3.5 w-3.5 text-primary" aria-hidden="true" /> Allocation is a plan, not a transfer
-        </div>
-      </div>
+      <Card className="border-border/75 shadow-sm">
+        <CardContent className="flex flex-col justify-between gap-3 p-4 sm:flex-row sm:items-end sm:p-5">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">A clearer way to save</p>
+            <h2 className="mt-1 text-xl font-semibold tracking-tight">Give every dollar a direction.</h2>
+            <p className="mt-1 max-w-2xl text-sm text-muted-foreground">Earmark cash already in your accounts—no transfers, no new buckets. Drag an account to a goal, or use the assign button.</p>
+          </div>
+          <div className="flex items-center gap-2 self-start rounded-full border bg-background px-3 py-1.5 text-xs text-muted-foreground sm:self-auto">
+            <ClipboardList className="h-3.5 w-3.5 text-primary" aria-hidden="true" /> Allocation is a plan, not a transfer
+          </div>
+        </CardContent>
+      </Card>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <Card className="border-primary/15 bg-primary/[0.035]"><CardContent className="px-4 py-3">
