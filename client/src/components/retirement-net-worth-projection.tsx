@@ -38,7 +38,7 @@ export type RetirementProjectionLiability = {
   currentBalance: number;
   projectedBalance: number;
   configuredAmount?: number;
-  interestRate: number;
+  interestRate: number | null;
   minimumPayment: number;
   maturityDate?: string | null;
   status: "paid-off" | "remaining" | "unknown";
@@ -202,7 +202,7 @@ function AssetRow({ asset, actions }: { asset: RetirementProjectionAsset; action
   );
 }
 
-function LiabilityRow({ liability, actions }: { liability: RetirementProjectionLiability; actions: ProjectionActions }) {
+export function LiabilityRow({ liability, actions }: { liability: RetirementProjectionLiability; actions: ProjectionActions }) {
   const included = liability.included !== false;
   const paidOff = liability.status === "paid-off" || liability.projectedBalance <= 0;
   return (
@@ -248,7 +248,7 @@ function LiabilityRow({ liability, actions }: { liability: RetirementProjectionL
       {!liability.isProjectionOnly && (
         <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
           <span>Current <strong className="text-foreground">{formatCurrency(liability.currentBalance)}</strong></span>
-          <span>APR <strong className="text-foreground">{liability.interestRate.toFixed(2)}%</strong></span>
+          <span>APR <strong className="text-foreground">{liability.interestRate == null ? "Unknown" : `${liability.interestRate.toFixed(2)}%`}</strong></span>
           <span>Payment <strong className="text-foreground">{formatCurrency(liability.minimumPayment)}/mo</strong></span>
           {liability.maturityDate && <span>Matures <strong className="text-foreground">{liability.maturityDate}</strong></span>}
         </div>

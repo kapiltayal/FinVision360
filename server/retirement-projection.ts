@@ -70,7 +70,7 @@ type ProjectedLiability = {
   category: string;
   currentBalance: number;
   projectedBalance: number;
-  interestRate: number;
+  interestRate: number | null;
   minimumPayment: number;
   maturityDate: string | null;
   status: "paid-off" | "remaining" | "unknown";
@@ -228,9 +228,9 @@ export function buildRetirementNetWorthProjection(input: {
     const closedEnd = parentCategory !== "Revolving Credit";
     const currentBalance = numberValue(liability.balance);
     const interestRateAvailable = liability.interestRate !== null
-      && liability.interestRate !== ""
+      && liability.interestRate.trim() !== ""
       && Number.isFinite(Number(liability.interestRate));
-    const interestRate = interestRateAvailable ? numberValue(liability.interestRate) : 0;
+    const interestRate = interestRateAvailable ? numberValue(liability.interestRate) : null;
     const minimumPayment = numberValue(liability.minimumPayment);
     const maturityDate = liability.maturityDate;
     const hasCurrentBalance = liability.balance !== null
@@ -260,7 +260,7 @@ export function buildRetirementNetWorthProjection(input: {
       status = "paid-off";
       message = `Paid off by ${maturityDate}.`;
     } else {
-      const amortizedBalance = interestRateAvailable
+      const amortizedBalance = interestRate !== null
         ? projectDebt(currentBalance, interestRate, minimumPayment, daysToRetirement)
         : null;
       if (amortizedBalance === null) {

@@ -3,6 +3,7 @@ import test from "node:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { InlineAccountInclusion, ProjectionExclusionNotice, type RetirementAccountInclusionKind } from "./retirement-account-selection";
+import { LiabilityRow, type RetirementProjectionLiability } from "./retirement-net-worth-projection";
 
 function renderCheckbox(projection: "net-worth" | "income-expense", included: boolean, kind: RetirementAccountInclusionKind) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { gcTime: Infinity } } });
@@ -82,4 +83,28 @@ test("notice escapes account text and does not merge separate accounts sharing a
   assert.ok(html.includes("Savings, Savings"));
   assert.ok(html.includes("&lt;script&gt;bad()&lt;/script&gt;"));
   assert.ok(!html.includes("<script>"));
+});
+
+test("debt rows distinguish missing APR from explicit zero, regardless of payoff status", () => {
+  const actions = {
+    onAssetRateChange: async () => {}, onAssetRateReset: async () => {},
+    onSaveEntry: async () => {}, onDeleteEntry: () => {}, saving: false,
+  };
+  for (const [rate, label] of [[null, "Unknown"], [0, "0.00%"], [6, "6.00%"]] as const) {
+    for (const status of ["unknown", "remaining", "paid-off"] as const) {
+      const queryClient = new QueryClient();
+      try {
+        const liability: RetirementProjectionLiability = {
+          id: 1, sourceLiabilityId: 1, name: "Loan", category: "Loan", parentCategory: "Debt",
+          interestRate: rate, currentBalance: 10000, projectedBalance: 10000,
+          minimumPayment: 0, status,
+        };
+        const html = renderToStaticMarkup(<QueryClientProvider client={queryClient}>
+          <LiabilityRow liability={liability} actions={actions} />
+        </QueryClientProvider>);
+        assert.ok(html.includes(`APR <strong class="text-foreground">${label}</strong>`));
+        if (rate === null) assert.ok(!html.includes("0.00%"));
+      } finally { queryClient.clear(); }
+    }
+  }
 });
