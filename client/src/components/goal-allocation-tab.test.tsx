@@ -37,7 +37,7 @@ test("allocation workspace exposes balances, legacy funding, completed goals and
   assert.ok(!html.includes("lucide-link"), "allocation entries must not retain chain-link icons");
   assert.match(html, /legacy/i);
   assert.ok(html.includes("not a transfer"));
-  assert.ok(html.includes("border-border/75 shadow-sm"), "intro text is enclosed in a card");
+  assert.ok(html.includes("stat-card-surface"), "intro text uses the shared card surface");
   assert.ok(html.indexOf("Give every dollar a direction.") < html.indexOf("Unassigned cash"), "allocation header precedes the summary cards");
 });
 

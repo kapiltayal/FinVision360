@@ -195,7 +195,7 @@ export function GoalAllocationTab({ onAddGoal }: { onAddGoal: () => void }) {
 
   return (
     <section className="space-y-4" aria-label="Goal allocation">
-      <Card className="border-border/75 shadow-sm">
+      <Card className="stat-card-surface">
         <CardContent className="flex flex-col justify-between gap-3 p-4 sm:flex-row sm:items-end sm:p-5">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">A clearer way to save</p>
