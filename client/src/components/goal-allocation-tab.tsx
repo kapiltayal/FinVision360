@@ -1,8 +1,9 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { AlertCircle, ArrowDown, ArrowRight, Banknote, Check, ClipboardList, Loader2, Plus, Trash2 } from "lucide-react";
+import { AlertCircle, ArrowDown, ArrowRight, Banknote, Check, ClipboardList, GripVertical, Loader2, Plus, Trash2 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { formatCurrency } from "@/lib/format";
+import { applySavedOrder, moveItem } from "@/lib/goal-allocation-order";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -24,10 +25,17 @@ type AllocationAccount = {
   allocatedAmount: string; unallocatedAmount: string; deficitAmount: string;
 };
 type AllocationLink = { id: number; assetId: number; goalId: number; amount: string };
-type AllocationData = { accounts: AllocationAccount[]; goals: AllocationGoal[]; allocations: AllocationLink[] };
+type AllocationOrder = { accountOrder: number[]; activeGoalOrder: number[] };
+type AllocationData = {
+  accounts: AllocationAccount[]; goals: AllocationGoal[]; allocations: AllocationLink[];
+  accountOrder?: number[]; activeGoalOrder?: number[];
+};
 
 const money = (value: string | number | null | undefined) => Number(value || 0);
 const cents = (value: number) => Math.round(value * 100) / 100;
+const ACCOUNT_ORDER_DRAG_TYPE = "application/x-finvision-account-order";
+const GOAL_ORDER_DRAG_TYPE = "application/x-finvision-goal-order";
+const hasDragType = (dataTransfer: DataTransfer, type: string) => Array.from(dataTransfer.types).includes(type);
 
 function invalidateAllocationData() {
   void queryClient.invalidateQueries({ queryKey: ["/api/goals"] });
@@ -45,6 +53,7 @@ export function GoalAllocationTab({ onAddGoal }: { onAddGoal: () => void }) {
   const [legacyAmount, setLegacyAmount] = useState("0");
   const [removeId, setRemoveId] = useState<number | null>(null);
   const [draggingAssetId, setDraggingAssetId] = useState<number | null>(null);
+  const [draggingGoalId, setDraggingGoalId] = useState<number | null>(null);
 
   const saveMutation = useMutation({
     mutationFn: (body: { assetId: number; goalId: number; amount: number; legacyAmount: number }) =>
@@ -64,6 +73,34 @@ export function GoalAllocationTab({ onAddGoal }: { onAddGoal: () => void }) {
       setRemoveId(null);
     },
     onError: (error: Error) => toast({ title: "Could not remove allocation", description: error.message, variant: "destructive" }),
+  });
+
+  const orderMutation = useMutation({
+    mutationFn: (order: AllocationOrder) =>
+      apiRequest("PUT", "/api/goal-allocations/order", order).then((response) => response.json() as Promise<AllocationOrder>),
+    onMutate: async (order) => {
+      const queryKey = ["/api/goal-allocations"];
+      await queryClient.cancelQueries({ queryKey });
+      const previous = queryClient.getQueryData<AllocationData>(queryKey);
+      if (previous) queryClient.setQueryData<AllocationData>(queryKey, { ...previous, ...order });
+      return {
+        previousOrder: previous
+          ? { accountOrder: previous.accountOrder, activeGoalOrder: previous.activeGoalOrder }
+          : null,
+      };
+    },
+    onError: (error: Error, _order, context) => {
+      const queryKey = ["/api/goal-allocations"];
+      if (context?.previousOrder) {
+        queryClient.setQueryData<AllocationData>(queryKey, (current) =>
+          current ? { ...current, ...context.previousOrder } : current);
+      } else void queryClient.invalidateQueries({ queryKey });
+      toast({ title: "Could not save tile order", description: error.message, variant: "destructive" });
+    },
+    onSuccess: (savedOrder) => {
+      queryClient.setQueryData<AllocationData>(["/api/goal-allocations"], (current) =>
+        current ? { ...current, ...savedOrder } : current);
+    },
   });
 
   const accountById = useMemo(() => new Map((data?.accounts ?? []).map((a) => [a.id, a])), [data?.accounts]);
@@ -139,9 +176,32 @@ export function GoalAllocationTab({ onAddGoal }: { onAddGoal: () => void }) {
   }
 
   const allocationData = data;
-  const activeGoals = allocationData.goals.filter((goal) => money(goal.currentAmount) < money(goal.targetAmount));
+  const orderedAccounts = applySavedOrder(allocationData.accounts, allocationData.accountOrder ?? []);
+  const activeGoals = applySavedOrder(
+    allocationData.goals.filter((goal) => money(goal.currentAmount) < money(goal.targetAmount)),
+    allocationData.activeGoalOrder ?? [],
+  );
   const completedGoals = allocationData.goals.filter((goal) => money(goal.currentAmount) >= money(goal.targetAmount));
-  function renderGoal(goal: AllocationGoal) {
+  function persistTileOrder(accounts: AllocationAccount[], goals: AllocationGoal[]) {
+    if (orderMutation.isPending) return;
+    orderMutation.mutate({
+      accountOrder: accounts.map((account) => account.id),
+      activeGoalOrder: goals.map((goal) => goal.id),
+    });
+  }
+  function reorderAccount(movingId: number, targetId: number, afterTarget = false) {
+    const next = moveItem(orderedAccounts, movingId, targetId, afterTarget);
+    if (next !== orderedAccounts && next.some((item, index) => item.id !== orderedAccounts[index]?.id)) {
+      persistTileOrder(next, activeGoals);
+    }
+  }
+  function reorderGoal(movingId: number, targetId: number, afterTarget = false) {
+    const next = moveItem(activeGoals, movingId, targetId, afterTarget);
+    if (next !== activeGoals && next.some((item, index) => item.id !== activeGoals[index]?.id)) {
+      persistTileOrder(orderedAccounts, next);
+    }
+  }
+  function renderGoal(goal: AllocationGoal, reorderable = false) {
     const goalLinks = allocationData.allocations.filter((link) => link.goalId === goal.id);
     const total = money(goal.currentAmount);
     const target = money(goal.targetAmount);
@@ -152,19 +212,51 @@ export function GoalAllocationTab({ onAddGoal }: { onAddGoal: () => void }) {
     const remaining = Math.max(0, target - total);
     const pct = target ? Math.min(100, total / target * 100) : 0;
     return <article key={goal.id} data-allocation-goal={goal.id}
-      onDragOver={(event) => { if (draggingAssetId !== null) event.preventDefault(); }}
+      onDragOver={(event) => { if (draggingAssetId !== null || (reorderable && draggingGoalId !== null)) event.preventDefault(); }}
       onDrop={(event) => {
+        const sortId = Number(event.dataTransfer.getData(GOAL_ORDER_DRAG_TYPE));
+        if (reorderable && Number.isSafeInteger(sortId) && sortId > 0) {
+          event.preventDefault();
+          event.stopPropagation();
+          const bounds = event.currentTarget.getBoundingClientRect();
+          reorderGoal(sortId, goal.id, event.clientY >= bounds.top + bounds.height / 2);
+          setDraggingGoalId(null);
+          return;
+        }
         event.preventDefault();
         const id = Number(event.dataTransfer.getData("text/plain"));
         setDraggingAssetId(null);
         if (Number.isInteger(id) && accountById.has(id)) openEditor(id, goal.id);
       }}
-      className={`rounded-lg border bg-card p-3 shadow-sm transition-colors ${draggingAssetId !== null ? "border-primary/60 bg-primary/[0.035] ring-1 ring-primary/15" : "hover:border-primary/35"}`}
+      className={`rounded-lg border bg-card p-3 shadow-sm transition-colors ${draggingAssetId !== null ? "border-primary/60 bg-primary/[0.035] ring-1 ring-primary/15" : "hover:border-primary/35"} ${draggingGoalId === goal.id ? "opacity-60" : ""}`}
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2"><h4 className="truncate font-semibold">{goal.title}</h4>{total >= target && <Badge className="border-0 bg-emerald-500/10 text-emerald-700"><Check className="mr-1 h-3 w-3" />Reached</Badge>}</div>
-          <p className="mt-1 text-xs text-muted-foreground">{formatCurrency(total)} total funding of {formatCurrency(target)}</p>
+        <div className="flex min-w-0 flex-1 items-start gap-1.5">
+          {reorderable && <button
+            type="button"
+            draggable={!orderMutation.isPending}
+            disabled={orderMutation.isPending}
+            aria-label={`Reorder goal ${goal.title}; use up or down arrow keys to move`}
+            title="Drag to reorder, or use the up/down arrow keys"
+            onDragStart={(event) => {
+              event.dataTransfer.effectAllowed = "move";
+              event.dataTransfer.setData(GOAL_ORDER_DRAG_TYPE, String(goal.id));
+              setDraggingGoalId(goal.id);
+            }}
+            onDragEnd={() => setDraggingGoalId(null)}
+            onKeyDown={(event) => {
+              if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
+              event.preventDefault();
+              const index = activeGoals.findIndex((item) => item.id === goal.id);
+              const target = activeGoals[index + (event.key === "ArrowUp" ? -1 : 1)];
+              if (target) reorderGoal(goal.id, target.id, event.key === "ArrowDown");
+            }}
+            className="inline-flex h-7 w-5 shrink-0 cursor-grab touch-none items-center justify-center rounded text-muted-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:cursor-grabbing"
+          ><GripVertical className="h-4 w-4" aria-hidden="true" /></button>}
+          <div className="min-w-0">
+            <div className="flex items-center gap-2"><h4 className="truncate font-semibold">{goal.title}</h4>{total >= target && <Badge className="border-0 bg-emerald-500/10 text-emerald-700"><Check className="mr-1 h-3 w-3" />Reached</Badge>}</div>
+            <p className="mt-1 text-xs text-muted-foreground">{formatCurrency(total)} total funding of {formatCurrency(target)}</p>
+          </div>
         </div>
         <Button size="sm" variant="outline" disabled={allocationData.accounts.length === 0} onClick={() => {
           const first = allocationData.accounts.find((account) => money(account.unallocatedAmount) > 0) ??
@@ -254,21 +346,56 @@ export function GoalAllocationTab({ onAddGoal }: { onAddGoal: () => void }) {
               <Badge variant="secondary">{data.accounts.length}</Badge>
             </div>
             <div className="space-y-2">
-              {data.accounts.map((account) => {
+              {orderedAccounts.map((account, accountIndex) => {
                 const deficit = money(account.deficitAmount);
                 return <article
                   key={account.id}
                   data-allocation-account={account.id}
-                  draggable
-                  onDragStart={(event) => { event.dataTransfer.setData("text/plain", String(account.id)); setDraggingAssetId(account.id); }}
-                  onDragEnd={() => setDraggingAssetId(null)}
+                  onDragOver={(event) => {
+                    if (hasDragType(event.dataTransfer, ACCOUNT_ORDER_DRAG_TYPE)) {
+                      event.preventDefault();
+                      event.dataTransfer.dropEffect = "move";
+                    }
+                  }}
+                  onDrop={(event) => {
+                    const movingId = Number(event.dataTransfer.getData(ACCOUNT_ORDER_DRAG_TYPE));
+                    if (!Number.isSafeInteger(movingId) || movingId <= 0) return;
+                    event.preventDefault();
+                    event.stopPropagation();
+                    const bounds = event.currentTarget.getBoundingClientRect();
+                    reorderAccount(movingId, account.id, event.clientY >= bounds.top + bounds.height / 2);
+                    setDraggingAssetId(null);
+                  }}
                   className={`rounded-lg border bg-card p-3 shadow-sm transition-opacity ${draggingAssetId === account.id ? "opacity-50" : "hover:border-primary/35"}`}
                   aria-label={`${account.name}, ${formatCurrency(account.value)} total, ${formatCurrency(account.unallocatedAmount)} unallocated`}
                 >
                   <div className="flex items-start justify-between gap-3">
-                    <div className="flex min-w-0 items-start gap-2">
-                      <span aria-hidden="true" className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full ring-2 ring-background" style={{ backgroundColor: accountAllocationColor(account.id) }} />
-                      <div className="min-w-0"><p className="truncate font-medium">{account.name}</p><p className="mt-0.5 truncate text-xs text-muted-foreground">{account.institution || account.category}</p></div>
+                    <div className="flex min-w-0 items-start gap-1.5">
+                      <button
+                        type="button"
+                        draggable={!orderMutation.isPending}
+                        disabled={orderMutation.isPending}
+                        aria-label={`Reorder account ${account.name}; use up or down arrow keys to move`}
+                        title="Drag to reorder, or use the up/down arrow keys"
+                        onDragStart={(event) => {
+                          event.dataTransfer.effectAllowed = "move";
+                          event.dataTransfer.setData(ACCOUNT_ORDER_DRAG_TYPE, String(account.id));
+                          event.dataTransfer.setData("text/plain", String(account.id));
+                          setDraggingAssetId(account.id);
+                        }}
+                        onDragEnd={() => setDraggingAssetId(null)}
+                        onKeyDown={(event) => {
+                          if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
+                          event.preventDefault();
+                          const target = orderedAccounts[accountIndex + (event.key === "ArrowUp" ? -1 : 1)];
+                          if (target) reorderAccount(account.id, target.id, event.key === "ArrowDown");
+                        }}
+                        className="inline-flex h-7 w-5 shrink-0 cursor-grab touch-none items-center justify-center rounded text-muted-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:cursor-grabbing"
+                      ><GripVertical className="h-4 w-4" aria-hidden="true" /></button>
+                      <div className="flex min-w-0 items-start gap-2">
+                        <span aria-hidden="true" className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full ring-2 ring-background" style={{ backgroundColor: accountAllocationColor(account.id) }} />
+                        <div className="min-w-0"><p className="truncate font-medium">{account.name}</p><p className="mt-0.5 truncate text-xs text-muted-foreground">{account.institution || account.category}</p></div>
+                      </div>
                     </div>
                     <div className="shrink-0 text-right">
                       <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Total balance</p>
@@ -292,7 +419,7 @@ export function GoalAllocationTab({ onAddGoal }: { onAddGoal: () => void }) {
             </div>
             <div className="space-y-3">
               {activeGoals.length === 0 && <p className="rounded-lg border border-dashed p-5 text-sm text-muted-foreground">No active goals. Completed goals stay available below.</p>}
-              {activeGoals.map(renderGoal)}
+              {activeGoals.map((goal) => renderGoal(goal, true))}
             </div>
             {completedGoals.length > 0 && <details className="group rounded-xl border bg-card">
               <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3.5 font-medium [&::-webkit-details-marker]:hidden">
@@ -300,7 +427,7 @@ export function GoalAllocationTab({ onAddGoal }: { onAddGoal: () => void }) {
                 <span className="text-xs text-muted-foreground group-open:hidden">Show allocations</span>
                 <span className="hidden text-xs text-muted-foreground group-open:inline">Hide allocations</span>
               </summary>
-              <div className="space-y-3 border-t p-3 sm:p-4">{completedGoals.map(renderGoal)}</div>
+              <div className="space-y-3 border-t p-3 sm:p-4">{completedGoals.map((goal) => renderGoal(goal))}</div>
             </details>}
           </section>
           </div>

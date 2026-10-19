@@ -47,10 +47,23 @@ test("allocation ownership, concurrency, limits, legacy mapping, deficits and im
     await saveAllocation(pool, owner, { assetId: account.id, goalId: goal.id, amount: 200 });
     assert.equal((await funding()).current_amount, "500.00");
     const privateData = await call("get", "/api/goal-allocations", other);
-    assert.deepEqual(privateData.body, { accounts: [], goals: [], allocations: [] });
+    assert.deepEqual(privateData.body, { accounts: [], goals: [], allocations: [], accountOrder: [], activeGoalOrder: [] });
     const ownerData = await call("get", "/api/goal-allocations", owner);
     assert.equal(ownerData.body.accounts.length, 1, "each eligible asset appears exactly once");
     assert.equal(ownerData.body.goals.find((g: any) => g.id === goal.id).legacyAmount, "300.00");
+    assert.deepEqual(ownerData.body.accountOrder, []);
+    assert.deepEqual(ownerData.body.activeGoalOrder, []);
+    const savedOrder = await call("put", "/api/goal-allocations/order", owner, {
+      accountOrder: [account.id],
+      activeGoalOrder: [goal2.id, goal.id],
+    });
+    assert.equal(savedOrder.code, 200);
+    assert.deepEqual(savedOrder.body, { accountOrder: [account.id], activeGoalOrder: [goal2.id, goal.id] });
+    assert.equal((await call("get", "/api/goal-allocations", owner)).body.activeGoalOrder[0], goal2.id, "the order persists for its owner");
+    assert.deepEqual((await call("get", "/api/goal-allocations", other)).body.accountOrder, [], "another user cannot see the saved order");
+    assert.equal((await call("put", "/api/goal-allocations/order", owner, {
+      accountOrder: ["not-an-id"], activeGoalOrder: [],
+    })).code, 422);
     const linkId = ownerData.body.allocations[0].id;
     assert.equal((await call("delete", "/api/goal-allocations/:id", other, {}, { id: linkId })).code, 404);
     assert.equal((await call("post", "/api/goal-allocations", other, { assetId: account.id, goalId: goal.id, amount: 10 })).code, 404);

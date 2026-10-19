@@ -22,6 +22,14 @@ export async function ensureGoalAllocationSchema(pool: Pool) {
         updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
         CONSTRAINT goal_allocations_user_pair_unique UNIQUE(user_id, asset_id, goal_id)
       );
+      CREATE TABLE IF NOT EXISTS goal_allocation_layouts (
+        user_id VARCHAR PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+        account_order JSONB NOT NULL DEFAULT '[]'::jsonb
+          CONSTRAINT goal_allocation_layouts_account_order_array CHECK (jsonb_typeof(account_order) = 'array'),
+        active_goal_order JSONB NOT NULL DEFAULT '[]'::jsonb
+          CONSTRAINT goal_allocation_layouts_active_goal_order_array CHECK (jsonb_typeof(active_goal_order) = 'array'),
+        updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+      );
       CREATE OR REPLACE VIEW goal_funding AS
       SELECT g.id,g.user_id,g.title,g.category,g.target_amount,
         (g.current_amount + COALESCE(a.amount,0))::numeric(12,2) AS current_amount,
@@ -36,6 +44,43 @@ export async function ensureGoalAllocationSchema(pool: Pool) {
     await client.query("ROLLBACK");
     throw error;
   } finally { client.release(); }
+}
+
+export type GoalAllocationOrder = { accountOrder: number[]; activeGoalOrder: number[] };
+
+function validateOrderIds(value: unknown, label: string): number[] {
+  if (!Array.isArray(value) || value.length > 1000 ||
+      value.some((id) => typeof id !== "number" || !Number.isSafeInteger(id) || id <= 0) ||
+      new Set(value).size !== value.length) {
+    throw new AllocationError(`Invalid ${label} order.`);
+  }
+  return [...value] as number[];
+}
+
+export async function getGoalAllocationOrder(pool: Pool, userId: string): Promise<GoalAllocationOrder> {
+  const { rows: [layout] } = await pool.query(`
+    SELECT account_order AS "accountOrder",active_goal_order AS "activeGoalOrder"
+    FROM goal_allocation_layouts WHERE user_id=$1`, [userId]);
+  return {
+    accountOrder: Array.isArray(layout?.accountOrder) ? layout.accountOrder : [],
+    activeGoalOrder: Array.isArray(layout?.activeGoalOrder) ? layout.activeGoalOrder : [],
+  };
+}
+
+export async function saveGoalAllocationOrder(pool: Pool, userId: string, input: unknown): Promise<GoalAllocationOrder> {
+  const order = input as Partial<GoalAllocationOrder> | null;
+  const accountOrder = validateOrderIds(order?.accountOrder, "account");
+  const activeGoalOrder = validateOrderIds(order?.activeGoalOrder, "active goal");
+  const { rows: [saved] } = await pool.query(`
+    INSERT INTO goal_allocation_layouts(user_id,account_order,active_goal_order)
+    VALUES($1,$2::jsonb,$3::jsonb)
+    ON CONFLICT(user_id) DO UPDATE SET
+      account_order=EXCLUDED.account_order,
+      active_goal_order=EXCLUDED.active_goal_order,
+      updated_at=NOW()
+    RETURNING account_order AS "accountOrder",active_goal_order AS "activeGoalOrder"`,
+  [userId, JSON.stringify(accountOrder), JSON.stringify(activeGoalOrder)]);
+  return { accountOrder: saved.accountOrder, activeGoalOrder: saved.activeGoalOrder };
 }
 
 export async function withFundingLock<T>(pool: Pool, userId: string, action: (client: PoolClient) => Promise<T>) {

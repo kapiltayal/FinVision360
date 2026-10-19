@@ -44,7 +44,10 @@ import { getRetirementItemPreferences, deleteRetirementItemPreference } from "./
 import { retirementItemIncluded } from "@shared/retirement-account-inclusion";
 import { buildRetirementIncomeExpenseProjection, isPretaxRetirementAccountCategory } from "./retirement-income-expense-projection";
 import { parseOptionalInterestRate } from "./liability-apr";
-import { AllocationError, allocationAccounts, moneyCents, saveAllocation, withFundingLock } from "./goal-allocation";
+import {
+  AllocationError, allocationAccounts, getGoalAllocationOrder, moneyCents,
+  saveAllocation, saveGoalAllocationOrder, withFundingLock,
+} from "./goal-allocation";
 import { deletePlaidConnection } from "./plaid-disconnect";
 
 const MAX_PENSION_AMOUNT = 9_999_999_999_999.99;
@@ -1994,14 +1997,26 @@ Include a year-by-year overview, useful milestones, a conservative/base/optimist
   app.get("/api/goal-allocations", requireAuth, async (req, res) => {
     try {
       const userId = req.user!.id;
-      const [accounts, goals, { rows: allocations }] = await Promise.all([
+      const [accounts, goals, { rows: allocations }, order] = await Promise.all([
         allocationAccounts(pool, userId), storage.getUserGoals(userId),
         pool.query('SELECT id,asset_id AS "assetId",goal_id AS "goalId",amount FROM goal_allocations WHERE user_id=$1 ORDER BY id', [userId]),
+        getGoalAllocationOrder(pool, userId),
       ]);
-      res.json({ accounts, goals, allocations });
+      res.json({ accounts, goals, allocations, ...order });
     } catch (error) {
       logRouteFailure(req, error);
       res.status(500).json({ message: "Failed to load goal allocations" });
+    }
+  });
+
+  app.put("/api/goal-allocations/order", requireAuth, async (req, res) => {
+    try {
+      res.json(await saveGoalAllocationOrder(pool, req.user!.id, req.body));
+    } catch (error) {
+      if (!(error instanceof AllocationError)) logRouteFailure(req, error);
+      res.status(error instanceof AllocationError ? error.status : 500).json({
+        message: error instanceof AllocationError ? error.message : "Failed to save goal allocation order",
+      });
     }
   });
 

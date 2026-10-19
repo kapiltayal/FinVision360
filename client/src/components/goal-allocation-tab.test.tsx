@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Router } from "wouter";
 import { GoalAllocationTab } from "./goal-allocation-tab";
 import { accountAllocationColor } from "./goal-allocation-connections";
+import { applySavedOrder, moveItem } from "../lib/goal-allocation-order";
 import GoalsPage from "../pages/goals";
 
 function render(data: unknown) {
@@ -37,6 +38,9 @@ test("allocation workspace exposes balances, legacy funding, completed goals and
   assert.ok(html.includes(`background-color:${accountAllocationColor(1)}`));
   assert.ok(html.includes("lucide-clipboard-list"), "allocation entries and legend use planning icons");
   assert.ok(!html.includes("lucide-link"), "allocation entries must not retain chain-link icons");
+  assert.ok(html.includes('aria-label="Reorder account Checking; use up or down arrow keys to move"'));
+  assert.ok(html.includes('aria-label="Reorder goal House; use up or down arrow keys to move"'));
+  assert.ok(!html.includes('aria-label="Reorder goal Trip; use up or down arrow keys to move"'), "completed goals are not included in the active-goal sorter");
   assert.match(html, /legacy/i);
   assert.ok(html.includes("not a transfer"));
   assert.ok(html.includes("Goal amount to go"));
@@ -45,6 +49,13 @@ test("allocation workspace exposes balances, legacy funding, completed goals and
   assert.ok(!html.includes("Connected goals"));
   assert.ok(html.includes("stat-card-surface"), "intro text uses the shared card surface");
   assert.ok(html.indexOf("Give every dollar a direction.") < html.indexOf("Unassigned cash"), "allocation header precedes the summary cards");
+});
+
+test("saved tile order is applied and drop positions reorder items deterministically", () => {
+  const items = [{ id: 1 }, { id: 2 }, { id: 3 }];
+  assert.deepEqual(applySavedOrder(items, [3, 1, 3, 99]).map((item) => item.id), [3, 1, 2]);
+  assert.deepEqual(moveItem(items, 1, 3).map((item) => item.id), [2, 1, 3]);
+  assert.deepEqual(moveItem(items, 1, 3, true).map((item) => item.id), [2, 3, 1]);
 });
 
 test("account relationship colors are deterministic and distinct across accounts", () => {

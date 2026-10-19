@@ -732,6 +732,13 @@ export const goalAllocations = pgTable("goal_allocations", {
   positiveAmount: check("goal_allocations_amount_check", sql`${table.amount} > 0`),
 }));
 
+export const goalAllocationLayouts = pgTable("goal_allocation_layouts", {
+  userId: varchar("user_id").primaryKey().references(() => users.id, { onDelete: "cascade" }),
+  accountOrder: jsonb("account_order").$type<number[]>().notNull().default(sql`'[]'::jsonb`),
+  activeGoalOrder: jsonb("active_goal_order").$type<number[]>().notNull().default(sql`'[]'::jsonb`),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 export const userGoalsHistory = pgTable("user_goals_history", {
   id: serial("id").primaryKey(),
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
