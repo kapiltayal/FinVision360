@@ -4,9 +4,11 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
+import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   CalendarDays,
+  CircleAlert,
   Landmark,
   ReceiptText,
   WalletCards,
@@ -63,7 +65,13 @@ export default function RetirementPlannerPage() {
   const { data: savedSettings } = useQuery<RetirementPlannerSettings>({
     queryKey: ["/api/retirement/planner-settings"],
   });
-  const { data: retirementProjection, isLoading: projectionLoading } = useQuery<RetirementProjection>({
+  const {
+    data: retirementProjection,
+    isLoading: projectionLoading,
+    isError: projectionError,
+    isFetching: projectionFetching,
+    refetch: refetchProjection,
+  } = useQuery<RetirementProjection>({
     queryKey: ["/api/retirement/net-worth-projection"],
   });
   const { data: assetCategories = [] } = useQuery<BookCategory[]>({
@@ -333,7 +341,16 @@ export default function RetirementPlannerPage() {
 
           <CardContent className="p-4 sm:p-5">
             <TabsContent value="net-worth" className="mt-0 space-y-5">
-              {projectionLoading || !retirementProjection ? (
+              {projectionError ? (
+                <div role="alert" className="rounded-2xl border border-rose-200 bg-rose-50/60 p-8 text-center dark:border-rose-900 dark:bg-rose-950/20">
+                  <CircleAlert className="mx-auto h-8 w-8 text-rose-600" aria-hidden="true" />
+                  <p className="mt-3 font-semibold">We couldn’t load your retirement net worth</p>
+                  <p className="mt-1 text-sm text-muted-foreground">Your saved plan is safe. Try loading it again.</p>
+                  <Button className="mt-4" variant="outline" disabled={projectionFetching} onClick={() => void refetchProjection()}>
+                    {projectionFetching ? "Trying again..." : "Try again"}
+                  </Button>
+                </div>
+              ) : projectionLoading || !retirementProjection ? (
                 <div className="rounded-xl border px-4 py-12 text-center text-sm text-muted-foreground">
                   Calculating your retirement projection...
                 </div>

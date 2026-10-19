@@ -3,9 +3,9 @@ name: Retirement net-worth projections
 description: Durable assumptions for projecting account values and debt balances at retirement.
 ---
 
-Asset type default returns are stored as decimal fractions, while account rates and user projection overrides are percentages. Use a saved override first, then a meaningful account rate, then the asset type default.
+Asset type default returns are stored as decimal fractions, while account rates and user projection overrides are percentages. Use a saved override first, then a valid account rate (including explicit zero), then the asset type default only for missing or invalid rates.
 
-**Why:** Mixing fraction and percentage units produces materially incorrect compound growth, and legacy account rows use zero where an account-specific return was not provided.
+**Why:** Mixing fraction and percentage units produces materially incorrect compound growth. The user approved honoring saved 0% rates in retirement projections; do not guess that a stored zero represents missing information or silently replace it with category growth.
 
 **How to apply:** Convert asset type defaults to percentages before display or compounding. Keep user overrides separate from source account data so resetting an override restores the account/category assumption.
 

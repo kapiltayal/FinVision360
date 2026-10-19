@@ -23,7 +23,9 @@ These are projection preferences, not account deletion or global exclusion. They
 
 ## Rates and access assumptions
 
-Missing live asset returns or debt APRs remain unknown, while explicit 0% is a real zero rate. Retirement models can use documented category-return fallback assumptions and projection-specific overrides; do not write those assumptions back as actual account rates.
+Missing live asset returns or debt APRs remain unknown, while explicit 0% is a real zero rate. For asset growth, a projection-specific override takes precedence, followed by a valid saved account return (including 0%). Only missing or invalid account returns fall back to the category default; do not write those assumptions back as actual account rates.
+
+If the Net Worth projection cannot load or refresh, the tab shows an error with a **Try again** button instead of remaining on the calculating message. Retrying reloads the projection without changing saved settings or accounts.
 
 Net Worth and Income/Expense use their own projection services. Early access to pretax retirement accounts follows account/category inference and the persisted early-withdrawal override; excluding an account is distinct from unlocking it.
 

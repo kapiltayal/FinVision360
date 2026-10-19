@@ -179,9 +179,8 @@ export function buildRetirementNetWorthProjection(input: {
     const overrideRate = overrideByAsset.get(asset.id);
     const hasOverride = overrideRate !== undefined;
     const hasAccountRate = asset.interestRate !== null
-      && asset.interestRate !== ""
-      && Number.isFinite(Number(asset.interestRate))
-      && accountRate !== 0;
+      && asset.interestRate.trim() !== ""
+      && Number.isFinite(Number(asset.interestRate));
     const typeRate = type ? numberValue(type.rateOfReturn) * 100 : 0;
     const returnRate = Math.min(30, Math.max(0, hasOverride ? overrideRate : hasAccountRate ? accountRate ?? 0 : typeRate));
     const currentValue = numberValue(asset.value);
