@@ -21,6 +21,8 @@ test("allocation workspace exposes balances, legacy funding, completed goals and
     goals: [
       { id: 1, title: "House", category: "home", targetAmount: "1000", currentAmount: "700", legacyAmount: "100", allocatedAmount: "600" },
       { id: 2, title: "Trip", category: "travel", targetAmount: "200", currentAmount: "200", legacyAmount: "200", allocatedAmount: "0" },
+      { id: 3, title: "Emergency", category: "safety", targetAmount: "1000", currentAmount: "400", legacyAmount: "0", allocatedAmount: "0" },
+      { id: 4, title: "Overfunded", category: "other", targetAmount: "100", currentAmount: "150", legacyAmount: "150", allocatedAmount: "0" },
     ],
     allocations: [{ id: 1, assetId: 1, goalId: 1, amount: "600" }],
   });
@@ -37,6 +39,10 @@ test("allocation workspace exposes balances, legacy funding, completed goals and
   assert.ok(!html.includes("lucide-link"), "allocation entries must not retain chain-link icons");
   assert.match(html, /legacy/i);
   assert.ok(html.includes("not a transfer"));
+  assert.ok(html.includes("Goal amount to go"));
+  assert.ok(html.includes("Across active goals"));
+  assert.ok(html.includes("$900"), "the summary adds remaining amounts for active goals and excludes completed or overfunded goals");
+  assert.ok(!html.includes("Connected goals"));
   assert.ok(html.includes("stat-card-surface"), "intro text uses the shared card surface");
   assert.ok(html.indexOf("Give every dollar a direction.") < html.indexOf("Unassigned cash"), "allocation header precedes the summary cards");
 });

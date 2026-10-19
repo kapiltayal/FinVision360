@@ -70,6 +70,13 @@ export function GoalAllocationTab({ onAddGoal }: { onAddGoal: () => void }) {
   const goalById = useMemo(() => new Map((data?.goals ?? []).map((g) => [g.id, g])), [data?.goals]);
   const totalAvailable = (data?.accounts ?? []).reduce((sum, account) => sum + money(account.unallocatedAmount), 0);
   const totalAllocated = (data?.accounts ?? []).reduce((sum, account) => sum + money(account.allocatedAmount), 0);
+  const totalGoalAmountToGo = (data?.goals ?? []).reduce((sumCents, goal) => {
+    const remainingCents = Math.max(
+      0,
+      Math.round(money(goal.targetAmount) * 100) - Math.round(money(goal.currentAmount) * 100),
+    );
+    return sumCents + remainingCents;
+  }, 0) / 100;
   const currentPair = editor && data ? data.allocations.find((a) => a.assetId === editor.assetId && a.goalId === editor.goalId) : undefined;
   const selectedAccount = editor ? accountById.get(editor.assetId) : undefined;
   const selectedGoal = editor ? goalById.get(editor.goalId) : undefined;
@@ -220,9 +227,9 @@ export function GoalAllocationTab({ onAddGoal }: { onAddGoal: () => void }) {
           <p className="mt-1 text-xs text-muted-foreground">Still held in your accounts</p>
         </CardContent></Card>
         <Card><CardContent className="px-4 py-3">
-          <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">Connected goals</p>
-          <p className="mt-1 text-xl font-semibold tracking-tight">{data.goals.length}</p>
-          <p className="mt-1 text-xs text-muted-foreground">Including goals already reached</p>
+          <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">Goal amount to go</p>
+          <p className="mt-1 text-xl font-semibold tracking-tight">{formatCurrency(totalGoalAmountToGo)}</p>
+          <p className="mt-1 text-xs text-muted-foreground">Across active goals</p>
         </CardContent></Card>
       </div>
 
