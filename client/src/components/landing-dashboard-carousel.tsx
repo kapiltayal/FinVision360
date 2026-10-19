@@ -3,62 +3,27 @@ import useEmblaCarousel from "embla-carousel-react";
 
 type DashboardSlide = {
   label: string;
-  src?: string;
+  src: string;
   alt: string;
 };
 
 const slides: DashboardSlide[] = [
-  { label: "Your financial snapshot", src: undefined, alt: "Net worth, assets, liabilities, and interest spread dashboard preview" },
-  { label: "A clearer view of your finances", src: undefined, alt: "Net worth, assets, liabilities, and interest spread dashboard preview" },
-  { label: "Your progress, all in one place", src: undefined, alt: "Net worth, assets, liabilities, and interest spread dashboard preview" },
+  {
+    label: "Financial Snapshot",
+    src: "/Images/landing-snapshot.jpg",
+    alt: "Financial Snapshot page showing net worth, monthly cash flow, emergency savings, and retirement progress with illustrative demo data",
+  },
+  {
+    label: "Liability Map",
+    src: "/Images/landing-liability-map.jpg",
+    alt: "Liability Map page comparing mortgage, auto loan, and student loan payoff timelines with illustrative demo data",
+  },
+  {
+    label: "Budget Planning",
+    src: "/Images/landing-budget-planning.jpg",
+    alt: "Budgeting Plan page showing monthly income, outflows, cash flow, and plan sections with illustrative demo data",
+  },
 ];
-
-function DashboardPreview() {
-  return (
-    <div className="rounded-lg border bg-card p-4 text-left shadow-lg">
-      <div className="mb-4 flex items-center gap-2">
-        <div className="h-3 w-3 rounded-full bg-red-400" />
-        <div className="h-3 w-3 rounded-full bg-yellow-400" />
-        <div className="h-3 w-3 rounded-full bg-emerald-400" />
-        <span className="ml-2 text-xs text-muted-foreground">Net Worth</span>
-      </div>
-      <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">
-        {[
-          { label: "Net Worth", value: "$421,300", color: "text-emerald-500" },
-          { label: "Total Assets", value: "$732,300", color: "text-[#1C91D4]" },
-          { label: "Total Liabilities", value: "$311,000", color: "text-red-500" },
-          { label: "Interest Spread", value: "+3.21%", color: "text-violet-500" },
-        ].map((stat) => (
-          <div key={stat.label} className="rounded-md bg-muted/80 p-3">
-            <p className="text-xs text-muted-foreground">{stat.label}</p>
-            <p className={`text-base font-bold ${stat.color}`}>{stat.value}</p>
-          </div>
-        ))}
-      </div>
-      <div className="grid grid-cols-3 gap-3">
-        <div className="col-span-2 flex h-24 items-end gap-1 rounded-md bg-muted/80 p-3">
-          {[40, 55, 45, 70, 65, 80, 72, 85, 90, 88, 95, 100].map((height, index) => (
-            <div
-              key={index}
-              className="flex-1 rounded-sm bg-primary/60"
-              style={{ height: `${height}%` }}
-            />
-          ))}
-        </div>
-        <div className="flex h-24 items-center justify-center rounded-md bg-muted/80 p-3">
-          <div className="relative h-14 w-14">
-            <svg viewBox="0 0 36 36" className="h-14 w-14 -rotate-90" aria-hidden="true">
-              <circle cx="18" cy="18" r="13" fill="none" stroke="hsl(var(--muted))" strokeWidth="4" />
-              <circle cx="18" cy="18" r="13" fill="none" stroke="hsl(var(--chart-1))" strokeWidth="4" strokeDasharray="50 82" />
-              <circle cx="18" cy="18" r="13" fill="none" stroke="hsl(var(--chart-2))" strokeWidth="4" strokeDasharray="20 82" strokeDashoffset="-50" />
-              <circle cx="18" cy="18" r="13" fill="none" stroke="hsl(var(--chart-3))" strokeWidth="4" strokeDasharray="12 82" strokeDashoffset="-70" />
-            </svg>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 export function LandingDashboardCarousel() {
   const [activeIndex, setActiveIndex] = useState(0);
@@ -122,7 +87,7 @@ export function LandingDashboardCarousel() {
       className="mt-14 relative mx-auto max-w-4xl"
       role="region"
       aria-roledescription="carousel"
-      aria-label="FinVision360 dashboard preview"
+      aria-label="FinVision360 product screenshots"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       onFocus={() => setIsFocused(true)}
@@ -142,20 +107,17 @@ export function LandingDashboardCarousel() {
               aria-label={`${index + 1} of ${slides.length}: ${slide.label}`}
               aria-hidden={index !== activeIndex}
             >
-              {slide.src ? (
-                <img
-                  className="block h-auto w-full rounded-lg border bg-card"
-                  src={slide.src}
-                  alt={slide.alt}
-                />
-              ) : (
-                <DashboardPreview />
-              )}
+              <img
+                className="block h-auto w-full rounded-lg border bg-card"
+                src={slide.src}
+                alt={slide.alt}
+              />
             </div>
           ))}
         </div>
       </div>
 
+      <p className="mt-2 text-center text-xs text-muted-foreground">Sample workspace · all values shown are illustrative</p>
       <div className="mt-4 flex items-center justify-center">
         <div className="flex items-center gap-1.5" aria-label="Choose a dashboard preview slide">
           {slides.map((slide, index) => (
