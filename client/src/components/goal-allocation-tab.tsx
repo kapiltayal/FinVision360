@@ -176,7 +176,8 @@ export function GoalAllocationTab({ onAddGoal }: { onAddGoal: () => void }) {
   }
 
   const allocationData = data;
-  const orderedAccounts = applySavedOrder(allocationData.accounts, allocationData.accountOrder ?? []);
+  const accountsByBalance = [...allocationData.accounts].sort((left, right) => money(right.value) - money(left.value));
+  const orderedAccounts = applySavedOrder(accountsByBalance, allocationData.accountOrder ?? []);
   const activeGoals = applySavedOrder(
     allocationData.goals.filter((goal) => money(goal.currentAmount) < money(goal.targetAmount)),
     allocationData.activeGoalOrder ?? [],

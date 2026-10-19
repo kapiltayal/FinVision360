@@ -60,6 +60,26 @@ test("saved tile order is applied and drop positions reorder items deterministic
   assert.deepEqual(moveItem(items, 1, 3, true).map((item) => item.id), [2, 3, 1]);
 });
 
+test("accounts default to descending balance until a saved user order exists", () => {
+  const accounts = [
+    { id: 1, name: "Small", category: "Checking Account", value: "100", allocatedAmount: "0", unallocatedAmount: "100", deficitAmount: "0" },
+    { id: 2, name: "Largest", category: "Savings Account", value: "900", allocatedAmount: "0", unallocatedAmount: "900", deficitAmount: "0" },
+    { id: 3, name: "Middle", category: "Checking Account", value: "450", allocatedAmount: "0", unallocatedAmount: "450", deficitAmount: "0" },
+  ];
+  const data = {
+    accounts,
+    goals: [{ id: 1, title: "House", category: "home", targetAmount: "1000", currentAmount: "0" }],
+    allocations: [],
+  };
+  const defaultOrder = render({ ...data, accountOrder: [] });
+  const savedOrder = render({ ...data, accountOrder: [1, 3, 2] });
+  const position = (html: string, id: number) => html.indexOf(`data-allocation-account="${id}"`);
+  assert.ok(position(defaultOrder, 2) < position(defaultOrder, 3));
+  assert.ok(position(defaultOrder, 3) < position(defaultOrder, 1));
+  assert.ok(position(savedOrder, 1) < position(savedOrder, 3));
+  assert.ok(position(savedOrder, 3) < position(savedOrder, 2));
+});
+
 test("account relationship colors are deterministic and distinct across accounts", () => {
   assert.equal(accountAllocationColor(17), accountAllocationColor(17));
   assert.notEqual(accountAllocationColor(17), accountAllocationColor(18));
