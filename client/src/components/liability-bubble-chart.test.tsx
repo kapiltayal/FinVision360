@@ -14,8 +14,10 @@ const debt = (id: number, change: Partial<ExposureItem> = {}): ExposureItem => (
 test("flat two-axis bubbles retain one legend, pan, zoom, reset and keyboard controls without shading", () => {
   const html = renderToStaticMarkup(<LiabilityBubbleChart items={[debt(1)]} />);
   for (const label of ['aria-label="Zoom in"', 'aria-label="Zoom out"',
-    'aria-label="Reset chart view"', "X · MONTHS REMAINING", "Y · APR %",
+    'aria-label="Reset chart view"', "MONTHS REMAINING", "APR %",
     "Use arrow keys to pan", "Circle area = balance"]) assert.ok(html.includes(label), label);
+  assert.ok(!html.includes("X · MONTHS REMAINING"));
+  assert.ok(!html.includes("Y · APR %"));
   assert.ok(html.includes('viewBox="0 0 960 560"'));
   assert.ok(!html.includes("radialGradient"));
   assert.ok(!html.includes("feGaussianBlur"));

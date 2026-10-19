@@ -331,7 +331,7 @@ export function LiabilityBubbleChart({ items }: { items: ExposureItem[] }) {
         style={{ touchAction: "none" }}
       >
         {!plotAvailable && <div className="absolute inset-0 z-10 flex items-center justify-center px-6 text-center text-sm text-muted-foreground">No debts have usable balance, APR, and remaining duration to plot yet.</div>}
-        <svg ref={svgRef} viewBox={`0 0 ${BUBBLE_VIEWBOX.width} ${BUBBLE_VIEWBOX.height}`} className="block h-auto w-full select-none" role="group" aria-label="Orthogonal bubble chart. X axis: months remaining. Y axis: APR percent. Circle area: current balance.">
+        <svg ref={svgRef} viewBox={`0 0 ${BUBBLE_VIEWBOX.width} ${BUBBLE_VIEWBOX.height}`} className="block h-auto w-full select-none" role="group" aria-label="Orthogonal bubble chart. Horizontal axis: months remaining. Vertical axis: APR percent. Circle area: current balance.">
           <defs>
             <clipPath id={`${defsId}-plot-clip`} clipPathUnits="userSpaceOnUse">
               <rect
@@ -389,13 +389,13 @@ export function LiabilityBubbleChart({ items }: { items: ExposureItem[] }) {
           <g className="bubble-axes">
             <path d={`M${BUBBLE_PLOT.left},${BUBBLE_PLOT.bottom} L${BUBBLE_PLOT.right},${BUBBLE_PLOT.bottom}`} />
             <path d={`M${BUBBLE_PLOT.left},${BUBBLE_PLOT.bottom} L${BUBBLE_PLOT.left},${BUBBLE_PLOT.top}`} />
-            <text x={(BUBBLE_PLOT.left + BUBBLE_PLOT.right) / 2} y={BUBBLE_PLOT.bottom + 42} textAnchor="middle">X · MONTHS REMAINING</text>
+            <text x={(BUBBLE_PLOT.left + BUBBLE_PLOT.right) / 2} y={BUBBLE_PLOT.bottom + 42} textAnchor="middle">MONTHS REMAINING</text>
             <text
               x={32}
               y={(BUBBLE_PLOT.top + BUBBLE_PLOT.bottom) / 2}
               textAnchor="middle"
               transform={`rotate(-90 32 ${(BUBBLE_PLOT.top + BUBBLE_PLOT.bottom) / 2})`}
-            >Y · APR %</text>
+            >APR %</text>
           </g>
           <g className="bubble-ticks">
             {axisTicks.x.map((tick, index) => (
