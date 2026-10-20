@@ -170,13 +170,13 @@ All three flows write to the `transactions` table. The signed-in user's ID is as
 | `amount`, `type` | A positive numeric amount and a separate `income` or `expense` type. |
 | `parent_category`, `subcategory` | Canonical category values; the parent may be empty for unassigned transactions. |
 | `needs_want` | `need`, `want`, or `na`. |
-| `is_recurring`, `recurring_type` | Recurrence flag and, when set, `subscription` or `recurring_bill`. |
+| `is_recurring`, `recurring_type`, `recurring_freq` | Recurrence flag, whether the item is a `subscription` or `recurring_bill`, and an optional frequency: `Weekly`, `Bi-Weekly`, `Semi-monthly`, `Monthly`, `Quarterly`, `Semi-Annually`, or `Annually`. Frequency defaults to `NULL`. |
 | `source` | `upload` for reviewed file imports, `plaid` for connected-account imports, or `manual` for single-row manual entry. |
 | Plaid metadata | Plaid transaction ID, account ID/name, and institution name; populated only for Plaid rows. |
 | Upload identity | Source transaction ID and account context, when supplied by the file; `upload_identity` is a hash of that account context plus source ID. |
 | `notes`, timestamps | Optional notes and database-managed creation/update timestamps. |
 
-The database constrains transaction type, Need/Want value, recurring type, and source. Amount is stored as `NUMERIC(12,2)`. Partial unique indexes protect `(user_id, plaid_transaction_id)` and `(user_id, upload_identity)` when those identities are present. Content-based similarities are deliberately not database uniqueness constraints: identical-looking charges can be legitimate.
+The database constrains transaction type, Need/Want value, recurring type and frequency, and source. Amount is stored as `NUMERIC(12,2)`. Partial unique indexes protect `(user_id, plaid_transaction_id)` and `(user_id, upload_identity)` when those identities are present. Content-based similarities are deliberately not database uniqueness constraints: identical-looking charges can be legitimate.
 
 ## Merchant and category reference tables
 

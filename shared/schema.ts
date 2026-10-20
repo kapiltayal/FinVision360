@@ -123,6 +123,17 @@ export const transactionTypeList = pgTable("transaction_type_list", {
 export type TransactionTypeList = typeof transactionTypeList.$inferSelect;
 export type InsertTransactionTypeList = typeof transactionTypeList.$inferInsert;
 
+export const RECURRING_FREQUENCIES = [
+  "Weekly",
+  "Bi-Weekly",
+  "Semi-monthly",
+  "Monthly",
+  "Quarterly",
+  "Semi-Annually",
+  "Annually",
+] as const;
+export type RecurringFrequency = (typeof RECURRING_FREQUENCIES)[number];
+
 // Kept in the shared schema even though the finance tracker currently uses
 // parameterized SQL for its hot paths.
 export const transactions = pgTable("transactions", {
@@ -139,6 +150,7 @@ export const transactions = pgTable("transactions", {
   isUserModified: boolean("is_user_modified").notNull().default(false),
   isRecurring: boolean("is_recurring").default(false),
   recurringType: text("recurring_type"),
+  recurringFreq: text("recurring_freq").default(sql`NULL`),
   source: text("source").notNull().default("manual"),
   plaidTransactionId: text("plaid_transaction_id"),
   plaidAccountId: text("plaid_account_id"),
@@ -163,6 +175,10 @@ export const transactions = pgTable("transactions", {
   typeCheck: check("transactions_type_check", sql`${table.type} IN ('income', 'expense')`),
   needsWantCheck: check("transactions_needs_want_check", sql`${table.needsWant} IN ('need', 'want', 'na')`),
   recurringTypeCheck: check("transactions_recurring_type_check", sql`${table.recurringType} IN ('subscription', 'recurring_bill')`),
+  recurringFreqCheck: check(
+    "transactions_recurring_freq_check",
+    sql`${table.recurringFreq} IS NULL OR ${table.recurringFreq} IN ('Weekly', 'Bi-Weekly', 'Semi-monthly', 'Monthly', 'Quarterly', 'Semi-Annually', 'Annually')`,
+  ),
   sourceCheck: check("transactions_source_check", sql`${table.source} IN ('manual', 'plaid', 'upload', 'import')`),
 }));
 

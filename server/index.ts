@@ -60,6 +60,8 @@ app.use(createApiRequestLogger((message) => log(message)));
        is_user_modified BOOLEAN NOT NULL DEFAULT FALSE,
       is_recurring    BOOLEAN DEFAULT FALSE,
       recurring_type  TEXT CHECK(recurring_type IN ('subscription','recurring_bill')),
+      recurring_freq  TEXT DEFAULT NULL CONSTRAINT transactions_recurring_freq_check
+        CHECK (recurring_freq IS NULL OR recurring_freq IN ('Weekly','Bi-Weekly','Semi-monthly','Monthly','Quarterly','Semi-Annually','Annually')),
       source          TEXT NOT NULL DEFAULT 'manual' CHECK(source IN ('manual','plaid','upload','import')),
       plaid_transaction_id TEXT,
       plaid_account_id TEXT,
@@ -74,6 +76,18 @@ app.use(createApiRequestLogger((message) => log(message)));
     ALTER TABLE transactions ADD COLUMN IF NOT EXISTS plaid_institution_name TEXT;
     ALTER TABLE transactions ADD COLUMN IF NOT EXISTS parent_category TEXT;
     ALTER TABLE transactions ADD COLUMN IF NOT EXISTS is_user_modified BOOLEAN NOT NULL DEFAULT FALSE;
+    ALTER TABLE transactions ADD COLUMN IF NOT EXISTS recurring_freq TEXT DEFAULT NULL;
+    DO $$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conname = 'transactions_recurring_freq_check'
+          AND conrelid = 'transactions'::regclass
+      ) THEN
+        ALTER TABLE transactions ADD CONSTRAINT transactions_recurring_freq_check
+          CHECK (recurring_freq IS NULL OR recurring_freq IN ('Weekly','Bi-Weekly','Semi-monthly','Monthly','Quarterly','Semi-Annually','Annually'));
+      END IF;
+    END $$;
     CREATE TABLE IF NOT EXISTS transaction_change_history (
       id SERIAL PRIMARY KEY,
       user_id VARCHAR NOT NULL,

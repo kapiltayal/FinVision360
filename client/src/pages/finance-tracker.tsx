@@ -15,6 +15,7 @@ import { ConnectedAccountsImportPanel } from "@/components/finance-tracker/conne
 import { TransactionFileImportPanel } from "@/components/finance-tracker/transaction-file-import";
 import { FinancialChartTooltip } from "@/components/financial-chart-tooltip";
 import type { TransactionImportResult } from "@shared/transaction-import";
+import { RECURRING_FREQUENCIES, type RecurringFrequency } from "@shared/schema";
 import {
   TrendingUp, TrendingDown, Wallet, Plus, Upload, RefreshCw, Pencil, Trash2,
   AlertCircle, ArrowDownCircle, ArrowUpCircle, Repeat2, Tag, Search, X,
@@ -33,6 +34,7 @@ type Transaction = {
   amount: string; type: "income" | "expense"; parent_category?: string | null; subcategory: string;
   needs_want: "need" | "want" | "na" | null; is_recurring: boolean;
   recurring_type: "subscription" | "recurring_bill" | null;
+  recurring_freq: RecurringFrequency | null;
   source: "manual" | "plaid" | "upload" | "import"; notes: string | null;
   plaid_transaction_id: string | null; plaid_account_id: string | null;
   plaid_account_name: string | null; plaid_institution_name: string | null;
@@ -265,6 +267,7 @@ function TransactionDialog({
   const [nw, setNw] = useState(initial?.needs_want ?? "");
   const [recurring, setRecurring] = useState(initial?.is_recurring ?? false);
   const [recurringType, setRecurringType] = useState(initial?.recurring_type ?? "");
+  const [recurringFreq, setRecurringFreq] = useState<RecurringFrequency | "">(initial?.recurring_freq ?? "");
   const [notes, setNotes] = useState(initial?.notes ?? "");
 
   const matchingCategories = categories.filter(category => category.type.toLowerCase() === type);
@@ -379,15 +382,32 @@ function TransactionDialog({
             </div>
           </div>
           {recurring && (
-            <div>
-              <Label className="text-xs">Recurring Type</Label>
-              <Select value={recurringType || "subscription"} onValueChange={setRecurringType}>
-                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="subscription">Subscription (fixed amount)</SelectItem>
-                  <SelectItem value="recurring_bill">Recurring Bill (variable)</SelectItem>
-                </SelectContent>
-              </Select>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs">Frequency</Label>
+                <Select
+                  value={recurringFreq || "unspecified"}
+                  onValueChange={value => setRecurringFreq(value === "unspecified" ? "" : value as RecurringFrequency)}
+                >
+                  <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="unspecified">Not specified</SelectItem>
+                    {RECURRING_FREQUENCIES.map(frequency => (
+                      <SelectItem key={frequency} value={frequency}>{frequency}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-xs">Recurring Type</Label>
+                <Select value={recurringType || "subscription"} onValueChange={setRecurringType}>
+                  <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="subscription">Subscription (fixed amount)</SelectItem>
+                    <SelectItem value="recurring_bill">Recurring Bill (variable)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           )}
           <div>
@@ -399,7 +419,7 @@ function TransactionDialog({
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
           <Button
             disabled={!canSave || saving}
-            onClick={() => onSave({ date, description: desc, amount, type, subcategory: subcat, parentCategory: parentCategory || undefined, needsWant: nw || null, isRecurring: recurring, recurringType: recurring ? (recurringType || "subscription") : null, notes })}
+            onClick={() => onSave({ date, description: desc, amount, type, subcategory: subcat, parentCategory: parentCategory || undefined, needsWant: nw || null, isRecurring: recurring, recurringType: recurring ? (recurringType || "subscription") : null, recurringFreq: recurring ? recurringFreq || null : null, notes })}
           >
             {saving ? "Saving…" : isEdit ? "Save Changes" : "Add Transaction"}
           </Button>

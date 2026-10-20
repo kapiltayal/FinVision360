@@ -23,11 +23,15 @@ import { buildMerchantCatalog } from "./merchant-matching";
 import { checkUserTransactionDuplicates, ImportConflict, saveDuplicateSafeImport, validDuplicateReview } from "./transaction-duplicates";
 import { detectAndMarkRecurring } from "./recurring-transactions";
 import { formatSafeApiError, getSafeApiRoutePath } from "./api-logging";
+import { RECURRING_FREQUENCIES, type RecurringFrequency } from "@shared/schema";
 
 const transactionUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024, files: 1 } });
 const CORRUPT_TRANSACTION_FILE = "File content could not be read or appears corrupted.";
 const INVALID_TRANSACTION_FILE_TYPE = "File type is not supported or does not match its contents.";
 const UNASSIGNED_TRANSACTION_CATEGORY = "unassigned";
+function isRecurringFrequency(value: unknown): value is RecurringFrequency {
+  return typeof value === "string" && (RECURRING_FREQUENCIES as readonly string[]).includes(value);
+}
 type CanonicalTransactionCategory = {
   id: number;
   type: string; parentCategory: string; category: string; needVsWant: string | null; description: string;
@@ -1011,7 +1015,7 @@ export function registerFinanceTrackerRoutes(app: Express) {
   app.post("/api/transactions", requireAuth, async (req, res) => {
     try {
       const userId = (req.user as any).id;
-      const { date, description, amount, type, subcategory, category, parentCategory, needsWant, isRecurring, recurringType, notes, source = "manual" } = req.body;
+      const { date, description, amount, type, subcategory, category, parentCategory, needsWant, isRecurring, recurringType, recurringFreq, notes, source = "manual" } = req.body;
       if (source === "upload") return res.status(409).json({
         code: "REVIEW_REQUIRED", message: "File imports must use the preview and reviewed-save workflow.",
       });
@@ -1022,6 +1026,12 @@ export function registerFinanceTrackerRoutes(app: Express) {
       if (!normalizedDate) return res.status(400).json({ message: "Invalid transaction date" });
 
       if (type !== "income" && type !== "expense") return res.status(400).json({ message: "Invalid transaction type" });
+      if (recurringFreq !== undefined && recurringFreq !== null && !isRecurringFrequency(recurringFreq)) {
+        return res.status(400).json({ message: "Invalid recurrence frequency" });
+      }
+      if (recurringFreq != null && !Boolean(isRecurring)) {
+        return res.status(400).json({ message: "Recurrence frequency requires a recurring transaction" });
+      }
       const categories = await canonicalTransactionCategories();
       const supplied = subcategory ?? category;
       if (parentCategory !== undefined && supplied === undefined) return res.status(400).json({ message: "Invalid category" });
@@ -1035,10 +1045,10 @@ export function registerFinanceTrackerRoutes(app: Express) {
       const finalNW = needsWant ?? selected.needVsWant?.toLowerCase() ?? "na";
 
       const { rows } = await pool.query(
-        `INSERT INTO transactions (user_id, date, description, merchant, amount, type, parent_category, subcategory, needs_want, is_recurring, recurring_type, source, notes)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING *`,
+        `INSERT INTO transactions (user_id, date, description, merchant, amount, type, parent_category, subcategory, needs_want, is_recurring, recurring_type, recurring_freq, source, notes)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING *`,
         [userId, normalizedDate, description, description, Math.abs(parseFloat(amount)), type, selected.storedParentCategory, selected.storedCategory, finalNW,
-         isRecurring ?? false, isRecurring && recurringType ? recurringType : null, source, notes || null]
+         isRecurring ?? false, isRecurring && recurringType ? recurringType : null, isRecurring ? recurringFreq ?? null : null, source, notes || null]
       );
 
       res.status(201).json(rows[0]);
@@ -1430,7 +1440,7 @@ export function registerFinanceTrackerRoutes(app: Express) {
       };
 
       const {
-        date, description, amount, type, subcategory, category, parentCategory, needsWant, isRecurring, recurringType, notes,
+        date, description, amount, type, subcategory, category, parentCategory, needsWant, isRecurring, recurringType, recurringFreq, notes,
         applyToMerchant = false, merchantFields = [],
       } = req.body;
       const { rows: existingRows } = await editClient.query(
@@ -1451,6 +1461,13 @@ export function registerFinanceTrackerRoutes(app: Express) {
         return abortEdit(400, "A valid category is required when changing transaction type");
       }
       if (needsWant !== undefined && !isNeedWant(needsWant)) return abortEdit(400, "Invalid Need / Want value");
+      if (recurringFreq !== undefined && recurringFreq !== null && !isRecurringFrequency(recurringFreq)) {
+        return abortEdit(400, "Invalid recurrence frequency");
+      }
+      const effectiveIsRecurring = isRecurring === undefined ? Boolean(existing.is_recurring) : Boolean(isRecurring);
+      if (recurringFreq != null && !effectiveIsRecurring) {
+        return abortEdit(400, "Recurrence frequency requires a recurring transaction");
+      }
       if (parentCategory !== undefined && requestedCategory === undefined) {
         return abortEdit(400, "A category is required when setting a parent category");
       }
@@ -1483,13 +1500,18 @@ export function registerFinanceTrackerRoutes(app: Express) {
       } else if (isRecurring !== false && recurringType !== undefined && recurringType !== existing.recurring_type) {
         addUpdate("recurring_type", recurringType);
       }
+      if (isRecurring === false && existing.recurring_freq !== null) {
+        addUpdate("recurring_freq", null);
+      } else if (isRecurring !== false && recurringFreq !== undefined && (recurringFreq ?? null) !== existing.recurring_freq) {
+        addUpdate("recurring_freq", recurringFreq ?? null);
+      }
       if (notes !== undefined && notes !== existing.notes) addUpdate("notes", notes || null);
 
       let transaction = existing;
       let primaryChanged = false;
       if (updates.length > 0) {
         const modifiesClassification = updates.some((update) =>
-          /^(parent_category|subcategory|needs_want|is_recurring|recurring_type)\s*=/.test(update),
+          /^(parent_category|subcategory|needs_want|is_recurring|recurring_type|recurring_freq)\s*=/.test(update),
         );
         if (modifiesClassification) updates.push("is_user_modified = TRUE");
         params.push(id, userId);
@@ -1508,6 +1530,7 @@ export function registerFinanceTrackerRoutes(app: Express) {
           ["needs_want", existing.needs_want, transaction.needs_want],
           ["is_recurring", existing.is_recurring, transaction.is_recurring],
           ["recurring_type", existing.recurring_type, transaction.recurring_type],
+          ["recurring_freq", existing.recurring_freq, transaction.recurring_freq],
         ].filter(([, oldValue, newValue]) => String(oldValue ?? "") !== String(newValue ?? ""));
         for (const [field, oldValue, newValue] of audited) {
           await editClient.query(
