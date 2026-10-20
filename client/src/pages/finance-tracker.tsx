@@ -609,7 +609,7 @@ function SpendingInsightCarousel({
           <Button type="button" variant="ghost" size="icon" className="hidden h-7 w-7 shrink-0 sm:inline-flex" onClick={goPrevious} aria-label={`Show ${slides[(activeSlide + slides.length - 1) % slides.length].title}`}>
             <ChevronLeft className="h-4 w-4" />
           </Button>
-          <div role="tablist" aria-label="Spending insight views" className="grid min-w-0 flex-1 grid-cols-3 gap-1">
+          <div role="tablist" aria-label="Spending insight views" className="grid min-w-0 flex-1 grid-cols-3">
             {slides.map((slide, index) => (
               <button
                 key={slide.title}
@@ -633,7 +633,7 @@ function SpendingInsightCarousel({
                   goToSlide(nextIndex);
                   slideTabRefs.current[nextIndex]?.focus();
                 }}
-                className={`min-w-0 rounded-full px-1 py-1.5 text-[10px] font-medium leading-tight transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 sm:px-2 sm:text-xs ${index === activeSlide ? "bg-violet-600 text-white" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}
+                className={`min-w-0 border-b-2 border-transparent px-1 py-2 text-center text-[10px] font-medium leading-tight transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 sm:px-2 sm:text-xs ${index === activeSlide ? "border-violet-600 text-violet-700 dark:text-violet-300" : "text-muted-foreground hover:text-foreground"}`}
               >
                 {slide.title}
               </button>
