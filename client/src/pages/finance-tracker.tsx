@@ -425,6 +425,7 @@ function SpendingInsightCarousel({
 }) {
   const [activeSlide, setActiveSlide] = useState(0);
   const touchStartX = useRef<number | null>(null);
+  const slideTabRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const slides = [
     { title: "By Category", icon: PieChartIcon },
     { title: "Subscriptions", icon: CreditCard },
@@ -481,9 +482,10 @@ function SpendingInsightCarousel({
       <CardContent className="pb-4">
         <div
           className="touch-pan-y outline-none"
-          role="group"
+          id="spending-insight-panel"
+          role="tabpanel"
           aria-roledescription="carousel"
-          aria-label="Spending insights"
+          aria-labelledby={`spending-insight-tab-${activeSlide}`}
           aria-live="polite"
           tabIndex={0}
           onTouchStart={event => { touchStartX.current = event.touches[0]?.clientX ?? null; }}
@@ -603,22 +605,41 @@ function SpendingInsightCarousel({
           )}
         </div>
 
-        <div className="mt-3 pt-3 border-t flex items-center justify-between">
-          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={goPrevious} aria-label={`Show ${slides[(activeSlide + slides.length - 1) % slides.length].title}`}>
+        <div className="mt-3 flex items-center gap-1 border-t pt-3">
+          <Button type="button" variant="ghost" size="icon" className="hidden h-7 w-7 shrink-0 sm:inline-flex" onClick={goPrevious} aria-label={`Show ${slides[(activeSlide + slides.length - 1) % slides.length].title}`}>
             <ChevronLeft className="h-4 w-4" />
           </Button>
-          <div className="flex items-center gap-1.5" aria-label={`Insight ${activeSlide + 1} of ${slides.length}`}>
+          <div role="tablist" aria-label="Spending insight views" className="grid min-w-0 flex-1 grid-cols-3 gap-1">
             {slides.map((slide, index) => (
               <button
                 key={slide.title}
+                ref={(element) => { slideTabRefs.current[index] = element; }}
+                id={`spending-insight-tab-${index}`}
+                type="button"
+                role="tab"
+                aria-selected={index === activeSlide}
+                aria-controls="spending-insight-panel"
+                tabIndex={index === activeSlide ? 0 : -1}
                 onClick={() => goToSlide(index)}
-                className={`h-2 rounded-full transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 ${index === activeSlide ? "w-5 bg-violet-600" : "w-2 bg-slate-300 dark:bg-slate-700"}`}
-                aria-label={`Show ${slide.title}`}
-                aria-current={index === activeSlide ? "true" : undefined}
-              />
+                onKeyDown={(event) => {
+                  let nextIndex: number | null = null;
+                  if (event.key === "ArrowRight") nextIndex = (index + 1) % slides.length;
+                  if (event.key === "ArrowLeft") nextIndex = (index + slides.length - 1) % slides.length;
+                  if (event.key === "Home") nextIndex = 0;
+                  if (event.key === "End") nextIndex = slides.length - 1;
+                  if (nextIndex === null) return;
+                  event.preventDefault();
+                  event.stopPropagation();
+                  goToSlide(nextIndex);
+                  slideTabRefs.current[nextIndex]?.focus();
+                }}
+                className={`min-w-0 rounded-full px-1 py-1.5 text-[10px] font-medium leading-tight transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 sm:px-2 sm:text-xs ${index === activeSlide ? "bg-violet-600 text-white" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}
+              >
+                {slide.title}
+              </button>
             ))}
           </div>
-          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={goNext} aria-label={`Show ${slides[(activeSlide + 1) % slides.length].title}`}>
+          <Button type="button" variant="ghost" size="icon" className="hidden h-7 w-7 shrink-0 sm:inline-flex" onClick={goNext} aria-label={`Show ${slides[(activeSlide + 1) % slides.length].title}`}>
             <ChevronRight className="h-4 w-4" />
           </Button>
         </div>
