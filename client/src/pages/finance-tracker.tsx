@@ -427,7 +427,7 @@ function SpendingInsightCarousel({
   const touchStartX = useRef<number | null>(null);
   const slideTabRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const slides = [
-    { title: "By Category", icon: PieChartIcon },
+    { title: "Category", icon: PieChartIcon },
     { title: "Subscriptions", icon: CreditCard },
     { title: "Need vs Want", icon: HeartHandshake },
   ];
