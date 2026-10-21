@@ -188,6 +188,7 @@ export const merchants = pgTable("merchants", {
   logoUrl: text("logo_url"),
   categoryId: integer("category_id").references(() => transactionTypeList.id, { onDelete: "set null" }),
   isKnownSubscription: boolean("is_known_subscription").notNull().default(false),
+  isKnownRecurring: boolean("is_known_recurring").notNull().default(false),
 }, (table) => ({
   nameUnique: uniqueIndex("merchants_name_unique").on(table.name),
 }));

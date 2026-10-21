@@ -43,6 +43,7 @@ type ImportResult = {
   };
   unavailable: number;
   unavailableInstitutions: string[];
+  recurrenceSignalsUnavailableInstitutions?: string[];
   recurringMarked: number;
 };
 
@@ -295,9 +296,15 @@ export function ConnectedAccountsImportPanel({ onImported }: { onImported: () =>
               ].filter(Boolean).join(" · ")}
             </p>
           )}
+          {!!result.recurrenceSignalsUnavailableInstitutions?.length && (
+            <p className="mt-3 text-xs text-amber-700 dark:text-amber-300">
+              Plaid recurring signals were unavailable from: {result.recurrenceSignalsUnavailableInstitutions.join(", ")}.
+              Detection used your history, merchant profiles and transaction patterns instead.
+            </p>
+          )}
           {result.recurringMarked > 0 && (
             <p className="mt-2 text-xs text-muted-foreground">
-              {result.recurringMarked} matching transactions were flagged as recurring.
+              Recurrence tags were updated on {result.recurringMarked} transactions.
             </p>
           )}
         </div>

@@ -21,7 +21,9 @@ import {
 } from "./transaction-import";
 import { buildMerchantCatalog } from "./merchant-matching";
 import { checkUserTransactionDuplicates, ImportConflict, saveDuplicateSafeImport, validDuplicateReview } from "./transaction-duplicates";
-import { detectAndMarkRecurring } from "./recurring-transactions";
+import { detectAndMarkRecurring, detectPreviewRecurrence } from "./recurrence-ingestion";
+import { plaidRecurrenceSignal, plaidStreamSignals } from "./plaid-recurrence";
+import type { RecurrenceTags } from "./recurring-transactions";
 import { formatSafeApiError, getSafeApiRoutePath } from "./api-logging";
 import { RECURRING_FREQUENCIES, type RecurringFrequency } from "@shared/schema";
 
@@ -1131,6 +1133,7 @@ export function registerFinanceTrackerRoutes(app: Express) {
       };
       event({ stage: "duplicates" });
       preview.entries = await checkUserTransactionDuplicates(pool, userId, preview.entries);
+      preview.entries = await detectPreviewRecurrence(pool, userId, preview.entries);
       if (streaming) {
         event({ preview });
         event({ stage: "review" });
@@ -1273,10 +1276,28 @@ export function registerFinanceTrackerRoutes(app: Express) {
       let skippedUnsupportedCurrency = 0;
       let skippedInvalid = 0;
       const unavailableInstitutions: string[] = [];
+      const recurrenceSignalsUnavailableInstitutions: string[] = [];
+      const recurrenceTargetIds: number[] = [];
+      const providerSignals = new Map<number, RecurrenceTags>();
 
       for (const item of selectedItems) {
         let offset = 0;
         let totalTransactions = 0;
+        let streamSignals = new Map<string, RecurrenceTags>();
+        try {
+          const recurring = await plaid.transactionsRecurringGet({
+            access_token: item.accessToken,
+            ...(accountId ? { account_ids: [accountId] } : {}),
+          });
+          streamSignals = plaidStreamSignals(recurring.data.outflow_streams,
+            new Set(allAccounts.filter(account => account.plaidItemId === item.id &&
+              (!accountId || account.plaidAccountId === accountId)).map(account => account.plaidAccountId)));
+        } catch (error) {
+          // Not every institution/Item has the optional recurring product.
+          // Continue with user history, catalog and heuristics, and report the limitation.
+          logRouteFailure(req, error);
+          recurrenceSignalsUnavailableInstitutions.push(item.institutionName || "Connected Institution");
+        }
 
         do {
           let response;
@@ -1363,7 +1384,7 @@ export function registerFinanceTrackerRoutes(app: Express) {
                  plaid_account_name=EXCLUDED.plaid_account_name,
                  plaid_institution_name=EXCLUDED.plaid_institution_name,
                  updated_at=NOW()
-               RETURNING (xmax = 0) AS was_inserted`,
+               RETURNING id, (xmax = 0) AS was_inserted`,
               [
                 userId,
                 transaction.date,
@@ -1383,6 +1404,11 @@ export function registerFinanceTrackerRoutes(app: Express) {
 
             if (rows[0]?.was_inserted) inserted++;
             else updated++;
+            if (rows[0]?.id) {
+              recurrenceTargetIds.push(rows[0].id);
+              const signal = plaidRecurrenceSignal(transaction) || streamSignals.get(transaction.transaction_id);
+              if (signal) providerSignals.set(rows[0].id, signal);
+            }
           }
 
           offset += plaidTransactions.length;
@@ -1390,7 +1416,8 @@ export function registerFinanceTrackerRoutes(app: Express) {
         } while (offset < totalTransactions);
       }
 
-      const recurringMarked = inserted || updated ? await detectAndMarkRecurring(pool, userId) : 0;
+      const recurringMarked = recurrenceTargetIds.length
+        ? await detectAndMarkRecurring(pool, userId, { targetIds: recurrenceTargetIds, providerSignals }) : 0;
       res.json({
         inserted,
         updated,
@@ -1403,6 +1430,7 @@ export function registerFinanceTrackerRoutes(app: Express) {
         },
         unavailable: unavailableInstitutions.length,
         unavailableInstitutions,
+        recurrenceSignalsUnavailableInstitutions,
         recurringMarked,
       });
     } catch (e) {

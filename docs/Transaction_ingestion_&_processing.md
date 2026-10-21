@@ -1,6 +1,6 @@
 # Financial Transaction Ingestion and Processing
 
-*Implementation guide, reviewed against repository code on October 18, 2026.* [Documentation index](README.md).
+*Implementation guide, reviewed against repository code on October 20, 2026.* [Documentation index](README.md).
 
 This guide covers the three ways transactions enter the Finance Tracker: user-uploaded files, transactions imported on request from Plaid-connected accounts, and transactions entered manually. It follows each path from the user's selection through validation, categorization, review or confirmation, and database persistence.
 
@@ -9,14 +9,14 @@ This guide covers the three ways transactions enter the Finance Tracker: user-up
 ```text
 File upload
 Choose file → validate and parse → normalize rows → categorize suggestions
-→ check duplicates → user reviews/edits → revalidate and recheck duplicates
+→ check duplicates → detect recurrence → user reviews/edits → revalidate and recheck duplicates
 → atomically save selected rows + retry receipt → complete
 
 Plaid
-Choose accounts and dates → verify ownership → fetch pages
+Choose accounts and dates → verify ownership → fetch available recurring signals and transaction pages
 → filter and normalize → preference/profile/Plaid/description category
 → upsert by Plaid transaction ID → protect user-edited categories
-→ detect cadence for eligible rows when data changed → import summary
+→ detect recurrence on imported rows using provider signals and user history → import summary
 
 Manual entry
 Enter transaction → validate → use selected category or preference/profile/rules
@@ -37,7 +37,7 @@ The visible flowcharts are repository-local SVG images, so they do not require a
 
 1. Authenticate, validate file type/signature/size, parse and normalize at most 500 nonblank rows.
 2. Suggest categories using user preference → valid file category → merchant profile → AI for unresolved rows.
-3. Check duplicates within this file and the user's ledger; return a read-only editable preview.
+3. Check duplicates within this file and the user's ledger, then detect recurrence using included rows plus the user's saved history. Return suggestions in a read-only editable preview; excluded duplicates do not supply extra observations.
 4. User corrects fields, chooses Save rows, and explicitly confirms legitimate content matches. Stable-ID repeats cannot be saved.
 5. Validate selected rows and review freshness; invalid input returns to review without a write.
 6. Begin a database transaction, acquire the user lock, and repeat duplicate checks. A conflict rolls back the batch.
@@ -58,7 +58,8 @@ flowchart TD
     E -- "No" --> F["AI classifies remaining rows"]
     F --> G
     G --> H["Check duplicates against this user's saved transactions and this file"]
-    H --> I["Return editable preview; no transaction rows written"]
+    H --> H1["Detect recurrence using included rows and this user's history"]
+    H1 --> I["Return editable preview; no transaction rows written"]
     I --> J["User edits rows and selects which transactions to save"]
     J --> K["Validate all selected rows; verify duplicate review is current"]
     K --> L["Begin database transaction; repeat duplicate check"]
@@ -74,15 +75,15 @@ AI-unavailable or unresolved categories remain editable; a valid reviewed transa
 
 ### Plaid: connected-account import and refresh
 
-![Plaid transaction flow: select connected accounts and dates, verify ownership, fetch pages, filter and categorize, upsert rows while protecting user edits, detect eligible monthly recurrence and return results.](diagrams/transaction-plaid.svg)
+![Plaid transaction flow: select accounts and dates, verify ownership, fetch recurring signals and pages, filter and categorize, upsert while protecting user edits, detect recurrence and return results.](diagrams/transaction-plaid.svg)
 
 1. User chooses connected institution/accounts and dates; server authenticates and validates ownership/range.
-2. Fetch Plaid pages. Unavailable institutions are reported while others continue.
+2. Fetch active recurring-stream signals and Plaid transaction pages. Optional recurring-signal failures produce warnings; unavailable transaction institutions are reported while others continue.
 3. Skip pending transactions, transfers, non-USD values and invalid rows.
 4. Normalize accepted rows; categorize using user preference → merchant profile → Plaid mapping → description rules. Skip unresolved categories; no AI call.
 5. Upsert `transactions` by `(user_id, plaid_transaction_id)`; retain explicitly edited category/parent/Need-Want.
 6. Continue all selected pages/institutions. Writes are per row, not one atomic whole-import transaction; an unexpected database error may leave earlier rows committed.
-7. If any rows changed, detect eligible monthly recurrence; return New/Updated/Skipped/Unavailable counts and refresh the ledger.
+7. Detect recurrence for imported row IDs using the user's saved history; return counts and refresh the ledger. Active owned-account Plaid outflow streams supply recurring flags/frequency when available; report a warning if the optional recurring endpoint is unavailable.
 
 <details>
 <summary>Editable Mermaid source — Plaid</summary>
@@ -90,7 +91,7 @@ AI-unavailable or unresolved categories remain editable; a valid reviewed transa
 ```mermaid
 flowchart TD
     A["Choose institution/accounts and date range"] --> B["Authenticate; validate date range and account ownership"]
-    B --> C["Fetch Plaid transactions in pages"]
+    B --> C["Fetch available recurring signals and Plaid transactions in pages"]
     C --> D{"Pending, transfer, unsupported currency, or invalid account/amount?"}
     D -- "Yes" --> E["Skip and count the reason"]
     E --> U{"More rows, pages, or selected institutions?"}
@@ -113,7 +114,7 @@ flowchart TD
     Q --> U
     U -- "Yes" --> C
     U -- "No" --> V{"Any rows inserted or updated?"}
-    V -- "Yes" --> R["Detect recurring cadence for eligible rows"]
+    V -- "Yes" --> R["Detect recurrence: overrides → Plaid signals → merchant flags → heuristics"]
     V -- "No" --> S["Return inserted/updated/skipped/unavailable counts"]
     R --> S
 ```
@@ -170,7 +171,7 @@ All three flows write to the `transactions` table. The signed-in user's ID is as
 | `amount`, `type` | A positive numeric amount and a separate `income` or `expense` type. |
 | `parent_category`, `subcategory` | Canonical category values; the parent may be empty for unassigned transactions. |
 | `needs_want` | `need`, `want`, or `na`. |
-| `is_recurring`, `recurring_type`, `recurring_freq` | Recurrence flag, whether the item is a `subscription` or `recurring_bill`, and an optional frequency: `Weekly`, `Bi-Weekly`, `Semi-monthly`, `Monthly`, `Quarterly`, `Semi-Annually`, or `Annually`. Frequency defaults to `NULL`. File reviews accept source frequency values and allow the reviewer to choose one; Plaid recurrence detection fills frequency only when at least three transactions show a consistent cadence. |
+| `is_recurring`, `recurring_type`, `recurring_freq` | Recurrence flag, canonical lowercase type (`subscription` or `recurring_bill`), and nullable frequency: `Weekly`, `Bi-Weekly`, `Semi-monthly`, `Monthly`, `Quarterly`, `Semi-Annually`, or `Annually`. Overrides/provider tags can supply frequency directly; heuristic inference requires at least three transactions. Default frequency is `NULL`. |
 | `source` | `upload` for reviewed file imports, `plaid` for connected-account imports, or `manual` for single-row manual entry. |
 | Plaid metadata | Plaid transaction ID, account ID/name, and institution name; populated only for Plaid rows. |
 | Upload identity | Source transaction ID and account context, when supplied by the file; `upload_identity` is a hash of that account context plus source ID. |
@@ -188,7 +189,8 @@ The database constrains transaction type, Need/Want value, recurring type and fr
 | `name` | Canonical brand name used for transaction matching; a unique index prevents duplicate exact names. |
 | `logo_url` | Optional brand icon URL for display. |
 | `category_id` | Optional foreign key to `transaction_type_list.id`; a known profile suggests this exact category row, including its canonical parent and Need/Want default. Deleting the category sets this field to `NULL`. |
-| `is_known_subscription` | Defaults to `false`; helps label a qualifying recurring monthly merchant sequence as a subscription, but a profile flag or a single purchase does not establish recurrence. |
+| `is_known_subscription` | Defaults to `false`; explicitly identifies a subscription-only merchant. Can tag one transaction without waiting for three observations. |
+| `is_known_recurring` | Defaults to `false`; explicitly identifies a recurring-bill-only merchant. Used when the subscription-only flag is not set. |
 
 `transaction_type_list` remains the authoritative category dictionary, including transaction type, parent, display label, and Need/Want defaults. Merchant matching must resolve the profile's `category_id` against this table and confirm its transaction type. A missing category reference or income/expense mismatch does not supply a category.
 
@@ -369,7 +371,8 @@ Selected rows are inserted with `source='upload'`. Canonical category values are
 - If every insert succeeds, the server commits the batch.
 - If any insert fails, it rolls back the entire batch; the user does not get a partially saved reviewed import.
 - The original upload is not retained. Only the reviewed transaction fields are saved.
-- The reviewed path does not run automatic recurring detection; it saves recurrence values selected in the review.
+- Detection runs after normalization, categorization and duplicate checking, immediately before preview. It reads history without writing transactions. Save does not rerun it: final review values remain authoritative.
+- Editing recurrence status, type or frequency in review marks an explicit override. Saving audits these choices and protects the saved row, including an explicit choice of not recurring.
 
 Successful saves write selected rows plus a durable receipt in `transaction_import_receipts` in the same transaction. The receipt records the signed-in user, request UUID, canonical payload hash, and result. Retrying an unchanged request returns the previous result instead of inserting again—even if the first response was lost after commit, or retries arrive concurrently. Reusing a committed UUID with changed data fails with `REQUEST_ID_REUSED`. Changed review payloads get new UUIDs; failed transactions leave no receipt.
 
@@ -433,20 +436,47 @@ The importer upserts rows returned by Plaid; it does not delete existing transac
 
 ## 5. Recurring detection and import summary
 
-After at least one Plaid row is inserted or updated, the server runs recurring detection across that user's unmodified expense transactions. The authenticated `POST /api/transactions/detect-recurring` endpoint uses the same detector; the Transactions page no longer exposes a manual detection button.
+### When it runs
 
-The detector reads canonical profiles from `merchants`. An exact normalized `merchant` name takes precedence. Charges with a missing merchant, or a merchant copied from the normalized bank description (the Plaid/file import fallback), can match whole-token canonical names, with longer names preferred and ambiguous matches rejected. A distinct explicit merchant identity is never overridden by incidental brands in its description. Matched charges are grouped by merchant ID. Unmatched charges retain the existing normalized first-three-description-words grouping so changing bank reference numbers do not split their history.
+- **File uploads:** after parsing, standardization, categorization and duplicate checking, immediately before preview. Included incoming rows combine with the same user's historical transactions. Excluded duplicates do not count again. Detection is read-only; the reviewer can change suggested tags. Save persists final review values without rerunning detection.
+- **Plaid:** on every import, fetch available recurring signals, save accepted transactions, then detect recurrence for imported row IDs using the user's historical transactions. Existing corrected rows remain protected. There is no per-row Plaid preview.
+- The authenticated `POST /api/transactions/detect-recurring` endpoint uses the same engine for an explicit ledger-wide recheck; the Transactions page does not expose a manual detection button.
 
-A merchant's `is_known_subscription` flag is only a classification signal, not proof of recurrence. At least two consecutive charges 20–45 days apart are still required. Only rows in qualifying monthly sequences are marked, not unrelated one-off charges elsewhere in the same merchant's history:
+### Merchant identity and priority
 
-- A qualifying sequence for a known subscription merchant is labeled `subscription`, even when prices vary.
-- Other qualifying sequences retain the amount-based rule: amounts less than two cents apart throughout the sequence mean `subscription`; varying amounts mean `recurring_bill`.
-- Single charges, non-monthly histories, income/transfers, invalid amounts/dates, and user-modified rows are not automatically marked.
-- Writes recheck ownership and manual-edit protection. The reported count includes only rows whose recurrence classification actually changed.
+Exact normalized merchant identity takes precedence. Missing merchants or copied bank descriptors allow guarded whole-token canonical matching, preferring longer names and rejecting ambiguity. Incidental brands never replace distinct explicit identities. Matched charges group by merchant ID; unmatched explicit identities group by normalized merchant name, while copied descriptors retain the first-three-word fallback.
 
-Merchant profiles must be populated to supply the known-subscription signal; detection does not seed merchants automatically.
+1. **User history always wins.** Recurrence-specific audit edits, explicit file-review recurrence edits, and manually entered positive tags supply the merchant's tags. If choices conflict, the latest explicit choice wins for new/unmodified rows; transaction ID breaks ties. Existing corrected rows are never rewritten. Negative overrides propagate `is_recurring=false` and clear type/frequency. Category-only corrections do not establish recurrence preferences.
+2. **Plaid flags.** Use explicit subscription/recurring flags when present. Standard transaction responses currently omit them; `/transactions/recurring/get` supplies active outflow stream membership and frequency. Map only owned accounts and imported IDs. A stream signals `recurring_bill` unless it explicitly supplies a subscription flag; never invent that flag from a merchant name. If the optional endpoint is unavailable, warn and continue with the remaining priorities. Supplied file recurrence tags remain reviewable unless user history overrides them.
+3. **Merchant-only profiles.** `is_known_subscription=true` sets `subscription`; otherwise `is_known_recurring=true` sets `recurring_bill`. These explicit profiles require no minimum history. Infer frequency if sufficient history exists, otherwise leave it `NULL`. Detection does not seed profiles.
+4. **Core heuristic engine.** When higher priorities do not supply tags, require at least **three valid expense transactions from the merchant**, including the user's saved history.
 
-The UI shows counts for **New**, **Updated**, **Skipped**, and **Unavailable**, plus skip reasons and institutions that could not provide transactions. It also reports how many rows the recurring detector flagged. The transaction list is refreshed after the import.
+### Step A — temporal analysis
+
+Sort the merchant cluster by date and calculate consecutive `days_difference`. All windows are inclusive:
+
+| Frequency | Nominal days | Accepted interval |
+|---|---:|---:|
+| Weekly | 7 | 6–8 |
+| Bi-Weekly | 14 | 13–15 |
+| Semi-monthly | 15 | 14–16 |
+| Monthly | 30 | 27–33 |
+| Quarterly | 90 | 85–95 |
+| Semi-Annually | 180 | 175–195 |
+| Annually | 365 | 360–370 |
+
+- **3–4 transactions:** the median interval must fall in a cycle window.
+- **5+ transactions:** at least **80% of all intervals** must fall in the cycle window. Four qualifying intervals out of five passes; three out of four does not.
+- Alternating **14/16-day gaps are Semi-monthly**, not Bi-Weekly. For other overlapping windows, choose the qualifying cycle closest to the median; steady 14-day gaps are Bi-Weekly.
+- Qualifying clusters set `is_recurring=true` and `recurring_freq` to the selected label. Insufficient/nonqualifying history alone produces no heuristic tag.
+
+### Step B — amount variance
+
+Calculate the median amount of the entire qualifying merchant cluster. If **every amount** is within inclusive **±5%** of that median, set `recurring_type='subscription'`; otherwise set `recurring_type='recurring_bill'`. These lowercase strings are the database/API values even when the UI displays “Subscription.”
+
+Invalid dates, nonpositive/invalid amounts, income and transfers do not supply heuristic observations. Valid corrected rows may supply history, but are never automatically overwritten. Writes recheck ownership and recurrence audit protection to avoid racing user edits.
+
+The Plaid UI shows **New**, **Updated**, **Skipped**, and **Unavailable**, skip reasons, institution errors, optional recurring-signal warnings, and the count of changed recurrence tags. The ledger refreshes after import.
 
 ## Duplicate and retry summary
 
@@ -472,6 +502,9 @@ The UI shows counts for **New**, **Updated**, **Skipped**, and **Unavailable**, 
 - `server/finance-tracker-routes.ts` — preview, direct import, Plaid retrieval, category mapping, deduplication, and recurring detection.
 - `server/ai/provider.ts` — shared model provider used for file-category classification.
 - `shared/transaction-import.ts` — preview and result contracts.
+- `server/recurring-transactions.ts` — priority rules, cycle windows and median amount variance.
+- `server/recurrence-ingestion.ts` — read-only preview enrichment, owned history/override lookup and protected persistence.
+- `server/plaid-recurrence.ts` — provider flag/frequency normalization and active owned-account stream mapping.
 - `shared/schema.ts` — transaction, merchant, category, and import-receipt schemas and their key constraints.
 - `server/transaction-import-schema.ts` — narrow, additive migration called by the existing application schema bootstrap before routes start. Both `npm run dev` and the published `dist/index.cjs` apply it; concurrent cold starts are serialized, failures stop startup, and no existing transaction data is changed.
 - `scripts/transaction-import-schema.ts` — optional standalone runner for the same migration (`npx tsx scripts/transaction-import-schema.ts`); normal application/deployment startup does not depend on running it manually.

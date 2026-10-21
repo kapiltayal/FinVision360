@@ -1,6 +1,11 @@
-import type { Pool } from "pg";
 import type { RecurringFrequency } from "../shared/schema";
 import { buildMerchantCatalog, matchKnownMerchant } from "./merchant-matching";
+
+export type RecurrenceTags = {
+  isRecurring: boolean;
+  recurringType: "subscription" | "recurring_bill" | null;
+  recurringFreq: RecurringFrequency | null;
+};
 
 export type RecurringTransaction = {
   id: number;
@@ -10,167 +15,112 @@ export type RecurringTransaction = {
   amount: string | number;
   type: string;
   is_user_modified?: boolean;
+  is_recurring?: boolean;
+  recurring_type?: string | null;
+  recurring_freq?: RecurringFrequency | null;
+  recurrence_override?: boolean;
+  recurrence_override_at?: string | Date | null;
+  source?: string;
+  providerSignal?: RecurrenceTags;
 };
 
 export type RecurringMerchant = {
   id: number;
   name: string;
   is_known_subscription: boolean;
+  is_known_recurring?: boolean;
 };
 
-export type RecurringUpdate = {
-  id: number;
-  recurringType: "subscription" | "recurring_bill";
-  recurringFreq?: RecurringFrequency;
-};
+export type RecurringUpdate = RecurrenceTags & { id: number };
 
-function merchantKey(value: string): string {
-  return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+const cycles: Array<{ name: RecurringFrequency; days: number; min: number; max: number }> = [
+  { name: "Weekly", days: 7, min: 6, max: 8 },
+  { name: "Bi-Weekly", days: 14, min: 13, max: 15 },
+  { name: "Semi-monthly", days: 15, min: 14, max: 16 },
+  { name: "Monthly", days: 30, min: 27, max: 33 },
+  { name: "Quarterly", days: 90, min: 85, max: 95 },
+  { name: "Semi-Annually", days: 180, min: 175, max: 195 },
+  { name: "Annually", days: 365, min: 360, max: 370 },
+];
+
+function median(values: number[]): number {
+  const sorted = [...values].sort((a, b) => a - b);
+  const middle = Math.floor(sorted.length / 2);
+  return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
 }
 
-function daysBetween(previous: number, current: number): number {
-  return (current - previous) / 86_400_000;
+export function inferRecurrence(rows: RecurringTransaction[]): RecurrenceTags | undefined {
+  if (rows.length < 3) return undefined;
+  const sorted = [...rows].sort((a, b) => +new Date(a.date) - +new Date(b.date));
+  const intervals = sorted.slice(1).map((row, index) =>
+    (+new Date(row.date) - +new Date(sorted[index].date)) / 86_400_000);
+  const midpoint = median(intervals);
+  const candidates = cycles.filter(cycle => rows.length <= 4
+    ? midpoint >= cycle.min && midpoint <= cycle.max
+    : intervals.filter(days => days >= cycle.min && days <= cycle.max).length / intervals.length >= 0.8);
+  // The overlapping windows must not turn alternating 14/16-day billing into biweekly billing.
+  const alternating = intervals.length >= 2 && intervals.every((days, index) =>
+    (days === 14 || days === 16) && (!index || days !== intervals[index - 1]));
+  const cycle = alternating
+    ? candidates.find(candidate => candidate.name === "Semi-monthly")
+    : [...candidates].sort((a, b) => Math.abs(a.days - midpoint) - Math.abs(b.days - midpoint))[0];
+  if (!cycle) return undefined;
+  const amounts = rows.map(row => Math.abs(Number(row.amount)));
+  const medianAmount = median(amounts);
+  const stable = amounts.every(amount => Math.abs(amount - medianAmount) <= medianAmount * 0.05 + 1e-8);
+  return { isRecurring: true, recurringType: stable ? "subscription" : "recurring_bill", recurringFreq: cycle.name };
 }
 
-function hasSemiMonthlyPattern(charges: Array<{ time: number }>): boolean {
-  if (charges.length < 4) return false;
-  const byMonth = new Map<string, number[]>();
-  for (const charge of charges) {
-    const date = new Date(charge.time);
-    const month = `${date.getUTCFullYear()}-${date.getUTCMonth()}`;
-    const dates = byMonth.get(month) ?? [];
-    dates.push(date.getUTCDate());
-    byMonth.set(month, dates);
-  }
-  let matchingMonths = 0;
-  for (const dates of Array.from(byMonth.values())) {
-    dates.sort((a, b) => a - b);
-    if (dates.length === 2 && dates[1] - dates[0] >= 13 && dates[1] - dates[0] <= 17) {
-      matchingMonths++;
-    }
-  }
-  return matchingMonths >= 2;
+export function hasRecurrenceOverride(row: RecurringTransaction): boolean {
+  return row.recurrence_override === true || (row.source === "manual" && row.is_recurring === true);
 }
 
-function inferRecurringFrequency(
-  charges: Array<{ time: number }>,
-): RecurringFrequency | undefined {
-  if (charges.length < 3) return undefined;
-  const intervals = charges.slice(1).map((charge, index) =>
-    daysBetween(charges[index].time, charge.time));
-  const allWithin = (minimum: number, maximum: number) =>
-    intervals.every((days) => days >= minimum && days <= maximum);
-
-  if (allWithin(6, 8)) return "Weekly";
-  if (allWithin(13, 15)) return "Bi-Weekly";
-  if (hasSemiMonthlyPattern(charges)) return "Semi-monthly";
-  if (allWithin(25, 35)) return "Monthly";
-  if (allWithin(80, 100)) return "Quarterly";
-  if (allWithin(165, 200)) return "Semi-Annually";
-  if (allWithin(330, 400)) return "Annually";
-  return undefined;
-}
-
-function recurringIntervalBand(days: number): string | null {
-  if (days >= 6 && days <= 8) return "weekly";
-  if (days >= 13 && days <= 17) return "twice-monthly";
-  // Keep the existing wider window for recurring classification; the narrower
-  // frequency classifier still requires a more typical monthly interval.
-  if (days >= 20 && days <= 45) return "monthly";
-  if (days >= 80 && days <= 100) return "quarterly";
-  if (days >= 165 && days <= 200) return "semi-annual";
-  if (days >= 330 && days <= 400) return "annual";
-  return null;
-}
-
-/** Known merchants influence classification, never the requirement for history. */
+/** Use the same guarded identity matching as categorization, scoped to one user's history. */
 export function identifyRecurringTransactions(
-  rows: RecurringTransaction[],
-  merchants: RecurringMerchant[],
+  rows: RecurringTransaction[], merchants: RecurringMerchant[],
 ): RecurringUpdate[] {
   const catalog = buildMerchantCatalog(merchants);
-  const groups = new Map<string, {
-    knownSubscription: boolean;
-    charges: Array<{ id: number; time: number; amount: number }>;
-  }>();
+  const groups = new Map<string, { merchant?: RecurringMerchant; rows: RecurringTransaction[] }>();
   for (const row of rows) {
-    const time = new Date(row.date).getTime();
-    const amount = Number(row.amount);
-    if (row.is_user_modified || row.type.toLowerCase() !== "expense" ||
-        !Number.isFinite(time) || !Number.isFinite(amount) || amount === 0) continue;
+    const date = new Date(row.date);
+    const impossibleDay = typeof row.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(row.date) &&
+      Number.isFinite(+date) && date.toISOString().slice(0, 10) !== row.date;
+    if (row.type.toLowerCase() !== "expense" || !Number.isFinite(+date) || impossibleDay ||
+        !Number.isFinite(Number(row.amount)) || Number(row.amount) <= 0) continue;
     const merchant = matchKnownMerchant(row, catalog);
-    // Retain the legacy description grouping for unmatched imports: their
-    // merchant field can itself contain changing bank reference numbers.
-    const fallback = merchantKey(row.description || row.merchant || "").split(" ").slice(0, 3).join(" ");
+    const normalize = (text: string) => text.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+    const explicit = normalize(row.merchant || "");
+    const descriptor = normalize(row.description);
+    const fallback = explicit && explicit !== descriptor ? explicit :
+      (descriptor || explicit).split(" ").slice(0, 3).join(" ");
     if (!merchant && fallback.length < 3) continue;
     const key = merchant ? `catalog:${merchant.id}` : `unmatched:${fallback}`;
-    let group = groups.get(key);
-    if (!group) {
-      group = { knownSubscription: merchant?.is_known_subscription === true, charges: [] };
-      groups.set(key, group);
-    }
-    group.charges.push({ id: row.id, time, amount });
+    const group = groups.get(key) ?? { merchant, rows: [] };
+    group.rows.push(row);
+    groups.set(key, group);
   }
-
   const updates: RecurringUpdate[] = [];
-  for (const { charges, knownSubscription } of Array.from(groups.values())) {
-    charges.sort((a, b) => a.time - b.time);
-    let sequence: typeof charges = [];
-    let sequenceBand: string | null = null;
-    const flush = () => {
-      if (sequence.length < 2) return;
-      const sameAmount = sequence.slice(1).every((charge, index) =>
-        Math.abs(charge.amount - sequence[index].amount) < 0.02);
-      const recurringType = knownSubscription || sameAmount ? "subscription" : "recurring_bill";
-      const recurringFreq = inferRecurringFrequency(sequence);
-      for (const charge of sequence) updates.push({
-        id: charge.id,
-        recurringType,
-        ...(recurringFreq ? { recurringFreq } : {}),
-      });
-    };
-    for (const charge of charges) {
-      const previous = sequence[sequence.length - 1];
-      const days = previous ? daysBetween(previous.time, charge.time) : 0;
-      const band = previous ? recurringIntervalBand(days) : null;
-      if (previous && (!band || (sequenceBand && band !== sequenceBand))) {
-        flush();
-        sequence = [];
-        sequenceBand = null;
-      } else if (previous && band && !sequenceBand) {
-        sequenceBand = band;
-      }
-      sequence.push(charge);
+  for (const group of Array.from(groups.values())) {
+    const override = group.rows.filter(hasRecurrenceOverride).sort((a, b) =>
+      (+new Date(b.recurrence_override_at || b.date) - +new Date(a.recurrence_override_at || a.date)) ||
+      b.id - a.id)[0];
+    const inferred = inferRecurrence(group.rows);
+    const historyTags: RecurrenceTags | undefined = override ? {
+      isRecurring: override.is_recurring === true,
+      recurringType: override.is_recurring
+        ? (override.recurring_type === "subscription" ? "subscription" : "recurring_bill") : null,
+      recurringFreq: override.is_recurring ? override.recurring_freq ?? null : null,
+    } : undefined;
+    for (const row of group.rows) {
+      // An existing corrected row is never rewritten, even by a later merchant-wide preference.
+      if (row.is_user_modified || hasRecurrenceOverride(row)) continue;
+      const knownType = group.merchant?.is_known_subscription ? "subscription" :
+        group.merchant?.is_known_recurring ? "recurring_bill" : null;
+      const tags = historyTags || row.providerSignal || (knownType ? {
+        isRecurring: true, recurringType: knownType, recurringFreq: inferred?.recurringFreq ?? null,
+      } : inferred);
+      if (tags) updates.push({ id: row.id, ...tags });
     }
-    flush();
   }
   return updates;
-}
-
-export async function detectAndMarkRecurring(database: Pick<Pool, "query">, userId: string): Promise<number> {
-  const [transactions, merchants] = await Promise.all([
-    database.query<RecurringTransaction>(
-      `SELECT id, date, description, merchant, amount, type, is_user_modified
-       FROM transactions WHERE user_id = $1 AND NOT is_user_modified AND lower(type) = 'expense'
-       ORDER BY date ASC`,
-      [userId],
-    ),
-    database.query<RecurringMerchant>("SELECT id, name, is_known_subscription FROM merchants"),
-  ]);
-  const updates = identifyRecurringTransactions(transactions.rows, merchants.rows);
-  let marked = 0;
-  for (const update of updates) {
-    // Recheck ownership and manual corrections in case an edit raced detection.
-    const result = await database.query(
-      `UPDATE transactions
-       SET is_recurring = TRUE, recurring_type = $1,
-           recurring_freq = COALESCE(recurring_freq, $2::text), updated_at = NOW()
-       WHERE id = $3 AND user_id = $4 AND NOT is_user_modified AND lower(type) = 'expense'
-          AND (is_recurring IS DISTINCT FROM TRUE OR recurring_type IS DISTINCT FROM $1
-             OR (recurring_freq IS NULL AND $2::text IS NOT NULL))`,
-      [update.recurringType, update.recurringFreq ?? null, update.id, userId],
-    );
-    marked += result.rowCount ?? 0;
-  }
-  return marked;
 }

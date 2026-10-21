@@ -20,6 +20,7 @@ test("merchant categories guide imports and existing routes without overriding u
   const originalItems = storage.getPlaidItems;
   const originalAccounts = storage.getPlaidAccounts;
   const originalTransactionsGet = PlaidApi.prototype.transactionsGet;
+  const originalRecurringGet = PlaidApi.prototype.transactionsRecurringGet;
   const invoke = async (method: string, path: string, extra: any = {}) => {
     const handlers = routes.get(`${method} ${path}`)!;
     assert.equal(handlers[0], requireAuth);
@@ -64,12 +65,14 @@ test("merchant categories guide imports and existing routes without overriding u
     assert.equal(first.body.entries[0].parentCategory, primary.parent_category);
     assert.equal(first.body.entries[0].needsWant, "need", "source Need / Want survives profile suggestion");
     assert.equal(first.body.entries[0].amount, "31.23");
-    assert.equal(first.body.entries[0].isRecurring, false, "a subscription profile is not proof of recurrence");
+    assert.equal(first.body.entries[0].isRecurring, true, "subscription-only profiles tag rows before preview");
+    assert.equal(first.body.entries[0].recurringType, "subscription");
     const sourceChoice = await preview(alternate);
     assert.equal(sourceChoice.body.entries[0].subcategory, alternate.category, "valid source category wins over profile");
 
     const reviewed = {
       ...first.body.entries[0], subcategory: alternate.category, parentCategory: alternate.parent_category,
+      isRecurring: false, recurringType: "", recurringFreq: "", recurrenceOverride: true,
     };
     const saved = await invoke("post", "/api/transactions/import-reviewed", {
       body: { entries: [reviewed], requestId: randomUUID() },
@@ -81,6 +84,8 @@ test("merchant categories guide imports and existing routes without overriding u
     assert.equal(uploaded.subcategory, alternate.category, "reviewed category is not replaced at save");
     assert.equal(uploaded.parent_category, alternate.parent_category);
     assert.equal(Number(uploaded.amount), 31.23);
+    assert.equal(uploaded.is_recurring, false, "save must not rerun detection and undo the reviewer");
+    assert.equal(uploaded.is_user_modified, true);
 
     const manualBody = { date: "2026-09-02", description: names[0], amount: "42.50", type: "expense" };
     const manual = await invoke("post", "/api/transactions", { body: manualBody });
@@ -96,6 +101,7 @@ test("merchant categories guide imports and existing routes without overriding u
     assert.equal(later.body.subcategory, alternate.category, "user correction wins over catalog in single creation");
     const preferencePreview = await preview(primary);
     assert.equal(preferencePreview.body.entries[0].subcategory, alternate.category, "user correction wins over file/category suggestion");
+    assert.equal(preferencePreview.body.entries[0].isRecurring, false, "negative review overrides beat subscription profiles");
     const otherPreview = await preview(undefined, otherUser);
     assert.equal(otherPreview.body.entries[0].subcategory, primary.category, "preferences do not cross user boundaries");
     const explicit = await invoke("post", "/api/transactions", {
@@ -111,6 +117,12 @@ test("merchant categories guide imports and existing routes without overriding u
       plaidAccountId: "fixture-account", plaidItemId: 1, name: "Fixture Checking",
     }] as any;
     let bankName = names[1];
+    PlaidApi.prototype.transactionsRecurringGet = async () => ({
+      data: { inflow_streams: [], outflow_streams: [{
+        is_active: true, account_id: "fixture-account", frequency: "WEEKLY",
+        transaction_ids: [`catalog-${suffix}`, `preference-${suffix}`],
+      }] },
+    }) as any;
     PlaidApi.prototype.transactionsGet = async () => ({
       data: {
         total_transactions: 2,
@@ -132,7 +144,10 @@ test("merchant categories guide imports and existing routes without overriding u
       "SELECT * FROM transactions WHERE user_id=$1 AND plaid_transaction_id=$2", [userId, `${id}-${suffix}`],
     )).rows[0];
     assert.equal((await bankRow("catalog")).subcategory, primary.category);
+    assert.equal((await bankRow("catalog")).recurring_type, "recurring_bill", "Plaid stream beats subscription-only profile");
+    assert.equal((await bankRow("catalog")).recurring_freq, "Weekly");
     assert.equal((await bankRow("preference")).subcategory, alternate.category, "Plaid respects explicit merchant preference");
+    assert.equal((await bankRow("preference")).is_recurring, false, "user recurrence override beats Plaid signal");
 
     await pool.query("UPDATE merchants SET category_id=$1 WHERE id=$2", [alternate.id, merchantIds[1]]);
     const refresh = await importBank();
@@ -157,10 +172,15 @@ test("merchant categories guide imports and existing routes without overriding u
     assert.equal(preserved.needs_want, "need");
     assert.equal(preserved.is_user_modified, true);
     assert.equal(preserved.is_recurring, false);
+    PlaidApi.prototype.transactionsRecurringGet = async () => { throw new Error("Fixture recurring product unavailable"); };
+    const noSignals = await importBank();
+    assert.equal(noSignals.statusCode, 200, "unavailable optional recurring product must not block importing");
+    assert.deepEqual(noSignals.body.recurrenceSignalsUnavailableInstitutions, ["Fixture Bank"]);
   } finally {
     storage.getPlaidItems = originalItems;
     storage.getPlaidAccounts = originalAccounts;
     PlaidApi.prototype.transactionsGet = originalTransactionsGet;
+    PlaidApi.prototype.transactionsRecurringGet = originalRecurringGet;
     await pool.query("DELETE FROM transaction_change_history WHERE user_id=ANY($1::text[])", [[userId, otherUser]]);
     await pool.query("DELETE FROM transaction_import_receipts WHERE user_id=ANY($1::text[])", [[userId, otherUser]]);
     await pool.query("DELETE FROM transactions WHERE user_id=ANY($1::text[])", [[userId, otherUser]]);

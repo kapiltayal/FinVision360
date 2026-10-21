@@ -41,6 +41,7 @@ export interface PreparedReviewedTransaction {
   isRecurring: boolean;
   recurringType: string | null;
   recurringFreq: RecurringFrequency | null;
+  recurrenceOverride?: boolean;
   notes: string | null;
   sourceTransactionId?: string;
   sourceAccount?: string;
@@ -384,6 +385,7 @@ export function validateReviewedTransactionEntries(
         isRecurring: entry.isRecurring,
         recurringType: entry.isRecurring && recurringType ? recurringType : null,
         recurringFreq: entry.isRecurring && recurringFreq ? recurringFreq as RecurringFrequency : null,
+        ...(entry.recurrenceOverride === true ? { recurrenceOverride: true } : {}),
         notes: entry.notes.trim() || null,
         ...(entry.sourceTransactionId ? { sourceTransactionId: entry.sourceTransactionId.trim() } : {}),
         ...(entry.sourceAccount ? { sourceAccount: entry.sourceAccount.trim() } : {}),
@@ -405,12 +407,12 @@ export async function saveReviewedTransactionBatch(
   try {
     if (manageTransaction) await client.query("BEGIN");
     for (const transaction of transactions) {
-      await client.query(
+      const insertedRow = await client.query(
         `INSERT INTO transactions
            (user_id, date, description, merchant, amount, type, parent_category, subcategory,
             needs_want, is_recurring, recurring_type, recurring_freq, source, notes,
             upload_source_id, upload_source_account, upload_identity)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,'upload',$13,$14,$15,$16)`,
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,'upload',$13,$14,$15,$16) RETURNING id`,
         [
           userId,
           transaction.date,
@@ -430,6 +432,19 @@ export async function saveReviewedTransactionBatch(
           stableSourceKey(transaction) ? createHash("sha256").update(stableSourceKey(transaction)!).digest("hex") : null,
         ],
       );
+      if (transaction.recurrenceOverride) {
+        const transactionId = (insertedRow as { rows: Array<{ id: number }> }).rows[0].id;
+        await client.query("UPDATE transactions SET is_user_modified=TRUE WHERE id=$1 AND user_id=$2", [transactionId, userId]);
+        for (const [field, value] of [
+          ["is_recurring", String(transaction.isRecurring)],
+          ["recurring_type", transaction.recurringType],
+          ["recurring_freq", transaction.recurringFreq],
+        ]) {
+          await client.query(
+            `INSERT INTO transaction_change_history (user_id,transaction_id,field,old_value,new_value)
+             VALUES ($1,$2,$3,NULL,$4)`, [userId, transactionId, field, value]);
+        }
+      }
       inserted++;
       if (transaction.subcategory === "unassigned") uncategorized++;
       if (transaction.isRecurring) recurringMarked++;

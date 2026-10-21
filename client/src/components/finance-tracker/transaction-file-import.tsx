@@ -475,7 +475,8 @@ export function TransactionFileImportPanel({
           const selected = categories.find(category => category.category === subcategory && category.type.toLowerCase() === entry.type);
           return { ...entry, subcategory, parentCategory: selected?.parentCategory ?? "" };
         }
-        if (field === "isRecurring" && value === false) return { ...entry, isRecurring: false, recurringType: "", recurringFreq: "" };
+        if (field === "isRecurring" && value === false) return { ...entry, isRecurring: false, recurringType: "", recurringFreq: "", recurrenceOverride: true };
+        if (["isRecurring", "recurringType", "recurringFreq"].includes(field)) return { ...entry, [field]: value, recurrenceOverride: true };
         if (field === "include") {
           if (entry.duplicate?.kind === "stable") return entry;
           const include = value === true;

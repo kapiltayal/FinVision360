@@ -11,6 +11,7 @@ export interface TransactionImportEntry {
   isRecurring: boolean;
   recurringType: string;
   recurringFreq: string;
+  recurrenceOverride?: boolean;
   notes: string;
   sourceCategory?: string;
   sourceTransactionId?: string;

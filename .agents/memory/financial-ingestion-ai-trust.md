@@ -27,8 +27,14 @@ Save a reviewed financial file all-or-nothing and keep the review intact if savi
 
 **How to apply:** Validate the whole reviewed batch first, then commit in a single transaction; report a failed save without clearing the review.
 
-Recurrence frequency should come from an explicit source/reviewer choice or consistent transaction history, not an AI guess based on merchant identity. Keep unknown frequency `NULL` and preserve existing frequency choices during automatic sync.
+Recurrence frequency should come from an explicit source/reviewer/provider choice or consistent transaction history, not an AI guess based on merchant identity. Keep unknown frequency `NULL` and preserve explicit reviewer choices during automatic sync.
 
 **Why:** A subscription brand does not establish a customer's billing schedule, and short histories can make biweekly and semi-monthly schedules indistinguishable.
 
-**How to apply:** Require multiple observed intervals before assigning an inferred frequency. Prefer leaving the frequency unknown over guessing, and never replace an explicit imported or user-selected frequency with a detector's estimate.
+**How to apply:** Require multiple observed intervals before assigning an inferred frequency. Priority is user overrides (including negative choices), then Plaid signals, then explicit merchant-only profiles, then temporal/amount heuristics. Merchant-only profiles can establish type without history, but not a guessed frequency.
+
+File-upload detection must happen after standardization and duplicate checking, before preview, with no writes. Final review choices must not be redetected on save.
+
+**Why:** The user explicitly requested a chance to correct algorithmic suggestions; running detection after review would silently undo those choices. Excluded duplicates must not manufacture recurrence evidence.
+
+**How to apply:** Combine included incoming rows with only that user's history, audit recurrence-specific review edits, and reuse those explicit tags on future imports. If historical overrides conflict, use the most recent explicit choice for new rows while preserving each already-corrected row.

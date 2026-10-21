@@ -19,14 +19,14 @@
     </g>
     <g font-size="16" font-weight="700">
       <text x="330" y="110">1. Validate and parse the file</text><text x="330" y="220">2. Suggest canonical categories</text>
-      <text x="330" y="330">3. Check duplicates; return preview</text><text x="330" y="440">4. User reviews, edits and selects rows</text>
+      <text x="330" y="330">3. Deduplicate; detect recurrence</text><text x="330" y="440">4. User reviews, edits and selects rows</text>
       <text x="330" y="550">5. Revalidate selected rows</text><text x="330" y="660">6. Begin transaction; lock and recheck</text>
       <text x="330" y="770">7. Insert transactions + retry receipt</text><text x="330" y="880">8. Commit; return counts and refresh</text>
     </g>
     <g font-size="13" fill="#475569">
       <text x="330" y="135">CSV / TSV / TXT / XLS / XLSX; maximum 500 rows</text>
       <text x="330" y="245">Preference → file category → merchant → AI if unresolved</text>
-      <text x="330" y="355">Only this user's ledger; no transaction writes</text>
+      <text x="330" y="355">Use owned history + included rows; read-only preview</text>
       <text x="330" y="465">Unassigned allowed; stable source-ID repeats blocked</text>
       <text x="330" y="575">Check row fields, categories and duplicate review freshness</text>
       <text x="330" y="685">Duplicate conflict: roll back and return to review</text>

@@ -127,6 +127,7 @@ app.use(createApiRequestLogger((message) => log(message)));
     );
     CREATE UNIQUE INDEX IF NOT EXISTS merchants_name_unique ON merchants(name);
   `);
+  await pool.query("ALTER TABLE merchants ADD COLUMN IF NOT EXISTS is_known_recurring BOOLEAN NOT NULL DEFAULT FALSE");
 
   // Capture the source selected during signup. Keep this additive so existing
   // users and databases can be upgraded without changing existing records.

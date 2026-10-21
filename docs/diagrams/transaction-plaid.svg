@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="800" height="940" viewBox="0 0 800 940" role="img" aria-labelledby="title desc">
   <title id="title">Plaid transactions: explicit import and refresh</title>
-  <desc id="desc">Seven steps from connected-account selection through owner checks, paginated fetching, filtering, deterministic categorization, per-row upserts, monthly recurring detection and result counts. Skipped rows and unavailable institutions are reported.</desc>
+  <desc id="desc">Seven steps from account ownership checks through recurring signals, paginated fetching, filtering, categorization, per-row upserts, priority-based recurrence detection and result counts. Unavailable recurring signals produce a warning.</desc>
   <defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10Z" fill="#2563eb"/></marker></defs>
   <rect width="800" height="940" rx="20" fill="#f8fafc"/>
   <g font-family="Arial, sans-serif" text-anchor="middle" fill="#0f172a">
@@ -25,12 +25,12 @@
     </g>
     <g font-size="13" fill="#475569">
       <text x="330" y="135">Authenticated user's stored Plaid institutions/accounts only</text>
-      <text x="330" y="245">Unavailable institution: report it and continue others</text>
+      <text x="330" y="245">Fetch recurring signals too; warn if unavailable</text>
       <text x="330" y="355">Skip pending, transfers, non-USD and invalid data</text>
       <text x="330" y="465">Preference → merchant → Plaid mapping → description rules</text>
       <text x="330" y="575">Key: user + Plaid ID; protect user-edited classification</text>
       <text x="330" y="685">No whole-import database transaction or upload receipt</text>
-      <text x="330" y="795">New / Updated / Skipped / Unavailable; refresh ledger</text>
+      <text x="330" y="795">Overrides → Plaid → merchant flags → cadence / variance</text>
       <text x="635" y="418">More pages</text><text x="635" y="438">or institutions</text>
       <text x="400" y="862">Unresolved categories are skipped; overlapping Plaid IDs update existing records.</text>
       <text x="400" y="886">Unexpected database failure may leave earlier per-row writes committed.</text>

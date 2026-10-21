@@ -1,55 +1,81 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { pool } from "./db";
-import { detectAndMarkRecurring } from "./recurring-transactions";
+import { detectAndMarkRecurring, detectPreviewRecurrence } from "./recurrence-ingestion";
+import { transactionEntryFromSource, validateReviewedTransactionEntries, saveReviewedTransactionBatch } from "./transaction-import";
 
-test("database detection uses the merchant catalog, scopes each user, preserves manual choices and is idempotent", async () => {
+test("preview is read-only, merges owned history, excludes duplicates, and saved review overrides remain authoritative", async () => {
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
-    // Temporary tables shadow the real tables on this connection only.
     await client.query(`
       CREATE TEMP TABLE merchants (
-        id INTEGER PRIMARY KEY, name TEXT NOT NULL, is_known_subscription BOOLEAN NOT NULL
+        id INTEGER PRIMARY KEY, name TEXT NOT NULL,
+        is_known_subscription BOOLEAN DEFAULT FALSE, is_known_recurring BOOLEAN DEFAULT FALSE
       ) ON COMMIT DROP;
       CREATE TEMP TABLE transactions (
-        id INTEGER PRIMARY KEY, user_id TEXT NOT NULL, date DATE NOT NULL,
+        id SERIAL PRIMARY KEY, user_id TEXT NOT NULL, date DATE NOT NULL,
         description TEXT NOT NULL, merchant TEXT, amount NUMERIC NOT NULL, type TEXT NOT NULL,
+        parent_category TEXT, subcategory TEXT, needs_want TEXT, notes TEXT,
+        upload_source_id TEXT, upload_source_account TEXT, upload_identity TEXT,
+        source TEXT DEFAULT 'upload', created_at TIMESTAMPTZ DEFAULT NOW(), updated_at TIMESTAMPTZ DEFAULT NOW(),
         is_user_modified BOOLEAN NOT NULL DEFAULT FALSE,
-        is_recurring BOOLEAN DEFAULT FALSE, recurring_type TEXT, recurring_freq TEXT DEFAULT NULL,
-        updated_at TIMESTAMPTZ DEFAULT NOW()
+        is_recurring BOOLEAN DEFAULT FALSE, recurring_type TEXT, recurring_freq TEXT DEFAULT NULL
       ) ON COMMIT DROP;
-      INSERT INTO merchants VALUES (1, 'Spotify', TRUE), (2, 'Power Company', FALSE), (3, 'Netflix', TRUE);
-      INSERT INTO transactions (id, user_id, date, description, merchant, amount, type, is_user_modified) VALUES
-        (1, 'alice', '2026-01-03', 'CARD 001', 'Spotify', 10, 'expense', FALSE),
-        (2, 'alice', '2026-02-03', 'CARD 002', 'Spotify', 12, 'expense', FALSE),
-        (3, 'alice', '2026-03-03', 'Manually corrected', 'Spotify', 15, 'expense', TRUE),
-        (4, 'alice', '2026-01-03', 'Power Company 001', NULL, 45, 'expense', FALSE),
-        (5, 'alice', '2026-02-03', 'Power Company 002', NULL, 65, 'expense', FALSE),
-        (6, 'alice', '2026-01-03', 'Single retailer purchase', NULL, 50, 'expense', FALSE),
-        (7, 'alice', '2026-01-03', 'Spotify', 'Spotify', 10, 'income', FALSE),
-        (8, 'alice', '2026-02-03', 'Spotify', 'Spotify', 12, 'income', FALSE),
-        (9, 'bob', '2026-01-03', 'Spotify', 'Spotify', 10, 'expense', FALSE),
-        (10, 'bob', '2026-02-03', 'Spotify', 'Spotify', 12, 'expense', FALSE),
-        (11, 'carol', '2026-01-03', 'Spotify', 'Spotify', 10, 'expense', FALSE),
-        (12, 'alice', '2026-08-03', 'One-off Spotify purchase', 'Spotify', 12, 'expense', FALSE),
-        (13, 'alice', '2026-01-03', 'PAYPAL NETFLIX ID 001', 'PAYPAL NETFLIX ID 001', 10, 'expense', FALSE),
-        (14, 'alice', '2026-02-03', 'PAYPAL NETFLIX ID 002', 'PAYPAL NETFLIX ID 002', 12, 'expense', FALSE),
-        (15, 'alice', '2026-01-03', 'BANK RETAIL STORE 001', 'BANK RETAIL STORE 001', 10, 'expense', FALSE),
-        (16, 'alice', '2026-02-03', 'BANK RETAIL STORE 002', 'BANK RETAIL STORE 002', 20, 'expense', FALSE),
-        (17, 'alice', '2026-03-03', 'CARD 003', 'Spotify', 13, 'expense', FALSE);
+      CREATE TEMP TABLE transaction_change_history (
+        id SERIAL PRIMARY KEY, user_id TEXT, transaction_id INTEGER, field TEXT,
+        old_value TEXT, new_value TEXT, created_at TIMESTAMPTZ DEFAULT NOW()
+      ) ON COMMIT DROP;
+      INSERT INTO merchants (id,name,is_known_subscription) VALUES (1,'Spotify',TRUE);
+      INSERT INTO transactions (user_id,date,description,merchant,amount,type) VALUES
+        ('alice','2026-01-01','Acme','Acme',100,'expense'),
+        ('alice','2026-02-01','Acme','Acme',100,'expense'),
+        ('bob','2026-03-01','Acme','Acme',500,'expense'),
+        ('alice','2026-01-01','Sparse','Sparse',100,'expense');
     `);
-    assert.equal(await detectAndMarkRecurring(client, "alice"), 9);
-    const { rows } = await client.query("SELECT id, is_recurring, recurring_type, recurring_freq FROM transactions ORDER BY id");
-    for (const row of rows) {
-      const expected = [1, 2, 13, 14, 17].includes(row.id) ? "subscription" : [4, 5, 15, 16].includes(row.id) ? "recurring_bill" : null;
-      assert.equal(row.recurring_type, expected, `classification of row ${row.id}`);
-      assert.equal(row.is_recurring, expected !== null, `recurrence of row ${row.id}`);
-      assert.equal(row.recurring_freq, [1, 2, 17].includes(row.id) ? "Monthly" : null, `frequency of row ${row.id}`);
-    }
-    assert.equal(await detectAndMarkRecurring(client, "alice"), 0, "unchanged classifications are not counted again");
-    assert.equal(await detectAndMarkRecurring(client, "bob"), 2);
-    assert.equal(await detectAndMarkRecurring(client, "carol"), 0, "a catalog flag cannot make a single charge recurring");
+    const entry = (id: number, merchant: string, date: string) =>
+      transactionEntryFromSource({ date, merchant, description: merchant, amount: 100, type: "expense" }, id);
+    const preview = await detectPreviewRecurrence(client, "alice", [
+      entry(1, "Acme", "2026-03-01"),
+      entry(2, "Sparse", "2026-02-01"),
+      { ...entry(3, "Sparse", "2026-03-01"), include: false },
+      entry(4, "Spotify", "2026-01-01"),
+    ]);
+    assert.equal(preview[0].recurringType, "subscription");
+    assert.equal(preview[0].recurringFreq, "Monthly");
+    assert.equal(preview[1].isRecurring, false, "an excluded duplicate must not be a third observation");
+    assert.equal(preview[2].isRecurring, false);
+    assert.equal(preview[3].recurringType, "subscription", "catalog-only signal needs no history");
+    assert.equal((await client.query("SELECT count(*)::int AS count FROM transactions")).rows[0].count, 4);
+    assert.equal((await client.query("SELECT count(*)::int AS count FROM transactions WHERE is_recurring")).rows[0].count, 0);
+    const forBob = await detectPreviewRecurrence(client, "bob", [entry(1, "Acme", "2026-04-01")]);
+    assert.equal(forBob[0].isRecurring, false, "other users' history must not supply observations");
+
+    const prepared = validateReviewedTransactionEntries([preview[0]], []);
+    assert.deepEqual(prepared.errors, []);
+    await saveReviewedTransactionBatch(client, "alice", prepared.transactions, false);
+    assert.equal(await detectAndMarkRecurring(client, "alice", {
+      targetIds: [5], providerSignals: new Map([[5, {
+        isRecurring: true, recurringType: "recurring_bill", recurringFreq: "Quarterly",
+      }]]),
+    }), 1);
+    const saved = (await client.query("SELECT * FROM transactions WHERE id=5")).rows[0];
+    assert.equal(saved.recurring_type, "recurring_bill");
+    assert.equal(saved.recurring_freq, "Quarterly");
+    assert.equal((await client.query("SELECT is_recurring FROM transactions WHERE id=1")).rows[0].is_recurring, false,
+      "Plaid-style targeted detection must not rewrite old non-target rows");
+
+    const reviewed = { ...entry(1, "Acme", "2026-04-01"), recurrenceOverride: true };
+    const reviewedPrepared = validateReviewedTransactionEntries([reviewed], []);
+    await saveReviewedTransactionBatch(client, "alice", reviewedPrepared.transactions, false);
+    assert.equal((await client.query("SELECT count(*)::int AS count FROM transaction_change_history")).rows[0].count, 3);
+    assert.equal((await client.query("SELECT is_user_modified FROM transactions WHERE id=6")).rows[0].is_user_modified, true);
+    const nextPreview = await detectPreviewRecurrence(client, "alice", [entry(1, "Acme", "2026-05-01")]);
+    assert.equal(nextPreview[0].isRecurring, false, "reviewer's negative choice wins over a regular cadence");
+    assert.equal(await detectAndMarkRecurring(client, "alice", { targetIds: [5] }), 1);
+    assert.equal((await client.query("SELECT recurring_freq FROM transactions WHERE id=5")).rows[0].recurring_freq, null);
+    assert.equal(await detectAndMarkRecurring(client, "alice", { targetIds: [5] }), 0, "detection is idempotent");
+    assert.equal((await client.query("SELECT is_recurring FROM transactions WHERE id=3")).rows[0].is_recurring, false);
   } finally {
     await client.query("ROLLBACK");
     client.release();
