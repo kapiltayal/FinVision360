@@ -971,6 +971,8 @@ export function registerFinanceTrackerRoutes(app: Express) {
         { rows: recurringBillSummaryRows },
         { rows: recurringBillRows },
         { rows: subscriptionRows },
+        { rows: recurringBillChargeRows },
+        { rows: subscriptionChargeRows },
         { rows: needsWantRows },
       ] = await Promise.all([
         pool.query(
@@ -1012,6 +1014,28 @@ export function registerFinanceTrackerRoutes(app: Express) {
         ),
         pool.query(
           `SELECT
+             COALESCE(NULLIF(TRIM(merchant), ''), description) AS name,
+             TO_CHAR(date, 'YYYY-MM-DD') AS charge_date,
+             COUNT(*) AS charge_count,
+             COALESCE(SUM(amount), 0) AS amount
+           FROM transactions ${recurringBillWhere}
+           GROUP BY COALESCE(NULLIF(TRIM(merchant), ''), description), date
+           ORDER BY name ASC, date ASC`,
+          params,
+        ),
+        pool.query(
+          `SELECT
+             COALESCE(NULLIF(TRIM(merchant), ''), description) AS name,
+             TO_CHAR(date, 'YYYY-MM-DD') AS charge_date,
+             COUNT(*) AS charge_count,
+             COALESCE(SUM(amount), 0) AS amount
+           FROM transactions ${subscriptionWhere}
+           GROUP BY COALESCE(NULLIF(TRIM(merchant), ''), description), date
+           ORDER BY name ASC, date ASC`,
+          params,
+        ),
+        pool.query(
+          `SELECT
              COALESCE(SUM(CASE WHEN needs_want = 'need' THEN amount ELSE 0 END), 0) AS needs,
              COALESCE(SUM(CASE WHEN needs_want = 'want' THEN amount ELSE 0 END), 0) AS wants,
              COALESCE(SUM(CASE WHEN needs_want IS NULL OR needs_want = 'na' THEN amount ELSE 0 END), 0) AS unclassified
@@ -1020,16 +1044,34 @@ export function registerFinanceTrackerRoutes(app: Express) {
         ),
       ]);
 
+      const groupChargeHistory = (rows: Array<{ name: string; charge_date: string; charge_count: string; amount: string }>) => {
+        const byMerchant = new Map<string, Array<{ date: string; charge_count: string; amount: string }>>();
+        for (const row of rows) {
+          const history = byMerchant.get(row.name) ?? [];
+          history.push({ date: row.charge_date, charge_count: row.charge_count, amount: row.amount });
+          byMerchant.set(row.name, history);
+        }
+        return byMerchant;
+      };
+      const recurringBillHistory = groupChargeHistory(recurringBillChargeRows);
+      const subscriptionHistory = groupChargeHistory(subscriptionChargeRows);
+
       res.json({
         subscriptions: {
           count: subscriptionSummaryRows[0]?.count ?? "0",
           total: subscriptionSummaryRows[0]?.total ?? "0",
-          items: subscriptionRows,
+          items: subscriptionRows.map(item => ({
+            ...item,
+            charge_history: subscriptionHistory.get(item.name) ?? [],
+          })),
         },
         recurringBills: {
           count: recurringBillSummaryRows[0]?.count ?? "0",
           total: recurringBillSummaryRows[0]?.total ?? "0",
-          items: recurringBillRows,
+          items: recurringBillRows.map(item => ({
+            ...item,
+            charge_history: recurringBillHistory.get(item.name) ?? [],
+          })),
         },
         needsWant: needsWantRows[0] ?? { needs: "0", wants: "0", unclassified: "0" },
       });

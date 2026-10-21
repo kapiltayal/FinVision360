@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { ConnectedAccountsImportPanel } from "@/components/finance-tracker/connected-accounts-import";
+import { MerchantChargeHistoryHover, type MerchantChargeHistoryPoint } from "@/components/finance-tracker/merchant-charge-history-hover";
 import { TransactionFileImportPanel } from "@/components/finance-tracker/transaction-file-import";
 import { FinancialChartTooltip } from "@/components/financial-chart-tooltip";
 import type { TransactionImportResult } from "@shared/transaction-import";
@@ -73,6 +74,7 @@ type CanonicalCategory = {
   needVsWant: string | null;
 };
 type TrendRow = { period: string; income: string; expenses: string };
+type InsightCharge = MerchantChargeHistoryPoint;
 type CatRow = { subcategory: string; total: string; count: string };
 type SubscriptionInsight = {
   name: string;
@@ -80,12 +82,14 @@ type SubscriptionInsight = {
   total_paid: string;
   latest_amount: string;
   latest_charge_date: string;
+  charge_history?: InsightCharge[];
 };
 type RecurringBillInsight = {
   name: string;
   charge_count: string;
   total_paid: string;
   average_amount: string;
+  charge_history?: InsightCharge[];
 };
 type SpendingInsights = {
   subscriptions: {
@@ -600,18 +604,20 @@ function SpendingInsightCarousel({
                     </div>
                     <div className="max-h-[153px] overflow-y-auto rounded-lg border divide-y">
                       {insights?.subscriptions.items.map(item => (
-                        <div key={item.name} className="flex items-center justify-between gap-3 px-3 py-2">
-                          <div className="min-w-0">
-                            <p className="text-xs font-medium truncate">{item.name}</p>
-                            <p className="text-[11px] text-muted-foreground">
-                              {item.charge_count} charge{Number(item.charge_count) === 1 ? "" : "s"} · {fmt(Number(item.total_paid))} paid
-                            </p>
+                        <MerchantChargeHistoryHover key={item.name} merchant={item.name} charges={item.charge_history}>
+                          <div className="flex w-full items-center justify-between gap-3 px-3 py-2">
+                            <div className="min-w-0">
+                              <p className="text-xs font-medium truncate">{item.name}</p>
+                              <p className="text-[11px] text-muted-foreground">
+                                {item.charge_count} charge{Number(item.charge_count) === 1 ? "" : "s"} · {fmt(Number(item.total_paid))} paid
+                              </p>
+                            </div>
+                            <div className="shrink-0 text-right">
+                              <p className="text-xs font-semibold tabular-nums">{fmtFull(Number(item.latest_amount))}</p>
+                              <p className="text-[10px] text-muted-foreground">latest charge</p>
+                            </div>
                           </div>
-                          <div className="shrink-0 text-right">
-                            <p className="text-xs font-semibold tabular-nums">{fmtFull(Number(item.latest_amount))}</p>
-                            <p className="text-[10px] text-muted-foreground">latest charge</p>
-                          </div>
-                        </div>
+                        </MerchantChargeHistoryHover>
                       ))}
                     </div>
                   </div>
@@ -641,18 +647,20 @@ function SpendingInsightCarousel({
                     </div>
                     <div className="max-h-[153px] overflow-y-auto rounded-lg border divide-y">
                       {insights?.recurringBills?.items.map(item => (
-                        <div key={item.name} className="flex items-center justify-between gap-3 px-3 py-2">
-                          <div className="min-w-0">
-                            <p className="text-xs font-medium truncate">{item.name}</p>
-                            <p className="text-[11px] text-muted-foreground">
-                              {item.charge_count} charge{Number(item.charge_count) === 1 ? "" : "s"} · {fmt(Number(item.total_paid))} paid
-                            </p>
+                        <MerchantChargeHistoryHover key={item.name} merchant={item.name} charges={item.charge_history}>
+                          <div className="flex w-full items-center justify-between gap-3 px-3 py-2">
+                            <div className="min-w-0">
+                              <p className="text-xs font-medium truncate">{item.name}</p>
+                              <p className="text-[11px] text-muted-foreground">
+                                {item.charge_count} charge{Number(item.charge_count) === 1 ? "" : "s"} · {fmt(Number(item.total_paid))} paid
+                              </p>
+                            </div>
+                            <div className="shrink-0 text-right">
+                              <p className="text-xs font-semibold tabular-nums">{fmtFull(Number(item.average_amount))}</p>
+                              <p className="text-[10px] text-muted-foreground">avg / charge</p>
+                            </div>
                           </div>
-                          <div className="shrink-0 text-right">
-                            <p className="text-xs font-semibold tabular-nums">{fmtFull(Number(item.average_amount))}</p>
-                            <p className="text-[10px] text-muted-foreground">avg / charge</p>
-                          </div>
-                        </div>
+                        </MerchantChargeHistoryHover>
                       ))}
                     </div>
                   </div>

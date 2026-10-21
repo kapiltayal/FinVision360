@@ -16,6 +16,7 @@ test("spending insights return per-merchant recurring bill averages, scoped to t
        VALUES
        ($1,'2026-03-05','Electric bill','Electric Co',40,'expense','utilities','need',TRUE,'recurring_bill','manual'),
        ($1,'2026-03-20','Electric bill','Electric Co',60,'expense','utilities','need',TRUE,'recurring_bill','manual'),
+       ($1,'2026-02-28','Electric bill','Electric Co',80,'expense','utilities','need',TRUE,'recurring_bill','manual'),
        ($1,'2026-03-10','Phone','Mobile Co',50,'expense','utilities','want',TRUE,'subscription','manual'),
        ($1,'2026-03-10','Salary','Electric Co',90,'income','salary','na',TRUE,'recurring_bill','manual'),
        ($2,'2026-03-10','Electric bill','Electric Co',300,'expense','utilities','need',TRUE,'recurring_bill','manual')`,
@@ -36,7 +37,19 @@ test("spending insights return per-merchant recurring bill averages, scoped to t
     assert.equal(response.body.recurringBills.items[0].name, "Electric Co");
     assert.equal(Number(response.body.recurringBills.items[0].charge_count), 2);
     assert.equal(Number(response.body.recurringBills.items[0].average_amount), 50);
+    assert.deepEqual(
+      response.body.recurringBills.items[0].charge_history.map((charge: any) => ({
+        date: charge.date,
+        amount: Number(charge.amount),
+        count: Number(charge.charge_count),
+      })),
+      [
+        { date: "2026-03-05", amount: 40, count: 1 },
+        { date: "2026-03-20", amount: 60, count: 1 },
+      ],
+    );
     assert.equal(response.body.subscriptions.count, "1", "the existing subscription view remains separate");
+    assert.equal(response.body.subscriptions.items[0].charge_history.length, 1);
   } finally {
     await pool.query("DELETE FROM transactions WHERE user_id=ANY($1::varchar[])", [[userId, `${userId}-other`]]);
   }
