@@ -71,13 +71,15 @@ export function MerchantChargeHistoryHover({
           collisionPadding={12}
           className="w-[min(320px,calc(100vw-2rem))] p-3"
         >
-          <div className="mb-2">
-            <p className="truncate text-sm font-semibold">{merchant}</p>
-            <p className="text-xs text-muted-foreground">Charges over time</p>
-            <p className="mt-1 text-xs">
-              <span className="text-muted-foreground">Frequency: </span>
-              <span className="font-medium">{frequencyLabel}</span>
-            </p>
+          <div className="mb-2 flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold">{merchant}</p>
+              <p className="text-xs text-muted-foreground">Charges over time</p>
+            </div>
+            <div className="max-w-[140px] shrink-0 text-right">
+              <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Frequency</p>
+              <p className="text-xs font-semibold leading-tight">{frequencyLabel}</p>
+            </div>
           </div>
           {history.length ? (
             <div className="h-36 w-full" aria-label={`Charge history chart for ${merchant}`}>
