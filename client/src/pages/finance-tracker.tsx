@@ -467,6 +467,7 @@ function SpendingInsightCarousel({
   insightsLoading: boolean;
 }) {
   const [activeSlide, setActiveSlide] = useState(0);
+  const [visibleTabStart, setVisibleTabStart] = useState(0);
   const touchStartX = useRef<number | null>(null);
   const slideTabRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const slides = [
@@ -486,7 +487,13 @@ function SpendingInsightCarousel({
   const needsPercent = classifiedTotal ? (needsTotal / classifiedTotal) * 100 : 0;
 
   const goToSlide = (slide: number) => {
-    setActiveSlide((slide + slides.length) % slides.length);
+    const nextSlide = (slide + slides.length) % slides.length;
+    setActiveSlide(nextSlide);
+    setVisibleTabStart(currentStart => {
+      if (nextSlide < currentStart) return nextSlide;
+      if (nextSlide >= currentStart + 3) return nextSlide - 2;
+      return currentStart;
+    });
   };
   const goNext = () => goToSlide(activeSlide + 1);
   const goPrevious = () => goToSlide(activeSlide - 1);
@@ -693,11 +700,13 @@ function SpendingInsightCarousel({
         </div>
 
         <div className="mt-3 flex items-center gap-1 border-t pt-3">
-          <Button type="button" variant="ghost" size="icon" className="hidden h-7 w-7 shrink-0 sm:inline-flex" onClick={goPrevious} aria-label={`Show ${slides[(activeSlide + slides.length - 1) % slides.length].title}`}>
+          <Button type="button" variant="ghost" size="icon" className="inline-flex h-7 w-7 shrink-0" onClick={goPrevious} aria-label={`Show ${slides[(activeSlide + slides.length - 1) % slides.length].title}`}>
             <ChevronLeft className="h-4 w-4" />
           </Button>
-          <div role="tablist" aria-label="Spending insight views" className="grid min-w-0 flex-1 grid-cols-4">
-            {slides.map((slide, index) => (
+          <div role="tablist" aria-label="Spending insight views" className="grid min-w-0 flex-1 grid-cols-3">
+            {slides.slice(visibleTabStart, visibleTabStart + 3).map((slide, offset) => {
+              const index = visibleTabStart + offset;
+              return (
               <button
                 key={slide.title}
                 ref={(element) => { slideTabRefs.current[index] = element; }}
@@ -718,15 +727,16 @@ function SpendingInsightCarousel({
                   event.preventDefault();
                   event.stopPropagation();
                   goToSlide(nextIndex);
-                  slideTabRefs.current[nextIndex]?.focus();
+                  window.requestAnimationFrame(() => slideTabRefs.current[nextIndex]?.focus());
                 }}
                 className={`min-w-0 border-b-2 border-transparent px-1 py-2 text-center text-[10px] font-medium leading-tight transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 sm:px-2 sm:text-xs ${index === activeSlide ? "border-violet-600 text-violet-700 dark:text-violet-300" : "text-muted-foreground hover:text-foreground"}`}
               >
                 {slide.title}
               </button>
-            ))}
+              );
+            })}
           </div>
-          <Button type="button" variant="ghost" size="icon" className="hidden h-7 w-7 shrink-0 sm:inline-flex" onClick={goNext} aria-label={`Show ${slides[(activeSlide + 1) % slides.length].title}`}>
+          <Button type="button" variant="ghost" size="icon" className="inline-flex h-7 w-7 shrink-0" onClick={goNext} aria-label={`Show ${slides[(activeSlide + 1) % slides.length].title}`}>
             <ChevronRight className="h-4 w-4" />
           </Button>
         </div>
