@@ -10,7 +10,7 @@ import { pool } from "./db";
 const entry = (overrides: Partial<TransactionImportEntry> = {}): TransactionImportEntry => ({
   id: 1, date: "2026-08-01", description: "Corner Grocery #123", merchant: "Corner Grocery",
   amount: "23.45", type: "expense", subcategory: "", parentCategory: "", needsWant: "need",
-  isRecurring: false, recurringType: "", notes: "", include: true, ...overrides,
+  isRecurring: false, recurringType: "", recurringFreq: "", notes: "", include: true, ...overrides,
 });
 const prepared = (rows: TransactionImportEntry[]) => {
   const validation = validateReviewedTransactionEntries(rows.filter(row => row.include !== false), []);
@@ -75,12 +75,19 @@ test("database enforcement, exclusions, atomic failure, ownership and network/co
     saveDuplicateSafeImport(client, userId, requestId, rows, prepared(rows));
   const count = async () => Number((await client.query("SELECT count(*) FROM transactions WHERE user_id=$1", [userId])).rows[0].count);
   try {
-    const initial = [entry({ sourceTransactionId: "stable-1", sourceAccount: "checking" })];
+    const initial = [entry({
+      sourceTransactionId: "stable-1",
+      sourceAccount: "checking",
+      isRecurring: true,
+      recurringType: "subscription",
+      recurringFreq: "Monthly",
+    })];
     const requestId = randomUUID();
     const first = await save(initial, requestId);
     assert.equal(first.inserted, 1);
     assert.deepEqual(await save(initial, requestId), first, "retry after lost response must return durable receipt");
     assert.equal(await count(), 1);
+    assert.equal((await client.query("SELECT recurring_freq FROM transactions WHERE user_id=$1", [userId])).rows[0].recurring_freq, "Monthly");
     await assert.rejects(save([entry({ ...initial[0], amount: "88.00" })], requestId),
       (error: any) => error.code === "REQUEST_ID_REUSED");
     await assert.rejects(save([entry({ ...initial[0], date: "2025-01-01", amount: "1.00", keepDuplicate: true })]),

@@ -18,7 +18,8 @@ test("normal bootstrap upgrades an existing legacy database without losing rows;
         id SERIAL PRIMARY KEY, user_id VARCHAR NOT NULL, date DATE NOT NULL,
         description TEXT NOT NULL, merchant TEXT, amount NUMERIC(12,2) NOT NULL,
         type TEXT NOT NULL, parent_category TEXT, subcategory TEXT NOT NULL DEFAULT 'unassigned',
-        needs_want TEXT, is_recurring BOOLEAN DEFAULT FALSE, recurring_type TEXT, source TEXT NOT NULL,
+        needs_want TEXT, is_recurring BOOLEAN DEFAULT FALSE, recurring_type TEXT,
+        recurring_freq TEXT DEFAULT NULL, source TEXT NOT NULL,
         notes TEXT
       );
       INSERT INTO transactions (user_id,date,description,merchant,amount,type,source)
@@ -27,7 +28,7 @@ test("normal bootstrap upgrades an existing legacy database without losing rows;
     const entry: TransactionImportEntry = {
       id: 1, date: "2026-08-02", description: "New shop", merchant: "New shop", amount: "2.01",
       type: "expense", parentCategory: "", subcategory: "", needsWant: "na",
-      isRecurring: false, recurringType: "", notes: "", sourceTransactionId: "source-1", include: true,
+      isRecurring: false, recurringType: "", recurringFreq: "", notes: "", sourceTransactionId: "source-1", include: true,
     };
     await assert.rejects(checkUserTransactionDuplicates(client, "legacy-user", [entry]),
       (error: any) => error.code === "42703", "legacy preview needs the additive schema");

@@ -41,6 +41,23 @@ test("known merchants still need monthly cadence, not just repeated purchases", 
   }
 });
 
+test("repeated transaction dates infer all supported recurrence frequencies", () => {
+  const cases: Array<[string, string[]]> = [
+    ["Weekly", ["2026-01-01", "2026-01-08", "2026-01-15"]],
+    ["Bi-Weekly", ["2026-01-01", "2026-01-15", "2026-01-29", "2026-02-12"]],
+    ["Semi-monthly", ["2026-01-01", "2026-01-15", "2026-02-01", "2026-02-15"]],
+    ["Monthly", ["2026-01-03", "2026-02-03", "2026-03-03"]],
+    ["Quarterly", ["2026-01-01", "2026-04-01", "2026-07-01"]],
+    ["Semi-Annually", ["2025-01-01", "2025-07-01", "2026-01-01"]],
+    ["Annually", ["2024-01-01", "2025-01-01", "2026-01-01"]],
+  ];
+  for (const [frequency, dates] of cases) {
+    const updates = identify(dates.map((date, index) => charge(index + 1, date)));
+    assert.equal(updates.length, dates.length, `${frequency} cadence should be detected`);
+    assert.ok(updates.every(update => update.recurringFreq === frequency), `${frequency} should be stored`);
+  }
+});
+
 test("canonical matching handles changing bank descriptors, case, and punctuation", () => {
   assert.deepEqual(identify([
     charge(1, "2026-01-03", { description: "PAYPAL * NETFLIX.COM 1234", amount: "12" }),

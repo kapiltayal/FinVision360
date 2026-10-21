@@ -29,11 +29,27 @@ test("row factory creates editable incomplete rows and validation requires repai
   assert.equal(row.type, "expense");
   assert.equal(row.subcategory, "");
   assert.equal(row.isRecurring, false);
+  assert.equal(row.recurringFreq, "");
   assert.deepEqual(Object.keys(validateTransactionImportEntry(row, categories)).sort(), [
     "amount",
     "date",
     "description",
   ]);
+});
+
+test("recurrence frequency must be one of the supported values and requires recurring status", () => {
+  const entry = validEntry();
+  entry.isRecurring = true;
+  entry.recurringType = "subscription";
+  entry.recurringFreq = "Semi-monthly";
+  assert.equal(validateTransactionImportEntry(entry, categories).recurringFreq, undefined);
+
+  entry.recurringFreq = "Every 10 days";
+  assert.match(validateTransactionImportEntry(entry, categories).recurringFreq ?? "", /supported recurrence frequency/);
+
+  entry.recurringFreq = "Monthly";
+  entry.isRecurring = false;
+  assert.match(validateTransactionImportEntry(entry, categories).recurringFreq ?? "", /requires recurring status/);
 });
 
 test("date validation rejects impossible and noncanonical dates", () => {

@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { stableSourceKey } from "../shared/transaction-duplicates";
 import type { RawRow } from "./asset-liability-ingestion";
 import { matchKnownMerchant, type MerchantCatalog, type MerchantIdentity } from "./merchant-matching";
+import { RECURRING_FREQUENCIES, type RecurringFrequency } from "../shared/schema";
 
 export interface ImportCategory {
   id?: number;
@@ -39,6 +40,7 @@ export interface PreparedReviewedTransaction {
   needsWant: "need" | "want" | "na";
   isRecurring: boolean;
   recurringType: string | null;
+  recurringFreq: RecurringFrequency | null;
   notes: string | null;
   sourceTransactionId?: string;
   sourceAccount?: string;
@@ -144,6 +146,24 @@ function sourceRecurringType(value: string): string {
   return "";
 }
 
+function sourceRecurringFrequency(value: string): string {
+  const normalized = value.toLowerCase().replace(/[^a-z]/g, "");
+  if (!normalized) return "";
+  const aliases: Record<string, RecurringFrequency> = {
+    weekly: "Weekly",
+    biweekly: "Bi-Weekly",
+    semimonthly: "Semi-monthly",
+    monthly: "Monthly",
+    quarterly: "Quarterly",
+    semiannually: "Semi-Annually",
+    biannually: "Semi-Annually",
+    annually: "Annually",
+    annual: "Annually",
+    yearly: "Annually",
+  };
+  return aliases[normalized] ?? value.trim();
+}
+
 export function transactionEntryFromSource(row: RawRow, id: number): TransactionImportEntry {
   const dateValue = sourceField(row, "date", "transactiondate", "posteddate");
   const description = sourceField(row, "description", "merchant", "name", "memo", "text");
@@ -189,8 +209,9 @@ export function transactionEntryFromSource(row: RawRow, id: number): Transaction
   const type = explicitType ?? inferredColumnType ?? "expense";
   const sourceCategory = sourceField(row, "subcategory", "category");
   const sourceRecurrenceType = sourceRecurringType(sourceField(row, "recurringtype"));
+  const sourceFrequency = sourceRecurringFrequency(sourceField(row, "recurringfreq", "recurringfrequency", "recurrencefrequency", "frequency"));
   const recurringFlag = sourceRecurringStatus(sourceField(row, "isrecurring", "recurring"));
-  const isRecurring = recurringFlag ?? !!sourceRecurrenceType;
+  const isRecurring = recurringFlag ?? (!!sourceRecurrenceType || !!sourceFrequency);
 
   return {
     id,
@@ -204,6 +225,7 @@ export function transactionEntryFromSource(row: RawRow, id: number): Transaction
     needsWant: sourceNeedsWant(row) ?? "na",
     isRecurring,
     recurringType: isRecurring ? sourceRecurrenceType : "",
+    recurringFreq: sourceFrequency,
     notes: sourceField(row, "notes", "memo"),
     sourceTransactionId: sourceField(row, "transactionid", "banktransactionid", "fitid") || undefined,
     sourceAccount: sourceField(row, "accountid", "accountnumber", "accountname", "account") || undefined,
@@ -317,6 +339,14 @@ export function validateReviewedTransactionEntries(
     if (entry.isRecurring === true && !recurringType) {
       addError("recurringType", "Choose a recurring type when recurring status is true");
     }
+    if (typeof entry.recurringFreq !== "string") addError("recurringFreq", "Recurrence frequency must be text");
+    const recurringFreq = typeof entry.recurringFreq === "string" ? entry.recurringFreq.trim() : "";
+    if (recurringFreq && !(RECURRING_FREQUENCIES as readonly string[]).includes(recurringFreq)) {
+      addError("recurringFreq", "Choose a supported recurrence frequency");
+    }
+    if (entry.isRecurring === false && recurringFreq) {
+      addError("recurringFreq", "Frequency must be empty when recurring status is false");
+    }
     if (typeof entry.merchant !== "string") addError("merchant", "Merchant must be text");
     if (typeof entry.notes !== "string") addError("notes", "Notes must be text");
     for (const key of ["sourceTransactionId", "sourceAccount"] as const) {
@@ -330,6 +360,9 @@ export function validateReviewedTransactionEntries(
       (entry.needsWant === "need" || entry.needsWant === "want" || entry.needsWant === "na") &&
       typeof entry.isRecurring === "boolean" && (!recurringType || entry.isRecurring) &&
       (entry.isRecurring === false || recurringType === "subscription" || recurringType === "recurring_bill") &&
+      typeof entry.recurringFreq === "string" &&
+      (!recurringFreq || (RECURRING_FREQUENCIES as readonly string[]).includes(recurringFreq)) &&
+      (entry.isRecurring === true || !recurringFreq) &&
       typeof entry.parentCategory === "string" && typeof entry.subcategory === "string" &&
       typeof entry.recurringType === "string" && Number.isInteger(entry.id) &&
       (!categoryInput || selected) && (!parentInput || categoryInput) &&
@@ -350,6 +383,7 @@ export function validateReviewedTransactionEntries(
         needsWant: entry.needsWant,
         isRecurring: entry.isRecurring,
         recurringType: entry.isRecurring && recurringType ? recurringType : null,
+        recurringFreq: entry.isRecurring && recurringFreq ? recurringFreq as RecurringFrequency : null,
         notes: entry.notes.trim() || null,
         ...(entry.sourceTransactionId ? { sourceTransactionId: entry.sourceTransactionId.trim() } : {}),
         ...(entry.sourceAccount ? { sourceAccount: entry.sourceAccount.trim() } : {}),
@@ -374,9 +408,9 @@ export async function saveReviewedTransactionBatch(
       await client.query(
         `INSERT INTO transactions
            (user_id, date, description, merchant, amount, type, parent_category, subcategory,
-            needs_want, is_recurring, recurring_type, source, notes,
+            needs_want, is_recurring, recurring_type, recurring_freq, source, notes,
             upload_source_id, upload_source_account, upload_identity)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'upload',$12,$13,$14,$15)`,
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,'upload',$13,$14,$15,$16)`,
         [
           userId,
           transaction.date,
@@ -389,6 +423,7 @@ export async function saveReviewedTransactionBatch(
           transaction.needsWant,
           transaction.isRecurring,
           transaction.recurringType,
+          transaction.recurringFreq,
           transaction.notes,
           transaction.sourceTransactionId || null,
           transaction.sourceAccount || null,

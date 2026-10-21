@@ -1,4 +1,5 @@
 import type { TransactionImportEntry } from "@shared/transaction-import";
+import { RECURRING_FREQUENCIES } from "@shared/schema";
 
 export type TransactionImportCategory = {
   type: string;
@@ -27,6 +28,7 @@ export function createBlankTransactionImportEntry(id: number): TransactionImport
     needsWant: "na",
     isRecurring: false,
     recurringType: "",
+    recurringFreq: "",
     notes: "",
     sourceCategory: "",
     include: true,
@@ -69,6 +71,11 @@ export function validateTransactionImportEntry(
   if (typeof entry.isRecurring !== "boolean") errors.isRecurring = "Choose whether this transaction recurs.";
   if (entry.isRecurring && entry.recurringType !== "subscription" && entry.recurringType !== "recurring_bill") {
     errors.recurringType = "Choose a recurring type.";
+  }
+  if (typeof entry.recurringFreq !== "string" || (entry.recurringFreq && !(RECURRING_FREQUENCIES as readonly string[]).includes(entry.recurringFreq))) {
+    errors.recurringFreq = "Choose a supported recurrence frequency.";
+  } else if (!entry.isRecurring && entry.recurringFreq) {
+    errors.recurringFreq = "Frequency requires recurring status.";
   }
   return errors;
 }

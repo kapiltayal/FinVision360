@@ -170,7 +170,7 @@ All three flows write to the `transactions` table. The signed-in user's ID is as
 | `amount`, `type` | A positive numeric amount and a separate `income` or `expense` type. |
 | `parent_category`, `subcategory` | Canonical category values; the parent may be empty for unassigned transactions. |
 | `needs_want` | `need`, `want`, or `na`. |
-| `is_recurring`, `recurring_type`, `recurring_freq` | Recurrence flag, whether the item is a `subscription` or `recurring_bill`, and an optional frequency: `Weekly`, `Bi-Weekly`, `Semi-monthly`, `Monthly`, `Quarterly`, `Semi-Annually`, or `Annually`. Frequency defaults to `NULL`. |
+| `is_recurring`, `recurring_type`, `recurring_freq` | Recurrence flag, whether the item is a `subscription` or `recurring_bill`, and an optional frequency: `Weekly`, `Bi-Weekly`, `Semi-monthly`, `Monthly`, `Quarterly`, `Semi-Annually`, or `Annually`. Frequency defaults to `NULL`. File reviews accept source frequency values and allow the reviewer to choose one; Plaid recurrence detection fills frequency only when at least three transactions show a consistent cadence. |
 | `source` | `upload` for reviewed file imports, `plaid` for connected-account imports, or `manual` for single-row manual entry. |
 | Plaid metadata | Plaid transaction ID, account ID/name, and institution name; populated only for Plaid rows. |
 | Upload identity | Source transaction ID and account context, when supplied by the file; `upload_identity` is a hash of that account context plus source ID. |

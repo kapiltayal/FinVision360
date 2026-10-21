@@ -36,6 +36,7 @@ function reviewedEntry(overrides: Partial<TransactionImportEntry> = {}): Transac
     needsWant: "need",
     isRecurring: false,
     recurringType: "",
+    recurringFreq: "",
     notes: "",
     ...overrides,
   };
@@ -123,6 +124,30 @@ test("Need/Want and recurrence source fields are normalized for review", () => {
   }, 3);
   assert.equal(unclear.needsWant, "na");
   assert.equal(unclear.isRecurring, false);
+});
+
+test("source recurrence frequencies are normalized while unsupported values remain reviewable", () => {
+  const source = transactionEntryFromSource({
+    Description: "Gym membership",
+    Amount: "40",
+    Type: "expense",
+    "Recurring frequency": "semi-annually",
+  }, 1);
+  assert.equal(source.isRecurring, true);
+  assert.equal(source.recurringFreq, "Semi-Annually");
+
+  const unsupported = transactionEntryFromSource({
+    Description: "Gym membership",
+    Amount: "40",
+    Type: "expense",
+    Recurring: "yes",
+    "Recurring frequency": "Every 10 days",
+  }, 2);
+  assert.equal(unsupported.recurringFreq, "Every 10 days");
+  const validation = validateReviewedTransactionEntries([
+    reviewedEntry({ isRecurring: true, recurringType: "subscription", recurringFreq: unsupported.recurringFreq }),
+  ], canonicalCategories);
+  assert.equal(validation.errors.some(error => error.field === "recurringFreq"), true);
 });
 
 test("preview parsing keeps incomplete CSV rows without changing legacy parsing", async () => {
@@ -235,6 +260,11 @@ test("invalid reviewed rows are rejected before persistence preparation", () => 
   ], canonicalCategories);
   assert.equal(missingRecurrenceType.errors.some((error) => error.field === "recurringType"), true);
 
+  const unsupportedFrequency = validateReviewedTransactionEntries([
+    reviewedEntry({ isRecurring: true, recurringType: "subscription", recurringFreq: "Every 10 days" }),
+  ], canonicalCategories);
+  assert.equal(unsupportedFrequency.errors.some((error) => error.field === "recurringFreq"), true);
+
   const uiInvalidCurrency = validateReviewedTransactionEntries([
     reviewedEntry({ amount: "$1,000.00" }),
   ], canonicalCategories);
@@ -268,6 +298,7 @@ test("reviewed transaction writes commit together and roll back on an insertion 
       needsWant: "na",
       isRecurring: false,
       recurringType: null,
+      recurringFreq: null,
       notes: null,
     },
     {
@@ -281,6 +312,7 @@ test("reviewed transaction writes commit together and roll back on an insertion 
       needsWant: "na",
       isRecurring: true,
       recurringType: "subscription",
+      recurringFreq: null,
       notes: null,
     },
   ];

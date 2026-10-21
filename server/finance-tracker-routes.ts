@@ -1345,8 +1345,8 @@ export function registerFinanceTrackerRoutes(app: Express) {
             const { rows } = await pool.query(
               `INSERT INTO transactions (
                  user_id, date, description, merchant, amount, type, parent_category, subcategory, needs_want,
-                 source, plaid_transaction_id, plaid_account_id, plaid_account_name, plaid_institution_name
-                ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'plaid',$10,$11,$12,$13)
+                 recurring_freq, source, plaid_transaction_id, plaid_account_id, plaid_account_name, plaid_institution_name
+                ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,NULL,'plaid',$10,$11,$12,$13)
                ON CONFLICT (user_id, plaid_transaction_id)
                  WHERE plaid_transaction_id IS NOT NULL
                DO UPDATE SET

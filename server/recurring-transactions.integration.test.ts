@@ -16,7 +16,7 @@ test("database detection uses the merchant catalog, scopes each user, preserves 
         id INTEGER PRIMARY KEY, user_id TEXT NOT NULL, date DATE NOT NULL,
         description TEXT NOT NULL, merchant TEXT, amount NUMERIC NOT NULL, type TEXT NOT NULL,
         is_user_modified BOOLEAN NOT NULL DEFAULT FALSE,
-        is_recurring BOOLEAN DEFAULT FALSE, recurring_type TEXT,
+        is_recurring BOOLEAN DEFAULT FALSE, recurring_type TEXT, recurring_freq TEXT DEFAULT NULL,
         updated_at TIMESTAMPTZ DEFAULT NOW()
       ) ON COMMIT DROP;
       INSERT INTO merchants VALUES (1, 'Spotify', TRUE), (2, 'Power Company', FALSE), (3, 'Netflix', TRUE);
@@ -36,14 +36,16 @@ test("database detection uses the merchant catalog, scopes each user, preserves 
         (13, 'alice', '2026-01-03', 'PAYPAL NETFLIX ID 001', 'PAYPAL NETFLIX ID 001', 10, 'expense', FALSE),
         (14, 'alice', '2026-02-03', 'PAYPAL NETFLIX ID 002', 'PAYPAL NETFLIX ID 002', 12, 'expense', FALSE),
         (15, 'alice', '2026-01-03', 'BANK RETAIL STORE 001', 'BANK RETAIL STORE 001', 10, 'expense', FALSE),
-        (16, 'alice', '2026-02-03', 'BANK RETAIL STORE 002', 'BANK RETAIL STORE 002', 20, 'expense', FALSE);
+        (16, 'alice', '2026-02-03', 'BANK RETAIL STORE 002', 'BANK RETAIL STORE 002', 20, 'expense', FALSE),
+        (17, 'alice', '2026-03-03', 'CARD 003', 'Spotify', 13, 'expense', FALSE);
     `);
-    assert.equal(await detectAndMarkRecurring(client, "alice"), 8);
-    const { rows } = await client.query("SELECT id, is_recurring, recurring_type FROM transactions ORDER BY id");
+    assert.equal(await detectAndMarkRecurring(client, "alice"), 9);
+    const { rows } = await client.query("SELECT id, is_recurring, recurring_type, recurring_freq FROM transactions ORDER BY id");
     for (const row of rows) {
-      const expected = [1, 2, 13, 14].includes(row.id) ? "subscription" : [4, 5, 15, 16].includes(row.id) ? "recurring_bill" : null;
+      const expected = [1, 2, 13, 14, 17].includes(row.id) ? "subscription" : [4, 5, 15, 16].includes(row.id) ? "recurring_bill" : null;
       assert.equal(row.recurring_type, expected, `classification of row ${row.id}`);
       assert.equal(row.is_recurring, expected !== null, `recurrence of row ${row.id}`);
+      assert.equal(row.recurring_freq, [1, 2, 17].includes(row.id) ? "Monthly" : null, `frequency of row ${row.id}`);
     }
     assert.equal(await detectAndMarkRecurring(client, "alice"), 0, "unchanged classifications are not counted again");
     assert.equal(await detectAndMarkRecurring(client, "bob"), 2);

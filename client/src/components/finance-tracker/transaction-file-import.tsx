@@ -15,6 +15,7 @@ import type {
   TransactionImportResult,
   TransactionImportStage,
 } from "@shared/transaction-import";
+import { RECURRING_FREQUENCIES } from "@shared/schema";
 import { TransactionImportProgress, transactionImportStageLabel, type ImportProgressStage } from "./transaction-import-progress";
 import { createImportRequestId, readTransactionImportStream } from "./transaction-import-stream";
 import {
@@ -134,7 +135,7 @@ function TransactionFileReview({
       {stage === "failed" && <div role="alert" className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /><div><p className="font-semibold">Import paused{failedAt ? ` during ${transactionImportStageLabel(failedAt).toLowerCase()}` : ""}</p><p className="mt-0.5">{errorMessage}</p><p className="mt-1 text-xs">Your review is still here. Correct the issue or retry when ready.</p></div></div>}
 
       <div className="max-h-[min(260px,45vh)] overflow-auto overscroll-contain rounded-xl border" aria-label="Editable transaction preview">
-        <table className="w-full min-w-[1880px] text-left text-xs">
+        <table className="w-full min-w-[2000px] text-left text-xs">
           <caption className="sr-only">Editable preview of transactions from {fileName}</caption>
           <thead className="sticky top-0 z-10 bg-muted">
             <tr>
@@ -150,6 +151,7 @@ function TransactionFileReview({
               <th scope="col" className="min-w-28 border-b px-2 py-2 font-medium">Need / Want</th>
               <th scope="col" className="min-w-28 border-b px-2 py-2 font-medium">Recurring</th>
               <th scope="col" className="min-w-40 border-b px-2 py-2 font-medium">Recurring type</th>
+              <th scope="col" className="min-w-40 border-b px-2 py-2 font-medium">Recurring frequency</th>
               <th scope="col" className="min-w-40 border-b px-2 py-2 font-medium">Notes</th>
               <th scope="col" className="min-w-36 border-b px-2 py-2 font-medium">Source category</th>
               <th scope="col" className="sticky right-0 z-20 w-10 min-w-10 border-b bg-muted px-1 py-2"><span className="sr-only">Remove</span></th>
@@ -215,6 +217,14 @@ function TransactionFileReview({
                   <td className="border-b px-2 py-1.5 align-top"><select value={entry.needsWant} onChange={event => onChange(entry.id, "needsWant", event.target.value)} aria-label={`Transaction ${index + 1} need or want`} disabled={saving} className="h-8 w-full rounded-md border border-input bg-background px-2 text-xs"><option value="na">N/A</option><option value="need">Need</option><option value="want">Want</option></select>{error.needsWant && <p className="mt-1 text-[10px] text-destructive">{error.needsWant}</p>}</td>
                   <td className="border-b px-2 py-1.5 align-top"><label className="flex h-8 items-center gap-2"><input type="checkbox" checked={entry.isRecurring} onChange={event => onChange(entry.id, "isRecurring", event.target.checked)} aria-label={`Transaction ${index + 1} recurring`} disabled={saving} className="h-4 w-4 rounded border-input" /><span>{entry.isRecurring ? "Yes" : "No"}</span></label></td>
                   <td className="border-b px-2 py-1.5 align-top"><select value={entry.recurringType} onChange={event => onChange(entry.id, "recurringType", event.target.value)} aria-label={`Transaction ${index + 1} recurring type`} disabled={saving || !entry.isRecurring} className="h-8 w-full rounded-md border border-input bg-background px-2 text-xs disabled:opacity-60"><option value="">Choose type</option><option value="subscription">Subscription</option><option value="recurring_bill">Recurring bill</option></select>{error.recurringType && <p className="mt-1 text-[10px] text-destructive">{error.recurringType}</p>}</td>
+                  <td className="border-b px-2 py-1.5 align-top">
+                    <select value={entry.recurringFreq} onChange={event => onChange(entry.id, "recurringFreq", event.target.value)} aria-label={`Transaction ${index + 1} recurring frequency`} disabled={saving || !entry.isRecurring} className="h-8 w-full rounded-md border border-input bg-background px-2 text-xs disabled:opacity-60">
+                      <option value="">Not specified</option>
+                      {entry.recurringFreq && !(RECURRING_FREQUENCIES as readonly string[]).includes(entry.recurringFreq) && <option value={entry.recurringFreq}>Unsupported: {entry.recurringFreq}</option>}
+                      {RECURRING_FREQUENCIES.map(frequency => <option key={frequency} value={frequency}>{frequency}</option>)}
+                    </select>
+                    {error.recurringFreq && <p className="mt-1 text-[10px] text-destructive">{error.recurringFreq}</p>}
+                  </td>
                   {input("notes", "Notes")}
                   <td className="border-b px-2 py-1.5 align-top">{((entry.sourceCategory && entry.sourceCategory !== entry.subcategory) || (entry.subcategory && !selectedCategory)) ? <span className="block max-w-36 truncate text-xs text-muted-foreground" title={entry.sourceCategory || entry.subcategory}>{entry.sourceCategory || entry.subcategory}</span> : <span className="text-muted-foreground">—</span>}</td>
                   <td className="sticky right-0 border-b bg-background px-1 py-1.5 align-top"><Button type="button" size="icon" variant="ghost" className="h-8 w-8 text-destructive" aria-label={`Remove transaction ${index + 1}`} onClick={() => onRemove(entry.id)} disabled={saving}><Trash2 className="h-3.5 w-3.5" /></Button></td>
@@ -465,7 +475,7 @@ export function TransactionFileImportPanel({
           const selected = categories.find(category => category.category === subcategory && category.type.toLowerCase() === entry.type);
           return { ...entry, subcategory, parentCategory: selected?.parentCategory ?? "" };
         }
-        if (field === "isRecurring" && value === false) return { ...entry, isRecurring: false, recurringType: "" };
+        if (field === "isRecurring" && value === false) return { ...entry, isRecurring: false, recurringType: "", recurringFreq: "" };
         if (field === "include") {
           if (entry.duplicate?.kind === "stable") return entry;
           const include = value === true;
@@ -494,7 +504,7 @@ export function TransactionFileImportPanel({
     if (!selected.length || invalidSelected || checking || checkError || categoriesLoading || categoriesError) return;
     const payloadEntries = entries.map(entry => {
       const category = categories.find(item => item.category === entry.subcategory && item.type.toLowerCase() === entry.type);
-      return { ...entry, parentCategory: category?.parentCategory ?? "", recurringType: entry.isRecurring ? entry.recurringType : "" };
+      return { ...entry, parentCategory: category?.parentCategory ?? "", recurringType: entry.isRecurring ? entry.recurringType : "", recurringFreq: entry.isRecurring ? entry.recurringFreq : "" };
     });
     const payload = JSON.stringify(payloadEntries);
     if (!requestRef.current || requestRef.current.payload !== payload) requestRef.current = { payload, id: createImportRequestId() };

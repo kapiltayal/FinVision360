@@ -10,6 +10,7 @@ export interface TransactionImportEntry {
   needsWant: "need" | "want" | "na";
   isRecurring: boolean;
   recurringType: string;
+  recurringFreq: string;
   notes: string;
   sourceCategory?: string;
   sourceTransactionId?: string;
