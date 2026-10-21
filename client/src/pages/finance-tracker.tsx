@@ -1295,7 +1295,6 @@ export default function FinanceTrackerPage() {
             <CardTitle className="text-sm flex items-center gap-2">
               <Tag className="h-4 w-4 text-slate-500" />Transactions
               <Badge variant="secondary">{transactions.length}</Badge>
-              {unassigned > 0 && <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 border-amber-200">{unassigned} unassigned</Badge>}
             </CardTitle>
             <div className="flex items-center gap-2 flex-wrap">
               {/* Page size */}
