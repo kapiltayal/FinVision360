@@ -82,6 +82,7 @@ type SubscriptionInsight = {
   total_paid: string;
   latest_amount: string;
   latest_charge_date: string;
+  recurring_frequencies?: string[];
   charge_history?: InsightCharge[];
 };
 type RecurringBillInsight = {
@@ -89,6 +90,7 @@ type RecurringBillInsight = {
   charge_count: string;
   total_paid: string;
   average_amount: string;
+  recurring_frequencies?: string[];
   charge_history?: InsightCharge[];
 };
 type SpendingInsights = {
@@ -604,7 +606,7 @@ function SpendingInsightCarousel({
                     </div>
                     <div className="max-h-[153px] overflow-y-auto rounded-lg border divide-y">
                       {insights?.subscriptions.items.map(item => (
-                        <MerchantChargeHistoryHover key={item.name} merchant={item.name} charges={item.charge_history}>
+                        <MerchantChargeHistoryHover key={item.name} merchant={item.name} charges={item.charge_history} frequencies={item.recurring_frequencies}>
                           <div className="flex w-full items-center justify-between gap-3 px-3 py-2">
                             <div className="min-w-0">
                               <p className="text-xs font-medium truncate">{item.name}</p>
@@ -647,7 +649,7 @@ function SpendingInsightCarousel({
                     </div>
                     <div className="max-h-[153px] overflow-y-auto rounded-lg border divide-y">
                       {insights?.recurringBills?.items.map(item => (
-                        <MerchantChargeHistoryHover key={item.name} merchant={item.name} charges={item.charge_history}>
+                        <MerchantChargeHistoryHover key={item.name} merchant={item.name} charges={item.charge_history} frequencies={item.recurring_frequencies}>
                           <div className="flex w-full items-center justify-between gap-3 px-3 py-2">
                             <div className="min-w-0">
                               <p className="text-xs font-medium truncate">{item.name}</p>

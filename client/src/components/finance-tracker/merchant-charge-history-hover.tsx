@@ -37,13 +37,20 @@ function formatChargeTick(value: string): string {
 export function MerchantChargeHistoryHover({
   merchant,
   charges,
+  frequencies,
   children,
 }: {
   merchant: string;
   charges?: MerchantChargeHistoryPoint[];
+  frequencies?: string[];
   children: ReactNode;
 }) {
   const history = charges ?? [];
+  const frequencyLabel = !frequencies?.length
+    ? "Not set"
+    : frequencies.length === 1
+      ? frequencies[0]
+      : `Mixed (${frequencies.join(", ")})`;
 
   return (
     <HoverCard openDelay={180} closeDelay={120}>
@@ -67,6 +74,10 @@ export function MerchantChargeHistoryHover({
           <div className="mb-2">
             <p className="truncate text-sm font-semibold">{merchant}</p>
             <p className="text-xs text-muted-foreground">Charges over time</p>
+            <p className="mt-1 text-xs">
+              <span className="text-muted-foreground">Frequency: </span>
+              <span className="font-medium">{frequencyLabel}</span>
+            </p>
           </div>
           {history.length ? (
             <div className="h-36 w-full" aria-label={`Charge history chart for ${merchant}`}>

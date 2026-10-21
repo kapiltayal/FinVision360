@@ -12,14 +12,14 @@ test("spending insights return per-merchant recurring bill averages, scoped to t
   registerFinanceTrackerRoutes(app as any);
   try {
     await pool.query(
-      `INSERT INTO transactions (user_id,date,description,merchant,amount,type,subcategory,needs_want,is_recurring,recurring_type,source)
+      `INSERT INTO transactions (user_id,date,description,merchant,amount,type,subcategory,needs_want,is_recurring,recurring_type,recurring_freq,source)
        VALUES
-       ($1,'2026-03-05','Electric bill','Electric Co',40,'expense','utilities','need',TRUE,'recurring_bill','manual'),
-       ($1,'2026-03-20','Electric bill','Electric Co',60,'expense','utilities','need',TRUE,'recurring_bill','manual'),
-       ($1,'2026-02-28','Electric bill','Electric Co',80,'expense','utilities','need',TRUE,'recurring_bill','manual'),
-       ($1,'2026-03-10','Phone','Mobile Co',50,'expense','utilities','want',TRUE,'subscription','manual'),
-       ($1,'2026-03-10','Salary','Electric Co',90,'income','salary','na',TRUE,'recurring_bill','manual'),
-       ($2,'2026-03-10','Electric bill','Electric Co',300,'expense','utilities','need',TRUE,'recurring_bill','manual')`,
+       ($1,'2026-03-05','Electric bill','Electric Co',40,'expense','utilities','need',TRUE,'recurring_bill','Monthly','manual'),
+       ($1,'2026-03-20','Electric bill','Electric Co',60,'expense','utilities','need',TRUE,'recurring_bill','Monthly','manual'),
+       ($1,'2026-02-28','Electric bill','Electric Co',80,'expense','utilities','need',TRUE,'recurring_bill','Monthly','manual'),
+       ($1,'2026-03-10','Phone','Mobile Co',50,'expense','utilities','want',TRUE,'subscription',NULL,'manual'),
+       ($1,'2026-03-10','Salary','Electric Co',90,'income','salary','na',TRUE,'recurring_bill','Monthly','manual'),
+       ($2,'2026-03-10','Electric bill','Electric Co',300,'expense','utilities','need',TRUE,'recurring_bill','Monthly','manual')`,
       [userId, `${userId}-other`],
     );
     const response = {
@@ -37,6 +37,7 @@ test("spending insights return per-merchant recurring bill averages, scoped to t
     assert.equal(response.body.recurringBills.items[0].name, "Electric Co");
     assert.equal(Number(response.body.recurringBills.items[0].charge_count), 2);
     assert.equal(Number(response.body.recurringBills.items[0].average_amount), 50);
+    assert.deepEqual(response.body.recurringBills.items[0].recurring_frequencies, ["Monthly"]);
     assert.deepEqual(
       response.body.recurringBills.items[0].charge_history.map((charge: any) => ({
         date: charge.date,
@@ -50,6 +51,7 @@ test("spending insights return per-merchant recurring bill averages, scoped to t
     );
     assert.equal(response.body.subscriptions.count, "1", "the existing subscription view remains separate");
     assert.equal(response.body.subscriptions.items[0].charge_history.length, 1);
+    assert.deepEqual(response.body.subscriptions.items[0].recurring_frequencies, []);
   } finally {
     await pool.query("DELETE FROM transactions WHERE user_id=ANY($1::varchar[])", [[userId, `${userId}-other`]]);
   }

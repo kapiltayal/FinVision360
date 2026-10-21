@@ -994,7 +994,8 @@ export function registerFinanceTrackerRoutes(app: Express) {
              COALESCE(NULLIF(TRIM(merchant), ''), description) AS name,
              COUNT(*) AS charge_count,
              COALESCE(SUM(amount), 0) AS total_paid,
-             COALESCE(AVG(amount), 0) AS average_amount
+             COALESCE(AVG(amount), 0) AS average_amount,
+             ARRAY_REMOVE(ARRAY_AGG(DISTINCT recurring_freq ORDER BY recurring_freq), NULL) AS recurring_frequencies
            FROM transactions ${recurringBillWhere}
            GROUP BY COALESCE(NULLIF(TRIM(merchant), ''), description)
            ORDER BY total_paid DESC, name ASC`,
@@ -1006,7 +1007,8 @@ export function registerFinanceTrackerRoutes(app: Express) {
              COUNT(*) AS charge_count,
              COALESCE(SUM(amount), 0) AS total_paid,
              (ARRAY_AGG(amount ORDER BY date DESC, created_at DESC))[1] AS latest_amount,
-             MAX(date)::DATE AS latest_charge_date
+             MAX(date)::DATE AS latest_charge_date,
+             ARRAY_REMOVE(ARRAY_AGG(DISTINCT recurring_freq ORDER BY recurring_freq), NULL) AS recurring_frequencies
            FROM transactions ${subscriptionWhere}
            GROUP BY COALESCE(NULLIF(TRIM(merchant), ''), description)
            ORDER BY total_paid DESC, name ASC`,
