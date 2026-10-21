@@ -952,7 +952,7 @@ export function registerFinanceTrackerRoutes(app: Express) {
     }
   });
 
-  // GET /api/transactions/insights — subscription and Need/Want spending summaries
+  // GET /api/transactions/insights — recurring-payment and Need/Want summaries
   app.get("/api/transactions/insights", requireAuth, async (req, res) => {
     try {
       const userId = (req.user as any).id;
@@ -964,10 +964,13 @@ export function registerFinanceTrackerRoutes(app: Express) {
       if (startDate) { expenseWhere += ` AND date >= $${idx++}`; params.push(startDate); }
       if (endDate) { expenseWhere += ` AND date <= $${idx++}`; params.push(endDate); }
       const subscriptionWhere = `${expenseWhere} AND is_recurring = TRUE AND recurring_type = 'subscription'`;
+      const recurringBillsWhere = `${expenseWhere} AND is_recurring = TRUE AND recurring_type = 'recurring_bill'`;
 
       const [
         { rows: subscriptionSummaryRows },
         { rows: subscriptionRows },
+        { rows: recurringBillsSummaryRows },
+        { rows: recurringBillsRows },
         { rows: needsWantRows },
       ] = await Promise.all([
         pool.query(
@@ -991,6 +994,25 @@ export function registerFinanceTrackerRoutes(app: Express) {
         ),
         pool.query(
           `SELECT
+             COUNT(DISTINCT COALESCE(NULLIF(TRIM(merchant), ''), description)) AS count,
+             COALESCE(SUM(amount), 0) AS total
+           FROM transactions ${recurringBillsWhere}`,
+          params,
+        ),
+        pool.query(
+          `SELECT
+             COALESCE(NULLIF(TRIM(merchant), ''), description) AS name,
+             COUNT(*) AS charge_count,
+             COALESCE(SUM(amount), 0) AS total_paid,
+             (ARRAY_AGG(amount ORDER BY date DESC, created_at DESC))[1] AS latest_amount,
+             MAX(date)::DATE AS latest_charge_date
+           FROM transactions ${recurringBillsWhere}
+           GROUP BY COALESCE(NULLIF(TRIM(merchant), ''), description)
+           ORDER BY total_paid DESC, name ASC`,
+          params,
+        ),
+        pool.query(
+          `SELECT
              COALESCE(SUM(CASE WHEN needs_want = 'need' THEN amount ELSE 0 END), 0) AS needs,
              COALESCE(SUM(CASE WHEN needs_want = 'want' THEN amount ELSE 0 END), 0) AS wants,
              COALESCE(SUM(CASE WHEN needs_want IS NULL OR needs_want = 'na' THEN amount ELSE 0 END), 0) AS unclassified
@@ -1004,6 +1026,11 @@ export function registerFinanceTrackerRoutes(app: Express) {
           count: subscriptionSummaryRows[0]?.count ?? "0",
           total: subscriptionSummaryRows[0]?.total ?? "0",
           items: subscriptionRows,
+        },
+        recurringBills: {
+          count: recurringBillsSummaryRows[0]?.count ?? "0",
+          total: recurringBillsSummaryRows[0]?.total ?? "0",
+          items: recurringBillsRows,
         },
         needsWant: needsWantRows[0] ?? { needs: "0", wants: "0", unclassified: "0" },
       });
