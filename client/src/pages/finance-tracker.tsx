@@ -1177,6 +1177,17 @@ export default function FinanceTrackerPage() {
         </span>
       </div>
 
+      {/* ── Unassigned Alert ── */}
+      {unassigned > 0 && (
+        <div className="flex items-center gap-3 p-3 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-700">
+          <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
+          <p className="text-sm text-amber-800 dark:text-amber-300">
+            <strong>{unassigned} transaction{unassigned !== 1 ? "s" : ""}</strong> couldn't be auto-categorized.
+            Filter by "Unassigned" to review and categorize them.
+          </p>
+        </div>
+      )}
+
       {/* ── KPI Cards ── */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {[
