@@ -16,6 +16,7 @@ import { TransactionFileImportPanel } from "@/components/finance-tracker/transac
 import { FinancialChartTooltip } from "@/components/financial-chart-tooltip";
 import type { TransactionImportResult } from "@shared/transaction-import";
 import { RECURRING_FREQUENCIES, type RecurringFrequency } from "@shared/schema";
+import { isUnchangedTransactionCategory } from "@/components/finance-tracker/transaction-dialog-validation";
 import {
   TrendingUp, TrendingDown, Wallet, Plus, Upload, RefreshCw, Pencil, Trash2,
   AlertCircle, ArrowDownCircle, ArrowUpCircle, Repeat2, Tag, Search, X,
@@ -278,6 +279,17 @@ function TransactionDialog({
   const selectedCanonicalCategory = matchingCategories.find(category => category.category === subcat);
   const hasCurrentCategory = Boolean(selectedCanonicalCategory);
   const isEdit = !!initial?.id;
+  const unchangedCategory = isUnchangedTransactionCategory({
+    isEdit,
+    type,
+    initialType: initial?.type,
+    subcategory: subcat,
+    initialSubcategory: initial?.subcategory,
+    parentCategory,
+    initialParentCategory: (initial as any)?.parent_category,
+  });
+  const preserveExistingCategory = unchangedCategory &&
+    (!selectedCanonicalCategory || categoriesLoading || !!categoriesError);
 
   useEffect(() => {
     if (!matchingCategories.length || !subcat) return;
@@ -291,8 +303,8 @@ function TransactionDialog({
     if (category.parentCategory !== parentCategory) setParentCategory(category.parentCategory);
   }, [matchingCategories, parentCategory, subcat]);
 
-  const canSave = !!date && !!desc && !!amount && parseFloat(amount) > 0
-    && !!selectedCanonicalCategory && !categoriesLoading && !categoriesError;
+  const canSave = !!date && !!desc.trim() && !!amount && Number.isFinite(parseFloat(amount)) && parseFloat(amount) > 0
+    && (preserveExistingCategory || (!!selectedCanonicalCategory && !categoriesLoading && !categoriesError));
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -419,7 +431,7 @@ function TransactionDialog({
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
           <Button
             disabled={!canSave || saving}
-            onClick={() => onSave({ date, description: desc, amount, type, subcategory: subcat, parentCategory: parentCategory || undefined, needsWant: nw || null, isRecurring: recurring, recurringType: recurring ? (recurringType || "subscription") : null, recurringFreq: recurring ? recurringFreq || null : null, notes })}
+            onClick={() => onSave({ date, description: desc, amount, type, subcategory: preserveExistingCategory ? undefined : subcat, parentCategory: preserveExistingCategory ? undefined : parentCategory || undefined, needsWant: nw || null, isRecurring: recurring, recurringType: recurring ? (recurringType || "subscription") : null, recurringFreq: recurring ? recurringFreq || null : null, notes })}
           >
             {saving ? "Saving…" : isEdit ? "Save Changes" : "Add Transaction"}
           </Button>
@@ -903,7 +915,7 @@ export default function FinanceTrackerPage() {
 
     const changedFields: MerchantUpdateField[] = [];
     const typeOnlyCategoryReset = data.type !== editTxn.type && data.subcategory === "unassigned";
-    if (
+    if (data.subcategory !== undefined &&
       (data.subcategory !== editTxn.subcategory || (data.parentCategory ?? "") !== (editTxn.parent_category ?? ""))
       && !typeOnlyCategoryReset
     ) changedFields.push("subcategory");
