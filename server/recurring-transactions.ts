@@ -43,7 +43,7 @@ function hasSemiMonthlyPattern(charges: Array<{ time: number }>): boolean {
     byMonth.set(month, dates);
   }
   let matchingMonths = 0;
-  for (const dates of byMonth.values()) {
+  for (const dates of Array.from(byMonth.values())) {
     dates.sort((a, b) => a - b);
     if (dates.length === 2 && dates[1] - dates[0] >= 13 && dates[1] - dates[0] <= 17) {
       matchingMonths++;
@@ -61,9 +61,9 @@ function inferRecurringFrequency(
   const allWithin = (minimum: number, maximum: number) =>
     intervals.every((days) => days >= minimum && days <= maximum);
 
-  if (hasSemiMonthlyPattern(charges)) return "Semi-monthly";
   if (allWithin(6, 8)) return "Weekly";
   if (allWithin(13, 15)) return "Bi-Weekly";
+  if (hasSemiMonthlyPattern(charges)) return "Semi-monthly";
   if (allWithin(25, 35)) return "Monthly";
   if (allWithin(80, 100)) return "Quarterly";
   if (allWithin(165, 200)) return "Semi-Annually";
@@ -137,8 +137,9 @@ export function identifyRecurringTransactions(
         flush();
         sequence = [];
         sequenceBand = null;
+      } else if (previous && band && !sequenceBand) {
+        sequenceBand = band;
       }
-      if (previous && band && !sequenceBand) sequenceBand = band;
       sequence.push(charge);
     }
     flush();

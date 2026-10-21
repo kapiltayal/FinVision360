@@ -26,3 +26,9 @@ Save a reviewed financial file all-or-nothing and keep the review intact if savi
 **Why:** Partial writes followed by a retry can duplicate the successful entries while the skipped entries disappear from the review.
 
 **How to apply:** Validate the whole reviewed batch first, then commit in a single transaction; report a failed save without clearing the review.
+
+Recurrence frequency should come from an explicit source/reviewer choice or consistent transaction history, not an AI guess based on merchant identity. Keep unknown frequency `NULL` and preserve existing frequency choices during automatic sync.
+
+**Why:** A subscription brand does not establish a customer's billing schedule, and short histories can make biweekly and semi-monthly schedules indistinguishable.
+
+**How to apply:** Require multiple observed intervals before assigning an inferred frequency. Prefer leaving the frequency unknown over guessing, and never replace an explicit imported or user-selected frequency with a detector's estimate.
