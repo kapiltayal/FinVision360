@@ -87,11 +87,6 @@ type SpendingInsights = {
     total: string;
     items: SubscriptionInsight[];
   };
-  recurringBills: {
-    count: string;
-    total: string;
-    items: SubscriptionInsight[];
-  };
   needsWant: {
     needs: string;
     wants: string;
@@ -470,8 +465,6 @@ function SpendingInsightCarousel({
   ];
   const subscriptionCount = Number(insights?.subscriptions.count ?? 0);
   const subscriptionTotal = Number(insights?.subscriptions.total ?? 0);
-  const recurringBillCount = Number(insights?.recurringBills.count ?? 0);
-  const recurringBillTotal = Number(insights?.recurringBills.total ?? 0);
   const needsTotal = Number(insights?.needsWant.needs ?? 0);
   const wantsTotal = Number(insights?.needsWant.wants ?? 0);
   const unclassifiedTotal = Number(insights?.needsWant.unclassified ?? 0);
@@ -566,53 +559,40 @@ function SpendingInsightCarousel({
           {activeSlide === 1 && (
             insightsLoading
               ? <div className="space-y-3 pt-1"><Skeleton className="h-16 w-full" /><Skeleton className="h-28 w-full" /></div>
-              : subscriptionCount === 0 && recurringBillCount === 0
+              : subscriptionCount === 0
                 ? <div className="h-[244px] flex flex-col items-center justify-center text-center px-5">
                     <CreditCard className="h-8 w-8 text-muted-foreground/60 mb-2" />
-                    <p className="text-sm font-medium">No recurring payments identified</p>
-                    <p className="text-xs text-muted-foreground mt-1">Mark transactions as subscriptions or recurring bills to see them here.</p>
+                    <p className="text-sm font-medium">No subscriptions identified</p>
+                    <p className="text-xs text-muted-foreground mt-1">Mark a recurring transaction as a subscription to see it here.</p>
                   </div>
                 : (
-                  <div className="space-y-2.5">
+                  <div className="space-y-3">
                     <div className="grid grid-cols-2 gap-2">
-                      <div className="rounded-lg bg-violet-50 dark:bg-violet-950/30 px-3 py-2">
+                      <div className="rounded-lg bg-violet-50 dark:bg-violet-950/30 px-3 py-2.5">
                         <p className="text-[10px] uppercase tracking-wide font-semibold text-muted-foreground">Subscriptions</p>
-                        <p className="mt-0.5 text-lg font-bold text-violet-700 dark:text-violet-300">{subscriptionCount}</p>
-                        <p className="text-[11px] text-muted-foreground">{fmt(subscriptionTotal)} paid this period</p>
+                        <p className="mt-0.5 text-xl font-bold text-violet-700 dark:text-violet-300">{subscriptionCount}</p>
                       </div>
-                      <div className="rounded-lg bg-emerald-50 dark:bg-emerald-950/30 px-3 py-2">
-                        <p className="text-[10px] uppercase tracking-wide font-semibold text-muted-foreground">Recurring Bills</p>
-                        <p className="mt-0.5 text-lg font-bold text-emerald-700 dark:text-emerald-300">{recurringBillCount}</p>
-                        <p className="text-[11px] text-muted-foreground">{fmt(recurringBillTotal)} paid this period</p>
+                      <div className="rounded-lg bg-slate-50 dark:bg-slate-900/50 px-3 py-2.5">
+                        <p className="text-[10px] uppercase tracking-wide font-semibold text-muted-foreground">Paid this period</p>
+                        <p className="mt-0.5 text-xl font-bold tabular-nums">{fmt(subscriptionTotal)}</p>
                       </div>
                     </div>
-                    {[{
-                      title: "Subscriptions", items: insights?.subscriptions.items ?? [], empty: "No subscriptions in this period",
-                    }, {
-                      title: "Recurring Bills", items: insights?.recurringBills.items ?? [], empty: "No recurring bills in this period",
-                    }].map(section => (
-                      <section key={section.title} aria-label={section.title}>
-                        <h3 className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{section.title}</h3>
-                        <div className="max-h-[82px] overflow-y-auto rounded-lg border divide-y">
-                          {section.items.length
-                            ? section.items.map(item => (
-                              <div key={item.name} className="flex items-center justify-between gap-3 px-3 py-1.5">
-                                <div className="min-w-0">
-                                  <p className="text-xs font-medium truncate">{item.name}</p>
-                                  <p className="text-[11px] text-muted-foreground">
-                                    {item.charge_count} charge{Number(item.charge_count) === 1 ? "" : "s"} · {fmt(Number(item.total_paid))} paid
-                                  </p>
-                                </div>
-                                <div className="shrink-0 text-right">
-                                  <p className="text-xs font-semibold tabular-nums">{fmtFull(Number(item.latest_amount))}</p>
-                                  <p className="text-[10px] text-muted-foreground">latest charge</p>
-                                </div>
-                              </div>
-                            ))
-                            : <p className="px-3 py-2 text-xs text-muted-foreground">{section.empty}</p>}
+                    <div className="max-h-[153px] overflow-y-auto rounded-lg border divide-y">
+                      {insights?.subscriptions.items.map(item => (
+                        <div key={item.name} className="flex items-center justify-between gap-3 px-3 py-2">
+                          <div className="min-w-0">
+                            <p className="text-xs font-medium truncate">{item.name}</p>
+                            <p className="text-[11px] text-muted-foreground">
+                              {item.charge_count} charge{Number(item.charge_count) === 1 ? "" : "s"} · {fmt(Number(item.total_paid))} paid
+                            </p>
+                          </div>
+                          <div className="shrink-0 text-right">
+                            <p className="text-xs font-semibold tabular-nums">{fmtFull(Number(item.latest_amount))}</p>
+                            <p className="text-[10px] text-muted-foreground">latest charge</p>
+                          </div>
                         </div>
-                      </section>
-                    ))}
+                      ))}
+                    </div>
                   </div>
                 )
           )}

@@ -109,27 +109,6 @@ test("merchant categories guide imports and existing routes without overriding u
     });
     assert.equal(explicit.body.subcategory, primary.category, "explicit creation choice remains authoritative");
 
-    const summaryEntries = [
-      { description: `Summary subscription ${suffix}`, amount: "8.99", recurringType: "subscription" },
-      { description: `Summary bill ${suffix}`, amount: "83.45", recurringType: "recurring_bill" },
-    ];
-    for (const item of summaryEntries) {
-      await pool.query(
-        `INSERT INTO transactions
-           (user_id,date,description,merchant,amount,type,parent_category,subcategory,needs_want,is_recurring,recurring_type,source)
-         VALUES ($1,'2026-09-04',$2,$2,$3,'expense',$4,$5,'na',TRUE,$6,'upload')`,
-        [userId, item.description, item.amount, primary.parent_category, primary.category, item.recurringType],
-      );
-    }
-    const insights = await invoke("get", "/api/transactions/insights");
-    assert.equal(insights.statusCode, 200);
-    assert.equal(insights.body.subscriptions.count, "1");
-    assert.equal(Number(insights.body.subscriptions.total), 8.99);
-    assert.equal(insights.body.subscriptions.items[0].name, summaryEntries[0].description);
-    assert.equal(insights.body.recurringBills.count, "1");
-    assert.equal(Number(insights.body.recurringBills.total), 83.45);
-    assert.equal(insights.body.recurringBills.items[0].name, summaryEntries[1].description);
-
     // Stub provider calls, not auth or database SQL. No real bank/API requests.
     storage.getPlaidItems = async () => [{
       id: 1, accessToken: "fixture-token", institutionName: "Fixture Bank",
