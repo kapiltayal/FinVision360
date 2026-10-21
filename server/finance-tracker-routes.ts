@@ -952,7 +952,7 @@ export function registerFinanceTrackerRoutes(app: Express) {
     }
   });
 
-  // GET /api/transactions/insights — subscription and Need/Want spending summaries
+  // GET /api/transactions/insights — subscriptions, recurring bills, and Need/Want summaries
   app.get("/api/transactions/insights", requireAuth, async (req, res) => {
     try {
       const userId = (req.user as any).id;
@@ -964,9 +964,12 @@ export function registerFinanceTrackerRoutes(app: Express) {
       if (startDate) { expenseWhere += ` AND date >= $${idx++}`; params.push(startDate); }
       if (endDate) { expenseWhere += ` AND date <= $${idx++}`; params.push(endDate); }
       const subscriptionWhere = `${expenseWhere} AND is_recurring = TRUE AND recurring_type = 'subscription'`;
+      const recurringBillWhere = `${expenseWhere} AND is_recurring = TRUE AND recurring_type = 'recurring_bill'`;
 
       const [
         { rows: subscriptionSummaryRows },
+        { rows: recurringBillSummaryRows },
+        { rows: recurringBillRows },
         { rows: subscriptionRows },
         { rows: needsWantRows },
       ] = await Promise.all([
@@ -975,6 +978,24 @@ export function registerFinanceTrackerRoutes(app: Express) {
              COUNT(DISTINCT COALESCE(NULLIF(TRIM(merchant), ''), description)) AS count,
              COALESCE(SUM(amount), 0) AS total
            FROM transactions ${subscriptionWhere}`,
+          params,
+        ),
+        pool.query(
+          `SELECT
+             COUNT(DISTINCT COALESCE(NULLIF(TRIM(merchant), ''), description)) AS count,
+             COALESCE(SUM(amount), 0) AS total
+           FROM transactions ${recurringBillWhere}`,
+          params,
+        ),
+        pool.query(
+          `SELECT
+             COALESCE(NULLIF(TRIM(merchant), ''), description) AS name,
+             COUNT(*) AS charge_count,
+             COALESCE(SUM(amount), 0) AS total_paid,
+             COALESCE(AVG(amount), 0) AS average_amount
+           FROM transactions ${recurringBillWhere}
+           GROUP BY COALESCE(NULLIF(TRIM(merchant), ''), description)
+           ORDER BY total_paid DESC, name ASC`,
           params,
         ),
         pool.query(
@@ -1004,6 +1025,11 @@ export function registerFinanceTrackerRoutes(app: Express) {
           count: subscriptionSummaryRows[0]?.count ?? "0",
           total: subscriptionSummaryRows[0]?.total ?? "0",
           items: subscriptionRows,
+        },
+        recurringBills: {
+          count: recurringBillSummaryRows[0]?.count ?? "0",
+          total: recurringBillSummaryRows[0]?.total ?? "0",
+          items: recurringBillRows,
         },
         needsWant: needsWantRows[0] ?? { needs: "0", wants: "0", unclassified: "0" },
       });
