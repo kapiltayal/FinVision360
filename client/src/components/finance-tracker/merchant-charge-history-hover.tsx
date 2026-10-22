@@ -46,6 +46,14 @@ export function MerchantChargeHistoryHover({
   children: ReactNode;
 }) {
   const history = charges ?? [];
+  const chartData = history
+    .map((charge) => ({
+      ...charge,
+      amount: Math.abs(Number(charge.amount)),
+    }))
+    .filter((charge) => Number.isFinite(charge.amount));
+  const maxCharge = chartData.reduce((max, charge) => Math.max(max, charge.amount), 0);
+  const yAxisMax = maxCharge > 0 ? maxCharge * 1.1 : 1;
   const frequencyLabel = !frequencies?.length
     ? "Not set"
     : frequencies.length === 1
@@ -81,10 +89,10 @@ export function MerchantChargeHistoryHover({
               <p className="text-xs font-semibold leading-tight">{frequencyLabel}</p>
             </div>
           </div>
-          {history.length ? (
+          {chartData.length ? (
             <div className="h-36 w-full" aria-label={`Charge history chart for ${merchant}`}>
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={history} margin={{ top: 4, right: 8, bottom: 2, left: 0 }}>
+                <BarChart data={chartData} margin={{ top: 6, right: 8, bottom: 2, left: 0 }}>
                   <CartesianGrid vertical={false} strokeDasharray="3 3" />
                   <XAxis
                     dataKey="date"
@@ -97,6 +105,8 @@ export function MerchantChargeHistoryHover({
                   />
                   <YAxis
                     width={62}
+                    domain={[0, yAxisMax]}
+                    tickCount={5}
                     tickFormatter={(value) => formatCurrency(Number(value))}
                     tick={{ fontSize: 10 }}
                     tickLine={false}
