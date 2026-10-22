@@ -31,10 +31,16 @@ Recurrence frequency should come from an explicit source/reviewer/provider choic
 
 **Why:** A subscription brand does not establish a customer's billing schedule, and short histories can make biweekly and semi-monthly schedules indistinguishable.
 
-**How to apply:** Require multiple observed intervals before assigning an inferred frequency. Priority is user overrides (including negative choices), then Plaid signals, then explicit merchant-only profiles, then temporal/amount heuristics. Merchant-only profiles can establish type without history, but not a guessed frequency.
+**How to apply:** Require multiple observed intervals before assigning an inferred frequency. Priority is user overrides (including negative choices), then this user's saved positive merchant tags, then Plaid signals, then explicit merchant-only profiles, then temporal/amount heuristics. Reuse saved tags exactly, including unknown frequency; later amount/interval variation must not silently reclassify an already recurring merchant. Merchant-only profiles can establish type without history, but not a guessed frequency.
 
 File-upload detection must happen after standardization and duplicate checking, before preview, with no writes. Final review choices must not be redetected on save.
 
 **Why:** The user explicitly requested a chance to correct algorithmic suggestions; running detection after review would silently undo those choices. Excluded duplicates must not manufacture recurrence evidence.
 
 **How to apply:** Combine included incoming rows with only that user's history, audit recurrence-specific review edits, and reuse those explicit tags on future imports. If historical overrides conflict, use the most recent explicit choice for new rows while preserving each already-corrected row.
+
+Confirmed recurring merchant tags must also reach eligible historical transactions, scoped to the same user and merchant, while preserving already user-modified rows.
+
+**Why:** The user wants a merchant's ledger to have consistent recurrence tags once detection establishes a classification, not only the newest imported rows. Explicit user corrections remain authoritative.
+
+**How to apply:** Plaid detection scopes affected merchant groups from imported IDs and backfills their history. File preview does not write; file save backfills history from final reviewed positive tags in the same transaction, without redetecting or changing any reviewed row. Resolve conflicting saved automatic tags by newest transaction date, then highest ID, but always prefer explicit user overrides.

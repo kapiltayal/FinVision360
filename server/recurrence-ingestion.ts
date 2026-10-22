@@ -1,12 +1,11 @@
-import type { Pool } from "pg";
 import type { TransactionImportEntry } from "../shared/transaction-import";
 import { identifyRecurringTransactions, type RecurrenceTags, type RecurringMerchant, type RecurringTransaction } from "./recurring-transactions";
 
-type Database = Pick<Pool, "query">;
+type Database = { query(sql: string, values?: any[]): Promise<any> };
 
 async function recurrenceContext(database: Database, userId: string) {
   const [transactions, merchants] = await Promise.all([
-    database.query<RecurringTransaction>(
+    database.query(
       `SELECT t.id, t.date, t.description, t.merchant, t.amount, t.type, t.source,
               t.is_user_modified, t.is_recurring, t.recurring_type, t.recurring_freq,
               (h.last_override IS NOT NULL) AS recurrence_override,
@@ -18,9 +17,9 @@ async function recurrenceContext(database: Database, userId: string) {
            AND field IN ('is_recurring','recurring_type','recurring_freq')
        ) h ON TRUE
        WHERE t.user_id = $1 AND lower(t.type) = 'expense' ORDER BY t.date, t.id`, [userId]),
-    database.query<RecurringMerchant>("SELECT id, name, is_known_subscription, is_known_recurring FROM merchants"),
+    database.query("SELECT id, name, is_known_subscription, is_known_recurring FROM merchants"),
   ]);
-  return { transactions: transactions.rows, merchants: merchants.rows };
+  return { transactions: transactions.rows as RecurringTransaction[], merchants: merchants.rows as RecurringMerchant[] };
 }
 
 /** No writes: excluded duplicates do not contribute additional observations. */
@@ -50,12 +49,12 @@ export async function detectPreviewRecurrence(
 
 export async function detectAndMarkRecurring(
   database: Database, userId: string,
-  options: { targetIds?: number[]; providerSignals?: Map<number, RecurrenceTags> } = {},
+  options: { targetIds?: number[]; providerSignals?: Map<number, RecurrenceTags>; reviewed?: boolean } = {},
 ): Promise<number> {
   const context = await recurrenceContext(database, userId);
   const rows = context.transactions.map(row => ({ ...row, providerSignal: options.providerSignals?.get(row.id) }));
   const targets = options.targetIds ? new Set(options.targetIds) : undefined;
-  const updates = identifyRecurringTransactions(rows, context.merchants).filter(update => !targets || targets.has(update.id));
+  const updates = identifyRecurringTransactions(rows, context.merchants, { targetIds: targets, reviewed: options.reviewed });
   let marked = 0;
   for (const update of updates) {
     const result = await database.query(

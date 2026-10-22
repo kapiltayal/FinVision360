@@ -85,6 +85,48 @@ test("provider tags beat merchant-only flags and heuristics", () => {
   assert.equal(identifyRecurringTransactions([row], known)[0].recurringType, "recurring_bill");
 });
 
+test("saved positive merchant tags are reused unchanged before provider and heuristic signals", () => {
+  const rows = monthly([100, 200, 300]);
+  Object.assign(rows[0], { is_recurring: true, recurring_type: "subscription", recurring_freq: "Annually" });
+  rows[2].providerSignal = { isRecurring: true, recurringType: "recurring_bill", recurringFreq: "Weekly" };
+  assert.ok(identifyRecurringTransactions(rows, known).every(update =>
+    update.recurringType === "subscription" && update.recurringFreq === "Annually"));
+  rows[0].recurring_freq = null;
+  assert.ok(identifyRecurringTransactions(rows, known).every(update => update.recurringFreq === null),
+    "reuse must not invent a frequency when the saved frequency is unknown");
+});
+
+test("the newest saved positive tags resolve conflicts, but explicit negative overrides win", () => {
+  const rows = monthly();
+  Object.assign(rows[0], { is_recurring: true, recurring_type: "subscription", recurring_freq: "Monthly" });
+  Object.assign(rows[1], { is_recurring: true, recurring_type: "recurring_bill", recurring_freq: "Quarterly" });
+  assert.ok(identifyRecurringTransactions(rows, []).every(update =>
+    update.recurringType === "recurring_bill" && update.recurringFreq === "Quarterly"));
+  Object.assign(rows[2], { recurrence_override: true, is_recurring: false });
+  assert.ok(identifyRecurringTransactions(rows, []).every(update =>
+    !update.isRecurring && update.recurringType === null && update.recurringFreq === null));
+});
+
+test("targeted imports backfill their merchant only and share provider tags across the group", () => {
+  const rows = monthly([100, 200, 300]);
+  rows[2].providerSignal = { isRecurring: true, recurringType: "subscription", recurringFreq: "Weekly" };
+  const other = { ...rows[0], id: 4, merchant: "Unrelated", description: "Unrelated" };
+  const updates = identifyRecurringTransactions([...rows, other], [], { targetIds: new Set([3]) });
+  assert.deepEqual(updates.map(update => update.id), [1, 2, 3]);
+  assert.ok(updates.every(update => update.recurringType === "subscription" && update.recurringFreq === "Weekly"));
+  assert.deepEqual(identifyRecurringTransactions(rows, [], { targetIds: new Set() }), []);
+});
+
+test("reviewed-file backfill preserves all reviewed rows and never redetects on save", () => {
+  const rows = monthly([100, 200, 300]);
+  Object.assign(rows[1], { is_recurring: true, recurring_type: "subscription", recurring_freq: "Weekly" });
+  const updates = identifyRecurringTransactions(rows, [], { targetIds: new Set([2, 3]), reviewed: true });
+  assert.deepEqual(updates, [{ id: 1, isRecurring: true, recurringType: "subscription", recurringFreq: "Weekly" }]);
+  rows[1].is_recurring = false;
+  assert.deepEqual(identifyRecurringTransactions(rows, known, { targetIds: new Set([2, 3]), reviewed: true }), [],
+    "neither catalog nor heuristics may replace the reviewed negative choices");
+});
+
 test("merchant-only subscription and recurring-bill profiles need no minimum history", () => {
   const row = charge(1, "2026-01-01");
   assert.equal(identifyRecurringTransactions([row], known)[0].recurringType, "subscription");

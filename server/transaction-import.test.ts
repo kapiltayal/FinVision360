@@ -320,7 +320,7 @@ test("reviewed transaction writes commit together and roll back on an insertion 
   const successfulClient = {
     async query(sql: string) {
       successfulQueries.push(sql.trim().split(/\s+/, 1)[0]);
-      return {};
+      return { rows: sql.trim().startsWith("INSERT") ? [{ id: successfulQueries.length }] : [] };
     },
   };
 
@@ -328,7 +328,7 @@ test("reviewed transaction writes commit together and roll back on an insertion 
     await saveReviewedTransactionBatch(successfulClient, "user-1", prepared),
     { inserted: 2, uncategorized: 2, recurringMarked: 1 },
   );
-  assert.deepEqual(successfulQueries, ["BEGIN", "INSERT", "INSERT", "COMMIT"]);
+  assert.deepEqual(successfulQueries, ["BEGIN", "INSERT", "INSERT", "SELECT", "SELECT", "COMMIT"]);
 
   const failedQueries: string[] = [];
   let inserts = 0;
@@ -337,9 +337,21 @@ test("reviewed transaction writes commit together and roll back on an insertion 
       const command = sql.trim().split(/\s+/, 1)[0];
       failedQueries.push(command);
       if (command === "INSERT" && ++inserts === 2) throw new Error("simulated insert failure");
-      return {};
+      return { rows: [{ id: inserts }] };
     },
   };
   await assert.rejects(saveReviewedTransactionBatch(failingClient, "user-1", prepared), /simulated insert failure/);
   assert.deepEqual(failedQueries, ["BEGIN", "INSERT", "INSERT", "ROLLBACK"]);
+
+  const backfillQueries: string[] = [];
+  const backfillFailureClient = {
+    async query(sql: string) {
+      const command = sql.trim().split(/\s+/, 1)[0];
+      backfillQueries.push(command);
+      if (command === "SELECT") throw new Error("simulated backfill failure");
+      return { rows: [{ id: backfillQueries.length }] };
+    },
+  };
+  await assert.rejects(saveReviewedTransactionBatch(backfillFailureClient, "user-1", prepared), /simulated backfill failure/);
+  assert.equal(backfillQueries.at(-1), "ROLLBACK", "backfill failure must roll back the reviewed import too");
 });

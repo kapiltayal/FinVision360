@@ -78,6 +78,7 @@ export function hasRecurrenceOverride(row: RecurringTransaction): boolean {
 /** Use the same guarded identity matching as categorization, scoped to one user's history. */
 export function identifyRecurringTransactions(
   rows: RecurringTransaction[], merchants: RecurringMerchant[],
+  options: { targetIds?: Set<number>; reviewed?: boolean } = {},
 ): RecurringUpdate[] {
   const catalog = buildMerchantCatalog(merchants);
   const groups = new Map<string, { merchant?: RecurringMerchant; rows: RecurringTransaction[] }>();
@@ -101,25 +102,42 @@ export function identifyRecurringTransactions(
   }
   const updates: RecurringUpdate[] = [];
   for (const group of Array.from(groups.values())) {
+    // Scope an import to its merchants, not just its newly imported row IDs.
+    if (options.targetIds && !group.rows.some(row => options.targetIds!.has(row.id))) continue;
+    const newestFirst = (a: RecurringTransaction, b: RecurringTransaction) =>
+      +new Date(b.date) - +new Date(a.date) || b.id - a.id;
     const override = group.rows.filter(hasRecurrenceOverride).sort((a, b) =>
       (+new Date(b.recurrence_override_at || b.date) - +new Date(a.recurrence_override_at || a.date)) ||
       b.id - a.id)[0];
-    const inferred = inferRecurrence(group.rows);
-    const historyTags: RecurrenceTags | undefined = override ? {
-      isRecurring: override.is_recurring === true,
-      recurringType: override.is_recurring
-        ? (override.recurring_type === "subscription" ? "subscription" : "recurring_bill") : null,
-      recurringFreq: override.is_recurring ? override.recurring_freq ?? null : null,
-    } : undefined;
+    const tagsFromRow = (row: RecurringTransaction): RecurrenceTags => ({
+      isRecurring: row.is_recurring === true,
+      recurringType: row.is_recurring &&
+        (row.recurring_type === "subscription" || row.recurring_type === "recurring_bill")
+        ? row.recurring_type : null,
+      recurringFreq: row.is_recurring ? row.recurring_freq ?? null : null,
+    });
+    // Negative preview IDs are drafts, not previously saved merchant preferences.
+    // At reviewed-file save, only the final reviewed positive rows may seed backfill.
+    const saved = group.rows.filter(row => row.id > 0 && row.is_recurring === true &&
+      (!options.reviewed || options.targetIds?.has(row.id))).sort(newestFirst)[0];
+    const historyTags = override ? tagsFromRow(override) : undefined;
+    const savedTags = saved ? tagsFromRow(saved) : undefined;
+    const providerTags = group.rows.filter(row => row.providerSignal).sort(newestFirst)[0]?.providerSignal;
+    const knownType = group.merchant?.is_known_subscription ? "subscription" :
+      group.merchant?.is_known_recurring ? "recurring_bill" : null;
+    // Never redetect reviewed files on save: use their final tags only.
+    const inferred = !options.reviewed && !historyTags && !savedTags && !providerTags
+      ? inferRecurrence(group.rows) : undefined;
+    const tags = options.reviewed ? (savedTags ? historyTags || savedTags : undefined) :
+      historyTags || savedTags || providerTags || (knownType ? {
+        isRecurring: true, recurringType: knownType, recurringFreq: inferred?.recurringFreq ?? null,
+      } : inferred);
+    if (!tags || (options.reviewed && !tags.isRecurring)) continue;
     for (const row of group.rows) {
       // An existing corrected row is never rewritten, even by a later merchant-wide preference.
       if (row.is_user_modified || hasRecurrenceOverride(row)) continue;
-      const knownType = group.merchant?.is_known_subscription ? "subscription" :
-        group.merchant?.is_known_recurring ? "recurring_bill" : null;
-      const tags = historyTags || row.providerSignal || (knownType ? {
-        isRecurring: true, recurringType: knownType, recurringFreq: inferred?.recurringFreq ?? null,
-      } : inferred);
-      if (tags) updates.push({ id: row.id, ...tags });
+      if (options.reviewed && options.targetIds?.has(row.id)) continue;
+      updates.push({ id: row.id, ...tags });
     }
   }
   return updates;

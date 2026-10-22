@@ -1,6 +1,6 @@
 # Financial Transaction Ingestion and Processing
 
-*Implementation guide, reviewed against repository code on October 20, 2026.* [Documentation index](README.md).
+*Implementation guide, reviewed against repository code on October 22, 2026.* [Documentation index](README.md).
 
 This guide covers the three ways transactions enter the Finance Tracker: user-uploaded files, transactions imported on request from Plaid-connected accounts, and transactions entered manually. It follows each path from the user's selection through validation, categorization, review or confirmation, and database persistence.
 
@@ -10,13 +10,13 @@ This guide covers the three ways transactions enter the Finance Tracker: user-up
 File upload
 Choose file → validate and parse → normalize rows → categorize suggestions
 → check duplicates → detect recurrence → user reviews/edits → revalidate and recheck duplicates
-→ atomically save selected rows + retry receipt → complete
+→ atomically save selected rows + backfill merchant history + retry receipt → complete
 
 Plaid
 Choose accounts and dates → verify ownership → fetch available recurring signals and transaction pages
 → filter and normalize → preference/profile/Plaid/description category
 → upsert by Plaid transaction ID → protect user-edited categories
-→ detect recurrence on imported rows using provider signals and user history → import summary
+→ reuse saved tags or detect recurrence → backfill matching merchant history → import summary
 
 Manual entry
 Enter transaction → validate → use selected category or preference/profile/rules
@@ -41,7 +41,7 @@ The visible flowcharts are repository-local SVG images, so they do not require a
 4. User corrects fields, chooses Save rows, and explicitly confirms legitimate content matches. Stable-ID repeats cannot be saved.
 5. Validate selected rows and review freshness; invalid input returns to review without a write.
 6. Begin a database transaction, acquire the user lock, and repeat duplicate checks. A conflict rolls back the batch.
-7. Insert selected `transactions` and the `transaction_import_receipts` retry receipt together, then commit. Any insert failure rolls everything back.
+7. Insert selected `transactions`, propagate confirmed positive recurrence tags to matching unmodified historical rows, and write the `transaction_import_receipts` retry receipt together, then commit. This uses the review's final tags, not a second detection pass. Any insert or backfill failure rolls everything back.
 8. Return counts and refresh the ledger. An unchanged retry returns the receipt instead of inserting again.
 
 <details>
@@ -65,7 +65,7 @@ flowchart TD
     K --> L["Begin database transaction; repeat duplicate check"]
     L --> M{"Valid and duplicate-safe?"}
     M -- "No" --> N["Roll back; keep review available for correction"]
-    M -- "Yes" --> O["Insert selected transactions and save retry receipt"]
+    M -- "Yes" --> O["Insert reviewed rows; backfill merchant history from final positive tags; save retry receipt"]
     O --> P["Commit and return import counts"]
 ```
 
@@ -83,7 +83,7 @@ AI-unavailable or unresolved categories remain editable; a valid reviewed transa
 4. Normalize accepted rows; categorize using user preference → merchant profile → Plaid mapping → description rules. Skip unresolved categories; no AI call.
 5. Upsert `transactions` by `(user_id, plaid_transaction_id)`; retain explicitly edited category/parent/Need-Want.
 6. Continue all selected pages/institutions. Writes are per row, not one atomic whole-import transaction; an unexpected database error may leave earlier rows committed.
-7. Detect recurrence for imported row IDs using the user's saved history; return counts and refresh the ledger. Active owned-account Plaid outflow streams supply recurring flags/frequency when available; report a warning if the optional recurring endpoint is unavailable.
+7. Resolve recurrence for merchants represented by the imported row IDs using the user's saved history. Reuse saved positive tags unless an explicit user override supersedes them; otherwise use provider/catalog/heuristic detection. Apply the resolved tags to imported and matching unmodified historical transactions, then return counts and refresh the ledger. Active owned-account Plaid outflow streams supply recurring flags/frequency when available; report a warning if the optional recurring endpoint is unavailable.
 
 <details>
 <summary>Editable Mermaid source — Plaid</summary>
@@ -114,7 +114,7 @@ flowchart TD
     Q --> U
     U -- "Yes" --> C
     U -- "No" --> V{"Any rows inserted or updated?"}
-    V -- "Yes" --> R["Detect recurrence: overrides → Plaid signals → merchant flags → heuristics"]
+    V -- "Yes" --> R["Resolve recurrence: overrides → saved tags → Plaid → merchant → heuristics; backfill matching history"]
     V -- "No" --> S["Return inserted/updated/skipped/unavailable counts"]
     R --> S
 ```
@@ -374,6 +374,8 @@ Selected rows are inserted with `source='upload'`. Canonical category values are
 - Detection runs after normalization, categorization and duplicate checking, immediately before preview. It reads history without writing transactions. Save does not rerun it: final review values remain authoritative.
 - Editing recurrence status, type or frequency in review marks an explicit override. Saving audits these choices and protects the saved row, including an explicit choice of not recurring.
 
+After inserting the reviewed rows, backfill matching unmodified history from the final positive recurrence tags, in the same database transaction as the rows and retry receipt. Never modify any newly reviewed row during this backfill, including a row left not recurring. Explicit historical overrides remain authoritative. If final positive rows for the same merchant conflict, choose the newest transaction date and then highest database ID for historical backfill; keep every reviewed row's own choice.
+
 Successful saves write selected rows plus a durable receipt in `transaction_import_receipts` in the same transaction. The receipt records the signed-in user, request UUID, canonical payload hash, and result. Retrying an unchanged request returns the previous result instead of inserting again—even if the first response was lost after commit, or retries arrive concurrently. Reusing a committed UUID with changed data fails with `REQUEST_ID_REUSED`. Changed review payloads get new UUIDs; failed transactions leave no receipt.
 
 Results report inserted, uncategorized, recurring-selected and excluded/skipped counts. Removed rows and completely blank rows are handled separately in review. The Finance Tracker displays the result and refreshes the transaction list.
@@ -439,7 +441,7 @@ The importer upserts rows returned by Plaid; it does not delete existing transac
 ### When it runs
 
 - **File uploads:** after parsing, standardization, categorization and duplicate checking, immediately before preview. Included incoming rows combine with the same user's historical transactions. Excluded duplicates do not count again. Detection is read-only; the reviewer can change suggested tags. Save persists final review values without rerunning detection.
-- **Plaid:** on every import, fetch available recurring signals, save accepted transactions, then detect recurrence for imported row IDs using the user's historical transactions. Existing corrected rows remain protected. There is no per-row Plaid preview.
+- **Plaid:** on every import, fetch available recurring signals, save accepted transactions, then resolve recurrence for the imported merchants and update their matching historical transactions as well. Existing corrected rows remain protected; unrelated merchants and other users are not updated. There is no per-row Plaid preview.
 - The authenticated `POST /api/transactions/detect-recurring` endpoint uses the same engine for an explicit ledger-wide recheck; the Transactions page does not expose a manual detection button.
 
 ### Merchant identity and priority
@@ -447,9 +449,10 @@ The importer upserts rows returned by Plaid; it does not delete existing transac
 Exact normalized merchant identity takes precedence. Missing merchants or copied bank descriptors allow guarded whole-token canonical matching, preferring longer names and rejecting ambiguity. Incidental brands never replace distinct explicit identities. Matched charges group by merchant ID; unmatched explicit identities group by normalized merchant name, while copied descriptors retain the first-three-word fallback.
 
 1. **User history always wins.** Recurrence-specific audit edits, explicit file-review recurrence edits, and manually entered positive tags supply the merchant's tags. If choices conflict, the latest explicit choice wins for new/unmodified rows; transaction ID breaks ties. Existing corrected rows are never rewritten. Negative overrides propagate `is_recurring=false` and clear type/frequency. Category-only corrections do not establish recurrence preferences.
-2. **Plaid flags.** Use explicit subscription/recurring flags when present. Standard transaction responses currently omit them; `/transactions/recurring/get` supplies active outflow stream membership and frequency. Map only owned accounts and imported IDs. A stream signals `recurring_bill` unless it explicitly supplies a subscription flag; never invent that flag from a merchant name. If the optional endpoint is unavailable, warn and continue with the remaining priorities. Supplied file recurrence tags remain reviewable unless user history overrides them.
-3. **Merchant-only profiles.** `is_known_subscription=true` sets `subscription`; otherwise `is_known_recurring=true` sets `recurring_bill`. These explicit profiles require no minimum history. Infer frequency if sufficient history exists, otherwise leave it `NULL`. Detection does not seed profiles.
-4. **Core heuristic engine.** When higher priorities do not supply tags, require at least **three valid expense transactions from the merchant**, including the user's saved history.
+2. **Reuse existing positive tags.** If any saved transaction for this user's merchant has `is_recurring=true`, reuse its `is_recurring`, `recurring_type` and `recurring_freq` exactly, including a `NULL` frequency, rather than running provider/catalog/heuristic classification again. This includes automatically tagged history, not only user edits. If saved positive rows conflict, use the newest transaction date and then highest database ID. Draft preview rows do not count as saved history. Explicit user overrides, including negative choices, still win.
+3. **Plaid flags.** Use explicit subscription/recurring flags when present. Standard transaction responses currently omit them; `/transactions/recurring/get` supplies active outflow stream membership and frequency. Map only owned accounts and imported IDs. A stream signals `recurring_bill` unless it explicitly supplies a subscription flag; never invent that flag from a merchant name. If the optional endpoint is unavailable, warn and continue with the remaining priorities. Supplied file recurrence tags remain reviewable unless user history or existing saved positive tags supersede them. The newest dated provider-tagged transaction (then highest ID) supplies one consistent set of tags for the merchant group.
+4. **Merchant-only profiles.** `is_known_subscription=true` sets `subscription`; otherwise `is_known_recurring=true` sets `recurring_bill`. These explicit profiles require no minimum history. Infer frequency if sufficient history exists, otherwise leave it `NULL`. Detection does not seed profiles.
+5. **Core heuristic engine.** When higher priorities do not supply tags, require at least **three valid expense transactions from the merchant**, including the user's saved history.
 
 ### Step A — temporal analysis
 
@@ -475,6 +478,12 @@ Sort the merchant cluster by date and calculate consecutive `days_difference`. A
 Calculate the median amount of the entire qualifying merchant cluster. If **every amount** is within inclusive **±5%** of that median, set `recurring_type='subscription'`; otherwise set `recurring_type='recurring_bill'`. These lowercase strings are the database/API values even when the UI displays “Subscription.”
 
 Invalid dates, nonpositive/invalid amounts, income and transfers do not supply heuristic observations. Valid corrected rows may supply history, but are never automatically overwritten. Writes recheck ownership and recurrence audit protection to avoid racing user edits.
+
+### Historical propagation
+
+When a merchant is confirmed recurring, propagate the same `is_recurring`, `recurring_type` and `recurring_freq` to eligible historical expense transactions for that merchant and user. Imported Plaid IDs scope the affected **merchant groups**, not just the updated rows; unrelated merchants remain untouched. Existing user-modified rows and recurrence-specific audited rows are protected, even if their values differ. The ledger-wide recheck uses the same rules. A stored positive classification is intentionally reused rather than re-evaluated when later amounts or intervals differ; an explicit user correction can supersede it.
+
+File previews remain read-only. File history backfill occurs only when the user saves, using final reviewed positive tags without running detection again or changing the reviewed rows. It commits or rolls back together with the entire reviewed import and retry receipt. The existing file `recurringMarked` count describes positive imported rows; Plaid's count includes historical rows whose tags changed.
 
 The Plaid UI shows **New**, **Updated**, **Skipped**, and **Unavailable**, skip reasons, institution errors, optional recurring-signal warnings, and the count of changed recurrence tags. The ledger refreshes after import.
 

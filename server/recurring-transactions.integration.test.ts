@@ -58,12 +58,15 @@ test("preview is read-only, merges owned history, excludes duplicates, and saved
       targetIds: [5], providerSignals: new Map([[5, {
         isRecurring: true, recurringType: "recurring_bill", recurringFreq: "Quarterly",
       }]]),
-    }), 1);
+    }), 0, "already saved merchant tags beat a conflicting provider signal");
     const saved = (await client.query("SELECT * FROM transactions WHERE id=5")).rows[0];
-    assert.equal(saved.recurring_type, "recurring_bill");
-    assert.equal(saved.recurring_freq, "Quarterly");
-    assert.equal((await client.query("SELECT is_recurring FROM transactions WHERE id=1")).rows[0].is_recurring, false,
-      "Plaid-style targeted detection must not rewrite old non-target rows");
+    assert.equal(saved.recurring_type, "subscription");
+    assert.equal(saved.recurring_freq, "Monthly");
+    assert.equal((await client.query("SELECT is_recurring FROM transactions WHERE id=1")).rows[0].is_recurring, true,
+      "saving reviewed positive tags backfills matching historical rows");
+    assert.equal((await client.query("SELECT recurring_freq FROM transactions WHERE id=2")).rows[0].recurring_freq, "Monthly");
+    assert.equal((await client.query("SELECT is_recurring FROM transactions WHERE id=4")).rows[0].is_recurring, false,
+      "unrelated merchants remain untouched");
 
     const reviewed = { ...entry(1, "Acme", "2026-04-01"), recurrenceOverride: true };
     const reviewedPrepared = validateReviewedTransactionEntries([reviewed], []);
@@ -72,10 +75,26 @@ test("preview is read-only, merges owned history, excludes duplicates, and saved
     assert.equal((await client.query("SELECT is_user_modified FROM transactions WHERE id=6")).rows[0].is_user_modified, true);
     const nextPreview = await detectPreviewRecurrence(client, "alice", [entry(1, "Acme", "2026-05-01")]);
     assert.equal(nextPreview[0].isRecurring, false, "reviewer's negative choice wins over a regular cadence");
-    assert.equal(await detectAndMarkRecurring(client, "alice", { targetIds: [5] }), 1);
+    assert.equal(await detectAndMarkRecurring(client, "alice", { targetIds: [5] }), 3);
     assert.equal((await client.query("SELECT recurring_freq FROM transactions WHERE id=5")).rows[0].recurring_freq, null);
     assert.equal(await detectAndMarkRecurring(client, "alice", { targetIds: [5] }), 0, "detection is idempotent");
     assert.equal((await client.query("SELECT is_recurring FROM transactions WHERE id=3")).rows[0].is_recurring, false);
+
+    const { rows: bills } = await client.query(`
+      INSERT INTO transactions (user_id,date,description,merchant,amount,type,is_user_modified) VALUES
+        ('alice','2026-01-01','Utility','Utility',100,'expense',FALSE),
+        ('alice','2026-02-01','Utility','Utility',150,'expense',FALSE),
+        ('alice','2026-03-01','Utility','Utility',200,'expense',TRUE)
+      RETURNING id`);
+    assert.equal(await detectAndMarkRecurring(client, "alice", {
+      targetIds: [bills[1].id], providerSignals: new Map([[bills[1].id, {
+        isRecurring: true, recurringType: "recurring_bill", recurringFreq: "Monthly",
+      }]]),
+    }), 2, "a Plaid signal must backfill older matching history, not only the imported row");
+    const { rows: updatedBills } = await client.query("SELECT * FROM transactions WHERE merchant='Utility' ORDER BY id");
+    assert.ok(updatedBills.slice(0, 2).every(row => row.is_recurring &&
+      row.recurring_type === "recurring_bill" && row.recurring_freq === "Monthly"));
+    assert.equal(updatedBills[2].is_recurring, false, "existing user-modified rows remain protected");
   } finally {
     await client.query("ROLLBACK");
     client.release();

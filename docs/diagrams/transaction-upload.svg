@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="800" height="1020" viewBox="0 0 800 1020" role="img" aria-labelledby="title desc">
   <title id="title">Uploaded transactions: preview, review and atomic save</title>
-  <desc id="desc">Eight steps from file validation to committed transactions and retry receipt. Preview is read-only. Invalid review or duplicate conflicts return to review; database failures roll back the whole batch.</desc>
+  <desc id="desc">Eight steps from file validation to committed reviewed transactions, merchant-history recurrence backfill and retry receipt. Preview is read-only. Saving preserves final review choices without redetection. Database failures roll back rows, backfill and receipt together.</desc>
   <defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10Z" fill="#2563eb"/></marker></defs>
   <rect width="800" height="1020" rx="20" fill="#f8fafc"/>
   <g font-family="Arial, sans-serif" text-anchor="middle" fill="#0f172a">
@@ -21,7 +21,7 @@
       <text x="330" y="110">1. Validate and parse the file</text><text x="330" y="220">2. Suggest canonical categories</text>
       <text x="330" y="330">3. Deduplicate; detect recurrence</text><text x="330" y="440">4. User reviews, edits and selects rows</text>
       <text x="330" y="550">5. Revalidate selected rows</text><text x="330" y="660">6. Begin transaction; lock and recheck</text>
-      <text x="330" y="770">7. Insert transactions + retry receipt</text><text x="330" y="880">8. Commit; return counts and refresh</text>
+      <text x="330" y="770">7. Save rows + history tags + retry receipt</text><text x="330" y="880">8. Commit; return counts and refresh</text>
     </g>
     <g font-size="13" fill="#475569">
       <text x="330" y="135">CSV / TSV / TXT / XLS / XLSX; maximum 500 rows</text>
@@ -30,7 +30,7 @@
       <text x="330" y="465">Unassigned allowed; stable source-ID repeats blocked</text>
       <text x="330" y="575">Check row fields, categories and duplicate review freshness</text>
       <text x="330" y="685">Duplicate conflict: roll back and return to review</text>
-      <text x="330" y="795">All selected rows and receipt succeed or all roll back</text>
+      <text x="330" y="795">Use final reviewed tags; all writes commit or roll back</text>
       <text x="330" y="905">Unchanged retry returns receipt, not duplicate inserts</text>
       <text x="620" y="530" fill="#b45309">Invalid</text><text x="652" y="620" fill="#b45309">Conflict</text>
       <text x="400" y="966">AI failure leaves categories reviewable. Final database failure saves no batch rows.</text>

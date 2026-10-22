@@ -4,6 +4,7 @@ import { stableSourceKey } from "../shared/transaction-duplicates";
 import type { RawRow } from "./asset-liability-ingestion";
 import { matchKnownMerchant, type MerchantCatalog, type MerchantIdentity } from "./merchant-matching";
 import { RECURRING_FREQUENCIES, type RecurringFrequency } from "../shared/schema";
+import { detectAndMarkRecurring } from "./recurrence-ingestion";
 
 export interface ImportCategory {
   id?: number;
@@ -404,6 +405,7 @@ export async function saveReviewedTransactionBatch(
   let inserted = 0;
   let uncategorized = 0;
   let recurringMarked = 0;
+  const insertedIds: number[] = [];
   try {
     if (manageTransaction) await client.query("BEGIN");
     for (const transaction of transactions) {
@@ -432,8 +434,9 @@ export async function saveReviewedTransactionBatch(
           stableSourceKey(transaction) ? createHash("sha256").update(stableSourceKey(transaction)!).digest("hex") : null,
         ],
       );
+      const transactionId = (insertedRow as { rows: Array<{ id: number }> }).rows[0].id;
+      insertedIds.push(transactionId);
       if (transaction.recurrenceOverride) {
-        const transactionId = (insertedRow as { rows: Array<{ id: number }> }).rows[0].id;
         await client.query("UPDATE transactions SET is_user_modified=TRUE WHERE id=$1 AND user_id=$2", [transactionId, userId]);
         for (const [field, value] of [
           ["is_recurring", String(transaction.isRecurring)],
@@ -448,6 +451,9 @@ export async function saveReviewedTransactionBatch(
       inserted++;
       if (transaction.subcategory === "unassigned") uncategorized++;
       if (transaction.isRecurring) recurringMarked++;
+    }
+    if (recurringMarked > 0) {
+      await detectAndMarkRecurring(client, userId, { targetIds: insertedIds, reviewed: true });
     }
     if (manageTransaction) await client.query("COMMIT");
     return { inserted, uncategorized, recurringMarked };
