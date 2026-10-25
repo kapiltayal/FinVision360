@@ -8,6 +8,11 @@ export type TransactionImportCategory = {
   needVsWant: string | null;
 };
 
+/** Category labels alone need not be unique across canonical parent categories. */
+export function transactionCategoryChoiceValue(category: Pick<TransactionImportCategory, "parentCategory" | "category">) {
+  return JSON.stringify([category.parentCategory, category.category]);
+}
+
 export type TransactionImportReviewField =
   Exclude<
     keyof TransactionImportEntry,

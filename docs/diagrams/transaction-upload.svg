@@ -18,14 +18,14 @@
       <rect x="100" y="740" width="460" height="80" rx="12" fill="#eff6ff"/><rect x="100" y="850" width="460" height="80" rx="12" fill="#dbeafe"/>
     </g>
     <g font-size="16" font-weight="700">
-      <text x="330" y="110">1. Validate and parse the file</text><text x="330" y="220">2. Suggest canonical categories</text>
+      <text x="330" y="110">1. Validate and parse the file</text><text x="330" y="220">2. Identify merchant; suggest category</text>
       <text x="330" y="330">3. Deduplicate; detect recurrence</text><text x="330" y="440">4. User reviews, edits and selects rows</text>
       <text x="330" y="550">5. Revalidate selected rows</text><text x="330" y="660">6. Begin transaction; lock and recheck</text>
       <text x="330" y="770">7. Save rows + history tags + retry receipt</text><text x="330" y="880">8. Commit; return counts and refresh</text>
     </g>
     <g font-size="13" fill="#475569">
       <text x="330" y="135">CSV / TSV / TXT / XLS / XLSX; maximum 500 rows</text>
-      <text x="330" y="245">Preference → file category → merchant → AI if unresolved</text>
+      <text x="330" y="245">User preference → merchant → file category → AI IDs</text>
       <text x="330" y="355">Use owned history + included rows; read-only preview</text>
       <text x="330" y="465">Unassigned allowed; stable source-ID repeats blocked</text>
       <text x="330" y="575">Check row fields, categories and duplicate review freshness</text>

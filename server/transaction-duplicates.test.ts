@@ -18,6 +18,16 @@ const prepared = (rows: TransactionImportEntry[]) => {
   return validation.transactions;
 };
 
+test("cleaned merchant comparison catches legacy descriptors without rewriting them or creating hard duplicates", () => {
+  const raw = entry({ merchant: "SQ *Corner Grocery STORE 123 CA", description: "Raw earlier narrative" });
+  const cleaned = entry({ id: 2, merchant: "corner grocery", description: "Different bank narrative" });
+  const detected = detectTransactionDuplicates([cleaned], [raw])[0];
+  assert.equal(detected.duplicate?.kind, "possible");
+  assert.equal(detected.merchant, "corner grocery");
+  assert.equal(raw.merchant, "SQ *Corner Grocery STORE 123 CA");
+  assert.equal(detectTransactionDuplicates([{ ...cleaned, keepDuplicate: true }], [raw])[0].include, true);
+});
+
 test("source IDs are recognized only from transaction identity columns, not a row number or generic reference", () => {
   assert.equal(transactionEntryFromSource({ ID: 1, Reference: 2 }, 1).sourceTransactionId, undefined);
   const result = transactionEntryFromSource({ FITID: "bank-abc", "Account ID": "checking-1" }, 1);

@@ -45,6 +45,7 @@ type ImportResult = {
   unavailableInstitutions: string[];
   recurrenceSignalsUnavailableInstitutions?: string[];
   recurringMarked: number;
+  uncategorized?: number;
 };
 
 function isoDate(date: Date) {
@@ -300,6 +301,11 @@ export function ConnectedAccountsImportPanel({ onImported }: { onImported: () =>
             <p className="mt-3 text-xs text-amber-700 dark:text-amber-300">
               Plaid recurring signals were unavailable from: {result.recurrenceSignalsUnavailableInstitutions.join(", ")}.
               Detection used your history, merchant profiles and transaction patterns instead.
+            </p>
+          )}
+          {!!result.uncategorized && (
+            <p className="text-xs text-amber-700 dark:text-amber-300" role="status">
+              {result.uncategorized} synced transactions are Uncategorized. They were kept in your ledger; use the Unassigned filter to review them.
             </p>
           )}
           {result.recurringMarked > 0 && (

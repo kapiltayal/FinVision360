@@ -12,8 +12,12 @@ export interface TransactionImportEntry {
   recurringType: string;
   recurringFreq: string;
   recurrenceOverride?: boolean;
+  categoryOverride?: boolean;
+  merchantOverride?: boolean;
   notes: string;
   sourceCategory?: string;
+  sourceParentCategory?: string;
+  sourceMerchant?: string;
   sourceTransactionId?: string;
   sourceAccount?: string;
   include?: boolean;

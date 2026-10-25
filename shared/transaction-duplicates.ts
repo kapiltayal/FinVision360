@@ -1,4 +1,5 @@
 import type { TransactionDuplicate, TransactionImportEntry } from "./transaction-import";
+import { cleanMerchantName } from "./merchant-name";
 
 export interface DuplicateCandidate {
   id: number;
@@ -40,9 +41,9 @@ function match(row: DuplicateCandidate, other: DuplicateCandidate): Omit<Transac
   const days = Math.abs(date - otherDate) / 86400000;
   if (days > 2) return;
   const description = normalizedTransactionText(row.description);
-  const merchant = normalizedTransactionText(row.merchant || row.description);
+  const merchant = cleanMerchantName(row.merchant || row.description);
   const sameDescription = !!description && description === normalizedTransactionText(other.description);
-  const sameMerchant = merchant.length >= 3 && merchant === normalizedTransactionText(other.merchant || other.description);
+  const sameMerchant = merchant.length >= 3 && merchant === cleanMerchantName(other.merchant || other.description);
   if (!sameDescription && !sameMerchant) return;
   if (days === 0 && sameDescription) {
     return { kind: "exact", reason: "Same date, amount, type and normalized description. Keep only if this is a separate real transaction." };

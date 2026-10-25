@@ -3,9 +3,17 @@ import test from "node:test";
 import type { TransactionImportEntry } from "@shared/transaction-import";
 import {
   createBlankTransactionImportEntry,
+  transactionCategoryChoiceValue,
   validateTransactionImportEntry,
   type TransactionImportCategory,
 } from "./transaction-file-import-validation";
+
+test("category review values distinguish the same label in different parents", () => {
+  assert.notEqual(transactionCategoryChoiceValue({ category: "Other", parentCategory: "Food" }),
+    transactionCategoryChoiceValue({ category: "Other", parentCategory: "Travel" }));
+  assert.notEqual(transactionCategoryChoiceValue({ category: "B-C", parentCategory: "A" }),
+    transactionCategoryChoiceValue({ category: "C", parentCategory: "A-B" }));
+});
 
 const categories: TransactionImportCategory[] = [
   { type: "expense", parentCategory: "Food", category: "Groceries", needVsWant: "need" },

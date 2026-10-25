@@ -7,7 +7,17 @@ AI may suggest one exact database category for an extracted row, but it must nev
 
 For transaction-file ingestion, a missing, malformed, or unusable AI categorization result must not drop an otherwise valid transaction or abort the upload. Save unresolved rows as unassigned and explicitly alert the user that category review is needed.
 
-Requested ingestion classification policy: identify the merchant first, then reuse the user's explicit category choice for that merchant and transaction type; next use the global merchant's type-compatible category; next match supplied source categories; then batch unresolved rows for AI using lookup IDs and descriptions. AI returns a validated lookup ID or an Uncategorized result, not an invented category. A new explicit manual selection and the reviewer's final selection remain authoritative.
+Ingestion classification policy: identify the merchant first, then reuse the user's explicit category choice for that merchant and transaction type; next use the global merchant's type-compatible category; next match supplied source categories; then batch unresolved rows for AI using lookup IDs and descriptions. AI returns a validated lookup ID or an Uncategorized result, not an invented category. A new explicit manual selection and the reviewer's final selection remain authoritative.
+
+Keep “Uncategorized” as an import result/presentation term without creating a new category dictionary row or changing the existing ledger's unresolved storage convention.
+
+**Why:** Existing filters, budget behavior and historical data already rely on the unresolved ledger sentinel; the new identification algorithm is not a category-schema migration.
+
+An unresolved automated refresh must not erase an earlier valid classification for the same transaction and direction, even when that classification was automatic.
+
+**Why:** Temporary model outages or missing source metadata are not evidence that an existing category is wrong; clearing it changes budget results.
+
+**How to apply:** Retain existing category/parent/Need-Want on unresolved bank replays; new unresolved records still use the normal unassigned fallback.
 
 User corrections to transaction parent category, category, need/want, or recurring status are authoritative. Track both a user-modified flag and old/new audit history; automated imports and recurring detection must not overwrite those corrected fields.
 

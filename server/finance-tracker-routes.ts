@@ -7,12 +7,9 @@ import { storage } from "./storage";
 import { isHistoricalBudgetMonth, normalizeBudgetCategory } from "../shared/budget-period";
 import { budgetEntityMetadata, legacyBudgetClose, preserveSavedEntityRows, type BudgetSnapshot } from "./budget-history";
 import multer from "multer";
-import { parseTransactionUpload, type RawRow } from "./asset-liability-ingestion";
-import { completeIngestionClassification } from "./ai/provider";
+import { parseTransactionUpload } from "./asset-liability-ingestion";
 import type { TransactionImportPreview, TransactionImportResult } from "../shared/transaction-import";
 import {
-  applyImportCategorySuggestion,
-  hasSuppliedNeedWant,
   isBlankTransactionSourceRow,
   knownMerchantCategory,
   transactionEntryFromSource,
@@ -20,6 +17,7 @@ import {
   type CategoryMerchant,
 } from "./transaction-import";
 import { buildMerchantCatalog } from "./merchant-matching";
+import { identifyTransactionBatch, loadIdentificationContext, matchSourceCategory } from "./transaction-identification";
 import { checkUserTransactionDuplicates, ImportConflict, saveDuplicateSafeImport, validDuplicateReview } from "./transaction-duplicates";
 import { detectAndMarkRecurring, detectPreviewRecurrence } from "./recurrence-ingestion";
 import { plaidRecurrenceSignal, plaidStreamSignals } from "./plaid-recurrence";
@@ -79,10 +77,6 @@ function transactionUploadFile(req: any, res: any, next: any) {
   });
 }
 
-function field(row: RawRow, ...names: string[]): string {
-  const found = Object.entries(row).find(([key]) => names.includes(categoryKey(key)));
-  return found && (typeof found[1] === "string" || typeof found[1] === "number") ? String(found[1]).trim() : "";
-}
 function categoryForInput(
   categories: CanonicalTransactionCategory[], type: "income" | "expense", value: unknown, parentValue?: unknown,
 ): CanonicalTransactionCategory | undefined {
@@ -165,33 +159,6 @@ function categoryFromMerchantPreference(
 ): CanonicalTransactionCategory | undefined {
   const key = merchantCategoryKey(row.type, row.merchant, row.description);
   return key ? preferences.get(key) : undefined;
-}
-
-async function aiTransactionCategories(
-  rows: RawRow[], categories: CanonicalTransactionCategory[],
-): Promise<Map<number, CanonicalTransactionCategory> | null> {
-  if (!rows.length) return new Map();
-  const allowed = categories.filter((item) => item.type === "Income" || item.type === "Expense")
-    .map(({ type, parentCategory, category, needVsWant, description }) => ({ type, parentCategory, category, needVsWant, description }));
-  try {
-    const content = await completeIngestionClassification(JSON.stringify({
-      task: "Use all provided fields in each transaction row to classify it. Return JSON {entries:[{sourceIndex:number,type:'income'|'expense',category:'exact provided category'}]}. Classify only clear transactions. Categories must be copied exactly from categories; never invent values.",
-      categories: allowed, rows: rows.map((row, sourceIndex) => ({ sourceIndex, row })),
-    }));
-    const entries = JSON.parse(content)?.entries;
-    if (!Array.isArray(entries) || !entries.length) return null;
-    const result = new Map<number, CanonicalTransactionCategory>();
-    for (const entry of entries) {
-      const index = Number(entry?.sourceIndex);
-      if (!Number.isInteger(index) || index < 0 || index >= rows.length || result.has(index)) continue;
-      const type = entry?.type === "income" || entry?.type === "expense" ? entry.type : "";
-      const match = type ? categoryForInput(categories, type, entry?.category) : undefined;
-      if (match) result.set(index, match);
-    }
-    return result.size ? result : null;
-  } catch {
-    return null;
-  }
 }
 
 function normalizeTransactionDate(value: unknown): string | null {
@@ -292,7 +259,9 @@ function categorizePlaidTransaction(
   description: string,
   type: "income" | "expense"
 ): { subcategory: string; needsWant: "need" | "want" | "na" | null } {
-  const fallback = autoCategorizeFn(description, type);
+  // Only provider-supplied category information belongs at the source-category step.
+  // Descriptor guesses must not bypass the common AI fallback.
+  const fallback = { subcategory: "unassigned", needsWant: "na" as const };
   const primary = transaction.personal_finance_category?.primary?.toUpperCase() ?? "";
   const detailed = transaction.personal_finance_category?.detailed?.toUpperCase() ?? "";
 
@@ -302,9 +271,7 @@ function categorizePlaidTransaction(
     if (detailed.includes("INTEREST_EARNED")) return { subcategory: "interest", needsWant: "na" };
     if (detailed.includes("TAX_REFUND") || detailed.includes("REFUND")) return { subcategory: "refund", needsWant: "na" };
     if (primary === "INCOME") {
-      return fallback.subcategory !== "unassigned"
-        ? fallback
-        : { subcategory: "other_income", needsWant: "na" };
+      return { subcategory: "other_income", needsWant: "na" };
     }
     return fallback;
   }
@@ -1168,37 +1135,12 @@ export function registerFinanceTrackerRoutes(app: Express) {
       if (!sourceRows.length) return fail(400, CORRUPT_TRANSACTION_FILE);
       const userId = (req.user as any).id;
       const categories = await canonicalTransactionCategories();
-      const preferences = await userMerchantCategoryPreferences(userId, categories);
-      const merchantCatalog = await knownCategoryMerchants();
+      const context = await loadIdentificationContext(pool, userId, categories);
       const entries = sourceRows.map((row, index) => transactionEntryFromSource(row, index + 1));
-      const assignments = new Map<number, CanonicalTransactionCategory>();
-      const unknownIndexes: number[] = [];
-
-      entries.forEach((entry, index) => {
-        // Preserve the import contract order: explicit merchant preference,
-        // source category, known profile, AI, then an empty category for review.
-        const merchantMatch = categoryFromMerchantPreference(preferences, entry);
-        const suppliedMatch = entry.sourceCategory
-          ? categoryForInput(categories, entry.type, entry.sourceCategory, field(sourceRows[index], "parentcategory"))
-          : undefined;
-        const selected = merchantMatch || suppliedMatch || knownMerchantCategory(entry, merchantCatalog, categories);
-        if (selected) assignments.set(index, selected);
-        else unknownIndexes.push(index);
-      });
-
-      const aiMatches = await aiTransactionCategories(unknownIndexes.map((index) => sourceRows[index]), categories);
-      for (const [sourceIndex, selected] of Array.from((aiMatches || new Map()).entries())) {
-        const targetIndex = unknownIndexes[sourceIndex];
-        if (targetIndex !== undefined) assignments.set(targetIndex, selected);
-      }
+      const identified = await identifyTransactionBatch(entries, sourceRows, context);
 
       const preview: TransactionImportPreview = {
-        entries: entries.map((entry, index) => {
-          const selected = assignments.get(index);
-          return selected
-            ? applyImportCategorySuggestion(entry, selected, !hasSuppliedNeedWant(sourceRows[index]))
-            : entry;
-        }),
+        entries: identified.entries,
         ignoredBlankRows: parsed.ignoredBlankRows,
       };
       event({ stage: "duplicates" });
@@ -1334,8 +1276,7 @@ export function registerFinanceTrackerRoutes(app: Express) {
 
       const plaid = getPlaidClient();
       const canonicalCategories = await canonicalTransactionCategories();
-      const preferences = await userMerchantCategoryPreferences(userId, canonicalCategories);
-      const merchantCatalog = await knownCategoryMerchants();
+      const context = await loadIdentificationContext(pool, userId, canonicalCategories);
       const accountByPlaidId = new Map(allAccounts.map((account) => [account.plaidAccountId, account]));
 
       let inserted = 0;
@@ -1345,6 +1286,7 @@ export function registerFinanceTrackerRoutes(app: Express) {
       let skippedTransfers = 0;
       let skippedUnsupportedCurrency = 0;
       let skippedInvalid = 0;
+      let uncategorized = 0;
       const unavailableInstitutions: string[] = [];
       const recurrenceSignalsUnavailableInstitutions: string[] = [];
       const recurrenceTargetIds: number[] = [];
@@ -1392,6 +1334,8 @@ export function registerFinanceTrackerRoutes(app: Express) {
           const plaidTransactions = response.data.transactions;
           totalTransactions = response.data.total_transactions;
 
+          const eligible: Array<{ transaction: PlaidTransaction; account: (typeof allAccounts)[number];
+            entry: ReturnType<typeof transactionEntryFromSource> }> = [];
           for (const transaction of plaidTransactions) {
             const amount = Number(transaction.amount);
             const account = accountByPlaidId.get(transaction.account_id);
@@ -1412,26 +1356,34 @@ export function registerFinanceTrackerRoutes(app: Express) {
               skippedUnsupportedCurrency++;
               continue;
             }
-            if (!account || !Number.isFinite(amount) || amount === 0) {
+            if (!account || account.plaidItemId !== item.id || (accountId && transaction.account_id !== accountId) ||
+                !Number.isFinite(amount) || amount === 0 || !isValidIsoDate(transaction.date) ||
+                !transaction.transaction_id?.trim()) {
               skipped++;
               skippedInvalid++;
               continue;
             }
 
-            const description = (transaction.merchant_name || transaction.name || "Bank transaction").trim();
+            const description = (transaction.original_description || transaction.name || transaction.merchant_name || "Bank transaction").trim();
             const merchant = (transaction.merchant_name || transaction.name || description).trim();
             const type: "income" | "expense" = amount < 0 ? "income" : "expense";
             const category = categorizePlaidTransaction(transaction, description, type);
-            const identity = { type, merchant, description };
-            const canonicalCategory = categoryFromMerchantPreference(preferences, identity) ||
-              knownMerchantCategory(identity, merchantCatalog, canonicalCategories) || categoryForInput(
-              canonicalCategories, type, legacyCategoryAliases[category.subcategory] || category.subcategory,
-            ) || deterministicTransactionCategory(canonicalCategories, description, type);
-            if (!canonicalCategory) {
-              skipped++;
-              skippedInvalid++;
-              continue;
-            }
+            const sourceCandidates = [transaction.personal_finance_category?.detailed,
+              ...(transaction.category || []).slice().reverse(), transaction.personal_finance_category?.primary,
+              legacyCategoryAliases[category.subcategory] || category.subcategory];
+            const sourceCategory = sourceCandidates.map(value => value
+              ? matchSourceCategory(canonicalCategories, type, value) : undefined).find(Boolean);
+            eligible.push({ transaction, account, entry: transactionEntryFromSource({
+              date: transaction.date, description, merchant, type, amount: Math.abs(amount),
+              category: sourceCategory?.category || "", parentcategory: sourceCategory?.parentCategory || "",
+            }, eligible.length + 1) });
+          }
+          // Shared identification completes before stable-ID upserts and recurrence detection.
+          const identified = await identifyTransactionBatch(eligible.map(row => row.entry),
+            eligible.map(row => row.transaction as unknown as Record<string, unknown>), context);
+          for (let index = 0; index < eligible.length; index++) {
+            const { transaction, account } = eligible[index];
+            const entry = identified.entries[index];
             const institutionName = item.institutionName || "Connected Institution";
             const { rows } = await pool.query(
               `INSERT INTO transactions (
@@ -1442,29 +1394,41 @@ export function registerFinanceTrackerRoutes(app: Express) {
                  WHERE plaid_transaction_id IS NOT NULL
                DO UPDATE SET
                  date=EXCLUDED.date,
-                 description=EXCLUDED.description,
-                 merchant=EXCLUDED.merchant,
+                  description=CASE WHEN EXISTS (
+                    SELECT 1 FROM transaction_change_history h WHERE h.user_id=transactions.user_id
+                    AND h.transaction_id=transactions.id AND h.field IN ('merchant','description')
+                  ) THEN transactions.description ELSE EXCLUDED.description END,
+                  merchant=CASE WHEN EXISTS (
+                    SELECT 1 FROM transaction_change_history h WHERE h.user_id=transactions.user_id
+                    AND h.transaction_id=transactions.id AND h.field IN ('merchant','description')
+                  ) THEN transactions.merchant ELSE EXCLUDED.merchant END,
                  amount=EXCLUDED.amount,
                  type=EXCLUDED.type,
-                  parent_category=CASE WHEN transactions.is_user_modified THEN transactions.parent_category ELSE EXCLUDED.parent_category END,
-                  subcategory=CASE WHEN transactions.is_user_modified THEN transactions.subcategory ELSE EXCLUDED.subcategory END,
-                  needs_want=CASE WHEN transactions.is_user_modified THEN transactions.needs_want ELSE EXCLUDED.needs_want END,
+                  parent_category=CASE WHEN transactions.is_user_modified OR
+                    (EXCLUDED.subcategory='unassigned' AND transactions.type=EXCLUDED.type)
+                    THEN transactions.parent_category ELSE EXCLUDED.parent_category END,
+                  subcategory=CASE WHEN transactions.is_user_modified OR
+                    (EXCLUDED.subcategory='unassigned' AND transactions.type=EXCLUDED.type)
+                    THEN transactions.subcategory ELSE EXCLUDED.subcategory END,
+                  needs_want=CASE WHEN transactions.is_user_modified OR
+                    (EXCLUDED.subcategory='unassigned' AND transactions.type=EXCLUDED.type)
+                    THEN transactions.needs_want ELSE EXCLUDED.needs_want END,
                  source='plaid',
                  plaid_account_id=EXCLUDED.plaid_account_id,
                  plaid_account_name=EXCLUDED.plaid_account_name,
                  plaid_institution_name=EXCLUDED.plaid_institution_name,
                  updated_at=NOW()
-               RETURNING id, (xmax = 0) AS was_inserted`,
+                RETURNING id, subcategory, (xmax = 0) AS was_inserted`,
               [
                 userId,
                 transaction.date,
-                description,
-                merchant,
-                Math.abs(amount),
-                type,
-                canonicalCategory.storedParentCategory,
-                canonicalCategory.storedCategory,
-                canonicalCategory.needVsWant?.toLowerCase() || "na",
+                entry.description,
+                entry.merchant,
+                entry.amount,
+                entry.type,
+                entry.parentCategory || null,
+                entry.subcategory || UNASSIGNED_TRANSACTION_CATEGORY,
+                entry.needsWant,
                 transaction.transaction_id,
                 transaction.account_id,
                 account.name,
@@ -1474,6 +1438,7 @@ export function registerFinanceTrackerRoutes(app: Express) {
 
             if (rows[0]?.was_inserted) inserted++;
             else updated++;
+            if (rows[0]?.subcategory === UNASSIGNED_TRANSACTION_CATEGORY) uncategorized++;
             if (rows[0]?.id) {
               recurrenceTargetIds.push(rows[0].id);
               const signal = plaidRecurrenceSignal(transaction) || streamSignals.get(transaction.transaction_id);
@@ -1502,6 +1467,7 @@ export function registerFinanceTrackerRoutes(app: Express) {
         unavailableInstitutions,
         recurrenceSignalsUnavailableInstitutions,
         recurringMarked,
+        uncategorized,
       });
     } catch (e) {
       logRouteFailure(req, e);
@@ -1623,6 +1589,8 @@ export function registerFinanceTrackerRoutes(app: Express) {
         transaction = rows[0];
         primaryChanged = true;
         const audited = [
+          ["merchant", existing.merchant, transaction.merchant],
+          ["description", existing.description, transaction.description],
           ["parent_category", existing.parent_category, transaction.parent_category],
           ["subcategory", existing.subcategory, transaction.subcategory],
           ["needs_want", existing.needs_want, transaction.needs_want],

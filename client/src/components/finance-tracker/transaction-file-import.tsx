@@ -20,6 +20,7 @@ import { TransactionImportProgress, transactionImportStageLabel, type ImportProg
 import { createImportRequestId, readTransactionImportStream } from "./transaction-import-stream";
 import {
   createBlankTransactionImportEntry,
+  transactionCategoryChoiceValue,
   validateTransactionImportEntry,
   type TransactionImportCategory,
   type TransactionImportReviewField,
@@ -89,6 +90,7 @@ function TransactionFileReview({
   const errors = entries.map(entry => validateTransactionImportEntry(entry, categories));
   const selectedIndexes = entries.map((entry, index) => entry.include !== false && entry.duplicate?.kind !== "stable" ? index : -1).filter(index => index >= 0);
   const invalidCount = selectedIndexes.filter(index => Object.keys(errors[index]).length > 0).length;
+  const uncategorizedCount = selectedIndexes.filter(index => !entries[index].subcategory).length;
   const stableCount = entries.filter(entry => entry.duplicate?.kind === "stable").length;
   const possibleCount = entries.filter(entry => entry.duplicate && entry.duplicate.kind !== "stable").length;
   const excludedCount = entries.filter(entry => entry.include === false || entry.duplicate?.kind === "stable").length;
@@ -130,6 +132,7 @@ function TransactionFileReview({
       {categoriesError && <p className="text-sm text-destructive" role="alert">Categories could not be loaded. Please try again before saving.</p>}
       {categoriesLoading && <p className="text-sm text-muted-foreground">Loading categories…</p>}
       {invalidCount > 0 && <p className="flex items-center gap-1.5 text-sm text-amber-800 dark:text-amber-300" role="status"><AlertCircle className="h-4 w-4" /> {invalidCount} selected {invalidCount === 1 ? "row needs" : "rows need"} attention. Excluded rows will not block saving.</p>}
+      {uncategorizedCount > 0 && <p className="text-sm text-amber-800 dark:text-amber-300" role="status">{uncategorizedCount} selected {uncategorizedCount === 1 ? "transaction is" : "transactions are"} Uncategorized. Choose categories below, or save and find them with the Unassigned filter.</p>}
       {checking && <p className="flex items-center gap-2 text-xs text-muted-foreground" role="status"><Loader2 className="h-3.5 w-3.5 animate-spin" /> Confirming duplicate matches… Saving is paused until this finishes.</p>}
       {checkError && <p className="text-sm text-destructive" role="alert">{checkError} Recheck before saving.</p>}
       {stage === "failed" && <div role="alert" className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /><div><p className="font-semibold">Import paused{failedAt ? ` during ${transactionImportStageLabel(failedAt).toLowerCase()}` : ""}</p><p className="mt-0.5">{errorMessage}</p><p className="mt-1 text-xs">Your review is still here. Correct the issue or retry when ready.</p></div></div>}
@@ -163,7 +166,7 @@ function TransactionFileReview({
               const stable = entry.duplicate?.kind === "stable";
               const included = entry.include !== false && !stable;
               const matchingCategories = allCategories.filter(item => item.type.toLowerCase() === entry.type);
-              const selectedCategory = matchingCategories.find(item => item.category === entry.subcategory);
+              const selectedCategory = matchingCategories.find(item => item.category === entry.subcategory && item.parentCategory === entry.parentCategory);
               const input = (field: "date" | "description" | "merchant" | "amount" | "notes", placeholder = "") => (
                 <td className="border-b px-2 py-1.5 align-top">
                   <Input type="text" inputMode={field === "date" ? "text" : field === "amount" ? "decimal" : undefined}
@@ -208,9 +211,9 @@ function TransactionFileReview({
                     {error.type && <p className="mt-1 text-[10px] leading-tight text-destructive">{error.type}</p>}
                   </td>
                   <td className="border-b px-2 py-1.5 align-top">
-                    <select value={entry.subcategory} onChange={event => onChange(entry.id, "subcategory", event.target.value)} aria-label={`Transaction ${index + 1} category`} aria-invalid={!!error.subcategory} disabled={saving} className={`h-8 w-full min-w-52 rounded-md border bg-background px-2 text-xs ${error.subcategory ? "border-destructive" : "border-input"}`}>
-                      <option value="">Unassigned (optional)</option>
-                      {matchingCategories.map(category => <option key={`${category.parentCategory}-${category.category}`} value={category.category}>{category.parentCategory} · {category.category}</option>)}
+                    <select value={entry.subcategory ? transactionCategoryChoiceValue({ category: entry.subcategory, parentCategory: entry.parentCategory }) : ""} onChange={event => onChange(entry.id, "subcategory", event.target.value)} aria-label={`Transaction ${index + 1} category`} aria-invalid={!!error.subcategory} disabled={saving} className={`h-8 w-full min-w-52 rounded-md border bg-background px-2 text-xs ${error.subcategory ? "border-destructive" : "border-input"}`}>
+                      <option value="">Uncategorized (optional)</option>
+                      {matchingCategories.map(category => <option key={transactionCategoryChoiceValue(category)} value={transactionCategoryChoiceValue(category)}>{category.parentCategory} · {category.category}</option>)}
                     </select>
                     {error.subcategory && <p className="mt-1 text-[10px] leading-tight text-destructive">{error.subcategory}</p>}
                   </td>
@@ -471,9 +474,8 @@ export function TransactionFileImportPanel({
           return { ...entry, type, subcategory: "", parentCategory: "", ...(entry.duplicate ? { include: false, keepDuplicate: false } : {}) };
         }
         if (field === "subcategory") {
-          const subcategory = value as string;
-          const selected = categories.find(category => category.category === subcategory && category.type.toLowerCase() === entry.type);
-          return { ...entry, subcategory, parentCategory: selected?.parentCategory ?? "" };
+          const selected = categories.find(category => transactionCategoryChoiceValue(category) === value && category.type.toLowerCase() === entry.type);
+          return { ...entry, subcategory: selected?.category ?? "", parentCategory: selected?.parentCategory ?? "", categoryOverride: true };
         }
         if (field === "isRecurring" && value === false) return { ...entry, isRecurring: false, recurringType: "", recurringFreq: "", recurrenceOverride: true };
         if (["isRecurring", "recurringType", "recurringFreq"].includes(field)) return { ...entry, [field]: value, recurrenceOverride: true };
@@ -483,9 +485,9 @@ export function TransactionFileImportPanel({
           return { ...entry, include, keepDuplicate: entry.duplicate ? include : false };
         }
         if (["date", "description", "merchant", "amount", "type", "sourceTransactionId", "sourceAccount"].includes(field) && entry.duplicate) {
-          return { ...entry, [field]: value, include: false, keepDuplicate: false };
+          return { ...entry, [field]: value, ...(field === "merchant" ? { merchantOverride: true } : {}), include: false, keepDuplicate: false };
         }
-        return { ...entry, [field]: value };
+        return { ...entry, [field]: value, ...(field === "merchant" ? { merchantOverride: true } : {}) };
       });
     });
     if (relevant) {

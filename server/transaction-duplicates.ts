@@ -23,7 +23,7 @@ export function validDuplicateReview(entries: unknown): entries is TransactionIm
       ["sourceTransactionId", "sourceAccount"].every(key =>
         row[key] === undefined || (typeof row[key] === "string" && row[key].length <= 256)) &&
       (row.recurringFreq === undefined || (typeof row.recurringFreq === "string" && row.recurringFreq.length <= 100)) &&
-      ["include", "keepDuplicate", "recurrenceOverride"].every(key => row[key] === undefined || typeof row[key] === "boolean");
+       ["include", "keepDuplicate", "recurrenceOverride", "categoryOverride", "merchantOverride"].every(key => row[key] === undefined || typeof row[key] === "boolean");
   });
 }
 

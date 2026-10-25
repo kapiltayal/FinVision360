@@ -1,6 +1,6 @@
 # Financial Transaction Ingestion and Processing
 
-*Implementation guide, reviewed against repository code on October 22, 2026.* [Documentation index](README.md).
+*Implementation guide, reviewed against repository code on October 25, 2026.* [Documentation index](README.md).
 
 This guide covers the three ways transactions enter the Finance Tracker: user-uploaded files, transactions imported on request from Plaid-connected accounts, and transactions entered manually. It follows each path from the user's selection through validation, categorization, review or confirmation, and database persistence.
 
@@ -8,14 +8,14 @@ This guide covers the three ways transactions enter the Finance Tracker: user-up
 
 ```text
 File upload
-Choose file → validate and parse → normalize rows → categorize suggestions
+Choose file → validate and parse → clean/identify merchants → categorize suggestions
 → check duplicates → detect recurrence → user reviews/edits → revalidate and recheck duplicates
 → atomically save selected rows + backfill merchant history + retry receipt → complete
 
 Plaid
 Choose accounts and dates → verify ownership → fetch available recurring signals and transaction pages
-→ filter and normalize → preference/profile/Plaid/description category
-→ upsert by Plaid transaction ID → protect user-edited categories
+→ filter/parse → clean/identify merchants → preference/profile/source/AI category
+→ upsert by Plaid transaction ID → protect user-edited names and categories
 → reuse saved tags or detect recurrence → backfill matching merchant history → import summary
 
 Manual entry
@@ -36,7 +36,7 @@ The visible flowcharts are repository-local SVG images, so they do not require a
 ![Uploaded transaction flow: file validation, parsing, category suggestions, duplicate review, user edits, final validation, atomic database save and retry receipt.](diagrams/transaction-upload.svg)
 
 1. Authenticate, validate file type/signature/size, parse and normalize at most 500 nonblank rows.
-2. Suggest categories using user preference → valid file category → merchant profile → AI for unresolved rows.
+2. Clean and identify merchant names using exact user history → exact catalog → high-confidence fuzzy/partial catalog matching → cleaned fallback. Suggest categories using user preference → merchant profile → valid file category → batched AI IDs for unresolved rows.
 3. Check duplicates within this file and the user's ledger, then detect recurrence using included rows plus the user's saved history. Return suggestions in a read-only editable preview; excluded duplicates do not supply extra observations.
 4. User corrects fields, chooses Save rows, and explicitly confirms legitimate content matches. Stable-ID repeats cannot be saved.
 5. Validate selected rows and review freshness; invalid input returns to review without a write.
@@ -51,11 +51,11 @@ The visible flowcharts are repository-local SVG images, so they do not require a
 flowchart TD
     A["Choose CSV, TSV, TXT, XLS, or XLSX"] --> B["Authenticate; check upload size, type, and file signature"]
     B --> C["Parse and normalize rows; reject files over 500 nonblank rows"]
-    C --> D["Suggest categories in priority order"]
-    D --> D1["User preference → valid source category → known merchant profile"]
+    C --> D["Clean/identify merchant: exact user history → exact global → confident fuzzy → cleaned fallback"]
+    D --> D1["Categories: user preference → known merchant profile → valid source category"]
     D1 --> E{"Category resolved?"}
     E -- "Yes" --> G["Apply available category and Need/Want suggestions; keep unresolved rows blank"]
-    E -- "No" --> F["AI classifies remaining rows"]
+    E -- "No" --> F["Bounded AI batches return canonical category IDs or Uncategorized"]
     F --> G
     G --> H["Check duplicates against this user's saved transactions and this file"]
     H --> H1["Detect recurrence using included rows and this user's history"]
@@ -80,8 +80,8 @@ AI-unavailable or unresolved categories remain editable; a valid reviewed transa
 1. User chooses connected institution/accounts and dates; server authenticates and validates ownership/range.
 2. Fetch active recurring-stream signals and Plaid transaction pages. Optional recurring-signal failures produce warnings; unavailable transaction institutions are reported while others continue.
 3. Skip pending transactions, transfers, non-USD values and invalid rows.
-4. Normalize accepted rows; categorize using user preference → merchant profile → Plaid mapping → description rules. Skip unresolved categories; no AI call.
-5. Upsert `transactions` by `(user_id, plaid_transaction_id)`; retain explicitly edited category/parent/Need-Want.
+4. Clean/identify accepted merchant names with the shared history/catalog/fuzzy pipeline; categorize using user preference → merchant profile → compatible Plaid category mapping → batched AI category IDs. Keep unresolved rows as Uncategorized, stored as `unassigned`.
+5. Upsert `transactions` by `(user_id, plaid_transaction_id)`; retain explicitly edited merchant/description and category/parent/Need-Want.
 6. Continue all selected pages/institutions. Writes are per row, not one atomic whole-import transaction; an unexpected database error may leave earlier rows committed.
 7. Resolve recurrence for merchants represented by the imported row IDs using the user's saved history. Reuse saved positive tags unless an explicit user override supersedes them; otherwise use provider/catalog/heuristic detection. Apply the resolved tags to imported and matching unmodified historical transactions, then return counts and refresh the ledger. Active owned-account Plaid outflow streams supply recurring flags/frequency when available; report a warning if the optional recurring endpoint is unavailable.
 
@@ -95,20 +95,21 @@ flowchart TD
     C --> D{"Pending, transfer, unsupported currency, or invalid account/amount?"}
     D -- "Yes" --> E["Skip and count the reason"]
     E --> U{"More rows, pages, or selected institutions?"}
-    D -- "No" --> F["Normalize merchant, date, amount, and type"]
+    D -- "No" --> F["Parse source values; clean/identify merchant using history → catalog → confident fuzzy"]
     F --> G["Use user's saved merchant preference"]
     G --> H{"Resolved?"}
     H -- "No" --> I["Match known merchant category_id"]
     I --> J{"Resolved?"}
-    J -- "No" --> K["Map Plaid category, then deterministic description rules"]
+    J -- "No" --> K["Map supplied Plaid category; batch unresolved rows for AI category IDs"]
     J -- "Yes" --> M["Resolve exact canonical category and parent"]
     H -- "Yes" --> M
     K --> L{"Canonical category found?"}
-    L -- "No" --> E
+    L -- "No" --> M0["Keep Uncategorized / unassigned"]
+    M0 --> N
     L -- "Yes" --> M
     M --> N["Upsert by user_id + Plaid transaction ID"]
     N --> O{"Existing row is user-modified?"}
-    O -- "Yes" --> P["Refresh bank details; keep category, parent, and Need/Want"]
+    O -- "Yes" --> P["Refresh bank details; protect corrected names, category, parent, and Need/Want"]
     O -- "No" --> Q["Refresh bank details and suggested classification"]
     P --> U
     Q --> U
@@ -200,43 +201,58 @@ Other persistence supporting these paths includes `transaction_import_receipts` 
 
 Categorization produces a suggestion from the app's canonical categories, not a free-form label. The allowed values come from `transaction_type_list`, including each category's transaction type, parent category, display label, Need/Want default, and description. Before a category is saved, the server resolves it against that list and stores the database's canonical parent/category labels. A user can still correct the suggestion in the file review.
 
-The import methods intentionally differ:
+Uploaded files and Plaid now share identification; manual entry retains its explicit-choice behavior:
 
 | Source | Categorization method | AI used? |
 |---|---|---|
-| Uploaded file | Saved user merchant preference → matching category supplied by the file → known merchant profile → AI for unresolved rows → leave unresolved for review | Only for unresolved rows |
-| Plaid | Saved user merchant preference → known merchant profile → Plaid personal-finance category mapping → description rules as fallback → skip if no canonical category can be resolved | No |
+| Uploaded file | Identify merchant; saved user category preference → known merchant profile → matching file category → AI category ID → Uncategorized for review | Only for unresolved rows |
+| Plaid | Identify merchant; saved user category preference → known merchant profile → compatible supplied Plaid category/mapping → AI category ID → retain as unassigned | Only for unresolved rows |
 | Manually entered transaction | User-selected canonical category → saved user merchant preference → known merchant profile → description rules | No |
 
-### Uploaded-file categorization, step by step
+### Shared merchant identification
 
-1. **Establish the row's initial type and text.** The parser reads explicit type labels when present. Otherwise, a debit column implies expense and a credit column implies income; when it cannot infer either, it initially treats the row as an expense. Merchant defaults to the uploaded merchant or description.
-2. **Look for a saved merchant preference.** The server checks this user's manual transactions and transactions with a recorded explicit parent/category edit. It matches by transaction type and a normalized merchant key derived from the merchant, or the description when merchant is absent. The normalization lowercases text, removes punctuation/asterisks, and uses the first three words. When multiple saved choices match, recorded category edits and the newest matching choices take precedence. A preference is reused only if it still maps to a valid canonical category.
-3. **Try the uploaded category.** If the file has a `Category` or `Subcategory` value, it is matched against the canonical list for the row's current type. A supplied parent category further narrows that match. Matching ignores case and punctuation, but the value saved is the canonical database label. An unknown or type-incompatible source label remains visible in review; it is not silently stored as a category.
-4. **Try a known merchant profile.** Match an exact, normalized merchant identity first. When merchant is missing or copies the bank description, allow whole-token brand matching in the description, preferring longer specific names and rejecting ambiguous normalized matches. A distinct explicit merchant is not replaced by an incidental brand in its description. Resolve `merchants.category_id` to the exact `transaction_type_list` row, including its parent and Need/Want default. A missing/stale category reference or incompatible income/expense type supplies no suggestion; a refund must not become an expense just because its brand has an expense category.
-5. **Ask AI only for rows still unresolved.** The server sends the unresolved raw source rows and the allowed canonical category list—including each category's type, parent, label, Need/Want default, and description—to the configured, non-streaming JSON classification call. The prompt asks for a transaction type and one exact category from the supplied list, and says to classify only clear transactions. The system message requires JSON only, with no markdown or commentary. The provider currently uses the shared `ADVISOR_MODEL` setting (currently `gpt-5.6-luna`), JSON-object response mode, and a maximum of 1,800 completion tokens; the shared provider caps total request content at 28,000 characters.
-6. **Validate the answer before using it.** Each returned `sourceIndex` must refer to a row sent in that call and may appear only once. The type must be `income` or `expense`, and the category must resolve to a canonical category for that type. Invalid, duplicate, missing, or unrecognized model results are ignored. The server applies only the validated type/category suggestion (and eligible canonical Need/Want default); it does not let AI replace the source date, amount, description, merchant, or server-created review-row identity.
-7. **Keep uncertainty reviewable.** If AI is unavailable or returns no usable classification, the upload preview continues. The category stays blank in review and is optional at save; if the user saves it without a category, it is stored as `unassigned`. This fallback prevents a categorization outage from dropping an otherwise valid transaction.
+After file validation and essential row parsing (or Plaid eligibility checks), and **before duplicate handling or subscription detection**, normalize merchant information to lowercase. Strip SQ/TST/PayPal prefixes, hash/store/reference numbers, identifiable dates and phone numbers, trailing US state abbreviations (and optional ZIP), punctuation, and extra whitespace. Keep meaningful brand numbers, such as 7-Eleven, Forever 21, and Microsoft 365. Original descriptions, amounts, dates and reliable source identifiers are not rewritten.
 
-The classifier receives the complete raw source row for unresolved entries, so any columns present in that row—including descriptions, amounts, notes, account metadata, or other exported fields—can be included in the request. It does not receive the signed-in user's database ID or a Plaid access token. Rows resolved from a saved preference, a valid uploaded category, or a known merchant profile are not sent for AI classification. Treat files as financial data and avoid adding unrelated sensitive columns to an export when they are not needed.
+1. Match the cleaned input exactly to this user's normalized historical merchant/description aliases. Preserve the historical merchant name. Explicit name corrections win over manual names and then automatic history; the latest applicable correction/update and transaction ID resolve ties.
+2. Otherwise match a normalized global merchant name exactly. Multiple catalog names normalizing to the same key are ambiguous and are not chosen.
+3. Otherwise accept only a clear, high-confidence catalog fallback. Edit similarity must be at least **0.90**, both names at least eight characters, and the winner must lead the runner-up by **0.08**. Whole-token prefix matching requires a brand of at least six characters covering at least **75%** of the cleaned input, with at most two trailing tokens and no incidental gift/card/via/for reference. These partial candidates score 0.96 and must pass the same winning-margin check. Fuzzy work is bounded to 160-character names; long or ambiguous descriptors stay unmatched.
+4. If unmatched, retain the cleaned merchant text. No AI is used for merchant identity.
+
+History queries and aliases are scoped to the signed-in user. Merchant edits recorded during file review or transaction editing provide aliases for future imports; final reviewed category corrections are audited as explicit category preferences. Automated saved categories or recurrence/Need-Want edits alone are not explicit category preferences.
+
+### Shared category identification, step by step
+
+1. **Establish the row's source type and resolve its merchant.** File type comes from explicit labels or debit/credit columns, defaulting to expense when unavailable. Plaid's amount sign determines direction: negative means income; otherwise expense. Merchant identification uses the shared pipeline above.
+2. **Use this user's explicit category preference.** Match the resolved merchant or source alias and transaction direction against manual transactions or recorded category/parent edits. Recorded edits take precedence over manual entries; latest applicable edit/update and ID break ties. Reuse only a still-valid, type-compatible canonical category.
+3. **Use the global merchant profile.** Resolve its `category_id` to the exact canonical row, parent and Need/Want default. Missing/stale or incompatible income/expense references supply no category. An expense-brand profile never changes an income/refund into an expense.
+4. **Match supplied category information.** Match canonical labels ignoring case, punctuation and ampersand formatting; a supplied parent narrows the match. For files, nonblank Subcategory takes priority over Category regardless of header order; explicit Parent Category wins, otherwise a distinct Category accompanying Subcategory supplies the parent. Duplicate labels without a disambiguating parent stay unresolved. Plaid tries compatible category labels and its explicit category mappings. Unmatched file source labels remain visible in review.
+5. **Ask AI only for unresolved rows, in bounded batches.** Send lookup columns `id`, `type`, `parent_category`, `category`, `description`, a server-owned `sourceIndex`, resolved merchant, source type, date, amount and bounded source context. The prompt requests JSON `{entries:[{sourceIndex:number,categoryId:number|null}]}`; null means **Uncategorized**. Batches contain at most 25 rows and 27,000 prompt characters, within the shared provider's 28,000-character total and 1,800-token completion budgets. An oversized catalog/row stays unresolved rather than being silently truncated. The provider/model is unchanged.
+6. **Validate every returned ID.** The index must belong to this batch and appear exactly once; all duplicate results for an index are rejected. The category ID must be an integer from the supplied lookup and compatible with the source transaction direction. Resolve its canonical stored parent/category labels and eligible Need/Want default server-side. AI cannot change source type, dates, amounts, descriptions, merchant identity, recurrence tags or row identity.
+7. **Keep uncertainty reviewable.** Failed, malformed, missing, invalid or ambiguous responses leave rows Uncategorized. File review shows an explicit count and editable optional category; saved unresolved rows use the existing `unassigned` ledger sentinel. Plaid retains valid unresolved rows as `unassigned` and returns an `uncategorized` count with a review warning. Failed batches do not prevent later batches. No new category is inserted into the lookup table.
+
+Only unresolved rows are sent to AI. Source context includes at most the first 24 source fields, bounded to 400 characters each (nested values serialized); the primary merchant/description context is bounded to 2,000 characters each. These limits affect AI context only, never the original financial values or stored source description. No application user ID, user's historical ledger, or Plaid access token is supplied by the server. Treat files as financial data and avoid unrelated sensitive columns.
+
+The preview's hidden original-merchant alias is also bounded to 2,000 characters before review. It is audit metadata, not a source financial value; correcting an overlong visible merchant must not leave uneditable metadata that blocks saving.
 
 When an uploaded row contains a valid Need/Want value, that value is preserved. Otherwise, the selected canonical category's Need/Want default is suggested when available; unresolved categories use `na` until the user changes it. The reviewer can edit both the category and Need/Want value before saving.
 
 ### Plaid categorization, step by step
 
-Plaid imports do not call the AI classifier. After transfer, pending, currency, account, and amount checks, the server determines transaction type from Plaid's amount sign (negative is income, otherwise expense). It first tries this user's saved merchant preference and then the type-compatible known merchant profile. If neither resolves a category, it uses Plaid's `personal_finance_category`:
+Plaid uses the same merchant/category pipeline and AI fallback as files, after transfer, pending, currency, account, amount, date and ID checks. At the source-category step, compatible supplied labels and `personal_finance_category` mappings are tried:
 
 | Plaid category condition | FinVision360 category suggestion |
 |---|---|
 | Income detail contains `WAGES`, `DIVIDEND`, `INTEREST_EARNED`, or `TAX_REFUND`/`REFUND` | Salary, dividend, interest, or refund respectively |
-| Income primary is `INCOME` and no more specific income detail matched | Description-rule match, or Other Income if the description rules find nothing |
+| Income primary is `INCOME` and no more specific income detail matched | Other Income |
 | Expense primary is `RENT_AND_UTILITIES` | Housing for rent/mortgage details; otherwise utilities |
 | Expense primary is `FOOD_AND_DRINK` | Groceries for grocery details; otherwise dining out |
 | Expense primary is `ENTERTAINMENT`, `TRANSPORTATION`, `MEDICAL`, `PERSONAL_CARE`, `TRAVEL`, `GENERAL_MERCHANDISE`, `HOME_IMPROVEMENT`, `LOAN_PAYMENTS`, or `BANK_FEES` | Entertainment, transportation, healthcare, personal care, travel, shopping, housing, debt payment, or other expense respectively |
 | Government/non-profit primary with a tax detail | Taxes |
-| No listed mapping applies | Description-rule fallback |
+| No listed mapping applies or mapped category is unavailable | Shared batched AI fallback, then retain as unassigned |
 
-The description fallback checks transaction text against ordered income and expense keyword/merchant rules. The first matching rule wins, so when a description contains terms from more than one row below, the earlier row takes precedence.
+### Manual-entry description rules
+
+Only manual entry retains the legacy description-rule fallback below. It is not a hidden extra step ahead of AI for file or Plaid imports. The first matching rule wins.
 
 | Income rule, in order | Example terms in the description | Suggestion |
 |---|---|---|
@@ -250,7 +266,7 @@ The description fallback checks transaction text against ordered income and expe
 | 8 | Refund, cash back, rebate | Refund |
 | 9 | Business income, revenue, invoice | Business |
 | 10 | Gift, Zelle, Venmo, Cash App, PayPal | Gift |
-| No match | — | Unassigned (except Plaid's `INCOME` primary category, which falls back to Other Income) |
+| No match | — | Unassigned |
 
 | Expense rule, in order | Example terms in the description | Suggestion |
 |---|---|---|
@@ -273,7 +289,7 @@ The description fallback checks transaction text against ordered income and expe
 | 17 | Transfer to savings, savings deposit/transfer, high-yield savings | Savings transfer |
 | No match | — | Unassigned |
 
-These rules are deliberately deterministic, not a confidence-ranked model. Their order matters: for example, the housing rule appears before taxes and includes “property tax,” so a description matching that rule is categorized as housing. If no rule matches, the result is `unassigned`; for Plaid, a row without a resolvable canonical category is counted as invalid and skipped rather than inserted unclassified.
+These manual-entry rules are deterministic, not a confidence-ranked model. Their order matters: for example, the housing rule appears before taxes and includes “property tax,” so a description matching that rule is categorized as housing. A manual entry without a resolvable category is rejected; this does not apply to the file/Plaid unresolved fallback.
 
 The internal rule labels are mapped to the current canonical category table before insertion. A category's canonical parent and Need/Want default are saved with it; if the category has no Need/Want default, the import uses `na`. On a later Plaid upsert, categorization is refreshed unless the transaction has been marked user-modified; in that case its existing category, parent category, and Need/Want values are preserved.
 
@@ -306,7 +322,7 @@ For delimited files, records are limited to 20,000 characters. XLSX archives are
 Each nonblank source row becomes an editable transaction draft. The importer normalizes fields for the preview:
 
 - **Date:** ISO and US-style dates are normalized when valid. Dates that cannot be normalized remain visible for correction and fail save validation until fixed.
-- **Description and merchant:** The source description is retained; merchant defaults to the source merchant or description.
+- **Description and merchant:** The source description is retained; merchant is identified from source merchant/description using the shared cleanup/history/catalog/fuzzy pipeline.
 - **Amount and type:** Currency symbols and grouping commas are accepted for parsing. Parentheses and minus signs are recognized as negative source notation, but the stored amount is a positive magnitude; income versus expense is a separate field. Type comes from an explicit type column or debit/credit layout when available, and otherwise defaults to expense. Type labels such as credit/deposit and debit/withdrawal are recognized.
 - **Need/Want and recurrence:** Recognized values are normalized. Missing Need/Want becomes `na`; recurrence can be reviewed as false/true and, when true, assigned a supported recurrence type.
 - **Source category:** An uploaded category is retained separately in the preview so the reviewer can compare it with the selected canonical category. The raw source category is not a transaction-table column.
@@ -316,7 +332,7 @@ The preview drafts receive temporary row numbers for editing. These numbers are 
 
 ## 4. Category suggestions are prepared
 
-The categorization priority, AI request and validation, canonical Need/Want defaults, and unassigned fallback are described in [How transaction categorization works](#how-transaction-categorization-works). In brief, each row tries the user's saved merchant preference first, then a valid category supplied by the file, then a known merchant profile, and then AI classification for unresolved rows. The suggestion is editable and no transaction is stored during preview.
+The categorization priority, AI ID validation, canonical Need/Want defaults, and Uncategorized fallback are described in [How transaction categorization works](#how-transaction-categorization-works). After merchant identification, each row tries the user's saved category preference, then a known merchant profile, then a valid file category, then batched AI. Suggestions remain editable and preview writes nothing.
 
 ## 5. Duplicate identification, after categorization
 
@@ -328,7 +344,7 @@ The server compares normalized, categorized drafts with earlier included rows in
 | Exact-looking content | Same date, amount to the cent, type, and full normalized description | Unchecked/excluded by default; select its **Save** checkbox only if it is a separate real transaction |
 | Possible content match | Same amount/type and matching normalized merchant or description, on the same date or within two days | Unchecked/excluded by default; inspect the match details and select its **Save** checkbox only for a legitimate repeat |
 
-Text comparison normalizes case and punctuation, not an aggressive fuzzy match. When both files provide different account contexts, they are not matched to one another. Missing account context does not prove that records belong to different accounts. Source IDs should be stable across exports; account identifiers help avoid ambiguity.
+Description comparison normalizes case/punctuation; merchant comparison uses the same cleanup key for new drafts and historical candidates. Duplicate comparison itself is exact on these keys, never fuzzy, and content matches always remain reviewable. When both files provide different account contexts, they are not matched to one another. Missing account context does not prove that records belong to different accounts. Reliable source IDs and account namespaces are unchanged by merchant cleanup.
 Different reliable IDs in the same account namespace identify separate transactions even when the dates, amounts and descriptions are identical.
 
 Warnings explain the matching rule and identify a stored transaction or earlier review row. Checks never delete, merge, or alter existing transactions.
@@ -411,13 +427,13 @@ Each returned row is checked before persistence:
 - Pending transactions are skipped.
 - Transfers are skipped when Plaid's primary category is `TRANSFER_IN` or `TRANSFER_OUT`, or the detailed category is `LOAN_PAYMENTS_CREDIT_CARD_PAYMENT`.
 - Only `USD` is imported; there is no currency conversion.
-- The account must be one of the signed-in user's stored Plaid accounts, the amount must be finite and nonzero, and a canonical category must be resolved.
+- The account must belong to the current stored institution and selected user-owned accounts, amount must be finite/nonzero, date must be valid, and Plaid transaction ID must be nonblank. A missing category is not an eligibility failure.
 
 For accepted rows:
 
 - Plaid's amount sign determines type: a negative amount is treated as income, otherwise expense. The stored amount is the absolute value.
-- The saved description/merchant uses `merchant_name`, then `name`, then `"Bank transaction"` as a fallback. The request asks Plaid to include its original description, but the current save mapping does not use `original_description`.
-- User merchant preferences and type-compatible known merchant profiles are tried before Plaid personal-finance categories and description-rule fallback. The detailed mapping is described in [How transaction categorization works](#how-transaction-categorization-works); this path does not call the AI classifier.
+- Description preserves `original_description`, then `name`, then `merchant_name`, then `"Bank transaction"` as fallback. Merchant identification starts from `merchant_name` or the available source narrative.
+- The shared pipeline identifies the merchant and tries user category preferences, compatible global profiles, supplied Plaid category information and batched AI IDs, retaining unresolved rows as `unassigned`. See [How transaction categorization works](#how-transaction-categorization-works).
 - Parent category and Need/Want come from the matched canonical category, defaulting Need/Want to `na` if it has none.
 - The saved row includes `source='plaid'`, Plaid transaction/account IDs, account name, and institution name.
 
@@ -429,8 +445,9 @@ The database has a unique key for each non-null Plaid transaction ID within a us
 
 - A new Plaid ID creates a transaction.
 - An existing Plaid ID updates the existing transaction instead of creating a duplicate. Re-importing overlapping date ranges therefore does not duplicate a matching Plaid transaction.
-- Date, description, merchant, amount, type, source, and Plaid account metadata are refreshed from the current Plaid result.
-- If the existing transaction is marked `is_user_modified`, its category, parent category, and Need/Want values are preserved; otherwise, those classification fields are refreshed from Plaid's category mapping.
+- Date, amount, type, source and Plaid account metadata are refreshed. Description/merchant refresh unless a name correction was explicitly audited.
+- If the existing transaction is marked `is_user_modified`, category, parent and Need/Want are preserved; otherwise classification fields are refreshed through the shared pipeline.
+- An unresolved incoming classification is not a request to erase a valid earlier classification. On an overlapping Plaid ID with the same income/expense direction, retain its existing category, parent and Need/Want when the new result is unassigned (including AI failure). New unresolved IDs still save as unassigned. Import warnings/counts reflect the persisted result.
 
 The Plaid route issues database upserts row by row and does not wrap the entire multi-institution import in one database transaction. Institution retrieval errors are reported as unavailable and processing continues. An unexpected database error can fail the request after earlier rows have already committed.
 

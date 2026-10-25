@@ -68,7 +68,7 @@ test("merchant categories guide imports and existing routes without overriding u
     assert.equal(first.body.entries[0].isRecurring, true, "subscription-only profiles tag rows before preview");
     assert.equal(first.body.entries[0].recurringType, "subscription");
     const sourceChoice = await preview(alternate);
-    assert.equal(sourceChoice.body.entries[0].subcategory, alternate.category, "valid source category wins over profile");
+    assert.equal(sourceChoice.body.entries[0].subcategory, primary.category, "known merchant category wins over source category");
 
     const reviewed = {
       ...first.body.entries[0], subcategory: alternate.category, parentCategory: alternate.parent_category,

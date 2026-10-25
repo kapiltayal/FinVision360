@@ -43,6 +43,9 @@ export interface PreparedReviewedTransaction {
   recurringType: string | null;
   recurringFreq: RecurringFrequency | null;
   recurrenceOverride?: boolean;
+  categoryOverride?: boolean;
+  merchantOverride?: boolean;
+  sourceMerchant?: string;
   notes: string | null;
   sourceTransactionId?: string;
   sourceAccount?: string;
@@ -58,11 +61,13 @@ function normalizedFieldName(value: string): string {
 }
 
 function sourceField(row: RawRow, ...names: string[]): string {
-  const wanted = new Set(names.map(normalizedFieldName));
-  const found = Object.entries(row).find(([key]) => wanted.has(normalizedFieldName(key)));
-  return found && (typeof found[1] === "string" || typeof found[1] === "number")
-    ? String(found[1]).trim()
-    : "";
+  for (const name of names) {
+    const found = Object.entries(row).find(([key]) => normalizedFieldName(key) === normalizedFieldName(name));
+    if (found && (typeof found[1] === "string" || typeof found[1] === "number") && String(found[1]).trim()) {
+      return String(found[1]).trim();
+    }
+  }
+  return "";
 }
 
 export function isBlankTransactionSourceRow(row: RawRow): boolean {
@@ -209,7 +214,11 @@ export function transactionEntryFromSource(row: RawRow, id: number): Transaction
   }
   const { amount } = parseSourceAmount(selectedAmount);
   const type = explicitType ?? inferredColumnType ?? "expense";
-  const sourceCategory = sourceField(row, "subcategory", "category");
+  const subcategory = sourceField(row, "subcategory");
+  const broadCategory = sourceField(row, "category");
+  const sourceCategory = subcategory || broadCategory;
+  const sourceParentCategory = sourceField(row, "parentcategory") ||
+    (subcategory && broadCategory !== subcategory ? broadCategory : "");
   const sourceRecurrenceType = sourceRecurringType(sourceField(row, "recurringtype"));
   const sourceFrequency = sourceRecurringFrequency(sourceField(row, "recurringfreq", "recurringfrequency", "recurrencefrequency", "frequency"));
   const recurringFlag = sourceRecurringStatus(sourceField(row, "isrecurring", "recurring"));
@@ -232,6 +241,7 @@ export function transactionEntryFromSource(row: RawRow, id: number): Transaction
     sourceTransactionId: sourceField(row, "transactionid", "banktransactionid", "fitid") || undefined,
     sourceAccount: sourceField(row, "accountid", "accountnumber", "accountname", "account") || undefined,
     ...(sourceCategory ? { sourceCategory } : {}),
+    ...(sourceParentCategory ? { sourceParentCategory } : {}),
   };
 }
 
@@ -350,6 +360,12 @@ export function validateReviewedTransactionEntries(
       addError("recurringFreq", "Frequency must be empty when recurring status is false");
     }
     if (typeof entry.merchant !== "string") addError("merchant", "Merchant must be text");
+    for (const flag of ["recurrenceOverride", "categoryOverride", "merchantOverride"]) {
+      if (entry[flag] !== undefined && typeof entry[flag] !== "boolean") addError(flag, "Override must be true or false");
+    }
+    if (entry.sourceMerchant !== undefined && (typeof entry.sourceMerchant !== "string" || entry.sourceMerchant.length > 2000)) {
+      addError("sourceMerchant", "Source merchant must be text of at most 2000 characters");
+    }
     if (typeof entry.notes !== "string") addError("notes", "Notes must be text");
     for (const key of ["sourceTransactionId", "sourceAccount"] as const) {
       if (entry[key] !== undefined && (typeof entry[key] !== "string" || entry[key].length > 256)) {
@@ -387,6 +403,9 @@ export function validateReviewedTransactionEntries(
         recurringType: entry.isRecurring && recurringType ? recurringType : null,
         recurringFreq: entry.isRecurring && recurringFreq ? recurringFreq as RecurringFrequency : null,
         ...(entry.recurrenceOverride === true ? { recurrenceOverride: true } : {}),
+        ...(entry.categoryOverride === true ? { categoryOverride: true } : {}),
+        ...(entry.merchantOverride === true ? { merchantOverride: true } : {}),
+        ...(typeof entry.sourceMerchant === "string" ? { sourceMerchant: entry.sourceMerchant } : {}),
         notes: entry.notes.trim() || null,
         ...(entry.sourceTransactionId ? { sourceTransactionId: entry.sourceTransactionId.trim() } : {}),
         ...(entry.sourceAccount ? { sourceAccount: entry.sourceAccount.trim() } : {}),
@@ -436,6 +455,19 @@ export async function saveReviewedTransactionBatch(
       );
       const transactionId = (insertedRow as { rows: Array<{ id: number }> }).rows[0].id;
       insertedIds.push(transactionId);
+      if (transaction.categoryOverride || transaction.merchantOverride) {
+        await client.query("UPDATE transactions SET is_user_modified=TRUE WHERE id=$1 AND user_id=$2", [transactionId, userId]);
+        const edits: Array<[string, string | null, string | null]> = [];
+        if (transaction.categoryOverride) edits.push(
+          ["subcategory", null, transaction.subcategory], ["parent_category", null, transaction.parentCategory]);
+        if (transaction.merchantOverride) edits.push(
+          ["merchant", transaction.sourceMerchant || transaction.description, transaction.merchant]);
+        for (const [field, before, after] of edits) {
+          await client.query(
+            `INSERT INTO transaction_change_history (user_id,transaction_id,field,old_value,new_value)
+             VALUES ($1,$2,$3,$4,$5)`, [userId, transactionId, field, before, after]);
+        }
+      }
       if (transaction.recurrenceOverride) {
         await client.query("UPDATE transactions SET is_user_modified=TRUE WHERE id=$1 AND user_id=$2", [transactionId, userId]);
         for (const [field, value] of [
