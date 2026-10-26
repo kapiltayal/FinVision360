@@ -1111,19 +1111,31 @@ export function registerFinanceTrackerRoutes(app: Express) {
       const categories = await canonicalTransactionCategories();
       const supplied = subcategory ?? category;
       if (parentCategory !== undefined && supplied === undefined) return res.status(400).json({ message: "Invalid category" });
-      const selected = supplied !== undefined
-        ? categoryForInput(categories, type, supplied, parentCategory)
-        : categoryFromMerchantPreference(await userMerchantCategoryPreferences(userId, categories), { type, description }) ||
-          knownMerchantCategory({ type, description }, await knownCategoryMerchants(), categories) ||
-          deterministicTransactionCategory(categories, description, type);
+      let selected: CanonicalTransactionCategory | undefined;
+      let categorySource: string;
+      if (supplied !== undefined) {
+        selected = categoryForInput(categories, type, supplied, parentCategory);
+        categorySource = "user_selected";
+      } else {
+        const preference = categoryFromMerchantPreference(
+          await userMerchantCategoryPreferences(userId, categories), { type, description },
+        );
+        const known = preference ? undefined
+          : knownMerchantCategory({ type, description }, await knownCategoryMerchants(), categories);
+        selected = preference || known || deterministicTransactionCategory(categories, description, type);
+        categorySource = preference ? "user_preference" : known ? "merchant_profile"
+          : selected ? "description_rule" : "unassigned";
+      }
       if (!selected) return res.status(400).json({ message: "Invalid category" });
       if (needsWant !== undefined && !isNeedWant(needsWant)) return res.status(400).json({ message: "Invalid Need / Want value" });
       const finalNW = needsWant ?? selected.needVsWant?.toLowerCase() ?? "na";
 
       const { rows } = await pool.query(
-        `INSERT INTO transactions (user_id, date, description, merchant, amount, type, parent_category, subcategory, needs_want, is_recurring, recurring_type, recurring_freq, source, notes)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING *`,
-        [userId, normalizedDate, description, description, Math.abs(parseFloat(amount)), type, selected.storedParentCategory, selected.storedCategory, finalNW,
+        `INSERT INTO transactions (user_id, date, description, merchant, merchant_source, amount, type, parent_category,
+          subcategory, category_source, needs_want, is_recurring, recurring_type, recurring_freq, source, notes)
+         VALUES ($1,$2,$3,$4,'manual_entry',$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING *`,
+        [userId, normalizedDate, description, description, Math.abs(parseFloat(amount)), type,
+         selected.storedParentCategory, selected.storedCategory, categorySource, finalNW,
          isRecurring ?? false, isRecurring && recurringType ? recurringType : null, isRecurring ? recurringFreq ?? null : null, source, notes || null]
       );
 
@@ -1424,9 +1436,10 @@ export function registerFinanceTrackerRoutes(app: Express) {
             const institutionName = item.institutionName || "Connected Institution";
             const { rows } = await pool.query(
               `INSERT INTO transactions (
-                 user_id, date, description, merchant, amount, type, parent_category, subcategory, needs_want,
+                 user_id, date, description, merchant, merchant_source, amount, type, parent_category,
+                 subcategory, category_source, needs_want,
                  recurring_freq, source, plaid_transaction_id, plaid_account_id, plaid_account_name, plaid_institution_name
-                ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,NULL,'plaid',$10,$11,$12,$13)
+                ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,NULL,'plaid',$12,$13,$14,$15)
                ON CONFLICT (user_id, plaid_transaction_id)
                  WHERE plaid_transaction_id IS NOT NULL
                DO UPDATE SET
@@ -1439,6 +1452,10 @@ export function registerFinanceTrackerRoutes(app: Express) {
                     SELECT 1 FROM transaction_change_history h WHERE h.user_id=transactions.user_id
                     AND h.transaction_id=transactions.id AND h.field IN ('merchant','description')
                   ) THEN transactions.merchant ELSE EXCLUDED.merchant END,
+                  merchant_source=CASE WHEN EXISTS (
+                    SELECT 1 FROM transaction_change_history h WHERE h.user_id=transactions.user_id
+                    AND h.transaction_id=transactions.id AND h.field IN ('merchant','description')
+                  ) THEN transactions.merchant_source ELSE EXCLUDED.merchant_source END,
                  amount=EXCLUDED.amount,
                  type=EXCLUDED.type,
                   parent_category=CASE WHEN transactions.is_user_modified OR
@@ -1447,6 +1464,9 @@ export function registerFinanceTrackerRoutes(app: Express) {
                   subcategory=CASE WHEN transactions.is_user_modified OR
                     (EXCLUDED.subcategory='unassigned' AND transactions.type=EXCLUDED.type)
                     THEN transactions.subcategory ELSE EXCLUDED.subcategory END,
+                   category_source=CASE WHEN transactions.is_user_modified OR
+                     (EXCLUDED.subcategory='unassigned' AND transactions.type=EXCLUDED.type)
+                     THEN transactions.category_source ELSE EXCLUDED.category_source END,
                   needs_want=CASE WHEN transactions.is_user_modified OR
                     (EXCLUDED.subcategory='unassigned' AND transactions.type=EXCLUDED.type)
                     THEN transactions.needs_want ELSE EXCLUDED.needs_want END,
@@ -1461,10 +1481,12 @@ export function registerFinanceTrackerRoutes(app: Express) {
                 transaction.date,
                 entry.description,
                 entry.merchant,
+                 entry.merchantSource,
                 entry.amount,
                 entry.type,
                 entry.parentCategory || null,
                 entry.subcategory || UNASSIGNED_TRANSACTION_CATEGORY,
+                 entry.categorySource,
                 entry.needsWant,
                 transaction.transaction_id,
                 transaction.account_id,
@@ -1584,13 +1606,23 @@ export function registerFinanceTrackerRoutes(app: Express) {
       if (description !== undefined && description !== existing.description) {
         addUpdate("description", description);
         addUpdate("merchant", description);
+        addUpdate("merchant_source", "user_edit");
       }
       if (amount !== undefined && Number.isFinite(Number(amount)) && Number(amount) !== Number(existing.amount)) {
         addUpdate("amount", Math.abs(Number(amount)));
       }
-      if (type !== undefined && type !== existing.type) addUpdate("type", type);
-      if (selectedCategory && selectedCategory.storedCategory !== existing.subcategory) addUpdate("subcategory", selectedCategory.storedCategory);
-      if (selectedCategory && selectedCategory.storedParentCategory !== existing.parent_category) addUpdate("parent_category", selectedCategory.storedParentCategory);
+      if (type !== undefined && type !== existing.type) {
+        addUpdate("type", type);
+        addUpdate("category_source", "user_edit");
+      }
+      if (selectedCategory && selectedCategory.storedCategory !== existing.subcategory) {
+        addUpdate("subcategory", selectedCategory.storedCategory);
+        addUpdate("category_source", "user_edit");
+      }
+      if (selectedCategory && selectedCategory.storedParentCategory !== existing.parent_category) {
+        addUpdate("parent_category", selectedCategory.storedParentCategory);
+        addUpdate("category_source", "user_edit");
+      }
       if (selectedCategory && needsWant === undefined && (selectedCategory.needVsWant?.toLowerCase() || "na") !== existing.needs_want) addUpdate("needs_want", selectedCategory.needVsWant?.toLowerCase() || "na");
       if (needsWant !== undefined && needsWant !== existing.needs_want) addUpdate("needs_want", needsWant);
       if (isRecurring !== undefined && Boolean(isRecurring) !== Boolean(existing.is_recurring)) {
@@ -1692,6 +1724,7 @@ export function registerFinanceTrackerRoutes(app: Express) {
           if (scopedFields.includes("subcategory") && selectedCategory) {
             addMerchantUpdate("subcategory", selectedCategory.storedCategory);
             addMerchantUpdate("parent_category", selectedCategory.storedParentCategory);
+            addMerchantUpdate("category_source", "user_edit");
             if (!scopedFields.includes("needsWant")) addMerchantUpdate("needs_want", selectedCategory.needVsWant?.toLowerCase() || "na");
           }
           if (scopedFields.includes("needsWant")) addMerchantUpdate("needs_want", needsWant);

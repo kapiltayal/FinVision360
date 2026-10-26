@@ -60,12 +60,15 @@ function editSimilarity(left: string, right: string): number {
  * Partial: a whole-token prefix >= 6 characters covering >= 75% of the input,
  * with at most two suffix tokens. Never infer a merchant from an incidental gift/card reference.
  */
-export function matchIngestedMerchant<T extends { name: string }>(value: string, merchants: T[]): T | undefined {
+export function matchIngestedMerchantWithMethod<T extends { name: string }>(
+  value: string,
+  merchants: T[],
+): { merchant: T; method: "exact" | "fuzzy" } | undefined {
   const key = cleanMerchantName(value);
   if (!key) return undefined;
   const index = getIngestedMerchantIndex(merchants);
   const exact = index.exact.get(key);
-  if (exact) return exact.length === 1 ? exact[0].merchant : undefined;
+  if (exact) return exact.length === 1 ? { merchant: exact[0].merchant, method: "exact" } : undefined;
   // Bound fuzzy work for pathological descriptors; the unchanged cleaned name is still returned by callers.
   if (key.length > 160) return undefined;
   const candidates = new Set<IndexedIngestedMerchant<T>>(index.byInitial.get(key[0]) || []);
@@ -89,7 +92,11 @@ export function matchIngestedMerchant<T extends { name: string }>(value: string,
     } else if (!runnerUp || score > runnerUp.score) runnerUp = { item, score };
   }
   if (!best || best.score < 0.90 || (runnerUp && best.score - runnerUp.score < 0.08)) return undefined;
-  return best.item.merchant;
+  return { merchant: best.item.merchant, method: "fuzzy" };
+}
+
+export function matchIngestedMerchant<T extends { name: string }>(value: string, merchants: T[]): T | undefined {
+  return matchIngestedMerchantWithMethod(value, merchants)?.merchant;
 }
 
 function merchantKey(value: string): string {

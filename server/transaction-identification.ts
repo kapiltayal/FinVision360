@@ -1,6 +1,6 @@
 import type { TransactionImportEntry } from "../shared/transaction-import";
 import type { RawRow } from "./asset-liability-ingestion";
-import { cleanMerchantName, matchIngestedMerchant } from "./merchant-matching";
+import { cleanMerchantName, matchIngestedMerchantWithMethod } from "./merchant-matching";
 import { completeIngestionClassification } from "./ai/provider";
 import { applyImportCategorySuggestion, hasSuppliedNeedWant, type CategoryMerchant, type ImportCategory } from "./transaction-import";
 
@@ -98,22 +98,36 @@ export async function identifyTransactionBatch(
 ): Promise<{ entries: TransactionImportEntry[]; uncategorized: number }> {
   const { categories, merchants, names, preferences } = context;
   const selected = new Map<number, IdentificationCategory>();
+  const categorySources = new Map<number, string>();
   const identified = entries.map((entry, index) => {
     const rawMerchant = entry.merchant || entry.description;
     const cleaned = cleanMerchantName(rawMerchant);
     const historical = names.get(cleaned);
-    const profile = matchIngestedMerchant(historical || cleaned, merchants);
+    const profileMatch = matchIngestedMerchantWithMethod(historical || cleaned, merchants);
+    const profile = profileMatch?.merchant;
     const merchant = historical || profile?.name || cleaned;
+    const merchantSource = historical ? "user_history"
+      : profileMatch?.method === "exact" ? "merchant_catalog_exact"
+      : profileMatch?.method === "fuzzy" ? "merchant_catalog_fuzzy"
+      : "cleaned_fallback";
     const preference = preferences.get(`${entry.type}:${cleanMerchantName(merchant)}`) ||
       preferences.get(`${entry.type}:${cleaned}`);
     const known = profile?.category_id == null ? undefined : categories.find(category =>
       category.id === profile.category_id && category.type.toLowerCase() === entry.type);
     const source = matchSourceCategory(categories, entry.type, entry.sourceCategory || "", entry.sourceParentCategory);
     const category = preference || known || source;
-    if (category) selected.set(index, category);
+    if (category) {
+      selected.set(index, category);
+      categorySources.set(index, preference ? "user_preference" : known ? "merchant_profile" : "provided_category");
+    }
     // This hidden alias is audit metadata, not an editable financial field.
     // Bound it before preview so repairing the visible merchant always permits saving.
-    return { ...entry, sourceMerchant: (entry.sourceMerchant ?? rawMerchant).slice(0, 2000), merchant };
+    return {
+      ...entry,
+      sourceMerchant: (entry.sourceMerchant ?? rawMerchant).slice(0, 2000),
+      merchant,
+      merchantSource,
+    };
   });
   const allowed = categories.filter(category => /^(income|expense)$/i.test(category.type) &&
     !/^(unassigned|uncategorized)$/i.test(category.category)).map(category => ({
@@ -150,7 +164,10 @@ export async function identifyTransactionBatch(
         const category = categories.find(category => category.id === item.categoryId &&
           category.type.toLowerCase() === entries[item.sourceIndex].type &&
           !/^(unassigned|uncategorized)$/i.test(category.category));
-        if (category) selected.set(item.sourceIndex, category);
+         if (category) {
+           selected.set(item.sourceIndex, category);
+           categorySources.set(item.sourceIndex, "ai");
+         }
       }
     } catch {
       // Failed/malformed classification never discards an otherwise valid financial row.
@@ -173,8 +190,10 @@ export async function identifyTransactionBatch(
   return {
     entries: identified.map((entry, index) => {
       const category = selected.get(index);
-      return category ? applyImportCategorySuggestion(entry, category, !hasSuppliedNeedWant(sourceRows[index] || {})) :
-        { ...entry, subcategory: "", parentCategory: "" };
+      const categorized = category
+        ? applyImportCategorySuggestion(entry, category, !hasSuppliedNeedWant(sourceRows[index] || {}))
+        : { ...entry, subcategory: "", parentCategory: "" };
+      return { ...categorized, categorySource: categorySources.get(index) || "unassigned" };
     }),
     uncategorized: identified.length - selected.size,
   };

@@ -52,6 +52,8 @@ app.use(createApiRequestLogger((message) => log(message)));
       date            DATE NOT NULL,
       description     TEXT NOT NULL,
       merchant        TEXT,
+      merchant_source TEXT,
+      category_source TEXT,
       amount          NUMERIC(12,2) NOT NULL,
       type            TEXT NOT NULL CHECK(type IN ('income','expense')),
        parent_category TEXT,
@@ -75,6 +77,8 @@ app.use(createApiRequestLogger((message) => log(message)));
     ALTER TABLE transactions ADD COLUMN IF NOT EXISTS plaid_account_name TEXT;
     ALTER TABLE transactions ADD COLUMN IF NOT EXISTS plaid_institution_name TEXT;
     ALTER TABLE transactions ADD COLUMN IF NOT EXISTS parent_category TEXT;
+    ALTER TABLE transactions ADD COLUMN IF NOT EXISTS merchant_source TEXT;
+    ALTER TABLE transactions ADD COLUMN IF NOT EXISTS category_source TEXT;
     ALTER TABLE transactions ADD COLUMN IF NOT EXISTS is_user_modified BOOLEAN NOT NULL DEFAULT FALSE;
     ALTER TABLE transactions ADD COLUMN IF NOT EXISTS recurring_freq TEXT DEFAULT NULL;
     DO $$

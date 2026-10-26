@@ -78,6 +78,11 @@ test("file handlers emit real ordered stages, preserve review on failures, scope
     const saved = await invoke("/api/transactions/import-reviewed", { body: { entries, requestId } });
     assert.equal(saved.statusCode, 200);
     assert.equal(saved.body.inserted, 1);
+    const stored = (await pool.query(
+      "SELECT merchant_source, category_source FROM transactions WHERE user_id=$1", [userId],
+    )).rows[0];
+    assert.equal(stored.merchant_source, "cleaned_fallback");
+    assert.equal(stored.category_source, "provided_category");
     const retry = await invoke("/api/transactions/import-reviewed", { body: { entries, requestId } });
     assert.deepEqual(retry.body, saved.body);
     assert.equal(await count(), 1);

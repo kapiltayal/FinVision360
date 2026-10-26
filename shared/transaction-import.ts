@@ -1,3 +1,25 @@
+export const MERCHANT_IDENTIFICATION_SOURCES = [
+  "user_history",
+  "merchant_catalog_exact",
+  "merchant_catalog_fuzzy",
+  "cleaned_fallback",
+  "manual_entry",
+  "user_edit",
+  "unknown",
+] as const;
+
+export const CATEGORY_IDENTIFICATION_SOURCES = [
+  "user_preference",
+  "merchant_profile",
+  "provided_category",
+  "ai",
+  "unassigned",
+  "user_selected",
+  "user_edit",
+  "description_rule",
+  "unknown",
+] as const;
+
 export interface TransactionImportEntry {
   id: number;
   date: string;
@@ -18,6 +40,8 @@ export interface TransactionImportEntry {
   sourceCategory?: string;
   sourceParentCategory?: string;
   sourceMerchant?: string;
+  merchantSource?: string;
+  categorySource?: string;
   sourceTransactionId?: string;
   sourceAccount?: string;
   include?: boolean;

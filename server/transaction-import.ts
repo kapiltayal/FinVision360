@@ -1,4 +1,8 @@
-import type { TransactionImportEntry } from "../shared/transaction-import";
+import {
+  CATEGORY_IDENTIFICATION_SOURCES,
+  MERCHANT_IDENTIFICATION_SOURCES,
+  type TransactionImportEntry,
+} from "../shared/transaction-import";
 import { createHash } from "node:crypto";
 import { stableSourceKey } from "../shared/transaction-duplicates";
 import type { RawRow } from "./asset-liability-ingestion";
@@ -46,6 +50,8 @@ export interface PreparedReviewedTransaction {
   categoryOverride?: boolean;
   merchantOverride?: boolean;
   sourceMerchant?: string;
+  merchantSource: (typeof MERCHANT_IDENTIFICATION_SOURCES)[number];
+  categorySource: (typeof CATEGORY_IDENTIFICATION_SOURCES)[number];
   notes: string | null;
   sourceTransactionId?: string;
   sourceAccount?: string;
@@ -366,6 +372,14 @@ export function validateReviewedTransactionEntries(
     if (entry.sourceMerchant !== undefined && (typeof entry.sourceMerchant !== "string" || entry.sourceMerchant.length > 2000)) {
       addError("sourceMerchant", "Source merchant must be text of at most 2000 characters");
     }
+    if (entry.merchantSource !== undefined &&
+        !(MERCHANT_IDENTIFICATION_SOURCES as readonly string[]).includes(entry.merchantSource)) {
+      addError("merchantSource", "Merchant source is not recognized");
+    }
+    if (entry.categorySource !== undefined &&
+        !(CATEGORY_IDENTIFICATION_SOURCES as readonly string[]).includes(entry.categorySource)) {
+      addError("categorySource", "Category source is not recognized");
+    }
     if (typeof entry.notes !== "string") addError("notes", "Notes must be text");
     for (const key of ["sourceTransactionId", "sourceAccount"] as const) {
       if (entry[key] !== undefined && (typeof entry[key] !== "string" || entry[key].length > 256)) {
@@ -406,6 +420,10 @@ export function validateReviewedTransactionEntries(
         ...(entry.categoryOverride === true ? { categoryOverride: true } : {}),
         ...(entry.merchantOverride === true ? { merchantOverride: true } : {}),
         ...(typeof entry.sourceMerchant === "string" ? { sourceMerchant: entry.sourceMerchant } : {}),
+        merchantSource: entry.merchantOverride === true ? "user_edit"
+          : (MERCHANT_IDENTIFICATION_SOURCES as readonly string[]).includes(entry.merchantSource) ? entry.merchantSource : "unknown",
+        categorySource: entry.categoryOverride === true ? "user_edit"
+          : (CATEGORY_IDENTIFICATION_SOURCES as readonly string[]).includes(entry.categorySource) ? entry.categorySource : "unknown",
         notes: entry.notes.trim() || null,
         ...(entry.sourceTransactionId ? { sourceTransactionId: entry.sourceTransactionId.trim() } : {}),
         ...(entry.sourceAccount ? { sourceAccount: entry.sourceAccount.trim() } : {}),
@@ -431,9 +449,9 @@ export async function saveReviewedTransactionBatch(
       const insertedRow = await client.query(
         `INSERT INTO transactions
            (user_id, date, description, merchant, amount, type, parent_category, subcategory,
-            needs_want, is_recurring, recurring_type, recurring_freq, source, notes,
+            merchant_source, category_source, needs_want, is_recurring, recurring_type, recurring_freq, source, notes,
             upload_source_id, upload_source_account, upload_identity)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,'upload',$13,$14,$15,$16) RETURNING id`,
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,'upload',$15,$16,$17,$18) RETURNING id`,
         [
           userId,
           transaction.date,
@@ -443,6 +461,8 @@ export async function saveReviewedTransactionBatch(
           transaction.type,
           transaction.parentCategory,
           transaction.subcategory,
+          transaction.merchantSource,
+          transaction.categorySource,
           transaction.needsWant,
           transaction.isRecurring,
           transaction.recurringType,

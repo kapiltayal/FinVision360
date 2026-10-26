@@ -47,6 +47,15 @@ test("uploads and Plaid identify before duplicates/recurrence, retain unresolved
     )).rows;
     const primary = categories[0], alternate = categories.find(row => row.category !== primary.category);
     assert.ok(primary && alternate);
+    const manual = await invoke("post", "/api/transactions", {
+      body: {
+        date: "2026-09-01", description: `Manual source ${suffix}`, amount: 19,
+        type: "expense", subcategory: primary.category, parentCategory: primary.parent_category,
+      },
+    });
+    assert.equal(manual.statusCode, 201);
+    assert.equal(manual.body.merchant_source, "manual_entry");
+    assert.equal(manual.body.category_source, "user_selected");
     for (const name of [profileName, historyName]) {
       merchantIds.push((await query(
         "INSERT INTO merchants(name,category_id,is_known_subscription) VALUES ($1,$2,TRUE) RETURNING id",
@@ -108,14 +117,20 @@ test("uploads and Plaid identify before duplicates/recurrence, retain unresolved
     assert.equal(entries[4].merchant, preferredName);
     assert.equal(entries[4].subcategory, alternate.category);
     assert.equal(aiCalls, 1, "only unresolved rows are classified together");
-    assert.equal(Number((await query("SELECT COUNT(*) FROM transactions WHERE user_id=$1", [userId])).rows[0].count), 1,
-      "preview does not write");
+    assert.equal(Number((await query("SELECT COUNT(*) FROM transactions WHERE user_id=$1", [userId])).rows[0].count), 2,
+      "preview does not write; only the explicit manual fixture and history exist");
     const reviewed = { ...entries[2], merchant: `Reviewed Shop ${suffix}`, merchantOverride: true,
       subcategory: alternate.category, parentCategory: alternate.parent_category, categoryOverride: true };
     const saved = await invoke("post", "/api/transactions/import-reviewed", {
       body: { entries: [reviewed], requestId: randomUUID() },
     });
     assert.equal(saved.statusCode, 200);
+    const reviewedSaved = (await query(
+      "SELECT merchant_source, category_source FROM transactions WHERE user_id=$1 AND merchant=$2",
+      [userId, reviewed.merchant],
+    )).rows[0];
+    assert.equal(reviewedSaved.merchant_source, "user_edit");
+    assert.equal(reviewedSaved.category_source, "user_edit");
     const reviewedHistory = await invoke("post", "/api/transactions/ingest/preview", {
       file: { ...file, buffer: Buffer.from(`Date,Description,Merchant,Amount\n2026-09-10,${quote(unknown)},${quote(unknown)},14`) },
     });
@@ -162,12 +177,18 @@ test("uploads and Plaid identify before duplicates/recurrence, retain unresolved
     assert.equal(bank.body.skippedReasons.pending, 1);
     const bankRows = (await query("SELECT * FROM transactions WHERE user_id=$1 AND source='plaid' ORDER BY plaid_transaction_id", [userId])).rows;
     assert.equal(bankRows[0].subcategory, primary.category);
+    assert.equal(bankRows[0].merchant_source, "cleaned_fallback");
+    assert.equal(bankRows[0].category_source, "ai");
     assert.equal(bankRows[0].description, "Original bank narrative 0");
     assert.equal(bankRows[1].subcategory, "unassigned", "unresolved Plaid rows are retained");
+    assert.equal(bankRows[1].category_source, "unassigned");
     assert.equal(bankRows[2].merchant, profileName);
     assert.equal(bankRows[2].subcategory, primary.category);
+    assert.equal(bankRows[2].category_source, "merchant_profile");
     assert.equal(bankRows[3].merchant, preferredName);
     assert.equal(bankRows[3].subcategory, alternate.category);
+    assert.equal(bankRows[3].merchant_source, "user_history");
+    assert.equal(bankRows[3].category_source, "user_preference");
     assert.equal(bankRows[0].is_user_modified, false, "this category was automatic, not user-protected");
     failAI = true;
     classificationCompleted = false;
@@ -197,6 +218,8 @@ test("uploads and Plaid identify before duplicates/recurrence, retain unresolved
     assert.equal(preserved.merchant, editedName);
     assert.equal(preserved.description, editedName);
     assert.equal(preserved.subcategory, alternate.category);
+    assert.equal(preserved.merchant_source, "user_edit");
+    assert.equal(preserved.category_source, "user_edit");
     assert.equal(Number((await query("SELECT COUNT(*) FROM transactions WHERE user_id=$1 AND source='plaid'", [userId])).rows[0].count), 4,
       "replay upserts rather than inserting duplicates");
   } finally {

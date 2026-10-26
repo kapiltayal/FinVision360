@@ -142,6 +142,8 @@ export const transactions = pgTable("transactions", {
   date: date("date").notNull(),
   description: text("description").notNull(),
   merchant: text("merchant"),
+  merchantSource: text("merchant_source"),
+  categorySource: text("category_source"),
   amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
   type: text("type").notNull(),
   parentCategory: text("parent_category"),

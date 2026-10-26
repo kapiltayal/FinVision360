@@ -53,7 +53,9 @@ test("user history wins identity and category; explicit corrections beat newer a
   const original = entry("TST* Netflix #43 CA", 77);
   const result = await identifyTransactionBatch([original], [{}], context, noAI);
   assert.equal(result.entries[0].merchant, "My Streaming");
+  assert.equal(result.entries[0].merchantSource, "user_history");
   assert.equal(result.entries[0].subcategory, "Groceries");
+  assert.equal(result.entries[0].categorySource, "user_preference");
   assert.equal(result.entries[0].description, original.description);
   assert.equal(result.entries[0].id, 77);
   assert.equal(original.merchant, "TST* Netflix #43 CA", "input is not mutated");
@@ -65,7 +67,9 @@ test("category priority is explicit history, catalog, source, then AI; Need/Want
   const catalogResult = await identifyTransactionBatch([original], [raw],
     buildIdentificationContext(categories, catalog, []), noAI);
   assert.equal(catalogResult.entries[0].merchant, "Netflix");
+  assert.equal(catalogResult.entries[0].merchantSource, "merchant_catalog_exact");
   assert.equal(catalogResult.entries[0].subcategory, "Entertainment");
+  assert.equal(catalogResult.entries[0].categorySource, "merchant_profile");
   assert.equal(catalogResult.entries[0].needsWant, "need");
   assert.equal(catalogResult.entries[0].sourceCategory, "Groceries");
   assert.equal(catalogResult.entries[0].amount, "10.00");
@@ -75,6 +79,8 @@ test("category priority is explicit history, catalog, source, then AI; Need/Want
   const sourceResult = await identifyTransactionBatch([entry("Unknown Store", 1, raw)], [raw],
     buildIdentificationContext(categories, [], []), noAI);
   assert.equal(sourceResult.entries[0].subcategory, "Groceries");
+  assert.equal(sourceResult.entries[0].categorySource, "provided_category");
+  assert.equal(sourceResult.entries[0].merchantSource, "cleaned_fallback");
 });
 
 test("source subcategory and parent are independent of header order, type and ambiguous parents are guarded", () => {
@@ -109,6 +115,7 @@ test("AI only resolves validated canonical IDs for the server-owned row and orig
       { sourceIndex: 999, categoryId: 1 },
     ] });
   });
+  assert.equal(result.entries[0].categorySource, "ai");
   assert.equal(result.entries[0].subcategory, "Entertainment");
   assert.equal(result.entries[0].type, "expense");
   assert.equal(result.entries[0].id, 900);
