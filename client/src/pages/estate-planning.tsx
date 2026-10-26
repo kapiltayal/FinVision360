@@ -405,16 +405,56 @@ export default function EstatePlanningPage() {
 
       {/* ── Section A: Beneficiary Designations ── */}
       {activeTab === "beneficiaries" && <>
-        <div className="mb-4 flex flex-wrap items-center gap-x-2 gap-y-1 border-l-2 border-blue-500/60 pl-3">
-          <UserCheck className="h-4 w-4 shrink-0 text-blue-500" aria-hidden="true" />
-          <span className="text-sm font-medium text-foreground">Beneficiary coverage</span>
-          <span className="text-sm font-bold tabular-nums text-blue-600 dark:text-blue-400">
-            {beneficiaryValueCoverage}%
-          </span>
-          <span className="text-xs text-muted-foreground">
-            ({formatCurrency(assignedBeneficiaryValue)} of {formatCurrency(totalAssetValue)} in total assets)
-          </span>
-        </div>
+        <Card className="mb-4 overflow-hidden border-blue-200/70 bg-gradient-to-br from-blue-50 via-background to-indigo-50 shadow-sm dark:border-blue-900/60 dark:from-blue-950/35 dark:via-card dark:to-indigo-950/25">
+          <CardContent className="p-4 sm:p-5">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div className="flex min-w-0 items-center gap-3">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white shadow-sm shadow-blue-600/20">
+                  <UserCheck className="h-5 w-5" aria-hidden="true" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-blue-700 dark:text-blue-300">
+                    Estate readiness
+                  </p>
+                  <h2 className="mt-0.5 text-base font-semibold text-foreground sm:text-lg">
+                    Beneficiary coverage
+                  </h2>
+                </div>
+              </div>
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-3xl font-bold leading-none tracking-tight tabular-nums text-blue-700 dark:text-blue-300 sm:text-4xl">
+                  {beneficiaryValueCoverage}%
+                </span>
+                <span className="text-xs font-medium text-muted-foreground">covered</span>
+              </div>
+            </div>
+            <div className="mt-4">
+              <div
+                className="h-2 overflow-hidden rounded-full bg-blue-100 dark:bg-blue-950/70"
+                role="progressbar"
+                aria-label="Beneficiary coverage"
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={beneficiaryValueCoverage}
+              >
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-blue-600 to-indigo-500 transition-[width] duration-500"
+                  style={{ width: `${Math.min(100, Math.max(0, beneficiaryValueCoverage))}%` }}
+                />
+              </div>
+              <p className="mt-2 text-sm text-muted-foreground">
+                <span className="font-semibold tabular-nums text-foreground">
+                  {formatCurrency(assignedBeneficiaryValue)}
+                </span>
+                {" "}of{" "}
+                <span className="font-medium tabular-nums text-foreground">
+                  {formatCurrency(totalAssetValue)}
+                </span>
+                {" "}in total assets have a named beneficiary
+              </p>
+            </div>
+          </CardContent>
+        </Card>
         <Card>
           <CardHeader className="pb-3">
             <div className="flex items-center gap-2">
