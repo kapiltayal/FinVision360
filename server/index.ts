@@ -125,6 +125,7 @@ app.use(createApiRequestLogger((message) => log(message)));
     CREATE TABLE IF NOT EXISTS merchants (
       id SERIAL PRIMARY KEY,
       name TEXT NOT NULL,
+      keywords TEXT NOT NULL DEFAULT '',
       logo_url TEXT,
       category_id INTEGER,
       is_known_subscription BOOLEAN NOT NULL DEFAULT FALSE
@@ -132,6 +133,17 @@ app.use(createApiRequestLogger((message) => log(message)));
     CREATE UNIQUE INDEX IF NOT EXISTS merchants_name_unique ON merchants(name);
   `);
   await pool.query("ALTER TABLE merchants ADD COLUMN IF NOT EXISTS is_known_recurring BOOLEAN NOT NULL DEFAULT FALSE");
+  const merchantKeywordsColumn = await pool.query(`
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = current_schema()
+      AND table_name = 'merchants'
+      AND column_name = 'keywords'
+  `);
+  await pool.query("ALTER TABLE merchants ADD COLUMN IF NOT EXISTS keywords TEXT NOT NULL DEFAULT ''");
+  if (merchantKeywordsColumn.rowCount === 0) {
+    await pool.query("UPDATE merchants SET keywords = name");
+  }
 
   // Capture the source selected during signup. Keep this additive so existing
   // users and databases can be upgraded without changing existing records.
