@@ -13,6 +13,15 @@ export function transactionCategoryChoiceValue(category: Pick<TransactionImportC
   return JSON.stringify([category.parentCategory, category.category]);
 }
 
+export function findTransactionImportCategory(
+  categories: TransactionImportCategory[], type: string, category: string, parentCategory: string,
+): TransactionImportCategory | undefined {
+  const matches = categories.filter(item =>
+    item.category === category && item.type.toLowerCase() === type.toLowerCase());
+  if (parentCategory) return matches.find(item => item.parentCategory === parentCategory);
+  return matches.length === 1 ? matches[0] : undefined;
+}
+
 export type TransactionImportReviewField =
   Exclude<
     keyof TransactionImportEntry,
@@ -65,9 +74,7 @@ export function validateTransactionImportEntry(
   }
   if (entry.type !== "income" && entry.type !== "expense") errors.type = "Choose income or expense.";
   if (entry.subcategory) {
-    const category = categories.find(item =>
-      item.category === entry.subcategory && item.type.toLowerCase() === entry.type,
-    );
+    const category = findTransactionImportCategory(categories, entry.type, entry.subcategory, entry.parentCategory);
     if (!category) errors.subcategory = "Choose a category for this transaction type.";
   }
   if (entry.needsWant !== "need" && entry.needsWant !== "want" && entry.needsWant !== "na") {

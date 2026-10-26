@@ -20,6 +20,7 @@ import { TransactionImportProgress, transactionImportStageLabel, type ImportProg
 import { createImportRequestId, readTransactionImportStream } from "./transaction-import-stream";
 import {
   createBlankTransactionImportEntry,
+  findTransactionImportCategory,
   transactionCategoryChoiceValue,
   validateTransactionImportEntry,
   type TransactionImportCategory,
@@ -506,8 +507,8 @@ export function TransactionFileImportPanel({
     const invalidSelected = selected.some(entry => Object.keys(validateTransactionImportEntry(entry, categories)).length > 0);
     if (!selected.length || invalidSelected || checking || checkError || categoriesLoading || categoriesError) return;
     const payloadEntries = entries.map(entry => {
-      const category = categories.find(item => item.category === entry.subcategory && item.type.toLowerCase() === entry.type);
-      return { ...entry, parentCategory: category?.parentCategory ?? "", recurringType: entry.isRecurring ? entry.recurringType : "", recurringFreq: entry.isRecurring ? entry.recurringFreq : "" };
+      const category = findTransactionImportCategory(categories, entry.type, entry.subcategory, entry.parentCategory);
+      return { ...entry, parentCategory: category?.parentCategory ?? entry.parentCategory, recurringType: entry.isRecurring ? entry.recurringType : "", recurringFreq: entry.isRecurring ? entry.recurringFreq : "" };
     });
     const payload = JSON.stringify(payloadEntries);
     if (!requestRef.current || requestRef.current.payload !== payload) requestRef.current = { payload, id: createImportRequestId() };

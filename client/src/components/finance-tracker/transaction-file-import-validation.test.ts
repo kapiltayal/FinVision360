@@ -3,6 +3,7 @@ import test from "node:test";
 import type { TransactionImportEntry } from "@shared/transaction-import";
 import {
   createBlankTransactionImportEntry,
+  findTransactionImportCategory,
   transactionCategoryChoiceValue,
   validateTransactionImportEntry,
   type TransactionImportCategory,
@@ -17,8 +18,20 @@ test("category review values distinguish the same label in different parents", (
 
 const categories: TransactionImportCategory[] = [
   { type: "expense", parentCategory: "Food", category: "Groceries", needVsWant: "need" },
+  { type: "expense", parentCategory: "Travel", category: "Other", needVsWant: null },
+  { type: "expense", parentCategory: "Food", category: "Other", needVsWant: "want" },
   { type: "income", parentCategory: "Employment", category: "Salary", needVsWant: null },
 ];
+
+test("save-time category resolution preserves the reviewed parent and validates the exact pair", () => {
+  const reviewed = { ...validEntry(), subcategory: "Other", parentCategory: "Travel" };
+  assert.equal(findTransactionImportCategory(categories, reviewed.type, reviewed.subcategory, reviewed.parentCategory)?.parentCategory, "Travel");
+  assert.equal(validateTransactionImportEntry(reviewed, categories).subcategory, undefined);
+  assert.equal(findTransactionImportCategory(categories, reviewed.type, reviewed.subcategory, "") , undefined,
+    "same-label choices without an explicit parent are not silently resolved");
+  reviewed.parentCategory = "Missing";
+  assert.match(validateTransactionImportEntry(reviewed, categories).subcategory || "", /category for this transaction type/i);
+});
 
 function validEntry(): TransactionImportEntry {
   return {

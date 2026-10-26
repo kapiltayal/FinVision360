@@ -8,6 +8,38 @@ export type MerchantIdentity = {
 
 export type MerchantCatalog<T> = Array<{ merchant: T; key: string }>;
 
+type IndexedIngestedMerchant<T extends { name: string }> = { merchant: T; key: string };
+type IngestedMerchantIndex<T extends { name: string }> = {
+  exact: Map<string, IndexedIngestedMerchant<T>[]>;
+  byLength: Map<number, IndexedIngestedMerchant<T>[]>;
+  byInitial: Map<string, IndexedIngestedMerchant<T>[]>;
+};
+const ingestedMerchantIndexes = new WeakMap<object, IngestedMerchantIndex<{ name: string }>>();
+
+function getIngestedMerchantIndex<T extends { name: string }>(merchants: T[]): IngestedMerchantIndex<T> {
+  const cached = ingestedMerchantIndexes.get(merchants) as IngestedMerchantIndex<T> | undefined;
+  if (cached) return cached;
+  const index: IngestedMerchantIndex<T> = {
+    exact: new Map(), byLength: new Map(), byInitial: new Map(),
+  };
+  for (const merchant of merchants) {
+    const key = cleanMerchantName(merchant.name);
+    if (!key) continue;
+    const item = { merchant, key };
+    const exact = index.exact.get(key) || [];
+    exact.push(item);
+    index.exact.set(key, exact);
+    const sameLength = index.byLength.get(key.length) || [];
+    sameLength.push(item);
+    index.byLength.set(key.length, sameLength);
+    const sameInitial = index.byInitial.get(key[0]) || [];
+    sameInitial.push(item);
+    index.byInitial.set(key[0], sameInitial);
+  }
+  ingestedMerchantIndexes.set(merchants, index as IngestedMerchantIndex<{ name: string }>);
+  return index;
+}
+
 function editSimilarity(left: string, right: string): number {
   if (Math.abs(left.length - right.length) > Math.max(left.length, right.length) * 0.1) return 0;
   let previous = Array.from({ length: right.length + 1 }, (_, index) => index);
@@ -31,23 +63,33 @@ function editSimilarity(left: string, right: string): number {
 export function matchIngestedMerchant<T extends { name: string }>(value: string, merchants: T[]): T | undefined {
   const key = cleanMerchantName(value);
   if (!key) return undefined;
-  const catalog = merchants.map(merchant => ({ merchant, key: cleanMerchantName(merchant.name) }))
-    .filter(item => item.key);
-  const exact = catalog.filter(item => item.key === key);
-  if (exact.length) return exact.length === 1 ? exact[0].merchant : undefined;
+  const index = getIngestedMerchantIndex(merchants);
+  const exact = index.exact.get(key);
+  if (exact) return exact.length === 1 ? exact[0].merchant : undefined;
   // Bound fuzzy work for pathological descriptors; the unchanged cleaned name is still returned by callers.
   if (key.length > 160) return undefined;
-  const ranked = catalog.map(item => {
+  const candidates = new Set<IndexedIngestedMerchant<T>>(index.byInitial.get(key[0]) || []);
+  const shortestPossible = Math.ceil(key.length * 0.9);
+  const longestPossible = Math.floor(key.length / 0.9);
+  for (let length = shortestPossible; length <= longestPossible; length++) {
+    for (const item of index.byLength.get(length) || []) candidates.add(item);
+  }
+  let best: { item: IndexedIngestedMerchant<T>; score: number } | undefined;
+  let runnerUp: { item: IndexedIngestedMerchant<T>; score: number } | undefined;
+  for (const item of Array.from(candidates)) {
     const partial = item.key.length >= 6 && key.startsWith(`${item.key} `) &&
       item.key.length / key.length >= 0.75 &&
       key.slice(item.key.length).trim().split(" ").length <= 2 &&
       !/\b(?:gift|card|via|for)\b/.test(key.slice(item.key.length));
     const score = partial ? 0.96 : Math.min(key.length, item.key.length) >= 8 && item.key.length <= 160
       ? editSimilarity(key, item.key) : 0;
-    return { ...item, score };
-  }).sort((a, b) => b.score - a.score);
-  return ranked[0]?.score >= 0.90 && (!ranked[1] || ranked[0].score - ranked[1].score >= 0.08)
-    ? ranked[0].merchant : undefined;
+    if (!best || score > best.score) {
+      runnerUp = best;
+      best = { item, score };
+    } else if (!runnerUp || score > runnerUp.score) runnerUp = { item, score };
+  }
+  if (!best || best.score < 0.90 || (runnerUp && best.score - runnerUp.score < 0.08)) return undefined;
+  return best.item.merchant;
 }
 
 function merchantKey(value: string): string {

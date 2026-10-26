@@ -135,6 +135,26 @@ test("AI batches fit provider limits; a failed batch does not prevent later batc
   assert.ok(result.entries.slice(25).every(row => row.subcategory === "Groceries"));
 });
 
+test("large AI classifications run at most three provider batches concurrently", async () => {
+  const rows = Array.from({ length: 176 }, (_, index) => entry(`Unique unmatched brand ${index}` , index + 1));
+  let active = 0;
+  let maximumActive = 0;
+  let calls = 0;
+  const result = await identifyTransactionBatch(rows, rows, buildIdentificationContext(categories, [], []), async prompt => {
+    active++;
+    maximumActive = Math.max(maximumActive, active);
+    calls++;
+    await new Promise(resolve => setTimeout(resolve, 5));
+    const input = JSON.parse(prompt);
+    active--;
+    return JSON.stringify({ entries: input.rows.map((row: any) => ({ sourceIndex: row.sourceIndex, categoryId: null })) });
+  });
+  assert.equal(calls, 8);
+  assert.equal(maximumActive, 3);
+  assert.equal(result.entries.length, rows.length);
+  assert.equal(result.uncategorized, rows.length);
+});
+
 test("malformed or oversized AI context stays unresolved; raw financial data is never truncated", async () => {
   const source = entry("Unknown");
   for (const response of ["not json", '{"entries":{}}', '{"entries":[null]}']) {
