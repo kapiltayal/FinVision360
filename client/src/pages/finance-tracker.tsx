@@ -8,7 +8,9 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { ConnectedAccountsImportPanel } from "@/components/finance-tracker/connected-accounts-import";
@@ -42,10 +44,10 @@ type Transaction = {
   plaid_account_name: string | null; plaid_institution_name: string | null;
   created_at: string; updated_at: string;
 };
-type TransactionAccount = {
-  plaid_account_id: string;
-  plaid_account_name: string | null;
-  plaid_institution_name: string | null;
+type TransactionCategoryOption = {
+  type: "income" | "expense";
+  parent_category: string | null;
+  subcategory: string;
 };
 type SortKey = "date" | "description" | "type" | "category" | "needsWant" | "amount" | "recurring";
 type SortDirection = "asc" | "desc";
@@ -207,6 +209,13 @@ function TrendChartLegend({ payload }: { payload?: Array<{ value?: string; color
 }
 function catLabel(v: string) {
   return ALL_SUBCATS.find(s => s.value === v)?.label ?? v;
+}
+function transactionCategoryValue(category: TransactionCategoryOption) {
+  return JSON.stringify([category.type, category.parent_category ?? "", category.subcategory]);
+}
+function transactionCategoryLabel(category: TransactionCategoryOption) {
+  const name = catLabel(category.subcategory);
+  return category.parent_category ? `${category.parent_category} · ${name}` : name;
 }
 function normalizeCategoryKey(value: string) {
   return value.toLowerCase().replace(/&/g, " and ").replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
@@ -762,7 +771,7 @@ export default function FinanceTrackerPage() {
   const [customStart, setCustomStart] = useState("");
   const [customEnd, setCustomEnd] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
-  const [transactionFilter, setTransactionFilter] = useState("all");
+  const [categoryFilter, setCategoryFilter] = useState("all");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
@@ -797,12 +806,24 @@ export default function FinanceTrackerPage() {
   const trendQK = ["/api/transactions/trend", start, end, groupBy];
   const catQK = ["/api/transactions/categories", start, end, catChartType];
   const insightsQK = ["/api/transactions/insights", start, end];
-  const txnQK = ["/api/transactions", start, end, typeFilter, search, transactionFilter];
-  const transactionFilterParams: Record<string, string> = transactionFilter.startsWith("account:")
-    ? { plaidAccountId: transactionFilter.slice("account:".length) }
-    : transactionFilter.startsWith("source:")
-      ? { source: transactionFilter.slice("source:".length) }
-      : {};
+  const {
+    data: transactionCategoriesRaw,
+    isLoading: transactionCategoriesLoading,
+    error: transactionCategoriesError,
+  } = useQuery<TransactionCategoryOption[]>({
+    queryKey: ["/api/transactions/filter-categories"],
+    queryFn: () => apiRequest("GET", "/api/transactions/filter-categories").then(r => r.json()),
+  });
+  const transactionCategories = Array.isArray(transactionCategoriesRaw) ? transactionCategoriesRaw : [];
+  const selectedCategory = categoryFilter === "all"
+    ? undefined
+    : transactionCategories.find(category => transactionCategoryValue(category) === categoryFilter);
+  const txnQK = ["/api/transactions", start, end, typeFilter, search, categoryFilter];
+  const transactionFilterParams: Record<string, string> = selectedCategory ? {
+    categoryType: selectedCategory.type,
+    categoryParent: selectedCategory.parent_category ?? "",
+    categoryName: selectedCategory.subcategory,
+  } : {};
   const insightParams = new URLSearchParams();
   if (start) insightParams.set("startDate", start);
   if (end) insightParams.set("endDate", end);
@@ -816,11 +837,6 @@ export default function FinanceTrackerPage() {
     queryFn: () => apiRequest("GET", `/api/transactions${buildQS(transactionFilterParams)}`).then(r => r.json()).catch(() => []),
   });
   const transactions: Transaction[] = Array.isArray(transactionsRaw) ? transactionsRaw : [];
-  const { data: transactionAccountsRaw } = useQuery<TransactionAccount[]>({
-    queryKey: ["/api/transactions/accounts"],
-    queryFn: () => apiRequest("GET", "/api/transactions/accounts").then(r => r.json()).catch(() => []),
-  });
-  const transactionAccounts = Array.isArray(transactionAccountsRaw) ? transactionAccountsRaw : [];
   const dateRangeLabel = period === "all"
     ? statsL
       ? "Loading…"
@@ -862,6 +878,7 @@ export default function FinanceTrackerPage() {
     queryClient.invalidateQueries({ queryKey: ["/api/transactions/stats"] });
     queryClient.invalidateQueries({ queryKey: ["/api/transactions/trend"] });
     queryClient.invalidateQueries({ queryKey: ["/api/transactions/categories"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/transactions/filter-categories"] });
     queryClient.invalidateQueries({ queryKey: ["/api/transactions/insights"] });
   }
 
@@ -1314,26 +1331,46 @@ export default function FinanceTrackerPage() {
                   </SelectContent>
                 </Select>
               </div>
-              {/* Account filter */}
-              <Select value={transactionFilter} onValueChange={value => { setTransactionFilter(value); setPage(1); }}>
-                <SelectTrigger className="h-8 w-[170px] text-xs" aria-label="Filter transactions by source or account">
-                  <SelectValue placeholder="All Transactions" />
+              {/* Category filter */}
+              <Select value={categoryFilter} onValueChange={value => {
+                setCategoryFilter(value);
+                const nextCategory = transactionCategories.find(category => transactionCategoryValue(category) === value);
+                if (nextCategory) setTypeFilter(nextCategory.type);
+                setPage(1);
+              }}>
+                <SelectTrigger className="h-8 w-[190px] text-xs" aria-label="Filter transactions by category">
+                  <SelectValue placeholder="All Categories" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Transactions</SelectItem>
-                  {transactionAccounts.map(account => (
-                    <SelectItem key={account.plaid_account_id} value={`account:${account.plaid_account_id}`}>
-                      {[account.plaid_institution_name, account.plaid_account_name].filter(Boolean).join(" · ") || "Connected Account"}
-                    </SelectItem>
-                  ))}
-                  <SelectItem value="source:upload">File Uploads</SelectItem>
-                  <SelectItem value="source:manual">Manual Entry</SelectItem>
+                  <SelectItem value="all">All Categories</SelectItem>
+                  {transactionCategoriesLoading ? (
+                    <SelectItem value="loading-categories" disabled>Loading categories…</SelectItem>
+                  ) : transactionCategoriesError ? (
+                    <SelectItem value="category-error" disabled>Categories unavailable</SelectItem>
+                  ) : (["income", "expense"] as const).map(type => {
+                    const options = transactionCategories.filter(category => category.type === type);
+                    if (!options.length) return null;
+                    return (
+                      <SelectGroup key={type}>
+                        <SelectLabel>{type === "income" ? "Income" : "Expense"}</SelectLabel>
+                        {options.map(category => (
+                          <SelectItem key={transactionCategoryValue(category)} value={transactionCategoryValue(category)}>
+                            {transactionCategoryLabel(category)}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    );
+                  })}
                 </SelectContent>
               </Select>
               {/* Type filter */}
               <div className="flex rounded-lg border overflow-hidden text-xs">
                 {[["all","All"],["income","Income"],["expense","Expense"]].map(([v,l]) => (
-                  <button key={v} onClick={() => { setTypeFilter(v); setPage(1); }}
+                  <button key={v} onClick={() => {
+                    setTypeFilter(v);
+                    if (v !== "all" && selectedCategory && selectedCategory.type !== v) setCategoryFilter("all");
+                    setPage(1);
+                  }}
                     className={`px-3 py-1.5 transition-all ${typeFilter===v?"bg-slate-800 text-white dark:bg-slate-200 dark:text-slate-900":"hover:bg-muted"}`}>
                     {l}
                   </button>

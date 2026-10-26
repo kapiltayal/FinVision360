@@ -654,11 +654,38 @@ export function registerFinanceTrackerRoutes(app: Express) {
     }
   });
 
+  // GET /api/transactions/filter-categories — this user's categories, regardless of current date/page filters
+  app.get("/api/transactions/filter-categories", requireAuth, async (req, res) => {
+    try {
+      const userId = (req.user as any).id;
+      const { rows } = await pool.query(
+        `SELECT type, parent_category, subcategory
+         FROM (
+           SELECT DISTINCT lower(type) AS type,
+             NULLIF(BTRIM(parent_category), '') AS parent_category,
+             subcategory
+           FROM transactions
+           WHERE user_id = $1 AND lower(type) IN ('income', 'expense')
+         ) categories
+         ORDER BY CASE type WHEN 'income' THEN 0 ELSE 1 END,
+           parent_category NULLS FIRST, subcategory`,
+        [userId],
+      );
+      res.json(rows);
+    } catch (e) {
+      logRouteFailure(req, e);
+      res.status(500).json({ message: "Failed to fetch transaction filter categories" });
+    }
+  });
+
   // GET /api/transactions — list with optional filters
   app.get("/api/transactions", requireAuth, async (req, res) => {
     try {
       const userId = (req.user as any).id;
-      const { startDate, endDate, type, subcategory, source, recurring, search, plaidAccountId } = req.query as Record<string, string>;
+      const {
+        startDate, endDate, type, subcategory, source, recurring, search, plaidAccountId,
+        categoryType, categoryParent, categoryName,
+      } = req.query as Record<string, string>;
 
       let sql = `SELECT * FROM transactions WHERE user_id = $1`;
       const params: any[] = [userId];
@@ -668,6 +695,16 @@ export function registerFinanceTrackerRoutes(app: Express) {
       if (endDate) { sql += ` AND date <= $${idx++}`; params.push(endDate); }
       if (type) { sql += ` AND type = $${idx++}`; params.push(type); }
       if (subcategory) { sql += ` AND subcategory = $${idx++}`; params.push(subcategory); }
+      if (categoryType && categoryName) {
+        sql += ` AND type = $${idx++}`;
+        params.push(categoryType);
+        sql += ` AND subcategory = $${idx++}`;
+        params.push(categoryName);
+        if (categoryParent !== undefined) {
+          sql += ` AND COALESCE(BTRIM(parent_category), '') = $${idx++}`;
+          params.push(categoryParent);
+        }
+      }
       if (source) { sql += ` AND source = $${idx++}`; params.push(source); }
       if (recurring === "true") sql += ` AND is_recurring = TRUE`;
       if (search) { sql += ` AND description ILIKE $${idx++}`; params.push(`%${search}%`); }
