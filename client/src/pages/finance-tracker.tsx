@@ -1167,32 +1167,36 @@ export default function FinanceTrackerPage() {
       )}
 
       {/* ── Period Selector ── */}
-      <div className="flex flex-wrap gap-2 items-center">
-        {PERIOD_OPTIONS.map(o => (
-          <button
-            key={o.value}
-            onClick={() => { setPeriod(o.value); setPage(1); }}
-            className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-all ${period === o.value
-              ? "bg-blue-600 text-white border-blue-600"
-              : "border-slate-200 dark:border-slate-700 hover:border-blue-400 text-muted-foreground"}`}
-          >
-            {o.label}
-          </button>
-        ))}
-        {period === "custom" && (
-          <div className="flex items-center gap-1.5">
-            <Input type="date" value={customStart} onChange={e => setCustomStart(e.target.value)} className="h-8 w-36 text-xs" />
-            <span className="text-muted-foreground text-xs">→</span>
-            <Input type="date" value={customEnd} onChange={e => setCustomEnd(e.target.value)} className="h-8 w-36 text-xs" />
+      <Card>
+        <CardContent className="space-y-2 p-3">
+          <div className="flex flex-wrap gap-2 items-center">
+            {PERIOD_OPTIONS.map(o => (
+              <button
+                key={o.value}
+                onClick={() => { setPeriod(o.value); setPage(1); }}
+                className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-all ${period === o.value
+                  ? "bg-blue-600 text-white border-blue-600"
+                  : "border-slate-200 dark:border-slate-700 hover:border-blue-400 text-muted-foreground"}`}
+              >
+                {o.label}
+              </button>
+            ))}
+            {period === "custom" && (
+              <div className="flex items-center gap-1.5">
+                <Input type="date" value={customStart} onChange={e => setCustomStart(e.target.value)} className="h-8 w-36 text-xs" />
+                <span className="text-muted-foreground text-xs">→</span>
+                <Input type="date" value={customEnd} onChange={e => setCustomEnd(e.target.value)} className="h-8 w-36 text-xs" />
+              </div>
+            )}
           </div>
-        )}
-      </div>
-      <div className="flex items-center gap-1.5 text-xs text-muted-foreground" aria-live="polite">
-        <CalendarDays className="h-3.5 w-3.5 text-blue-500" />
-        <span>
-          Showing transactions from <span className="font-medium text-foreground">{dateRangeLabel}</span>
-        </span>
-      </div>
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground" aria-live="polite">
+            <CalendarDays className="h-3.5 w-3.5 text-blue-500" />
+            <span>
+              Showing transactions from <span className="font-medium text-foreground">{dateRangeLabel}</span>
+            </span>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* ── Unassigned Alert ── */}
       {unassigned > 0 && (
