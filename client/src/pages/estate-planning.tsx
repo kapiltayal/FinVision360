@@ -430,7 +430,7 @@ export default function EstatePlanningPage() {
             </div>
             <div className="mt-4">
               <div
-                className="h-2 overflow-hidden rounded-full bg-blue-100 dark:bg-blue-950/70"
+                className="relative h-3 overflow-hidden rounded-full border border-white/80 bg-gradient-to-b from-blue-100 to-blue-200/80 shadow-inner dark:border-blue-300/10 dark:from-blue-950 dark:to-blue-900/80"
                 role="progressbar"
                 aria-label="Beneficiary coverage"
                 aria-valuemin={0}
@@ -438,9 +438,14 @@ export default function EstatePlanningPage() {
                 aria-valuenow={beneficiaryValueCoverage}
               >
                 <div
-                  className="h-full rounded-full bg-gradient-to-r from-blue-600 to-indigo-500 transition-[width] duration-500"
+                  className="relative h-full rounded-full bg-gradient-to-b from-sky-400 via-blue-600 to-indigo-700 shadow-[0_2px_6px_rgba(37,99,235,0.35)] ring-1 ring-inset ring-white/30 transition-[width] duration-500"
                   style={{ width: `${Math.min(100, Math.max(0, beneficiaryValueCoverage))}%` }}
-                />
+                >
+                  <span
+                    aria-hidden="true"
+                    className="absolute inset-x-0 top-0 h-1/2 rounded-t-full bg-gradient-to-b from-white/65 to-white/5"
+                  />
+                </div>
               </div>
               <p className="mt-2 text-sm text-muted-foreground">
                 <span className="font-semibold tabular-nums text-foreground">
