@@ -187,7 +187,7 @@ export const transactions = pgTable("transactions", {
 export const merchants = pgTable("merchants", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
-  keywords: text("keywords").notNull().default(""),
+  keywords: text("keywords"),
   logoUrl: text("logo_url"),
   categoryId: integer("category_id").references(() => transactionTypeList.id, { onDelete: "set null" }),
   isKnownSubscription: boolean("is_known_subscription").notNull().default(false),
