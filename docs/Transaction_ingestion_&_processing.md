@@ -1,6 +1,6 @@
 # Financial Transaction Ingestion and Processing
 
-*Implementation guide, reviewed against repository code on October 25, 2026.* [Documentation index](README.md).
+*Implementation guide, reviewed against repository code on October 27, 2026.* [Documentation index](README.md).
 
 This guide covers the three ways transactions enter the Finance Tracker: user-uploaded files, transactions imported on request from Plaid-connected accounts, and transactions entered manually. It follows each path from the user's selection through validation, categorization, review or confirmation, and database persistence.
 
@@ -189,6 +189,7 @@ The database constrains transaction type, Need/Want value, recurring type and fr
 |---|---|
 | `id` | Merchant profile primary key. |
 | `name` | Canonical brand name used for transaction matching; a unique index prevents duplicate exact names. |
+| `keywords` | Nullable comma-separated aliases used alongside the canonical name during exact, substring, and fuzzy merchant identification. Empty aliases are ignored; aliases resolve to the canonical merchant name. |
 | `logo_url` | Optional brand icon URL for display. |
 | `category_id` | Optional foreign key to `transaction_type_list.id`; a known profile suggests this exact category row, including its canonical parent and Need/Want default. Deleting the category sets this field to `NULL`. |
 | `is_known_subscription` | Defaults to `false`; explicitly identifies a subscription-only merchant. Can tag one transaction without waiting for three observations. |
@@ -489,7 +490,7 @@ The importer upserts rows returned by Plaid; it does not delete existing transac
 
 ### Merchant identity and priority
 
-Exact normalized merchant identity takes precedence. Missing merchants or copied bank descriptors allow guarded whole-token canonical matching, preferring longer names and rejecting ambiguity. Incidental brands never replace distinct explicit identities. Matched charges group by merchant ID; unmatched explicit identities group by normalized merchant name, while copied descriptors retain the first-three-word fallback.
+Recurrence grouping deliberately uses a separate, more conservative matcher than the shared ingestion identification pipeline above. Exact normalized merchant identity takes precedence. Missing merchants or copied bank descriptors allow guarded whole-token canonical-name matching, preferring longer names and rejecting ambiguity; it does not use merchant keywords or fuzzy matching. Incidental brands never replace distinct explicit identities. Matched charges group by merchant ID; unmatched explicit identities group by normalized merchant name, while copied descriptors retain the first-three-word fallback.
 
 1. **User history always wins.** Recurrence-specific audit edits, explicit file-review recurrence edits, and manually entered positive tags supply the merchant's tags. If choices conflict, the latest explicit choice wins for new/unmodified rows; transaction ID breaks ties. Existing corrected rows are never rewritten. Negative overrides propagate `is_recurring=false` and clear type/frequency. Category-only corrections do not establish recurrence preferences.
 2. **Reuse existing positive tags.** If any saved transaction for this user's merchant has `is_recurring=true`, reuse its `is_recurring`, `recurring_type` and `recurring_freq` exactly, including a `NULL` frequency, rather than running provider/catalog/heuristic classification again. This includes automatically tagged history, not only user edits. If saved positive rows conflict, use the newest transaction date and then highest database ID. Draft preview rows do not count as saved history. Explicit user overrides, including negative choices, still win.
