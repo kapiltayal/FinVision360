@@ -18,12 +18,24 @@ function categoryKey(value: string): string {
   return value.toLowerCase().replace(/&/g, " and ").replace(/[^a-z0-9]+/g, " ").trim();
 }
 
+const sourceCategoryIndexes = new WeakMap<ImportCategory[], Map<string, ImportCategory[]>>();
+function sourceCategoryIndex<T extends ImportCategory>(categories: T[]): Map<string, T[]> {
+  const cached = sourceCategoryIndexes.get(categories);
+  if (cached) return cached as Map<string, T[]>;
+  const index = new Map<string, T[]>();
+  for (const item of categories) {
+    const key = `${item.type.toLowerCase()}:${categoryKey(item.category)}`;
+    index.set(key, [...(index.get(key) || []), item]);
+  }
+  sourceCategoryIndexes.set(categories, index);
+  return index;
+}
+
 export function matchSourceCategory<T extends ImportCategory>(
   categories: T[], type: string, category: string, parent = "",
 ): T | undefined {
   if (!category || /^(?:unassigned|uncategorized)$/i.test(category)) return undefined;
-  const matches = categories.filter(item => item.type.toLowerCase() === type.toLowerCase() &&
-    categoryKey(item.category) === categoryKey(category) &&
+  const matches = (sourceCategoryIndex(categories).get(`${type.toLowerCase()}:${categoryKey(category)}`) || []).filter(item =>
     (!parent || categoryKey(item.parentCategory) === categoryKey(parent)));
   return matches.length === 1 ? matches[0] : undefined;
 }
@@ -57,14 +69,19 @@ export function buildIdentificationContext(
       if (!preferences.has(typedKey)) preferences.set(typedKey, selected);
     }
   }
-  return { categories, merchants, names, preferences };
+  const categoriesById = new Map(categories.map(category => [category.id, category]));
+  // Reused only for this ingestion context, never across users or requests.
+  const identities = new Map<string, {
+    merchant: string; merchantSource: string; profile?: CategoryMerchant;
+  }>();
+  return { categories, categoriesById, merchants, names, preferences, identities };
 }
 
 export async function loadIdentificationContext(
   database: QueryClient, userId: string, categories: IdentificationCategory[],
 ): Promise<IdentificationContext> {
   const [merchants, history] = await Promise.all([
-    database.query("SELECT id, name, category_id FROM merchants"),
+    database.query("SELECT id, name, keywords, category_id FROM merchants"),
     database.query(
       `SELECT t.id, t.merchant, t.description, t.type, t.parent_category, t.subcategory, t.source, t.updated_at,
               h.name_override_at, h.category_override_at, h.name_aliases
@@ -96,29 +113,51 @@ export async function identifyTransactionBatch(
   entries: TransactionImportEntry[], sourceRows: RawRow[], context: IdentificationContext,
   classify: Classify = completeIngestionClassification,
 ): Promise<{ entries: TransactionImportEntry[]; uncategorized: number }> {
-  const { categories, merchants, names, preferences } = context;
+  const { categories, categoriesById, merchants, names, preferences, identities } = context;
   const selected = new Map<number, IdentificationCategory>();
   const categorySources = new Map<number, string>();
+  const pending: Array<{
+    sourceIndex: number;
+    transaction: { merchant: string; description: string; type: string; date: string; amount: string };
+    source: RawRow;
+  }> = [];
   const identified = entries.map((entry, index) => {
     const rawMerchant = entry.merchant || entry.description;
     const cleaned = cleanMerchantName(rawMerchant);
-    const historical = names.get(cleaned);
-    const profileMatch = matchIngestedMerchantWithMethod(historical || cleaned, merchants);
-    const profile = profileMatch?.merchant;
-    const merchant = historical || profile?.name || cleaned;
-    const merchantSource = historical ? "user_history"
-      : profileMatch?.method === "exact" ? "merchant_catalog_exact"
-      : profileMatch?.method === "fuzzy" ? "merchant_catalog_fuzzy"
-      : "cleaned_fallback";
+    let identity = identities.get(cleaned);
+    if (!identity) {
+      const historical = names.get(cleaned);
+      const profileMatch = matchIngestedMerchantWithMethod(historical || rawMerchant, merchants);
+      identity = {
+        merchant: historical || profileMatch?.merchant.name || cleaned.replace(/\b[a-z]/g, letter => letter.toUpperCase()),
+        merchantSource: historical ? "USER_HISTORY"
+          : profileMatch?.method === "exact" ? "EXACT_MATCH"
+          : profileMatch?.method === "string" ? "MERCHANT_STRING_MATCH"
+          : profileMatch?.method === "fuzzy" ? "FUZZY_MATCH" : "NO_MATCH",
+        profile: profileMatch?.merchant,
+      };
+      identities.set(cleaned, identity);
+    }
+    const { merchant, merchantSource, profile } = identity;
     const preference = preferences.get(`${entry.type}:${cleanMerchantName(merchant)}`) ||
       preferences.get(`${entry.type}:${cleaned}`);
-    const known = profile?.category_id == null ? undefined : categories.find(category =>
-      category.id === profile.category_id && category.type.toLowerCase() === entry.type);
-    const source = matchSourceCategory(categories, entry.type, entry.sourceCategory || "", entry.sourceParentCategory);
+    const profileCategory = profile?.category_id == null ? undefined : categoriesById.get(profile.category_id);
+    const known = profileCategory?.type.toLowerCase() === entry.type ? profileCategory : undefined;
+    const source = preference || known ? undefined
+      : matchSourceCategory(categories, entry.type, entry.sourceCategory || "", entry.sourceParentCategory);
     const category = preference || known || source;
     if (category) {
       selected.set(index, category);
-      categorySources.set(index, preference ? "user_preference" : known ? "merchant_profile" : "provided_category");
+      categorySources.set(index, preference ? "USER_HISTORY" : known ? "MERCHANT_CAT" : "BANK_DATA_CAT");
+    } else {
+      pending.push({
+        sourceIndex: index,
+        transaction: {
+          merchant: merchant.slice(0, 2000), description: entry.description.slice(0, 2000),
+          type: entry.type, date: entry.date, amount: entry.amount,
+        },
+        source: aiSource(sourceRows[index] || {}),
+      });
     }
     // This hidden alias is audit metadata, not an editable financial field.
     // Bound it before preview so repairing the visible merchant always permits saving.
@@ -142,12 +181,6 @@ export async function identifyTransactionBatch(
       rows,
     });
   };
-  const pending = identified.map((entry, sourceIndex) => ({
-    sourceIndex, transaction: {
-      merchant: entry.merchant.slice(0, 2000), description: entry.description.slice(0, 2000),
-      type: entry.type, date: entry.date, amount: entry.amount,
-    }, source: aiSource(sourceRows[sourceIndex] || {}),
-  })).filter(row => !selected.has(row.sourceIndex));
   const runBatch = async (batch: typeof pending) => {
     if (!batch.length || !allowed.length) return;
     try {
@@ -161,12 +194,11 @@ export async function identifyTransactionBatch(
       for (const item of response) {
         if (!Number.isInteger(item?.sourceIndex) || !indexes.has(item.sourceIndex) ||
             counts.get(item.sourceIndex) !== 1 || !Number.isInteger(item.categoryId)) continue;
-        const category = categories.find(category => category.id === item.categoryId &&
-          category.type.toLowerCase() === entries[item.sourceIndex].type &&
-          !/^(unassigned|uncategorized)$/i.test(category.category));
-         if (category) {
+        const category = categoriesById.get(item.categoryId);
+         if (category && category.type.toLowerCase() === entries[item.sourceIndex].type &&
+             !/^(unassigned|uncategorized)$/i.test(category.category)) {
            selected.set(item.sourceIndex, category);
-           categorySources.set(item.sourceIndex, "ai");
+            categorySources.set(item.sourceIndex, "AI_MATCH");
          }
       }
     } catch {
@@ -193,7 +225,7 @@ export async function identifyTransactionBatch(
       const categorized = category
         ? applyImportCategorySuggestion(entry, category, !hasSuppliedNeedWant(sourceRows[index] || {}))
         : { ...entry, subcategory: "", parentCategory: "" };
-      return { ...categorized, categorySource: categorySources.get(index) || "unassigned" };
+      return { ...categorized, categorySource: categorySources.get(index) || "NO_MATCH" };
     }),
     uncategorized: identified.length - selected.size,
   };

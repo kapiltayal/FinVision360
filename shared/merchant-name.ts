@@ -1,7 +1,7 @@
 /** Merchant matching key only: never use this to change source descriptions or reliable IDs. */
 export function cleanMerchantName(value: string): string {
   return value.normalize("NFKC").trim()
-    .replace(/^(?:(?:sq|tst|paypal)\s*(?:\*+\s*|\s+))+/i, "")
+    .replace(/^(?:(?:sq|tst|paypal|stripe|venmo|cashapp)\s*(?:\*+\s*|\s+))+/i, "")
     .replace(/\b(?:store|ref(?:erence)?)\s*#?\s*[0-9][a-z0-9-]*\b/gi, " ")
     .replace(/#\s*[a-z0-9-]+\b/gi, " ")
     .replace(/\b\d{4}[-/]\d{1,2}[-/]\d{1,2}\b|\b\d{1,2}[-/]\d{1,2}[-/](?:\d{4}|\d{2})\b/g, " ")

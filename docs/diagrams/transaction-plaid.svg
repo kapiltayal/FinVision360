@@ -19,7 +19,9 @@
     </g>
     <g font-size="16" font-weight="700">
       <text x="330" y="110">1. Select accounts/dates; validate ownership</text><text x="330" y="220">2. Fetch transactions in pages of 500</text>
-      <text x="330" y="330">3. Filter; clean and identify merchants</text><text x="330" y="440">4. Resolve category; batch AI fallback</text>
+      <text x="330" y="326">3. Filter; clean and identify merchants</text>
+      <text x="330" y="343" font-size="11">History → exact name/alias → longest string → fuzzy → Proper Case</text>
+      <text x="330" y="440">4. Resolve category; batch AI fallback</text>
       <text x="330" y="550">5. Upsert each accepted transaction</text><text x="330" y="660">6. Continue selected pages / institutions</text>
       <text x="330" y="770">7. Resolve recurrence; backfill history</text>
     </g>

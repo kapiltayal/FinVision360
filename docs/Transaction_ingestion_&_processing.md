@@ -36,7 +36,7 @@ The visible flowcharts are repository-local SVG images, so they do not require a
 ![Uploaded transaction flow: file validation, parsing, category suggestions, duplicate review, user edits, final validation, atomic database save and retry receipt.](diagrams/transaction-upload.svg)
 
 1. Authenticate, validate file type/signature/size, parse and normalize at most 500 nonblank rows.
-2. Clean and identify merchant names using exact user history → exact catalog → high-confidence fuzzy/partial catalog matching → cleaned fallback. Suggest categories using user preference → merchant profile → valid file category → batched AI IDs for unresolved rows.
+2. Clean and identify merchant names using exact user history → exact catalog name/keyword → longest contained name/keyword → high-confidence fuzzy catalog matching → Proper Case cleaned fallback. Suggest categories using user preference → merchant profile → valid file category → batched AI IDs for unresolved rows.
 3. Check duplicates within this file and the user's ledger, then detect recurrence using included rows plus the user's saved history. Return suggestions in a read-only editable preview; excluded duplicates do not supply extra observations.
 4. User corrects fields, chooses Save rows, and explicitly confirms legitimate content matches. Stable-ID repeats cannot be saved.
 5. Validate selected rows and review freshness; invalid input returns to review without a write.
@@ -51,7 +51,7 @@ The visible flowcharts are repository-local SVG images, so they do not require a
 flowchart TD
     A["Choose CSV, TSV, TXT, XLS, or XLSX"] --> B["Authenticate; check upload size, type, and file signature"]
     B --> C["Parse and normalize rows; reject files over 500 nonblank rows"]
-    C --> D["Clean/identify merchant: exact user history → exact global → confident fuzzy → cleaned fallback"]
+    C --> D["Merchant: history → exact name/keyword → longest string → fuzzy → Proper Case fallback"]
     D --> D1["Categories: user preference → known merchant profile → valid source category"]
     D1 --> E{"Category resolved?"}
     E -- "Yes" --> G["Apply available category and Need/Want suggestions; keep unresolved rows blank"]
@@ -80,7 +80,7 @@ AI-unavailable or unresolved categories remain editable; a valid reviewed transa
 1. User chooses connected institution/accounts and dates; server authenticates and validates ownership/range.
 2. Fetch active recurring-stream signals and Plaid transaction pages. Optional recurring-signal failures produce warnings; unavailable transaction institutions are reported while others continue.
 3. Skip pending transactions, transfers, non-USD values and invalid rows.
-4. Clean/identify accepted merchant names with the shared history/catalog/fuzzy pipeline; categorize using user preference → merchant profile → compatible Plaid category mapping → batched AI category IDs. Keep unresolved rows as Uncategorized, stored as `unassigned`.
+4. Clean/identify accepted merchant names with the shared history → exact name/keyword → longest string → fuzzy → Proper Case fallback pipeline; categorize using user preference → merchant profile → compatible Plaid category mapping → batched AI category IDs. Keep unresolved rows as Uncategorized, stored as `unassigned`.
 5. Upsert `transactions` by `(user_id, plaid_transaction_id)`; retain explicitly edited merchant/description and category/parent/Need-Want.
 6. Continue all selected pages/institutions. Writes are per row, not one atomic whole-import transaction; an unexpected database error may leave earlier rows committed.
 7. Resolve recurrence for merchants represented by the imported row IDs using the user's saved history. Reuse saved positive tags unless an explicit user override supersedes them; otherwise use provider/catalog/heuristic detection. Apply the resolved tags to imported and matching unmodified historical transactions, then return counts and refresh the ledger. Active owned-account Plaid outflow streams supply recurring flags/frequency when available; report a warning if the optional recurring endpoint is unavailable.
@@ -95,7 +95,7 @@ flowchart TD
     C --> D{"Pending, transfer, unsupported currency, or invalid account/amount?"}
     D -- "Yes" --> E["Skip and count the reason"]
     E --> U{"More rows, pages, or selected institutions?"}
-    D -- "No" --> F["Parse source values; clean/identify merchant using history → catalog → confident fuzzy"]
+    D -- "No" --> F["Parse source; merchant: history → exact name/keyword → longest string → fuzzy → Proper Case"]
     F --> G["Use user's saved merchant preference"]
     G --> H{"Resolved?"}
     H -- "No" --> I["Match known merchant category_id"]
@@ -212,12 +212,17 @@ Uploaded files and Plaid now share identification; manual entry retains its expl
 
 ### Shared merchant identification
 
-After file validation and essential row parsing (or Plaid eligibility checks), and **before duplicate handling or subscription detection**, normalize merchant information to lowercase. Strip SQ/TST/PayPal prefixes, hash/store/reference numbers, identifiable dates and phone numbers, trailing US state abbreviations (and optional ZIP), punctuation, and extra whitespace. Keep meaningful brand numbers, such as 7-Eleven, Forever 21, and Microsoft 365. Original descriptions, amounts, dates and reliable source identifiers are not rewritten.
+After file validation and essential row parsing (or Plaid eligibility checks), and **before duplicate handling or subscription detection**, normalize merchant information to lowercase. Strip stacked SQ/TST/PAYPAL/STRIPE/VENMO/CASHAPP prefixes, hash/store/reference numbers, identifiable dates and phone numbers, trailing US state abbreviations (and optional ZIP), punctuation, and extra whitespace. Keep meaningful brand numbers, such as 7-Eleven, Forever 21, and Microsoft 365. Original descriptions, amounts, dates and reliable source identifiers are not rewritten.
 
 1. Match the cleaned input exactly to this user's normalized historical merchant/description aliases. Preserve the historical merchant name. Explicit name corrections win over manual names and then automatic history; the latest applicable correction/update and transaction ID resolve ties.
-2. Otherwise match a normalized global merchant name exactly. Multiple catalog names normalizing to the same key are ambiguous and are not chosen.
-3. Otherwise accept only a clear, high-confidence catalog fallback. Edit similarity must be at least **0.90**, both names at least eight characters, and the winner must lead the runner-up by **0.08**. Whole-token prefix matching requires a brand of at least six characters covering at least **75%** of the cleaned input, with at most two trailing tokens and no incidental gift/card/via/for reference. These partial candidates score 0.96 and must pass the same winning-margin check. Fuzzy work is bounded to 160-character names; long or ambiguous descriptors stay unmatched.
-4. If unmatched, retain the cleaned merchant text. No AI is used for merchant identity.
+2. Otherwise match a normalized global merchant name or individual comma-separated keyword exactly. Trim aliases, ignore empty aliases, and handle NULL keywords. Return the canonical catalog name, not the alias.
+3. Otherwise find catalog names or individual keywords contained **anywhere** in the cleaned descriptor and select the **longest matched name/alias**. This is literal containment, not the previous guarded prefix rule: even incidental brand references can match. For exact-key collisions or equal-length containment ties, prefer a canonical-name match over an alias, then lowest merchant ID, then lexical name. This makes results stable regardless of database row order.
+4. Otherwise accept only a clear, high-confidence fuzzy name/keyword match. Edit similarity must be at least **0.90**, both strings at least eight characters, and the winner must lead the next **distinct merchant** by **0.08**. Multiple similar aliases of one merchant do not count as competing merchants. Fuzzy work is bounded to 160-character strings.
+5. If unmatched, use the cleaned merchant text in **Proper Case** (for example, `new local shop` becomes `New Local Shop`). No AI is used for merchant identity.
+
+For example, catalog merchant `Walmart` with keywords `wal-mart,wm supercenter` resolves either alias to `Walmart`. When `wm supercenter fuel` is a keyword of a different merchant, it beats the shorter `wm supercenter` keyword in a descriptor containing both.
+
+The category dictionary is loaded once, and merchant catalog (including keywords) and this user's history each use one query per ingestion context, independent of transaction count. Exact/category lookups use reusable maps, literal matching uses a reusable character trie, fuzzy candidates are length-indexed, and repeated cleaned descriptors reuse cached identity results. No per-row matching SQL is issued. Rows are resolved and unresolved AI work collected together; final result assembly does not repeat matching. AI requests remain bounded to 25 rows, 27,000 prompt characters and three concurrent batches.
 
 History queries and aliases are scoped to the signed-in user. Merchant edits recorded during file review or transaction editing provide aliases for future imports; final reviewed category corrections are audited as explicit category preferences. Automated saved categories or recurrence/Need-Want edits alone are not explicit category preferences.
 
@@ -231,7 +236,25 @@ History queries and aliases are scoped to the signed-in user. Merchant edits rec
 6. **Validate every returned ID.** The index must belong to this batch and appear exactly once; all duplicate results for an index are rejected. The category ID must be an integer from the supplied lookup and compatible with the source transaction direction. Resolve its canonical stored parent/category labels and eligible Need/Want default server-side. AI cannot change source type, dates, amounts, descriptions, merchant identity, recurrence tags or row identity.
 7. **Keep uncertainty reviewable.** Failed, malformed, missing, invalid or ambiguous responses leave rows Uncategorized. File review shows an explicit count and editable optional category; saved unresolved rows use the existing `unassigned` ledger sentinel. Plaid retains valid unresolved rows as `unassigned` and returns an `uncategorized` count with a review warning. Failed batches do not prevent later batches. No new category is inserted into the lookup table.
 
-The saved `merchant_source` values identify `user_history`, `merchant_catalog_exact`, `merchant_catalog_fuzzy`, `cleaned_fallback`, `manual_entry`, or `user_edit`. The saved `category_source` values identify `user_preference`, `merchant_profile`, `provided_category`, `ai`, `unassigned`, `user_selected`, `description_rule`, or `user_edit`. A reviewed import whose older client did not send source metadata is marked `unknown`. These fields describe the winning decision path, not confidence scores.
+New file/Plaid automated identification persists these case-sensitive source values:
+
+| Merchant path | `merchant_source` |
+|---|---|
+| User history | `USER_HISTORY` |
+| Exact catalog name/keyword | `EXACT_MATCH` |
+| Longest contained catalog name/keyword | `MERCHANT_STRING_MATCH` |
+| High-confidence fuzzy catalog match | `FUZZY_MATCH` |
+| Proper Case cleaned fallback | `NO_MATCH` |
+
+| Category path | `category_source` |
+|---|---|
+| Explicit user category preference | `USER_HISTORY` |
+| Type-compatible catalog category | `MERCHANT_CAT` |
+| Matched source file/Plaid category | `BANK_DATA_CAT` |
+| Validated AI category ID | `AI_MATCH` |
+| Unresolved/failed classification | `NO_MATCH` |
+
+Manual/edit provenance (`manual_entry`, `user_selected`, `user_edit`, and existing manual fallback labels) remains unchanged. Legacy lowercase labels remain accepted for previews already open in a browser; existing rows are not relabeled or reclassified. Missing source metadata from an older client remains `unknown`. These fields describe the winning decision path, not confidence scores. An unresolved replay preserves an existing valid saved category and its provenance rather than erasing it.
 
 Only unresolved rows are sent to AI. Source context includes at most the first 24 source fields, bounded to 400 characters each (nested values serialized); the primary merchant/description context is bounded to 2,000 characters each. These limits affect AI context only, never the original financial values or stored source description. No application user ID, user's historical ledger, or Plaid access token is supplied by the server. Treat files as financial data and avoid unrelated sensitive columns.
 

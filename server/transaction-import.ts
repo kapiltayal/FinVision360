@@ -20,7 +20,7 @@ export interface ImportCategory {
   storedParentCategory?: string;
 }
 
-export type CategoryMerchant = { id: number; name: string; category_id: number | null };
+export type CategoryMerchant = { id: number; name: string; keywords?: string | null; category_id: number | null };
 
 /** Resolve by the FK, not category name: duplicate labels can have different parents/types. */
 export function knownMerchantCategory<T extends ImportCategory>(

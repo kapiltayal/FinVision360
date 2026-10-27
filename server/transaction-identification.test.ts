@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { cleanMerchantName, matchIngestedMerchant } from "./merchant-matching";
+import { cleanMerchantName, matchIngestedMerchant, matchIngestedMerchantWithMethod } from "./merchant-matching";
 import { transactionEntryFromSource } from "./transaction-import";
 import {
   buildIdentificationContext, identifyTransactionBatch, loadIdentificationContext, matchSourceCategory,
@@ -29,18 +29,20 @@ test("cleanup strips processors, numbers, dates, phones, states and whitespace, 
   assert.equal(cleanMerchantName("Forever 21 STORE 10"), "forever 21");
   assert.equal(cleanMerchantName("Microsoft 365"), "microsoft 365");
   assert.equal(cleanMerchantName("Studio 54"), "studio 54");
+  assert.equal(cleanMerchantName("STRIPE * VENMO * CASHAPP * SQ * Walmart #4829 CA"), "walmart");
 });
 
-test("ingestion catalog matches exact names, high-confidence typos/partials, and rejects weak or ambiguous matches", () => {
+test("ingestion catalog matches exact names, string containment and high-confidence fuzzy matches", () => {
   assert.equal(matchIngestedMerchant("NETFLIX #42", catalog), catalog[0]);
   const shops = [{ name: "Starbucks" }, { name: "Starbucks Reserve" }];
   assert.equal(matchIngestedMerchant("Starbuckss", shops), shops[0]);
   assert.equal(matchIngestedMerchant("Starbucks xy", [shops[0]]), shops[0]);
-  assert.equal(matchIngestedMerchant("Starbucks gift card", shops), undefined);
-  assert.equal(matchIngestedMerchant("Local Shop with Netflix", catalog), undefined);
-  assert.equal(matchIngestedMerchant("Netflixish", catalog), undefined);
-  assert.equal(matchIngestedMerchant("Starbucksa", [{ name: "Starbucks" }, { name: "Starbucksx" }]), undefined);
-  assert.equal(matchIngestedMerchant("A B", [{ name: "A+B" }, { name: "A B" }]), undefined);
+  assert.equal(matchIngestedMerchant("Starbucks gift card", shops), shops[0]);
+  assert.equal(matchIngestedMerchant("Local Shop with Netflix", catalog), catalog[0]);
+  assert.equal(matchIngestedMerchant("Netflixish", catalog), catalog[0], "literal containment is requested");
+  assert.equal(matchIngestedMerchant("Unrelated Shop", shops), undefined);
+  assert.equal(matchIngestedMerchant("Starbocks Reserve", shops), shops[1]);
+  assert.equal(matchIngestedMerchant("Starbuckq Reserve", [{ name: "Starbucks Reserve" }, { name: "Starbuckx Reserve" }]), undefined);
 });
 
 test("user history wins identity and category; explicit corrections beat newer automatic history", async () => {
@@ -53,9 +55,9 @@ test("user history wins identity and category; explicit corrections beat newer a
   const original = entry("TST* Netflix #43 CA", 77);
   const result = await identifyTransactionBatch([original], [{}], context, noAI);
   assert.equal(result.entries[0].merchant, "My Streaming");
-  assert.equal(result.entries[0].merchantSource, "user_history");
+  assert.equal(result.entries[0].merchantSource, "USER_HISTORY");
   assert.equal(result.entries[0].subcategory, "Groceries");
-  assert.equal(result.entries[0].categorySource, "user_preference");
+  assert.equal(result.entries[0].categorySource, "USER_HISTORY");
   assert.equal(result.entries[0].description, original.description);
   assert.equal(result.entries[0].id, 77);
   assert.equal(original.merchant, "TST* Netflix #43 CA", "input is not mutated");
@@ -67,9 +69,9 @@ test("category priority is explicit history, catalog, source, then AI; Need/Want
   const catalogResult = await identifyTransactionBatch([original], [raw],
     buildIdentificationContext(categories, catalog, []), noAI);
   assert.equal(catalogResult.entries[0].merchant, "Netflix");
-  assert.equal(catalogResult.entries[0].merchantSource, "merchant_catalog_exact");
+  assert.equal(catalogResult.entries[0].merchantSource, "EXACT_MATCH");
   assert.equal(catalogResult.entries[0].subcategory, "Entertainment");
-  assert.equal(catalogResult.entries[0].categorySource, "merchant_profile");
+  assert.equal(catalogResult.entries[0].categorySource, "MERCHANT_CAT");
   assert.equal(catalogResult.entries[0].needsWant, "need");
   assert.equal(catalogResult.entries[0].sourceCategory, "Groceries");
   assert.equal(catalogResult.entries[0].amount, "10.00");
@@ -79,8 +81,8 @@ test("category priority is explicit history, catalog, source, then AI; Need/Want
   const sourceResult = await identifyTransactionBatch([entry("Unknown Store", 1, raw)], [raw],
     buildIdentificationContext(categories, [], []), noAI);
   assert.equal(sourceResult.entries[0].subcategory, "Groceries");
-  assert.equal(sourceResult.entries[0].categorySource, "provided_category");
-  assert.equal(sourceResult.entries[0].merchantSource, "cleaned_fallback");
+  assert.equal(sourceResult.entries[0].categorySource, "BANK_DATA_CAT");
+  assert.equal(sourceResult.entries[0].merchantSource, "NO_MATCH");
 });
 
 test("source subcategory and parent are independent of header order, type and ambiguous parents are guarded", () => {
@@ -115,12 +117,12 @@ test("AI only resolves validated canonical IDs for the server-owned row and orig
       { sourceIndex: 999, categoryId: 1 },
     ] });
   });
-  assert.equal(result.entries[0].categorySource, "ai");
+  assert.equal(result.entries[0].categorySource, "AI_MATCH");
   assert.equal(result.entries[0].subcategory, "Entertainment");
   assert.equal(result.entries[0].type, "expense");
   assert.equal(result.entries[0].id, 900);
   assert.equal(result.entries[0].amount, "10.00");
-  assert.equal(result.entries[0].merchant, "unknown 0");
+  assert.equal(result.entries[0].merchant, "Unknown 0");
   assert.ok(result.entries.slice(1).every(row => row.subcategory === ""));
   assert.equal(result.uncategorized, 7);
 });
@@ -202,4 +204,68 @@ test("history and alias lookup is scoped to the authenticated user, not source-r
   assert.deepEqual(historyQuery.params, ["current-user"]);
   assert.match(historyQuery.sql, /WHERE t.user_id=\$1/);
   assert.match(historyQuery.sql, /transaction_id=t.id AND user_id=\$1/);
+});
+
+test("keywords resolve exact, anywhere-string and fuzzy stages with canonical names and longest aliases", async () => {
+  const walmart = { id: 20, name: "Walmart", keywords: " wal-mart, wm supercenter, , WAL-MART ", category_id: 1 };
+  const fuel = { id: 21, name: "Walmart Fuel", keywords: "wm supercenter fuel", category_id: 2 };
+  const microsoft = { id: 22, name: "Microsoft", keywords: "Microsoft Online Services, Microsoft Online Service", category_id: 2 };
+  const merchants = [fuel, walmart, microsoft, { id: 23, name: "Blank Shop", keywords: null, category_id: null }];
+  const descriptors = ["VENMO * WAL-MART #42 CA", "WM SUPERCENTER", "purchase wm supercenter fuel chicago",
+    "purchase wm supercenter chicago", "Microsift Online Services", "new local boutique"];
+  const result = await identifyTransactionBatch(descriptors.map(value => entry(value)), [],
+    buildIdentificationContext(categories, merchants, []), async () => '{"entries":[]}');
+  assert.deepEqual(result.entries.map(row => [row.merchant, row.merchantSource, row.categorySource]), [
+    ["Walmart", "EXACT_MATCH", "MERCHANT_CAT"], ["Walmart", "EXACT_MATCH", "MERCHANT_CAT"],
+    ["Walmart Fuel", "MERCHANT_STRING_MATCH", "MERCHANT_CAT"],
+    ["Walmart", "MERCHANT_STRING_MATCH", "MERCHANT_CAT"],
+    ["Microsoft", "FUZZY_MATCH", "MERCHANT_CAT"], ["New Local Boutique", "NO_MATCH", "NO_MATCH"],
+  ]);
+  assert.equal(result.uncategorized, 1);
+  assert.equal(matchIngestedMerchantWithMethod("wm supercenter", merchants)?.method, "exact");
+});
+
+test("catalog collisions and equal-length matches resolve consistently regardless of catalog order", () => {
+  const canonical = { id: 50, name: "Shared Name" };
+  const alias = { id: 1, name: "Another Shop", keywords: "shared name" };
+  const lowerId = { id: 2, name: "Shop One", keywords: "north shop" };
+  const higherId = { id: 3, name: "Shop Two", keywords: "south shop" };
+  for (const merchants of [[alias, canonical, higherId, lowerId], [lowerId, higherId, canonical, alias]]) {
+    assert.equal(matchIngestedMerchant("shared name", merchants), canonical);
+    assert.equal(matchIngestedMerchant("north shop and south shop", merchants), lowerId);
+  }
+});
+
+test("history wins over aliases, and unknown categories do not borrow opposite-direction catalog IDs", async () => {
+  const merchant = { id: 20, name: "Walmart", keywords: "wm supercenter", category_id: 1 };
+  const context = buildIdentificationContext(categories, [merchant], [
+    history({ merchant: "My Grocer", description: "WM SUPERCENTER", source: "manual" }),
+  ]);
+  const result = await identifyTransactionBatch([entry("WM SUPERCENTER")], [], context, noAI);
+  assert.equal(result.entries[0].merchant, "My Grocer");
+  assert.equal(result.entries[0].merchantSource, "USER_HISTORY");
+  assert.equal(result.entries[0].categorySource, "USER_HISTORY");
+  const refund = await identifyTransactionBatch([entry("Walmart", 2, { type: "income", category: "Refunds" })], [],
+    buildIdentificationContext(categories, [merchant], []), noAI);
+  assert.equal(refund.entries[0].subcategory, "Refunds");
+  assert.equal(refund.entries[0].categorySource, "BANK_DATA_CAT");
+});
+
+test("query counts stay fixed and descriptor identities are cached for 1 and 500 rows", async () => {
+  for (const count of [1, 500]) {
+    const queries: string[] = [];
+    const context = await loadIdentificationContext({ query: async (sql, params) => {
+      queries.push(sql);
+      if (sql.includes("FROM merchants")) return { rows: [{ id: 20, name: "Walmart", keywords: "wm supercenter", category_id: 1 }] };
+      assert.deepEqual(params, ["only-this-user"]);
+      return { rows: [] };
+    } }, "only-this-user", categories);
+    const result = await identifyTransactionBatch(Array.from({ length: count }, (_, i) => entry("wm supercenter", i + 1)), [],
+      context, noAI);
+    assert.equal(queries.length, 2, "catalog and history each load once; categories supplied by the caller");
+    assert.match(queries[0], /keywords/);
+    assert.equal(context.identities.size, 1, "repeated descriptors resolve once");
+    assert.equal(result.entries.length, count);
+    assert.ok(result.entries.every(row => row.merchantSource === "EXACT_MATCH" && row.categorySource === "MERCHANT_CAT"));
+  }
 });

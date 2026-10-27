@@ -16,6 +16,8 @@ test("uploads and Plaid identify before duplicates/recurrence, retain unresolved
   const otherUser = `identification-other-${randomUUID()}`;
   const suffix = randomUUID();
   const profileName = `Catalog Store ${suffix}`;
+  const fileAlias = `File Alias ${suffix}`;
+  const bankAlias = `Bank Alias ${suffix}`;
   const historyName = `History Store ${suffix}`;
   const preferredName = `My Favorite Shop ${suffix}`;
   const unknown = `Unlisted Merchant ${suffix}`;
@@ -58,8 +60,8 @@ test("uploads and Plaid identify before duplicates/recurrence, retain unresolved
     assert.equal(manual.body.category_source, "user_selected");
     for (const name of [profileName, historyName]) {
       merchantIds.push((await query(
-        "INSERT INTO merchants(name,category_id,is_known_subscription) VALUES ($1,$2,TRUE) RETURNING id",
-        [name, primary.id],
+        "INSERT INTO merchants(name,category_id,is_known_subscription,keywords) VALUES ($1,$2,TRUE,$3) RETURNING id",
+        [name, primary.id, name === profileName ? `${fileAlias}, ${bankAlias}` : null],
       )).rows[0].id);
     }
     const historicalId = (await query(
@@ -82,7 +84,7 @@ test("uploads and Plaid identify before duplicates/recurrence, retain unresolved
       if (failAI) throw new Error("Fixture AI failure");
       return { choices: [{ message: { content: JSON.stringify({ entries: input.rows.map((row: any) => ({
         sourceIndex: row.sourceIndex,
-        categoryId: row.transaction.merchant.includes("unclassified") ? null : primary.id,
+         categoryId: row.transaction.merchant.toLowerCase().includes("unclassified") ? null : primary.id,
       })) }) } }] };
     }) as any;
     (pool as any).query = (sql: any, params: any) => {
@@ -101,6 +103,8 @@ test("uploads and Plaid identify before duplicates/recurrence, retain unresolved
         ["2026-09-03", unknown, unknown, "11", "expense", "", ""],
         ["2026-09-04", nullMerchant, nullMerchant, "12", "expense", "", ""],
         ["2026-09-05", `SQ *${historyName} #103 CA`, `SQ *${historyName} #103 CA`, "13", "expense", primary.category, primary.parent_category],
+         ["2026-09-07", "File alias narrative", fileAlias, "31", "expense", "", ""],
+         ["2026-09-08", "Embedded alias narrative", `purchase ${fileAlias} chicago`, "32", "expense", "", ""],
       ].map(row => row.map(quote).join(",")).join("\n")),
     };
     const preview = await invoke("post", "/api/transactions/ingest/preview", { file });
@@ -116,6 +120,10 @@ test("uploads and Plaid identify before duplicates/recurrence, retain unresolved
     assert.equal(entries[3].subcategory, "", "unmatched rows remain in preview");
     assert.equal(entries[4].merchant, preferredName);
     assert.equal(entries[4].subcategory, alternate.category);
+    assert.equal(entries[5].merchant, profileName);
+    assert.equal(entries[5].merchantSource, "EXACT_MATCH");
+    assert.equal(entries[6].merchant, profileName);
+    assert.equal(entries[6].merchantSource, "MERCHANT_STRING_MATCH");
     assert.equal(aiCalls, 1, "only unresolved rows are classified together");
     assert.equal(Number((await query("SELECT COUNT(*) FROM transactions WHERE user_id=$1", [userId])).rows[0].count), 2,
       "preview does not write; only the explicit manual fixture and history exist");
@@ -138,6 +146,18 @@ test("uploads and Plaid identify before duplicates/recurrence, retain unresolved
     assert.equal(reviewedHistory.body.entries[0].subcategory, alternate.category);
     assert.equal(aiCalls, 1, "review choices are now explicit history preferences");
     assert.ok(historicalId);
+    const aliasSaved = await invoke("post", "/api/transactions/import-reviewed", {
+      body: { entries: [entries[5], entries[6]], requestId: randomUUID() },
+    });
+    assert.equal(aliasSaved.statusCode, 200);
+    const savedAliases = (await query(
+      "SELECT merchant_source, category_source FROM transactions WHERE user_id=$1 AND description IN ($2,$3) ORDER BY date",
+      [userId, "File alias narrative", "Embedded alias narrative"],
+    )).rows;
+    assert.deepEqual(savedAliases, [
+      { merchant_source: "EXACT_MATCH", category_source: "MERCHANT_CAT" },
+      { merchant_source: "MERCHANT_STRING_MATCH", category_source: "MERCHANT_CAT" },
+    ]);
 
     const longMerchant = `Long merchant ${"x".repeat(2400)}`;
     const longPreview = await invoke("post", "/api/transactions/ingest/preview", {
@@ -158,7 +178,7 @@ test("uploads and Plaid identify before duplicates/recurrence, retain unresolved
     storage.getPlaidAccounts = async () => [{ plaidItemId: 1, plaidAccountId: "owned", name: "Checking" }] as any;
     PlaidApi.prototype.transactionsRecurringGet = async () => ({ data: { inflow_streams: [], outflow_streams: [] } }) as any;
     const bankUnknown = `Bank Unknown ${suffix}`;
-    const transactions = [bankUnknown, nullMerchant, profileName, `SQ *${historyName} #400 CA`].map((merchant, index) => ({
+    const transactions = [bankUnknown, nullMerchant, bankAlias, `SQ *${historyName} #400 CA`].map((merchant, index) => ({
       transaction_id: `${suffix}-${index}`, account_id: "owned", date: "2026-09-06", amount: 20 + index,
       merchant_name: merchant, name: merchant, original_description: `Original bank narrative ${index}`,
       iso_currency_code: "USD", pending: false,
@@ -177,18 +197,19 @@ test("uploads and Plaid identify before duplicates/recurrence, retain unresolved
     assert.equal(bank.body.skippedReasons.pending, 1);
     const bankRows = (await query("SELECT * FROM transactions WHERE user_id=$1 AND source='plaid' ORDER BY plaid_transaction_id", [userId])).rows;
     assert.equal(bankRows[0].subcategory, primary.category);
-    assert.equal(bankRows[0].merchant_source, "cleaned_fallback");
-    assert.equal(bankRows[0].category_source, "ai");
+    assert.equal(bankRows[0].merchant_source, "NO_MATCH");
+    assert.equal(bankRows[0].category_source, "AI_MATCH");
     assert.equal(bankRows[0].description, "Original bank narrative 0");
     assert.equal(bankRows[1].subcategory, "unassigned", "unresolved Plaid rows are retained");
-    assert.equal(bankRows[1].category_source, "unassigned");
+    assert.equal(bankRows[1].category_source, "NO_MATCH");
     assert.equal(bankRows[2].merchant, profileName);
+    assert.equal(bankRows[2].merchant_source, "EXACT_MATCH");
     assert.equal(bankRows[2].subcategory, primary.category);
-    assert.equal(bankRows[2].category_source, "merchant_profile");
+    assert.equal(bankRows[2].category_source, "MERCHANT_CAT");
     assert.equal(bankRows[3].merchant, preferredName);
     assert.equal(bankRows[3].subcategory, alternate.category);
-    assert.equal(bankRows[3].merchant_source, "user_history");
-    assert.equal(bankRows[3].category_source, "user_preference");
+    assert.equal(bankRows[3].merchant_source, "USER_HISTORY");
+    assert.equal(bankRows[3].category_source, "USER_HISTORY");
     assert.equal(bankRows[0].is_user_modified, false, "this category was automatic, not user-protected");
     failAI = true;
     classificationCompleted = false;

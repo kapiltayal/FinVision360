@@ -1,4 +1,6 @@
 export const MERCHANT_IDENTIFICATION_SOURCES = [
+  "USER_HISTORY", "EXACT_MATCH", "MERCHANT_STRING_MATCH", "FUZZY_MATCH", "NO_MATCH",
+  // Accept existing previews without rewriting historical provenance.
   "user_history",
   "merchant_catalog_exact",
   "merchant_catalog_fuzzy",
@@ -9,6 +11,7 @@ export const MERCHANT_IDENTIFICATION_SOURCES = [
 ] as const;
 
 export const CATEGORY_IDENTIFICATION_SOURCES = [
+  "USER_HISTORY", "MERCHANT_CAT", "BANK_DATA_CAT", "AI_MATCH", "NO_MATCH",
   "user_preference",
   "merchant_profile",
   "provided_category",
