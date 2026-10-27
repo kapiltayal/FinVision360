@@ -2,7 +2,7 @@ import * as XLSX from "xlsx";
 import { parse as parseCsv } from "csv-parse/sync";
 import { parse as parseCsvStream } from "csv-parse";
 import { Readable } from "node:stream";
-import { completeIngestionClassification } from "./ai/provider";
+import { completeIngestionClassification, type AIUsageReporter } from "./ai/provider";
 
 export type Category = { parentCategory: string; category: string; description: string };
 export type RawRow = Record<string, unknown>;
@@ -433,8 +433,9 @@ export async function aiClassify(
   rows: RawRow[],
   categories: Category[],
   timeoutMs = 12_000,
+  onAIUsage?: AIUsageReporter,
 ): Promise<RawRow[]> {
-  const selections = await aiClassifySelections(kind, rows, categories, timeoutMs);
+  const selections = await aiClassifySelections(kind, rows, categories, timeoutMs, onAIUsage);
   return selections.map(({ sourceIndex, category }) => normalizeBookRow(rows[sourceIndex], category));
 }
 
@@ -443,6 +444,7 @@ export async function aiClassifySelections(
   rows: RawRow[],
   categories: Category[],
   timeoutMs = 12_000,
+  onAIUsage?: AIUsageReporter,
 ): Promise<ClassifiedSelection[]> {
   const classified: ClassifiedSelection[] = [];
   const safeCategories = categories.map((category) => ({
@@ -473,7 +475,7 @@ export async function aiClassifySelections(
       rows: aiRows,
     });
     try {
-      const content = await completeIngestionClassification(prompt, controller.signal);
+      const content = await completeIngestionClassification(prompt, controller.signal, onAIUsage);
       const parsed = JSON.parse(content);
       const output = extractJsonRows(parsed);
       if (!output?.length) throw new Error("invalid model output");

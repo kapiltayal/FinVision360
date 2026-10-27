@@ -24,6 +24,7 @@ import { plaidRecurrenceSignal, plaidStreamSignals } from "./plaid-recurrence";
 import type { RecurrenceTags } from "./recurring-transactions";
 import { formatSafeApiError, getSafeApiRoutePath } from "./api-logging";
 import { RECURRING_FREQUENCIES, type RecurringFrequency } from "@shared/schema";
+import { recordAIUsage } from "./ai-usage";
 
 const transactionUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024, files: 1 } });
 const CORRUPT_TRANSACTION_FILE = "File content could not be read or appears corrupted.";
@@ -1186,7 +1187,13 @@ export function registerFinanceTrackerRoutes(app: Express) {
       const categories = await canonicalTransactionCategories();
       const context = await loadIdentificationContext(pool, userId, categories);
       const entries = sourceRows.map((row, index) => transactionEntryFromSource(row, index + 1));
-      const identified = await identifyTransactionBatch(entries, sourceRows, context);
+      const identified = await identifyTransactionBatch(
+        entries,
+        sourceRows,
+        context,
+        undefined,
+        usage => recordAIUsage(userId, "file_upload", usage),
+      );
 
       const preview: TransactionImportPreview = {
         entries: identified.entries,

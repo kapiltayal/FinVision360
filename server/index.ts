@@ -6,6 +6,7 @@ import { pool } from "./db";
 import { ensureTransactionImportSchema } from "./transaction-import-schema";
 import { ensureGoalAllocationSchema } from "./goal-allocation";
 import { ensureRetirementAccountInclusionSchema } from "./retirement-account-inclusion";
+import { ensureAIUsageSchema } from "./ai-usage-schema";
 import { createApiRequestLogger, formatSafeApiError, getSafeApiRoutePath } from "./api-logging";
 
 const app = express();
@@ -145,6 +146,7 @@ app.use(createApiRequestLogger((message) => log(message)));
   // Apply additive import schema before registering endpoints that require it.
   await ensureTransactionImportSchema(pool);
   await ensureRetirementAccountInclusionSchema(pool);
+  await ensureAIUsageSchema(pool);
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS estate_beneficiaries (

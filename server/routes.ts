@@ -27,7 +27,11 @@ import {
   type Retirement401kGoal,
   type RetirementPlannerSettings,
 } from "@shared/schema";
-import { AI_ADVISOR_LIMITS, AIProviderError, type AdvisorMessage, streamAdvisorCompletion } from "./ai/provider";
+import {
+  AI_ADVISOR_LIMITS, AI_MODEL_ID, AIProviderError, normalizedAIModelUsage, reportAIUsageSafely,
+  type AdvisorMessage, type AIUsageReporter, streamAdvisorCompletion,
+} from "./ai/provider";
+import { recordAIUsage } from "./ai-usage";
 import { Products, CountryCode } from "plaid";
 import { getPlaidClient } from "./plaid";
 import multer from "multer";
@@ -258,6 +262,7 @@ async function streamAdvisorResponse(
   messages: readonly AdvisorMessage[],
   operation: string,
   onComplete?: (response: string) => Promise<void>,
+  onUsage?: AIUsageReporter,
 ) {
   setAdvisorStreamHeaders(res);
   const abortController = new AbortController();
@@ -266,8 +271,12 @@ async function streamAdvisorResponse(
 
   try {
     let completedResponse = "";
+    let completionUsage;
     const stream = await streamAdvisorCompletion(messages, abortController.signal);
     for await (const chunk of stream) {
+      if (chunk.usage) {
+        completionUsage = normalizedAIModelUsage(chunk.model || AI_MODEL_ID, chunk.usage);
+      }
       if (abortController.signal.aborted || res.destroyed) break;
       const content = chunk.choices[0]?.delta?.content || "";
       if (content) {
@@ -275,6 +284,7 @@ async function streamAdvisorResponse(
         res.write(`data: ${JSON.stringify({ content })}\n\n`);
       }
     }
+    await reportAIUsageSafely(onUsage, completionUsage);
     if (!res.destroyed && !res.writableEnded) {
       if (onComplete && completedResponse.trim()) {
         try {
@@ -346,10 +356,13 @@ export async function registerRoutes(
     }
     if (rows.length > 500) return res.status(400).json({ message: "Imports are limited to 500 entries at a time" });
 
+    const userId = (req.user as any).id;
+    const usageReporter = (usage: Parameters<typeof recordAIUsage>[2]) =>
+      recordAIUsage(userId, "file_upload", usage);
     const categories = await categoriesFor(kind);
     let classified: RawRow[];
     try {
-      classified = await aiClassify(kind, rows, categories);
+      classified = await aiClassify(kind, rows, categories, 12_000, usageReporter);
     } catch (error) {
       if (error instanceof AIProviderError) {
         classified = deterministicClassify(rows, categories);
@@ -380,11 +393,14 @@ export async function registerRoutes(
       });
     }
 
+    const userId = (req.user as any).id;
+    const usageReporter = (usage: Parameters<typeof recordAIUsage>[2]) =>
+      recordAIUsage(userId, "file_upload", usage);
     const categories = await categoriesFor(kind);
     let selections: Awaited<ReturnType<typeof aiClassifySelections>> = [];
     if (hasRecognizableStructure(kind, rows)) {
       try {
-        selections = await aiClassifySelections(kind, rows, categories);
+        selections = await aiClassifySelections(kind, rows, categories, 12_000, usageReporter);
       } catch {
         // Review remains available when categorization is unavailable or incomplete.
       }
@@ -1044,7 +1060,8 @@ Use exactly these four markdown headings, in this order:
 ## Risks
 Put each point under the matching heading. If a section has no useful content, say so briefly instead of omitting it. Be concise and use numbers only when the supplied data supports them.`,
       },
-    ], "scenario", response => saveAdvisorHistory(userId, "scenario", scenario, response));
+    ], "scenario", response => saveAdvisorHistory(userId, "scenario", scenario, response),
+    usage => recordAIUsage(userId, "ai_qa", usage));
   });
 
   app.post("/api/ai/debt-strategy", requireAuth, async (req, res) => {
@@ -1080,7 +1097,7 @@ Compare avalanche, snowball, and a suitable custom approach. Include debt priori
       "debt_strategy",
       `Debt strategy with a $${budget.toFixed(2)} monthly extra-payment budget`,
       response,
-    ));
+    ), usage => recordAIUsage(userId, "ai_qa", usage));
   });
 
   app.post("/api/ai/forecast", requireAuth, async (req, res) => {
@@ -1121,7 +1138,7 @@ Include a year-by-year overview, useful milestones, a conservative/base/optimist
       "forecast",
       `${years}-year net worth forecast`,
       response,
-    ));
+    ), usage => recordAIUsage(userId, "ai_qa", usage));
   });
 
   app.get("/api/ai/history", requireAuth, async (req, res) => {

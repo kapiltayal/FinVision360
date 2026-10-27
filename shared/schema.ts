@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, serial, integer, numeric, timestamp, boolean, date, uniqueIndex, index, check, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, serial, integer, bigint, numeric, timestamp, boolean, date, uniqueIndex, index, check, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -232,6 +232,28 @@ export const aiAdvisorHistory = pgTable("ai_advisor_history", {
 }, (table) => ({
   userDateIndex: index("idx_ai_advisor_history_user_date").on(table.userId, table.createdAt),
   queryTypeCheck: check("ai_advisor_history_query_type_check", sql`${table.queryType} IN ('scenario', 'debt_strategy', 'forecast')`),
+}));
+
+export const aiUsage = pgTable("ai_usage", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull(),
+  usageMonth: date("usage_month").notNull(),
+  fileUploadInputTokens: bigint("file_upload_input_tokens", { mode: "number" }).notNull().default(0),
+  fileUploadCachedInputTokens: bigint("file_upload_cached_input_tokens", { mode: "number" }).notNull().default(0),
+  fileUploadOutputTokens: bigint("file_upload_output_tokens", { mode: "number" }).notNull().default(0),
+  fileUploadTotalTokens: bigint("file_upload_total_tokens", { mode: "number" }).notNull().default(0),
+  fileUploadEstimatedCostUsd: numeric("file_upload_estimated_cost_usd", { precision: 18, scale: 8 }),
+  fileUploadUnpricedRequests: integer("file_upload_unpriced_requests").notNull().default(0),
+  aiQaInputTokens: bigint("ai_qa_input_tokens", { mode: "number" }).notNull().default(0),
+  aiQaCachedInputTokens: bigint("ai_qa_cached_input_tokens", { mode: "number" }).notNull().default(0),
+  aiQaOutputTokens: bigint("ai_qa_output_tokens", { mode: "number" }).notNull().default(0),
+  aiQaTotalTokens: bigint("ai_qa_total_tokens", { mode: "number" }).notNull().default(0),
+  aiQaEstimatedCostUsd: numeric("ai_qa_estimated_cost_usd", { precision: 18, scale: 8 }),
+  aiQaUnpricedRequests: integer("ai_qa_unpriced_requests").notNull().default(0),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  userMonthUnique: uniqueIndex("ai_usage_user_month_unique").on(table.userId, table.usageMonth),
 }));
 
 export const insurancePolicies = pgTable("insurance_policies", {

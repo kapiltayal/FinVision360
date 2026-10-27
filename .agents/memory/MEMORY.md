@@ -4,6 +4,7 @@
 - [Application database schema](application-database-schema.md) — the app database can differ from the workspace SQL target; verify schema changes through the app connection.
 - [Plaid book imports](plaid-book-imports.md) — explicit imports, linked-only sync, deletion releases claims for re-import, and expired authorization uses Link update mode.
 - [Native AI integration provisioning](native-ai-integration.md) — Replit-managed AI uses Agent provisioning, not the third-party connector inventory or a personal provider key.
+- [AI usage cost estimation](ai-usage-cost-estimation.md) — API token usage can be measured per request, but dollar totals are provider-rate estimates rather than actual Replit charges.
 - [Financial ingestion AI trust boundary](financial-ingestion-ai-trust.md) — AI assigns categories only; source values and server-owned row identities remain authoritative.
 - [Financial import duplicate policy](financial-import-duplicate-policy.md) — uncertain matches require user review; legitimate repeats remain possible, and uncertain-save retries keep their identity.
 - [Merchant identity fallbacks](merchant-identity-fallbacks.md) — imported merchant text can be a copied bank descriptor; retain guarded brand matching and descriptor grouping.
