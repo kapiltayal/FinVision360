@@ -1,6 +1,6 @@
 # Financial Transaction Ingestion and Processing
 
-*Implementation guide, reviewed against repository code on October 27, 2026.* [Documentation index](README.md).
+*Implementation guide, reviewed against repository code on October 28, 2026.* [Documentation index](README.md).
 
 This guide covers the three ways transactions enter the Finance Tracker: user-uploaded files, transactions imported on request from Plaid-connected accounts, and transactions entered manually. It follows each path from the user's selection through validation, categorization, review or confirmation, and database persistence.
 
@@ -36,7 +36,7 @@ The visible flowcharts are repository-local SVG images, so they do not require a
 ![Uploaded transaction flow: file validation, parsing, category suggestions, duplicate review, user edits, final validation, atomic database save and retry receipt.](diagrams/transaction-upload.svg)
 
 1. Authenticate, validate file type/signature/size, parse and normalize at most 500 nonblank rows.
-2. Clean and identify merchant names using exact user history → exact catalog name/keyword → longest contained name/keyword → high-confidence fuzzy catalog matching → Proper Case cleaned fallback. Suggest categories using user preference → merchant profile → valid file category → batched AI IDs for unresolved rows.
+2. Clean and identify merchant names using exact user history → exact catalog name/keyword → longest contained name/keyword of at least five cleaned characters → high-confidence fuzzy catalog matching → Proper Case cleaned fallback. Suggest categories using user preference → merchant profile → valid file category → batched AI IDs for unresolved rows.
 3. Check duplicates within this file and the user's ledger, then detect recurrence using included rows plus the user's saved history. Return suggestions in a read-only editable preview; excluded duplicates do not supply extra observations.
 4. User corrects fields, chooses Save rows, and explicitly confirms legitimate content matches. Stable-ID repeats cannot be saved.
 5. Validate selected rows and review freshness; invalid input returns to review without a write.
@@ -51,7 +51,7 @@ The visible flowcharts are repository-local SVG images, so they do not require a
 flowchart TD
     A["Choose CSV, TSV, TXT, XLS, or XLSX"] --> B["Authenticate; check upload size, type, and file signature"]
     B --> C["Parse and normalize rows; reject files over 500 nonblank rows"]
-    C --> D["Merchant: history → exact name/keyword → longest string → fuzzy → Proper Case fallback"]
+    C --> D["Merchant: history → exact name/keyword → longest string (name/keyword >= 5 chars) → fuzzy → Proper Case fallback"]
     D --> D1["Categories: user preference → known merchant profile → valid source category"]
     D1 --> E{"Category resolved?"}
     E -- "Yes" --> G["Apply available category and Need/Want suggestions; keep unresolved rows blank"]
@@ -80,7 +80,7 @@ AI-unavailable or unresolved categories remain editable; a valid reviewed transa
 1. User chooses connected institution/accounts and dates; server authenticates and validates ownership/range.
 2. Fetch active recurring-stream signals and Plaid transaction pages. Optional recurring-signal failures produce warnings; unavailable transaction institutions are reported while others continue.
 3. Skip pending transactions, transfers, non-USD values and invalid rows.
-4. Clean/identify accepted merchant names with the shared history → exact name/keyword → longest string → fuzzy → Proper Case fallback pipeline; categorize using user preference → merchant profile → compatible Plaid category mapping → batched AI category IDs. Keep unresolved rows as Uncategorized, stored as `unassigned`.
+4. Clean/identify accepted merchant names with the shared history → exact name/keyword → longest string (name/keyword >= 5 chars) → fuzzy → Proper Case fallback pipeline; categorize using user preference → merchant profile → compatible Plaid category mapping → batched AI category IDs. Keep unresolved rows as Uncategorized, stored as `unassigned`.
 5. Upsert `transactions` by `(user_id, plaid_transaction_id)`; retain explicitly edited merchant/description and category/parent/Need-Want.
 6. Continue all selected pages/institutions. Writes are per row, not one atomic whole-import transaction; an unexpected database error may leave earlier rows committed.
 7. Resolve recurrence for merchants represented by the imported row IDs using the user's saved history. Reuse saved positive tags unless an explicit user override supersedes them; otherwise use provider/catalog/heuristic detection. Apply the resolved tags to imported and matching unmodified historical transactions, then return counts and refresh the ledger. Active owned-account Plaid outflow streams supply recurring flags/frequency when available; report a warning if the optional recurring endpoint is unavailable.
@@ -95,7 +95,7 @@ flowchart TD
     C --> D{"Pending, transfer, unsupported currency, or invalid account/amount?"}
     D -- "Yes" --> E["Skip and count the reason"]
     E --> U{"More rows, pages, or selected institutions?"}
-    D -- "No" --> F["Parse source; merchant: history → exact name/keyword → longest string → fuzzy → Proper Case"]
+    D -- "No" --> F["Parse source; merchant: history → exact name/keyword → longest string (name/keyword >= 5 chars) → fuzzy → Proper Case"]
     F --> G["Use user's saved merchant preference"]
     G --> H{"Resolved?"}
     H -- "No" --> I["Match known merchant category_id"]
@@ -189,7 +189,7 @@ The database constrains transaction type, Need/Want value, recurring type and fr
 |---|---|
 | `id` | Merchant profile primary key. |
 | `name` | Canonical brand name used for transaction matching; a unique index prevents duplicate exact names. |
-| `keywords` | Nullable comma-separated aliases used alongside the canonical name during exact, substring, and fuzzy merchant identification. Empty aliases are ignored; aliases resolve to the canonical merchant name. |
+| `keywords` | Nullable comma-separated aliases used alongside the canonical name during exact, substring, and fuzzy merchant identification. Empty aliases are ignored; exact matching accepts any alias length, while substring matching requires at least five cleaned characters. Aliases resolve to the canonical merchant name. |
 | `logo_url` | Optional brand icon URL for display. |
 | `category_id` | Optional foreign key to `transaction_type_list.id`; a known profile suggests this exact category row, including its canonical parent and Need/Want default. Deleting the category sets this field to `NULL`. |
 | `is_known_subscription` | Defaults to `false`; explicitly identifies a subscription-only merchant. Can tag one transaction without waiting for three observations. |
