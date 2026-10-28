@@ -27,6 +27,10 @@ import {
 } from "recharts";
 import { formatCurrency } from "@/lib/format";
 import { FinancialChartTooltip } from "@/components/financial-chart-tooltip";
+import {
+  CategoryMonthlyHistoryHover,
+  type CategoryMonthlyHistoryPoint,
+} from "@/components/category-monthly-history-hover";
 
 type CashFlowCategory = {
   type: "income" | "expense";
@@ -34,6 +38,7 @@ type CashFlowCategory = {
   total: number;
   average: number;
   transactionCount: number;
+  history?: CategoryMonthlyHistoryPoint[];
 };
 
 type CashFlowSummary = {
@@ -164,17 +169,24 @@ function CategoryAverageList({
             {categories.map((category) => (
               <div
                 key={`${category.type}-${category.subcategory}`}
-                className="flex items-center justify-between gap-3 rounded-lg border bg-card p-3"
               >
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium">{categoryLabel(category.subcategory)}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {category.transactionCount} transaction{category.transactionCount === 1 ? "" : "s"} in period
-                  </p>
-                </div>
-                <p className={`shrink-0 text-sm font-semibold ${colorClass}`}>
-                  {formatCurrency(category.average)}/mo
-                </p>
+                <CategoryMonthlyHistoryHover
+                  category={categoryLabel(category.subcategory)}
+                  type={type}
+                  history={category.history}
+                >
+                  <div className="flex items-center justify-between gap-3 rounded-lg border bg-card p-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium">{categoryLabel(category.subcategory)}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {category.transactionCount} transaction{category.transactionCount === 1 ? "" : "s"} in period
+                      </p>
+                    </div>
+                    <p className={`shrink-0 text-sm font-semibold ${colorClass}`}>
+                      {formatCurrency(category.average)}/mo
+                    </p>
+                  </div>
+                </CategoryMonthlyHistoryHover>
               </div>
             ))}
           </div>
