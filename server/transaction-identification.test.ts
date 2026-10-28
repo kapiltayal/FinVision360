@@ -225,6 +225,39 @@ test("keywords resolve exact, anywhere-string and fuzzy stages with canonical na
   assert.equal(matchIngestedMerchantWithMethod("wm supercenter", merchants)?.method, "exact");
 });
 
+test("partial matching requires five cleaned characters per name or alias, while short exact matches remain valid", () => {
+  const shortName = { id: 30, name: "Uber" };
+  const shortAlias = { id: 31, name: "Local Transit", keywords: "ride" };
+  const fiveCharacterName = { id: 32, name: "Shell" };
+  const fiveCharacterAlias = { id: 33, name: "Neighborhood Market", keywords: "fresh" };
+  const normalizedShortAlias = { id: 34, name: "City Parking", keywords: "a-b-c" };
+  const merchants = [shortName, shortAlias, fiveCharacterName, fiveCharacterAlias, normalizedShortAlias];
+  assert.equal(matchIngestedMerchantWithMethod("UBER", merchants)?.method, "exact");
+  assert.equal(matchIngestedMerchantWithMethod("RIDE", merchants)?.merchant, shortAlias);
+  assert.equal(matchIngestedMerchantWithMethod("purchase uber trip", merchants), undefined);
+  assert.equal(matchIngestedMerchantWithMethod("purchase ride downtown", merchants), undefined);
+  assert.equal(matchIngestedMerchantWithMethod("purchase shell fuel", merchants)?.method, "string");
+  assert.equal(matchIngestedMerchantWithMethod("purchase fresh groceries", merchants)?.merchant, fiveCharacterAlias);
+  // Cleanup expands this alias to "a b c" (five characters), matching the cleaned key's length.
+  assert.equal(matchIngestedMerchantWithMethod("purchase a b c parking", merchants)?.method, "string");
+});
+
+test("short partial matches do not borrow catalog categories, but five-character aliases do", async () => {
+  const merchants = [
+    { id: 30, name: "Uber", category_id: 2 },
+    { id: 31, name: "Long Merchant Name", keywords: "ride, fresh", category_id: 1 },
+  ];
+  const result = await identifyTransactionBatch(
+    ["purchase uber trip", "purchase ride downtown", "purchase fresh groceries", "Uber"]
+      .map(value => entry(value)),
+    [], buildIdentificationContext(categories, merchants, []), async () => '{"entries":[]}',
+  );
+  assert.deepEqual(result.entries.map(row => [row.merchantSource, row.categorySource]), [
+    ["NO_MATCH", "NO_MATCH"], ["NO_MATCH", "NO_MATCH"],
+    ["MERCHANT_STRING_MATCH", "MERCHANT_CAT"], ["EXACT_MATCH", "MERCHANT_CAT"],
+  ]);
+});
+
 test("catalog collisions and equal-length matches resolve consistently regardless of catalog order", () => {
   const canonical = { id: 50, name: "Shared Name" };
   const alias = { id: 1, name: "Another Shop", keywords: "shared name" };

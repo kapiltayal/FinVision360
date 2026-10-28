@@ -46,6 +46,8 @@ function getIngestedMerchantIndex<T extends IngestedMerchant>(merchants: T[]): I
       const sameLength = index.byLength.get(key.length) || [];
       sameLength.push(item);
       index.byLength.set(key.length, sameLength);
+      // Short names/aliases remain eligible for exact matching, but not containment.
+      if (key.length < 5) continue;
       let node = index.trie;
       for (let offset = 0; offset < key.length; offset++) {
         if (!node.children.has(key[offset])) node.children.set(key[offset], { children: new Map(), matches: [] });
@@ -75,7 +77,7 @@ function editSimilarity(left: string, right: string): number {
 /**
  * Ingestion matching is deliberately separate from the existing recurrence matcher.
  * Fuzzy: >= .90 edit similarity, >= 8 characters, >= .08 lead over runner-up.
- * String stage: literal containment anywhere, longest name/alias first.
+ * String stage: literal containment anywhere for keys >= 5 characters, longest first.
  * This intentionally replaces the old guarded-prefix policy at the user's request.
  */
 export function matchIngestedMerchantWithMethod<T extends IngestedMerchant>(

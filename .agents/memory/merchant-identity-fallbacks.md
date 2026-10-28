@@ -11,7 +11,7 @@ A nonblank transaction merchant field is not necessarily a canonical identity: i
 
 Literal substring matching intentionally replaces the previous guarded-prefix/incidental-brand rejection policy for ingestion only. It can choose a merchant referenced incidentally in the descriptor.
 
-**Why:** The user explicitly requested matching names/keywords anywhere in the transaction string, with the longest match winning before fuzzy matching.
+**Why:** The user explicitly requested matching names/keywords anywhere in the transaction string, with the longest match winning before fuzzy matching. They subsequently restricted this partial-match step to names/individual keywords at least five characters long after cleanup; shorter exact matches remain allowed.
 
 **How to apply:** Do not restore the old prefix/token restrictions as a silent safeguard. Exact-key and equal-length ties prefer canonical names, then lowest merchant ID, then lexical name; fuzzy ambiguity is measured between distinct merchants, not aliases of the same merchant. Keep the independent recurrence matcher unchanged.
 
