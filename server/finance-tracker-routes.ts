@@ -1,10 +1,12 @@
 import { pool } from "./db";
+import { budgetActualsById, categoryPlansById, loadBudgetCategories, validBudgetCategoryKey } from "./budget-categories";
+import { parseBudgetCategoryPlanKey } from "../shared/budget-categories";
 import { requireAuth } from "./auth";
 import type { Express } from "express";
 import type { Transaction as PlaidTransaction } from "plaid";
 import { getPlaidClient } from "./plaid";
 import { storage } from "./storage";
-import { isHistoricalBudgetMonth, normalizeBudgetCategory } from "../shared/budget-period";
+import { isHistoricalBudgetMonth, normalizeBudgetCategory, normalizeBudgetPlanKey } from "../shared/budget-period";
 import { budgetEntityMetadata, legacyBudgetClose, preserveSavedEntityRows, type BudgetSnapshot } from "./budget-history";
 import multer from "multer";
 import { parseTransactionUpload } from "./asset-liability-ingestion";
@@ -396,19 +398,20 @@ export function registerFinanceTrackerRoutes(app: Express) {
         { rows: actualRows },
       ] = await Promise.all([
         pool.query(
-          `SELECT plan_key, planned_amount, entity_metadata
+          `SELECT plan_key, planned_amount, entity_metadata, transaction_type_id
            FROM budget_plans
            WHERE user_id = $1 AND month = $2::date
            ORDER BY plan_key`,
           [userId, startDate],
         ),
         pool.query(
-          `SELECT type, COALESCE(NULLIF(subcategory, ''), 'unassigned') AS subcategory,
-                  COALESCE(SUM(amount), 0) AS actual_amount
-           FROM transactions
-           WHERE user_id = $1 AND date >= $2::date AND date <= $3::date
-           GROUP BY type, COALESCE(NULLIF(subcategory, ''), 'unassigned')
-           ORDER BY type, subcategory`,
+          `SELECT t.type, t.transaction_type_id, c.category AS category_name,
+                  COALESCE(NULLIF(t.subcategory, ''), 'unassigned') AS subcategory,
+                  COALESCE(SUM(t.amount), 0) AS actual_amount
+           FROM transactions t LEFT JOIN transaction_type_list c ON c.id=t.transaction_type_id
+           WHERE t.user_id = $1 AND t.date >= $2::date AND t.date <= $3::date
+           GROUP BY t.type, t.transaction_type_id, c.category, COALESCE(NULLIF(t.subcategory, ''), 'unassigned')
+           ORDER BY t.type, subcategory`,
           [userId, startDate, endDate],
         ),
       ]);
@@ -428,9 +431,7 @@ export function registerFinanceTrackerRoutes(app: Express) {
         const actuals = Array.from(actualsByKey.values());
         const normalizedSavedPlans = new Map<string, (typeof plans)[number]>();
         for (const row of plans) {
-          const key = row.planKey.startsWith("income:") || row.planKey.startsWith("expense:")
-            ? `${row.planKey.slice(0, row.planKey.indexOf(":"))}:${normalizeBudgetCategory(row.planKey.slice(row.planKey.indexOf(":") + 1))}`
-            : row.planKey;
+          const key = normalizeBudgetPlanKey(row.planKey);
           const previous = normalizedSavedPlans.get(key);
           normalizedSavedPlans.set(key, {
             planKey: key,
@@ -449,7 +450,9 @@ export function registerFinanceTrackerRoutes(app: Express) {
           ? preserveSavedEntityRows(close.payload as BudgetSnapshot)
           : legacy?.payload ?? preserveSavedEntityRows({ plans: historicalPlans, liabilities: [], goals: [] });
         return res.json({
-          month, readOnly: true, ...historical, actuals,
+          month, readOnly: true, ...historical,
+          actuals: historical.plans.some((line) => parseBudgetCategoryPlanKey(line.planKey))
+            ? budgetActualsById(actualRows) : actuals,
           snapshot: {
             status: close
               ? close.payload?.source === "legacy_reconstructed" ? "legacy" : "complete"
@@ -459,9 +462,6 @@ export function registerFinanceTrackerRoutes(app: Express) {
           },
         });
       }
-      const actuals = actualRows.map((row) => ({
-        type: row.type, category: row.subcategory, amount: Number(row.actual_amount),
-      }));
       const [{ rows: liabilityRows }, { rows: goalRows }] = await Promise.all([
         pool.query(
           `SELECT id, name, category, balance, minimum_payment
@@ -483,15 +483,9 @@ export function registerFinanceTrackerRoutes(app: Express) {
         month,
         readOnly: false,
         snapshot: null,
-        plans: planRows.map((row) => ({
-          planKey: row.plan_key,
-          plannedAmount: Number(row.planned_amount),
-        })),
-        actuals: actualRows.map((row) => ({
-          type: row.type,
-          category: row.subcategory,
-          amount: Number(row.actual_amount),
-        })),
+        categories: await loadBudgetCategories(pool),
+        plans: categoryPlansById(planRows),
+        actuals: budgetActualsById(actualRows),
         liabilities: liabilityRows.map((row) => ({
           id: row.id,
           name: row.name,
@@ -543,17 +537,35 @@ export function registerFinanceTrackerRoutes(app: Express) {
       if (hasInvalidPlan || keys.size !== normalizedPlans.length) {
         return res.status(400).json({ message: "Every plan line must have a unique valid category and non-negative amount" });
       }
+      const catalog = await loadBudgetCategories(pool);
+      const validCategoryKeys = new Set(catalog.map((c) => `${c.type}:category:${c.id}`));
+      const { rows: existingCategoryPlans } = await pool.query(
+        "SELECT plan_key FROM budget_plans WHERE user_id=$1 AND month=$2::date AND plan_key=ANY($3::text[])",
+        [userId, `${month}-01`, normalizedPlans.map((p) => p.plan_key)],
+      );
+      existingCategoryPlans.forEach((row) => validCategoryKeys.add(row.plan_key));
+      if (normalizedPlans.some((plan) => /^(income|expense):/.test(plan.plan_key)
+        && !/^(income|expense):unassigned$/.test(plan.plan_key) && !validCategoryKeys.has(plan.plan_key))) {
+        return res.status(400).json({ message: "Choose an income or expense category from the category catalog" });
+      }
       const withMetadata = await Promise.all(normalizedPlans.map(async (plan) => ({
         ...plan, entity_metadata: await budgetEntityMetadata(pool, userId, plan.plan_key),
+        category_id: parseBudgetCategoryPlanKey(plan.plan_key)?.id ?? null,
       })));
 
       const { rows } = await pool.query(
-        `INSERT INTO budget_plans (user_id, month, plan_key, planned_amount, entity_metadata)
+        `WITH removed_aliases AS (
+           DELETE FROM budget_plans b USING jsonb_to_recordset($3::jsonb) AS item(plan_key text, category_id integer)
+           WHERE b.user_id=$1 AND b.month=$2::date AND b.transaction_type_id=item.category_id
+             AND b.plan_key<>item.plan_key
+         )
+         INSERT INTO budget_plans (user_id, month, plan_key, planned_amount, entity_metadata)
          SELECT $1, $2::date, item.plan_key, item.planned_amount, item.entity_metadata
          FROM jsonb_to_recordset($3::jsonb)
            AS item(plan_key text, planned_amount numeric, entity_metadata jsonb)
          ON CONFLICT (user_id, month, plan_key)
          DO UPDATE SET planned_amount = EXCLUDED.planned_amount,
+            transaction_type_id = EXCLUDED.transaction_type_id,
            entity_metadata = COALESCE(EXCLUDED.entity_metadata, budget_plans.entity_metadata), updated_at = NOW()
          RETURNING plan_key, planned_amount`,
         [userId, `${month}-01`, JSON.stringify(withMetadata)],
@@ -588,15 +600,27 @@ export function registerFinanceTrackerRoutes(app: Express) {
       if (!Number.isFinite(amount) || amount < 0 || amount > 999_999_999_999.99) {
         return res.status(400).json({ message: "Planned amount must be a valid non-negative number" });
       }
+      if (!await validBudgetCategoryKey(pool, normalizedKey)) {
+        const { rows } = await pool.query(
+          "SELECT id FROM budget_plans WHERE user_id=$1 AND month=$2::date AND plan_key=$3",
+          [userId, `${month}-01`, normalizedKey],
+        );
+        if (!rows.length) return res.status(400).json({ message: "Choose an income or expense category from the category catalog" });
+      }
 
       const { rows } = await pool.query(
-        `INSERT INTO budget_plans (user_id, month, plan_key, planned_amount, entity_metadata)
+        `WITH removed_aliases AS (
+           DELETE FROM budget_plans WHERE user_id=$1 AND month=$2::date
+             AND transaction_type_id=$6 AND plan_key<>$3
+         )
+         INSERT INTO budget_plans (user_id, month, plan_key, planned_amount, entity_metadata)
          VALUES ($1, $2::date, $3, $4, $5::jsonb)
          ON CONFLICT (user_id, month, plan_key)
          DO UPDATE SET planned_amount = EXCLUDED.planned_amount,
+            transaction_type_id = EXCLUDED.transaction_type_id,
            entity_metadata = COALESCE(EXCLUDED.entity_metadata, budget_plans.entity_metadata), updated_at = NOW()
          RETURNING plan_key, planned_amount`,
-        [userId, `${month}-01`, normalizedKey, amount.toFixed(2), JSON.stringify(await budgetEntityMetadata(pool, userId, normalizedKey))],
+        [userId, `${month}-01`, normalizedKey, amount.toFixed(2), JSON.stringify(await budgetEntityMetadata(pool, userId, normalizedKey)), parseBudgetCategoryPlanKey(normalizedKey)?.id ?? null],
       );
 
       return res.json({
@@ -620,8 +644,9 @@ export function registerFinanceTrackerRoutes(app: Express) {
       if (isHistoricalBudgetMonth(month)) return res.status(403).json({ message: "Historical budget plans are read-only" });
       const { rowCount } = await pool.query(
         `DELETE FROM budget_plans
-         WHERE user_id = $1 AND month = $2::date AND plan_key = $3`,
-        [userId, `${month}-01`, planKey.trim()],
+          WHERE user_id = $1 AND month = $2::date
+            AND (($4::integer IS NOT NULL AND (transaction_type_id=$4 OR plan_key=$3)) OR ($4::integer IS NULL AND plan_key=$3))`,
+        [userId, `${month}-01`, planKey.trim(), parseBudgetCategoryPlanKey(planKey.trim())?.id ?? null],
       );
       if (!rowCount) return res.status(404).json({ message: "Budget plan not found" });
       return res.status(204).send();
@@ -787,29 +812,28 @@ export function registerFinanceTrackerRoutes(app: Express) {
       const [{ rows }, { rows: monthlyRows }] = await Promise.all([
         pool.query(
           `SELECT
-             type,
-             COALESCE(NULLIF(subcategory, ''), 'unassigned') AS subcategory,
-             COALESCE(SUM(amount), 0) AS total,
+              t.type, t.transaction_type_id AS category_id,
+              MAX(c.category) AS subcategory,
+              COALESCE(SUM(t.amount), 0) AS total,
              COUNT(*) AS transaction_count
-           FROM transactions
-           WHERE user_id = $1
-             AND date >= $2
-             AND date <= $3
-           GROUP BY type, COALESCE(NULLIF(subcategory, ''), 'unassigned')
-           ORDER BY type, total DESC, subcategory ASC`,
+            FROM transactions t LEFT JOIN transaction_type_list c ON c.id=t.transaction_type_id
+            WHERE t.user_id = $1
+              AND t.date >= $2
+              AND t.date <= $3
+            GROUP BY t.type, t.transaction_type_id
+            ORDER BY t.type, total DESC, category_id ASC`,
           [userId, startMonth, endDate],
         ),
         pool.query(
           `SELECT
-             DATE_TRUNC('month', date)::DATE AS month,
-             type,
-             COALESCE(NULLIF(subcategory, ''), 'unassigned') AS subcategory,
-             COALESCE(SUM(amount), 0) AS amount
+              DATE_TRUNC('month', date)::DATE AS month,
+              type, transaction_type_id AS category_id,
+              COALESCE(SUM(amount), 0) AS amount
            FROM transactions
            WHERE user_id = $1
              AND date >= $2
              AND date <= $3
-           GROUP BY month, type, COALESCE(NULLIF(subcategory, ''), 'unassigned')
+            GROUP BY month, type, transaction_type_id
            ORDER BY month ASC`,
           [userId, startMonth, endDate],
         ),
@@ -825,20 +849,21 @@ export function registerFinanceTrackerRoutes(app: Express) {
       }
       const monthlyAmounts = new Map(
         monthlyRows.map((row) => [
-          `${row.type}:${row.subcategory || "unassigned"}:${normalizeDateValue(row.month)?.slice(0, 7)}`,
+          `${row.type}:${row.category_id ?? "unassigned"}:${normalizeDateValue(row.month)?.slice(0, 7)}`,
           Number(row.amount),
         ]),
       );
 
       const categories = rows.map((row) => ({
         type: row.type,
+        categoryId: row.category_id == null ? null : Number(row.category_id),
         subcategory: row.subcategory || "unassigned",
         total: Number(row.total),
         average: Number(row.total) / monthCount,
         transactionCount: Number(row.transaction_count),
         history: periodMonths.map((month) => ({
           month,
-          amount: monthlyAmounts.get(`${row.type}:${row.subcategory || "unassigned"}:${month}`) ?? 0,
+          amount: monthlyAmounts.get(`${row.type}:${row.category_id ?? "unassigned"}:${month}`) ?? 0,
         })),
       }));
       const income = categories

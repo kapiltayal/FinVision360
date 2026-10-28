@@ -44,6 +44,11 @@ test("month close, historical API, orphan values and current/future editing", {
   }
   try {
     await client.query("BEGIN");
+    const ids = (await client.query(
+      "SELECT budget_resolve_category_id('income','salary') AS salary, budget_resolve_category_id('expense','utilities') AS utilities",
+    )).rows[0];
+    const salaryKey = `income:category:${ids.salary}`;
+    const utilitiesKey = `expense:category:${ids.utilities}`;
     // Tests are isolated by rollback, including any global snapshots and pruning.
     await client.query("DELETE FROM budget_close_runs WHERE period_month=$1", [`${period}-01`]);
     await client.query("DELETE FROM budget_month_closes WHERE period_month=$1", [`${period}-01`]);
@@ -118,15 +123,15 @@ test("month close, historical API, orphan values and current/future editing", {
     const { rows: snapshotRows } = await client.query("SELECT payload FROM budget_month_closes WHERE user_id=$1", [user]);
     const frozen = snapshotRows[0].payload;
     const amounts = new Map(frozen.plans.map((row: any) => [row.planKey, row.plannedAmount]));
-    assert.equal(amounts.get("income:salary"), 0, "intentional zero overrides suggestion");
-    assert.equal(amounts.get("expense:utilities"), 50, "average divides by the complete month window");
-    assert.equal(amounts.get("expense:new_category"), 0, "new actual category has captured default");
+    assert.equal(amounts.get(salaryKey), 0, "intentional zero overrides suggestion");
+    assert.equal(amounts.get(utilitiesKey), 50, "average divides by the complete month window");
+    assert.equal(amounts.get("expense:unassigned"), 0, "unresolved actual category has captured default");
     assert.equal(amounts.get(debtKey), 150.25);
     assert.equal(amounts.get(goalKey), 200.99);
     assert.equal(frozen.liabilities[0].minimumPayment, 100);
     assert.equal(frozen.goals[0].monthlySavingsNeeded, Number(monthlySavingsRequired(12000, 1000, target, captured)!.toFixed(2)));
     const longHistory = await client.query("SELECT payload FROM budget_month_closes WHERE user_id=$1", [emptyUser]);
-    assert.equal(longHistory.rows[0].payload.plans.find((row: any) => row.planKey === "expense:utilities").plannedAmount, 10,
+    assert.equal(longHistory.rows[0].payload.plans.find((row: any) => row.planKey === utilitiesKey).plannedAmount, 10,
       "an older account keeps the full 12-month denominator even when recent months are empty");
     await client.query("DELETE FROM liabilities WHERE user_id=$1", [user]);
     await client.query("DELETE FROM user_goals WHERE user_id=$1", [user]);
@@ -186,11 +191,11 @@ test("month close, historical API, orphan values and current/future editing", {
     assert.equal((await invoke("put", missingUser, { month: period, planKey: "debt:90001", plannedAmount: 999 })).code, 403);
     assert.equal((await invoke("put", missingUser, { bulk: true, month: period, plans: [{ planKey: "debt:90001", plannedAmount: 999 }] })).code, 403);
     assert.equal((await invoke("delete", missingUser, {}, { month: period, planKey: "goal:90002" })).code, 403);
-    assert.equal((await invoke("put", missingUser, { month: current, planKey: "income:salary", plannedAmount: 10.12 })).code, 200);
-    assert.equal((await invoke("put", missingUser, { bulk: true, month: current, plans: [{ planKey: "income:salary", plannedAmount: 0 }] })).code, 200);
+    assert.equal((await invoke("put", missingUser, { month: current, planKey: salaryKey, plannedAmount: 10.12 })).code, 200);
+    assert.equal((await invoke("put", missingUser, { bulk: true, month: current, plans: [{ planKey: salaryKey, plannedAmount: 0 }] })).code, 200);
     assert.equal((await invoke("get", missingUser, {}, { month: current })).body.plans[0].plannedAmount, 0);
-    assert.equal((await invoke("delete", missingUser, {}, { month: current, planKey: "income:salary" })).code, 204);
-    assert.equal((await invoke("put", missingUser, { month: future, planKey: "expense:utilities", plannedAmount: 100.12 })).code, 200);
+    assert.equal((await invoke("delete", missingUser, {}, { month: current, planKey: salaryKey })).code, 204);
+    assert.equal((await invoke("put", missingUser, { month: future, planKey: utilitiesKey, plannedAmount: 100.12 })).code, 200);
     const { rows: metadataDebt } = await client.query(
       "INSERT INTO liabilities(user_id,name,category,balance,minimum_payment) VALUES ($1,'Saved identity','Loan',10,1) RETURNING id", [missingUser],
     );

@@ -13,7 +13,6 @@ import {
   Copy,
   Landmark,
   Loader2,
-  Plus,
   Target,
   Trash2,
   TrendingDown,
@@ -32,7 +31,8 @@ import { formatCurrency } from "@/lib/format";
 import { formatBudgetPlanInput, isValidBudgetPlanDraft } from "@/lib/budget-plan-input";
 import { budgetPlanSubtotal, budgetPlanVariance, effectiveBudgetPlanAmount } from "@/lib/budget-plan-amounts";
 import { budgetMonthlyGoalRequirement } from "@/lib/goal-monthly-savings";
-import { INCOME_CATEGORIES, EXPENSE_CATEGORIES } from "@shared/budget-period";
+import type { BudgetCategory } from "@shared/budget-categories";
+import { buildBudgetCategoryRows } from "@/lib/budget-category-rows";
 import { FinancialChartTooltip } from "@/components/financial-chart-tooltip";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
@@ -53,11 +53,13 @@ import {
 type PlanLine = {
   planKey: string;
   plannedAmount: number;
+  entityMetadata?: { name: string; category: string } | null;
 };
 
 type ActualLine = {
   type: "income" | "expense";
   category: string;
+  categoryName?: string;
   amount: number;
 };
 
@@ -84,6 +86,7 @@ type GoalLine = {
 type BudgetPlanData = {
   month: string;
   plans: PlanLine[];
+  categories?: BudgetCategory[];
   actuals: ActualLine[];
   liabilities: LiabilityLine[];
   goals: GoalLine[];
@@ -99,6 +102,7 @@ type CategoryHistoryPoint = {
 type CashFlowCategory = {
   type: "income" | "expense";
   subcategory: string;
+  categoryId: number | null;
   average: number;
   history: CategoryHistoryPoint[];
 };
@@ -547,7 +551,6 @@ export default function BudgetingPlanPage() {
   const lastPlanMonth = monthWindow.last;
   const [month, setMonth] = useState(currentMonth);
   const [savingKey, setSavingKey] = useState<string | null>(null);
-  const [newCategory, setNewCategory] = useState("");
   const [debtOpen, setDebtOpen] = useState(false);
   const [goalsOpen, setGoalsOpen] = useState(false);
   const queryKey = `/api/budget-plan?month=${month}`;
@@ -559,7 +562,7 @@ export default function BudgetingPlanPage() {
   });
   const readOnly = month < currentMonth || data?.readOnly === true;
   const closeComplete = data?.snapshot?.status === "complete" || data?.snapshot?.status === "legacy";
-  const { data: historySummary } = useQuery<CashFlowSummary>({
+  const { data: historySummary, isLoading: historyLoading, isError: historyError } = useQuery<CashFlowSummary>({
     queryKey: ["/api/transactions/monthly-averages"],
     staleTime: 0,
     refetchOnMount: "always",
@@ -609,85 +612,24 @@ export default function BudgetingPlanPage() {
     () => new Map((data?.plans ?? []).map((line) => [line.planKey, line.plannedAmount])),
     [data?.plans],
   );
-  const actualMap = useMemo(
-    () =>
-      new Map(
-        (data?.actuals ?? []).map((line) => [
-          `${line.type}:${line.category}`,
-          line.amount,
-        ]),
-      ),
-    [data?.actuals],
-  );
-  const historyMap = useMemo(
-    () =>
-      new Map(
-        (historySummary?.categories ?? []).map((category) => [
-          `${category.type}:${category.subcategory}`,
-          category,
-        ]),
-      ),
-    [historySummary?.categories],
-  );
   const historyMonths = useMemo(() => {
     const startMonth = historySummary?.period.startMonth?.slice(0, 7);
     const count = historySummary?.period.months ?? 0;
     if (!startMonth || count <= 0) return [];
     return Array.from({ length: count }, (_, index) => shiftMonth(startMonth, index));
   }, [historySummary?.period.months, historySummary?.period.startMonth]);
-  const historyFor = (key: string): CategoryHistoryPoint[] =>
-    historyMap.get(key)?.history ??
-    historyMonths.map((historyMonth) => ({ month: historyMonth, amount: 0 }));
-
-  const incomeRows = useMemo<StatementRow[]>(() => {
-    const categories = new Set(INCOME_CATEGORIES);
-    data?.actuals
-      .filter((line) => line.type === "income")
-      .forEach((line) => categories.add(line.category));
-    data?.plans
-      .filter((line) => line.planKey.startsWith("income:"))
-      .forEach((line) => categories.add(line.planKey.slice("income:".length)));
-    return Array.from(categories).map((category) => {
-      const key = `income:${category}`;
-      return {
-        key,
-        label: categoryLabel(category),
-        planned: planMap.get(key) ?? (readOnly && closeComplete ? 0 : undefined),
-        actual: actualMap.get(key) ?? 0,
-        average: readOnly ? 0 : historyMap.get(key)?.average ?? 0,
-        history: readOnly ? [] : historyFor(key),
-      };
-    });
-  }, [actualMap, data?.actuals, data?.plans, historyMap, historyMonths, planMap, readOnly, closeComplete]);
-
-  const expenseRows = useMemo<StatementRow[]>(() => {
-    const categories = new Set(EXPENSE_CATEGORIES);
-    data?.actuals
-      .filter(
-        (line) =>
-          line.type === "expense" &&
-          line.category !== "debt_payment" &&
-          line.category !== "savings_transfer",
-      )
-      .forEach((line) => categories.add(line.category));
-    data?.plans
-      .filter((line) => line.planKey.startsWith("expense:"))
-      .forEach((line) => categories.add(line.planKey.slice("expense:".length)));
-    return Array.from(categories).map((category) => {
-      const key = `expense:${category}`;
-      const hasActual = actualMap.has(key);
-      const isDefault = EXPENSE_CATEGORIES.includes(category);
-      return {
-        key,
-        label: categoryLabel(category),
-        planned: planMap.get(key) ?? (readOnly && closeComplete ? 0 : undefined),
-        actual: actualMap.get(key) ?? 0,
-        average: readOnly ? 0 : historyMap.get(key)?.average ?? 0,
-        history: readOnly ? [] : historyFor(key),
-        removable: !isDefault && !hasActual,
-      };
-    });
-  }, [actualMap, data?.actuals, data?.plans, historyMap, historyMonths, planMap, readOnly, closeComplete]);
+  const categoryRows = useMemo(() => {
+    const source = {
+      categories: data?.categories ?? [], plans: data?.plans ?? [], actuals: data?.actuals ?? [],
+      historyCategories: historySummary?.categories ?? [], historyMonths, readOnly, closeComplete,
+    };
+    return {
+      income: buildBudgetCategoryRows({ ...source, type: "income" }),
+      expense: buildBudgetCategoryRows({ ...source, type: "expense" }),
+    };
+  }, [data, historySummary, historyMonths, readOnly, closeComplete]);
+  const incomeRows = categoryRows.income;
+  const expenseRows = categoryRows.expense;
 
   const copyAllMutation = useMutation({
     mutationFn: async ({
@@ -754,23 +696,6 @@ export default function BudgetingPlanPage() {
   function savePlanLine(planKey: string, amount: number) {
     if (readOnly) return;
     saveMutation.mutate({ planKey, amount });
-  }
-
-  function addExpenseCategory() {
-    if (readOnly) return;
-    const normalized = newCategory
-      .trim()
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "_")
-      .replace(/^_+|_+$/g, "");
-    if (!normalized) return;
-    const key = `expense:${normalized}`;
-    if (expenseRows.some((row) => row.key === key)) {
-      toast({ title: "That category is already in this plan" });
-      return;
-    }
-    setNewCategory("");
-    savePlanLine(key, 0);
   }
 
   return (
@@ -868,7 +793,7 @@ export default function BudgetingPlanPage() {
         </div>
       </div>
 
-      {isLoading ? (
+      {isLoading || (!readOnly && historyLoading) ? (
         <div className="space-y-6">
           <div className="grid gap-4 md:grid-cols-3">
             {[1, 2, 3].map((item) => (
@@ -879,9 +804,9 @@ export default function BudgetingPlanPage() {
             <Skeleton key={item} className="h-72" />
           ))}
         </div>
-      ) : isError ? (
+      ) : isError || (!readOnly && historyError) ? (
         <Card><CardContent className="p-6 text-sm text-destructive" role="alert">
-          Could not load this budget plan. {error.message}
+          Could not load this budget plan or its transaction history. {error?.message}
         </CardContent></Card>
       ) : (
         <>
@@ -997,28 +922,6 @@ export default function BudgetingPlanPage() {
               onCopy={savePlanLine}
               readOnly={readOnly}
               onRemove={readOnly ? undefined : (key) => removeMutation.mutate(key)}
-              footer={
-                !readOnly ? <div className="flex flex-col gap-2 border-t bg-muted/20 p-3 sm:flex-row">
-                <Input
-                  value={newCategory}
-                  onChange={(event) => setNewCategory(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") addExpenseCategory();
-                  }}
-                  placeholder="Add another expense category"
-                  className="h-8 sm:max-w-sm"
-                />
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={addExpenseCategory}
-                  disabled={!newCategory.trim() || saveMutation.isPending}
-                >
-                  <Plus className="mr-2 h-4 w-4" />
-                  Add category
-                </Button>
-                </div> : undefined
-              }
             />
 
           <Card className="overflow-hidden">

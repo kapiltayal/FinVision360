@@ -1,6 +1,8 @@
 import type { PoolClient } from "pg";
 import { INCOME_CATEGORIES, EXPENSE_CATEGORIES, normalizeBudgetPlanKey } from "../shared/budget-period";
 import { monthlySavingsRequired } from "../shared/goal-monthly-savings";
+import { budgetCategoryPlanKey } from "../shared/budget-categories";
+import { categoryPlansById, loadBudgetCategories } from "./budget-categories";
 
 export type BudgetPlanLine = {
   planKey: string;
@@ -104,6 +106,50 @@ async function transactionPlanDefaults(client: Pick<PoolClient, "query">, userId
   return planRows;
 }
 
+async function transactionPlanDefaultsById(client: Pick<PoolClient, "query">, userId: string, period: string) {
+  const start = `${period}-01`;
+  const [year, month] = period.split("-").map(Number);
+  const earliest = new Date(Date.UTC(year, month - 13, 1)).toISOString().slice(0, 10);
+  const catalog = await loadBudgetCategories(client);
+  const { rows: boundary } = await client.query(
+    "SELECT MIN(date)::text AS first FROM transactions WHERE user_id=$1 AND date < $2::date", [userId, start],
+  );
+  const first = boundary[0]?.first?.slice(0, 7);
+  const count = first ? Math.min(12, (year - Number(first.slice(0, 4))) * 12 + month - Number(first.slice(5, 7))) : 0;
+  const plans = new Map<string, BudgetPlanLine>();
+  for (const category of catalog) {
+    if (category.type === "expense" && ["debt_payment", "savings_transfer"].includes(
+      category.name.toLowerCase().replace(/[^a-z0-9]+/g, "_"),
+    )) continue;
+    const key = budgetCategoryPlanKey(category.type, category.id);
+    plans.set(key, {
+      planKey: key, plannedAmount: 0,
+      entityMetadata: { name: category.name, category: category.parentCategory },
+    });
+  }
+  const { rows } = await client.query(
+    `SELECT type, transaction_type_id, SUM(amount) AS total FROM transactions
+     WHERE user_id=$1 AND date >= $2::date AND date < $3::date GROUP BY type, transaction_type_id`,
+    [userId, earliest, start],
+  );
+  for (const row of rows) {
+    const key = budgetCategoryPlanKey(row.type, row.transaction_type_id);
+    if (row.transaction_type_id != null && !plans.has(key)) continue;
+    plans.set(key, {
+      ...plans.get(key), planKey: key, plannedAmount: count ? Math.round(Number(row.total) / count * 100) / 100 : 0,
+    });
+  }
+  const { rows: uncategorizedInPeriod } = await client.query(
+    `SELECT DISTINCT type FROM transactions WHERE user_id=$1 AND transaction_type_id IS NULL
+     AND date >= $2::date AND date < $2::date + INTERVAL '1 month'`, [userId, start],
+  );
+  for (const row of uncategorizedInPeriod) {
+    const key = budgetCategoryPlanKey(row.type, null);
+    if (!plans.has(key)) plans.set(key, { planKey: key, plannedAmount: 0 });
+  }
+  return plans;
+}
+
 /**
  * Use only a unique, matching pair of legacy debt and goal backups made on
  * the first of the month following the requested budget period. Transaction
@@ -204,7 +250,7 @@ export async function legacyBudgetClose(
 export async function buildBudgetClose(client: PoolClient, userId: string, period: string, capturedAt: Date): Promise<BudgetSnapshot> {
   const start = `${period}-01`;
   const { rows: saved } = await client.query(
-    "SELECT plan_key, planned_amount, entity_metadata FROM budget_plans WHERE user_id=$1 AND month=$2::date",
+    "SELECT plan_key, planned_amount, entity_metadata, transaction_type_id FROM budget_plans WHERE user_id=$1 AND month=$2::date",
     [userId, start],
   );
   const { rows: debts } = await client.query(
@@ -213,7 +259,7 @@ export async function buildBudgetClose(client: PoolClient, userId: string, perio
   const { rows: goals } = await client.query(
     "SELECT id,title,category,target_amount,current_amount,target_date::text FROM goal_funding WHERE user_id=$1 ORDER BY id", [userId],
   );
-  const plans = await transactionPlanDefaults(client, userId, period);
+  const plans = await transactionPlanDefaultsById(client, userId, period);
   const add = (planKey: string, amount: number, entityMetadata: BudgetPlanLine["entityMetadata"] = null) =>
     plans.set(planKey, { planKey, plannedAmount: Math.round(amount * 100) / 100, entityMetadata });
   const liabilityRows: DebtSnapshot[] = debts.map((row) => {
@@ -225,8 +271,8 @@ export async function buildBudgetClose(client: PoolClient, userId: string, perio
     add(`goal:${row.id}`, row.target_date && row.target_date.slice(0, 7) >= period ? needed ?? 0 : 0, { name: row.title, category: row.category });
     return { id: row.id, title: row.title, category: row.category, targetAmount: Number(row.target_amount), currentAmount: Number(row.current_amount), targetDate: row.target_date, monthlySavingsNeeded: needed === null ? null : Math.round(needed * 100) / 100 };
   });
-  for (const row of saved) {
-    add(row.plan_key, Number(row.planned_amount), row.entity_metadata ?? plans.get(row.plan_key)?.entityMetadata);
+  for (const row of categoryPlansById(saved)) {
+    add(row.planKey, row.plannedAmount, row.entityMetadata ?? plans.get(row.planKey)?.entityMetadata);
   }
   return preserveSavedEntityRows({ plans: Array.from(plans.values()), liabilities: liabilityRows, goals: goalRows });
 }

@@ -6,6 +6,7 @@ export function normalizeBudgetCategory(category: string) {
 }
 
 export function normalizeBudgetPlanKey(planKey: string) {
+  if (/^(income|expense):category:[1-9]\d*$/.test(planKey)) return planKey;
   const separator = planKey.indexOf(":");
   if (separator < 0) return planKey;
   const type = planKey.slice(0, separator);

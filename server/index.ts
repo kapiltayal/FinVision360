@@ -7,6 +7,7 @@ import { ensureTransactionImportSchema } from "./transaction-import-schema";
 import { ensureGoalAllocationSchema } from "./goal-allocation";
 import { ensureRetirementAccountInclusionSchema } from "./retirement-account-inclusion";
 import { ensureAIUsageSchema } from "./ai-usage-schema";
+import { ensureBudgetCategorySchema } from "./budget-category-schema";
 import { createApiRequestLogger, formatSafeApiError, getSafeApiRoutePath } from "./api-logging";
 
 const app = express();
@@ -147,6 +148,7 @@ app.use(createApiRequestLogger((message) => log(message)));
   await ensureTransactionImportSchema(pool);
   await ensureRetirementAccountInclusionSchema(pool);
   await ensureAIUsageSchema(pool);
+  await ensureBudgetCategorySchema(pool);
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS estate_beneficiaries (

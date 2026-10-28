@@ -11,6 +11,8 @@ function run(command: string, args: string[], extraEnv: Record<string, string> =
 const dir = mkdtempSync(join(tmpdir(), "budget-tests-"));
 try {
   run("npx", ["tsx", "--test", "server/budget-history.test.ts", "server/budget-history.integration.test.ts",
+    "server/budget-categories.test.ts", "server/budget-category-schema.test.ts", "server/budget-category-routes.test.ts",
+    "client/src/lib/budget-category-rows.test.ts",
     "client/src/lib/budget-plan-amounts.test.ts", "client/src/lib/budget-plan-input.test.ts",
     "client/src/lib/goal-monthly-savings.test.ts"]);
   const compiled = join(dir, "ui.test.cjs");

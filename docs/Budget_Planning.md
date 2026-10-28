@@ -6,6 +6,13 @@ Reviewed against repository code: **2026-10-18**. [Documentation index](README.m
 
 ## Current-month planning and goal funding
 
+- Current and future income/living-expense rows come from `transaction_type_list`, not a fixed category list. Display uses the catalog's category name; matching, SQL grouping and saved overrides use its numeric ID. Transfer categories are not offered, and Debt Payment remains in the separate debt section.
+- `transactions.transaction_type_id` and `budget_plans.transaction_type_id` reference the category catalog. New income/expense plan keys encode that ID (`income:category:<id>` or `expense:category:<id>`); debt/goal keys are unchanged.
+- An additive startup migration resolves existing category labels and known legacy budget aliases to unambiguous IDs. Database triggers keep label-based file-upload, Plaid and manual writes synchronized with those IDs, and validate direction for explicit transaction IDs. Unresolved/ambiguous transactions remain Unassigned rather than receiving a guessed category.
+- Averages and 12-month sparklines use the latest complete transaction months, independently of the selected current/future budget month. They group by category ID, so casing, spaces and renamed display labels cannot break the lookup.
+- Existing mapped saved aliases are read together under their category ID. An explicit ID-based edit (including zero) replaces those aliases atomically for that user/month. Unmapped saved rows remain visible, editable and removable; arbitrary new label-only categories cannot be created from the budget page.
+- Existing closed-month payloads are not rewritten. New closes capture category IDs plus display names, so historical labels and amounts remain frozen.
+
 - Suggested amounts shown in an unsaved plan count toward the displayed plan totals; simply viewing a month does not save defaults.
 - Explicit saved plan values are authoritative, including a saved zero. Editing or copying a plan is distinct from loading suggestions.
 - Goal savings suggestions use combined funding: legacy goal progress plus account allocations. Allocating existing cash reduces the remaining goal requirement; it does not create income, expenses, transfers, or saved budget rows.

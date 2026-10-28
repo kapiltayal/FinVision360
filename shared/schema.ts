@@ -148,6 +148,7 @@ export const transactions = pgTable("transactions", {
   type: text("type").notNull(),
   parentCategory: text("parent_category"),
   subcategory: text("subcategory").notNull().default("unassigned"),
+  transactionTypeId: integer("transaction_type_id").references(() => transactionTypeList.id, { onDelete: "set null" }),
   needsWant: text("needs_want"),
   isUserModified: boolean("is_user_modified").notNull().default(false),
   isRecurring: boolean("is_recurring").default(false),
@@ -168,6 +169,7 @@ export const transactions = pgTable("transactions", {
   userIdIndex: index("idx_transactions_user_id").on(table.userId),
   dateIndex: index("idx_transactions_date").on(table.date),
   typeIndex: index("idx_transactions_type").on(table.type),
+  userCategoryDateIndex: index("idx_transactions_user_category_date").on(table.userId, table.transactionTypeId, table.date),
   plaidUnique: uniqueIndex("idx_transactions_plaid_unique")
     .on(table.userId, table.plaidTransactionId)
     .where(sql`${table.plaidTransactionId} IS NOT NULL`),
@@ -810,11 +812,13 @@ export const budgetPlans = pgTable("budget_plans", {
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   month: date("month").notNull(),
   planKey: varchar("plan_key", { length: 250 }).notNull(),
+  transactionTypeId: integer("transaction_type_id").references(() => transactionTypeList.id, { onDelete: "set null" }),
   plannedAmount: numeric("planned_amount", { precision: 12, scale: 2 }).notNull().default("0"),
   entityMetadata: jsonb("entity_metadata").$type<{ name: string; category: string }>(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
+  userMonthCategoryIndex: index("idx_budget_plans_user_month_category").on(table.userId, table.month, table.transactionTypeId),
   userMonthKeyUnique: uniqueIndex("budget_plans_user_month_key_unique").on(
     table.userId,
     table.month,
