@@ -59,3 +59,47 @@ test("unmapped legacy saved amounts remain visible rather than discarded", () =>
   const rows = buildBudgetCategoryRows({ ...base, plans: [{ planKey: "expense:legacy_custom", plannedAmount: 321 }] });
   assert.equal(rows.find((r) => r.key === "expense:legacy_custom")?.planned, 321);
 });
+
+for (const type of ["income", "expense"] as const) {
+  test(`${type} rows for current/future months sort by descending monthly average, not plan or actual`, () => {
+    const rows = buildBudgetCategoryRows({
+      ...base, type,
+      categories: [
+        { id: 101, type, name: "Lowest", parentCategory: "Group" },
+        { id: 102, type, name: "Highest", parentCategory: "Group" },
+        { id: 103, type, name: "Middle", parentCategory: "Group" },
+        { id: 104, type, name: "No history", parentCategory: "Group" },
+      ],
+      plans: [{ planKey: `${type}:category:101`, plannedAmount: 9999 }],
+      actuals: [{ type, category: "category:101", amount: 9999 }],
+      historyCategories: [
+        { type, categoryId: 101, average: 10, history: [] },
+        { type, categoryId: 102, average: 100, history: [] },
+        { type, categoryId: 103, average: 50, history: [] },
+      ],
+    });
+    assert.deepEqual(rows.map((r) => r.label), ["Highest", "Middle", "Lowest", "No history"]);
+    assert.deepEqual(rows.map((r) => r.average), [100, 50, 10, 0]);
+  });
+}
+
+test("equal averages retain catalog order, including categories without history", () => {
+  const rows = buildBudgetCategoryRows({
+    ...base, historyCategories: [
+      { type: "expense", categoryId: 21, average: 0, history: [] },
+      { type: "expense", categoryId: 38, average: 0, history: [] },
+    ],
+  });
+  assert.deepEqual(rows.map((r) => r.label), ["Groceries", "Donations"]);
+});
+
+test("historical rows retain captured order regardless of current monthly averages", () => {
+  const rows = buildBudgetCategoryRows({
+    ...base, readOnly: true, closeComplete: true,
+    plans: [
+      { planKey: "expense:category:38", plannedAmount: 100 },
+      { planKey: "expense:category:21", plannedAmount: 10 },
+    ],
+  });
+  assert.deepEqual(rows.map((r) => r.label), ["Donations", "Groceries"]);
+});

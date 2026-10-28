@@ -27,7 +27,7 @@ export function buildBudgetCategoryRows(input: {
   for (const plan of plans) if (plan.planKey.startsWith(`${type}:`)) keys.add(plan.planKey);
   if (!readOnly && historyMap.has(`${type}:unassigned`)) keys.add(`${type}:unassigned`);
 
-  return Array.from(keys).flatMap((key) => {
+  const rows = Array.from(keys).flatMap((key) => {
     const category = catalog.get(key);
     const plan = planMap.get(key);
     const actual = actualMap.get(key);
@@ -48,4 +48,6 @@ export function buildBudgetCategoryRows(input: {
       removable: !category && !actual,
     }];
   });
+  // Stable sorting keeps the existing catalog order for equal averages.
+  return readOnly ? rows : rows.sort((a, b) => b.average - a.average);
 }
