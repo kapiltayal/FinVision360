@@ -32,7 +32,7 @@ import { formatBudgetPlanInput, isValidBudgetPlanDraft } from "@/lib/budget-plan
 import { budgetPlanSubtotal, budgetPlanVariance, effectiveBudgetPlanAmount } from "@/lib/budget-plan-amounts";
 import { budgetMonthlyGoalRequirement } from "@/lib/goal-monthly-savings";
 import type { BudgetCategory } from "@shared/budget-categories";
-import { buildBudgetCategoryRows } from "@/lib/budget-category-rows";
+import { buildBudgetCategoryRows, budgetCategoryVisibility } from "@/lib/budget-category-rows";
 import { FinancialChartTooltip } from "@/components/financial-chart-tooltip";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
@@ -553,6 +553,7 @@ export default function BudgetingPlanPage() {
   const [savingKey, setSavingKey] = useState<string | null>(null);
   const [debtOpen, setDebtOpen] = useState(false);
   const [goalsOpen, setGoalsOpen] = useState(false);
+  const [addedCategories, setAddedCategories] = useState<Record<string, string[]>>({});
   const queryKey = `/api/budget-plan?month=${month}`;
 
   const { data, isLoading, isError, error } = useQuery<BudgetPlanData>({
@@ -630,6 +631,36 @@ export default function BudgetingPlanPage() {
   }, [data, historySummary, historyMonths, readOnly, closeComplete]);
   const incomeRows = categoryRows.income;
   const expenseRows = categoryRows.expense;
+  const incomeCategories = budgetCategoryVisibility(incomeRows, readOnly, addedCategories[month]);
+  const expenseCategories = budgetCategoryVisibility(expenseRows, readOnly, addedCategories[month]);
+  const categoryPicker = (type: "income" | "expense", available: StatementRow[]) => (
+    <div className="border-t px-4 py-3">
+      {available.length > 0 ? (
+        <label className="flex flex-wrap items-center gap-3 text-sm">
+          <span className="font-medium">Add {type === "income" ? "income" : "expense"} category</span>
+          <select
+            aria-label={`Add ${type} category`}
+            className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm sm:w-64"
+            value=""
+            onChange={(event) => {
+              const key = event.target.value;
+              if (!key) return;
+              setAddedCategories((previous) => ({
+                ...previous,
+                [month]: [...(previous[month] ?? []), key],
+              }));
+            }}
+          >
+            <option value="" disabled>Select a category…</option>
+            {available.map((row) => <option key={row.key} value={row.key}>{row.label}</option>)}
+          </select>
+          <span className="text-xs text-muted-foreground">Select a category, then enter its monthly plan.</span>
+        </label>
+      ) : (
+        <p className="text-xs text-muted-foreground">All available {type} categories are shown.</p>
+      )}
+    </div>
+  );
 
   const copyAllMutation = useMutation({
     mutationFn: async ({
@@ -903,24 +934,26 @@ export default function BudgetingPlanPage() {
             title="Income"
             subtitle="Expected income compared with income transactions received this month"
             icon={CircleDollarSign}
-            rows={incomeRows}
+            rows={incomeCategories.visible}
             tone="income"
             savingKey={savingKey}
             onSave={savePlanLine}
             onCopy={savePlanLine}
             readOnly={readOnly}
+            footer={categoryPicker("income", incomeCategories.available)}
           />
 
           <StatementSection
               title="Living & operating expenses"
               subtitle="Monthly spending by transaction category"
               icon={WalletCards}
-              rows={expenseRows}
+              rows={expenseCategories.visible}
               tone="expense"
               savingKey={savingKey}
               onSave={savePlanLine}
               onCopy={savePlanLine}
               readOnly={readOnly}
+              footer={categoryPicker("expense", expenseCategories.available)}
               onRemove={readOnly ? undefined : (key) => removeMutation.mutate(key)}
             />
 

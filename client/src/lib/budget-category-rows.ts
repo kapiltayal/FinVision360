@@ -1,5 +1,22 @@
 import { budgetCategoryPlanKey, type BudgetCategory } from "@shared/budget-categories";
 
+export function budgetCategoryVisibility<T extends {
+  key: string; average: number; planned?: number; actual: number;
+}>(rows: T[], readOnly: boolean, addedKeys: string[] = []) {
+  const added = new Set(addedKeys);
+  const visible: T[] = [];
+  const available: T[] = [];
+  for (const row of rows) {
+    // Never hide a saved override (including zero) or selected-month activity.
+    if (readOnly || row.average > 0 || row.planned !== undefined || row.actual !== 0 || added.has(row.key)) {
+      visible.push(row);
+    } else {
+      available.push(row);
+    }
+  }
+  return { visible, available };
+}
+
 type Plan = {
   planKey: string; plannedAmount: number;
   entityMetadata?: { name: string; category: string } | null;

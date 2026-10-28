@@ -14,3 +14,9 @@ For current and future months, order income and expense categories by monthly av
 **Why:** The user explicitly requested average-based ordering in both editable sections, scoped to current and future months.
 
 **How to apply:** Sort by each category's historical monthly average, not its planned amount or selected-month actuals; preserve existing order when averages are equal.
+
+For current and future months, initially show positive-average categories and provide quick catalog selection for adding other plan rows. Keep saved plans and selected-month actual activity visible.
+
+**Why:** The user requested shorter income/expense sections without losing the ability to plan for unused categories. Hiding existing plans or actuals would misrepresent section totals.
+
+**How to apply:** Selecting a category reveals an editable row, but only an explicit plan edit persists it. Retain saved zero overrides and do not change historical visibility.

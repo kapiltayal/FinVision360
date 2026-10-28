@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildBudgetCategoryRows } from "./budget-category-rows";
+import { buildBudgetCategoryRows, budgetCategoryVisibility } from "./budget-category-rows";
 
 const base = {
   type: "expense" as const,
@@ -14,6 +14,43 @@ const base = {
   historyCategories: [{ type: "expense", categoryId: 21, average: 467.53, history: [{ month: "2026-09", amount: 5610.38 }] }],
   historyMonths: ["2026-09"], readOnly: false, closeComplete: false,
 };
+
+for (const type of ["income", "expense"] as const) {
+  test(`${type} initially shows positive averages and lets users reveal unused catalog categories`, () => {
+    const rows = [
+      { key: `${type}:category:1`, average: 100, actual: 0 },
+      { key: `${type}:category:2`, average: 0, actual: 0 },
+      { key: `${type}:category:3`, average: -10, actual: 0 },
+    ];
+    const initial = budgetCategoryVisibility(rows, false);
+    assert.deepEqual(initial.visible, [rows[0]]);
+    assert.deepEqual(initial.available, rows.slice(1));
+    const added = budgetCategoryVisibility(rows, false, [rows[1].key]);
+    assert.deepEqual(added.visible, rows.slice(0, 2));
+    assert.deepEqual(added.available, [rows[2]]);
+    assert.deepEqual(budgetCategoryVisibility(rows, false).visible, initial.visible);
+  });
+}
+
+test("zero-average categories retain saved plans, explicit zeros and current-month actuals", () => {
+  const rows = [
+    { key: "expense:category:1", average: 0, planned: 25, actual: 0 },
+    { key: "expense:category:2", average: 0, planned: 0, actual: 0 },
+    { key: "expense:category:3", average: 0, actual: 40 },
+    { key: "expense:legacy", average: 0, planned: 50, actual: 0 },
+  ];
+  assert.deepEqual(budgetCategoryVisibility(rows, false).visible, rows);
+  assert.deepEqual(budgetCategoryVisibility(rows, false).available, []);
+});
+
+test("historical category visibility is unchanged even with zero averages", () => {
+  const rows = buildBudgetCategoryRows({
+    ...base, readOnly: true, closeComplete: true,
+    plans: [{ planKey: "expense:category:38", plannedAmount: 0 }],
+  });
+  assert.deepEqual(budgetCategoryVisibility(rows, true).visible, rows);
+  assert.deepEqual(budgetCategoryVisibility(rows, true).available, []);
+});
 
 test("catalog supplies rows and display names; ID matches averages and trends", () => {
   const rows = buildBudgetCategoryRows(base);
