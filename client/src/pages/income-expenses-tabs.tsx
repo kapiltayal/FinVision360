@@ -1,13 +1,15 @@
 import { useLocation, Link, Switch, Route } from "wouter";
-import { ArrowLeftRight, ClipboardList, Receipt } from "lucide-react";
+import { ArrowLeftRight, ClipboardList, Receipt, Scale } from "lucide-react";
 import IncomeExpensesPage from "./income-expenses";
 import FinanceTrackerPage from "./finance-tracker";
 import BudgetingPlanPage from "./budgeting-plan";
+import BenchmarkingPage from "./benchmarking";
 
 const tabs = [
   { title: "Historical Monthly Expenses", url: "/income-expenses", icon: Receipt },
   { title: "Budgeting Plan", url: "/income-expenses/budgeting-plan", icon: ClipboardList },
   { title: "Transactions", url: "/income-expenses/finance-tracker", icon: ArrowLeftRight },
+  { title: "Benchmarking", url: "/income-expenses/benchmarking", icon: Scale },
 ];
 
 export default function IncomeExpensesTabsPage() {
@@ -21,14 +23,14 @@ export default function IncomeExpensesTabsPage() {
             const isActive =
               tab.url === "/income-expenses"
                 ? location === "/income-expenses"
-                : location === tab.url || location === "/finance-tracker";
+                : location === tab.url || (tab.title === "Transactions" && location === "/finance-tracker");
 
             return (
               <Link
                 key={tab.url}
                 href={tab.url}
                 data-testid={`tab-${tab.title.toLowerCase().replace(/\s/g, "-").replace(/&/g, "and")}`}
-                className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
+                className={`relative flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${tab.title === "Benchmarking" ? "ml-3 before:absolute before:-left-2 before:top-3 before:bottom-3 before:w-px before:bg-border" : ""} ${
                   isActive
                     ? "border-primary text-primary"
                     : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
@@ -46,6 +48,7 @@ export default function IncomeExpensesTabsPage() {
           <Route path="/income-expenses" component={IncomeExpensesPage} />
           <Route path="/income-expenses/budgeting-plan" component={BudgetingPlanPage} />
           <Route path="/income-expenses/finance-tracker" component={FinanceTrackerPage} />
+          <Route path="/income-expenses/benchmarking" component={BenchmarkingPage} />
           <Route path="/finance-tracker" component={FinanceTrackerPage} />
         </Switch>
       </div>

@@ -42,6 +42,7 @@ type NavigationTab = {
   matches?: string[];
   default?: boolean;
   testId?: string;
+  dividerBefore?: boolean;
 };
 
 type NavigationItem = {
@@ -65,11 +66,12 @@ const baseNavItems: NavigationItem[] = [
     title: "Income & Expenses",
     url: "/income-expenses",
     icon: ArrowLeftRight,
-    matches: ["/income-expenses", "/income-expenses/budgeting-plan", "/income-expenses/finance-tracker", "/finance-tracker"],
+    matches: ["/income-expenses", "/income-expenses/budgeting-plan", "/income-expenses/finance-tracker", "/income-expenses/benchmarking", "/finance-tracker"],
     tabs: [
       { title: "Historical Monthly Expenses", url: "/income-expenses" },
       { title: "Budgeting Plan", url: "/income-expenses/budgeting-plan" },
       { title: "Transactions", url: "/income-expenses/finance-tracker", matches: ["/finance-tracker"] },
+      { title: "Benchmarking", url: "/income-expenses/benchmarking", dividerBefore: true },
     ],
   },
   {
@@ -351,6 +353,7 @@ export function AppHeader() {
                     >
                       {item.tabs.map((tab) => (
                         <div key={tab.title} className="contents">
+                        {tab.dividerBefore && <DropdownMenuSeparator data-testid="separator-nav-benchmarking" />}
                         {tab.url === "/liability-map" && (
                           <DropdownMenuSeparator data-testid="separator-nav-liabilities-liability-map" />
                         )}

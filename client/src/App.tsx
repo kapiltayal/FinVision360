@@ -66,6 +66,7 @@ function AuthenticatedApp() {
           <Route path="/income-expenses" component={IncomeExpensesTabsPage} />
           <Route path="/income-expenses/budgeting-plan" component={IncomeExpensesTabsPage} />
           <Route path="/income-expenses/finance-tracker" component={IncomeExpensesTabsPage} />
+          <Route path="/income-expenses/benchmarking" component={IncomeExpensesTabsPage} />
           <Route path="/insurance" component={InsurancePage} />
           <Route path="/estate-planning" component={EstatePlanningPage} />
           <Route path="/goals" component={GoalsPage} />
