@@ -6,7 +6,7 @@ import BudgetingPlanPage from "./budgeting-plan";
 import BenchmarkingPage from "./benchmarking";
 
 const tabs = [
-  { title: "Historical Monthly Expenses", url: "/income-expenses", icon: Receipt },
+  { title: "Monthly Averages", url: "/income-expenses", icon: Receipt },
   { title: "Budgeting Plan", url: "/income-expenses/budgeting-plan", icon: ClipboardList },
   { title: "Transactions", url: "/income-expenses/finance-tracker", icon: ArrowLeftRight },
   { title: "Benchmarking", url: "/income-expenses/benchmarking", icon: Scale },

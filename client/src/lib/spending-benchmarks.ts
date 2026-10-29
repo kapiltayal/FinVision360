@@ -12,7 +12,7 @@ export const BENCHMARK_SOURCE = {
   year: 2024,
   url: "https://www.bls.gov/news.release/archives/cesan_12192025.htm",
   population: "All U.S. consumer units (households and financially independent individuals)",
-  methodology: "Survey annual averages are divided by 12. Your averages use the same completed-month period as Historical Monthly Expenses, up to 12 months. Only clearly mapped categories are compared. National averages are not personalized for income, household size or location, are not inflation-adjusted, and are not recommended budgets. Missing transactions do not establish zero spending.",
+  methodology: "Survey annual averages are divided by 12. Your averages use the same completed-month period as Monthly Averages, up to 12 months. Only clearly mapped categories are compared. National averages are not personalized for income, household size or location, are not inflation-adjusted, and are not recommended budgets. Missing transactions do not establish zero spending.",
 };
 
 // BLS Table A, 2024 annual dollars, published December 19, 2025.

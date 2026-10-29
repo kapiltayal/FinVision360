@@ -68,7 +68,7 @@ const baseNavItems: NavigationItem[] = [
     icon: ArrowLeftRight,
     matches: ["/income-expenses", "/income-expenses/budgeting-plan", "/income-expenses/finance-tracker", "/income-expenses/benchmarking", "/finance-tracker"],
     tabs: [
-      { title: "Historical Monthly Expenses", url: "/income-expenses" },
+      { title: "Monthly Averages", url: "/income-expenses" },
       { title: "Budgeting Plan", url: "/income-expenses/budgeting-plan" },
       { title: "Transactions", url: "/income-expenses/finance-tracker", matches: ["/finance-tracker"] },
       { title: "Benchmarking", url: "/income-expenses/benchmarking", dividerBefore: true },
