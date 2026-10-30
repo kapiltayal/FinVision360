@@ -168,8 +168,13 @@ function TransactionFileReview({
               const included = entry.include !== false && !stable;
               const matchingCategories = allCategories.filter(item => item.type.toLowerCase() === entry.type);
               const selectedCategory = matchingCategories.find(item => item.category === entry.subcategory && item.parentCategory === entry.parentCategory);
+              const rowBackground = stable
+                ? "bg-red-50 dark:bg-red-950"
+                : Object.keys(error).length > 0 && included
+                  ? "bg-amber-50 dark:bg-amber-950"
+                  : included ? "bg-background" : "bg-muted";
               const input = (field: "date" | "description" | "merchant" | "amount" | "notes", placeholder = "") => (
-                <td className={`border-b px-2 py-1.5 align-top ${field === "date" ? "sticky left-80 z-10 w-32 min-w-32 max-w-32 bg-inherit" : field === "description" ? "sticky left-[28rem] z-10 w-40 min-w-40 max-w-40 border-r-2 border-r-primary/20 bg-inherit" : ""}`}>
+                <td className={`border-b px-2 py-1.5 align-top ${field === "date" ? `sticky left-80 z-10 w-32 min-w-32 max-w-32 ${rowBackground}` : field === "description" ? `sticky left-[28rem] z-10 w-40 min-w-40 max-w-40 border-r-2 border-r-primary/20 ${rowBackground}` : ""}`}>
                   <Input type="text" inputMode={field === "date" ? "text" : field === "amount" ? "decimal" : undefined}
                     value={entry[field]} onChange={event => onChange(entry.id, field, event.target.value)}
                     placeholder={placeholder} aria-label={`Transaction ${index + 1} ${field}`} aria-invalid={!!error[field]}
@@ -178,12 +183,12 @@ function TransactionFileReview({
                 </td>
               );
               return (
-                <tr key={entry.id} className={`${stable ? "bg-destructive/[0.035]" : included ? "bg-background" : "bg-muted/35"} ${Object.keys(error).length && included ? "bg-amber-50/40 dark:bg-amber-950/10" : ""}`}>
-                  <th scope="row" className="sticky left-0 z-10 w-12 min-w-12 max-w-12 border-b bg-inherit px-2 py-1.5 text-center font-normal">
+                <tr key={entry.id} className={rowBackground}>
+                  <th scope="row" className={`sticky left-0 z-10 w-12 min-w-12 max-w-12 border-b px-2 py-1.5 text-center font-normal ${rowBackground}`}>
                     <span className="block text-muted-foreground">{index + 1}</span>
                     {Object.keys(error).length > 0 && included && <AlertCircle className="mx-auto mt-1 h-3.5 w-3.5 text-amber-600" aria-label="Needs review" />}
                   </th>
-                  <td className="sticky left-12 z-10 w-28 min-w-28 max-w-28 border-b bg-inherit px-2 py-2 align-top">
+                  <td className={`sticky left-12 z-10 w-28 min-w-28 max-w-28 border-b px-2 py-2 align-top ${rowBackground}`}>
                     <label className={`flex items-start gap-2 ${stable ? "cursor-not-allowed opacity-70" : "cursor-pointer"}`}>
                       <input type="checkbox" checked={included} disabled={decisionDisabled || stable}
                         onChange={event => onChange(entry.id, "include", event.target.checked)}
@@ -200,7 +205,7 @@ function TransactionFileReview({
                     </label>
                     {entry.sourceTransactionId && <p className="mt-1 max-w-24 truncate text-[10px] text-muted-foreground" title={`Source transaction ID: ${entry.sourceTransactionId}`}>Source ID: {entry.sourceTransactionId}</p>}
                   </td>
-                  <td className="sticky left-40 z-10 w-40 min-w-40 max-w-40 border-b bg-inherit px-2 py-1.5 align-top">{entry.duplicate ? <DuplicateNotice entry={entry} /> : <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-1 font-medium text-primary"><CheckCircle2 className="h-3 w-3" /> No match found</span>}</td>
+                  <td className={`sticky left-40 z-10 w-40 min-w-40 max-w-40 border-b px-2 py-1.5 align-top ${rowBackground}`}>{entry.duplicate ? <DuplicateNotice entry={entry} /> : <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-1 font-medium text-primary"><CheckCircle2 className="h-3 w-3" /> No match found</span>}</td>
                   {input("date", "YYYY-MM-DD")}
                   {input("description", "Description")}
                   {input("merchant", "Merchant")}
