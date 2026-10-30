@@ -1076,7 +1076,9 @@ export default function FinanceTrackerPage() {
           setTransactionImportPanelKey(key => key + 1);
         }
       }}>
-        <DialogContent className={`max-h-[90vh] w-[calc(100vw-2rem)] overflow-y-auto ${reviewingTransactions ? "max-w-[1500px]" : "max-w-2xl"}`}>
+        <DialogContent className={reviewingTransactions
+          ? "flex h-[90vh] max-h-[90vh] min-h-0 w-[calc(100vw-1rem)] max-w-[1500px] flex-col overflow-hidden"
+          : "max-h-[90vh] w-[calc(100vw-2rem)] overflow-y-auto max-w-2xl"}>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Database className="h-4 w-4 text-blue-500" />
@@ -1088,7 +1090,7 @@ export default function FinanceTrackerPage() {
                 : "Enter a transaction, upload a file, or import activity from a connected account."}
             </DialogDescription>
           </DialogHeader>
-            <Tabs value={intakeTab} onValueChange={value => {
+            <Tabs value={intakeTab} className={reviewingTransactions ? "flex min-h-0 flex-1 flex-col" : undefined} onValueChange={value => {
               if (intakeBusy) return;
               setIntakeTab(value);
               if (value !== "upload") {
@@ -1114,7 +1116,7 @@ export default function FinanceTrackerPage() {
                   <Plus className="h-4 w-4 mr-2" />Open Manual Entry Form
                 </Button>
               </TabsContent>
-              <TabsContent value="upload" className="mt-4">
+              <TabsContent value="upload" className={reviewingTransactions ? "mt-2 flex min-h-0 flex-1 flex-col overflow-hidden" : "mt-4"}>
                 <TransactionFileImportPanel
                   key={transactionImportPanelKey}
                   onImported={handleReviewedImport}

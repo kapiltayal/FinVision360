@@ -99,8 +99,8 @@ function TransactionFileReview({
   const decisionDisabled = saving || checking;
 
   return (
-    <div className="space-y-4" data-testid="transaction-file-review">
-      <div className="w-full max-w-[70rem] space-y-4">
+    <div className="flex h-full min-h-0 flex-col gap-3" data-testid="transaction-file-review">
+      <div className="w-full shrink-0 space-y-3">
         <TransactionImportProgress current={stage} failedAt={failedAt} />
         <div className="relative w-full overflow-hidden rounded-xl border border-primary/10 bg-[linear-gradient(120deg,hsl(var(--card)),hsl(var(--muted)))] p-3">
           <div className="flex flex-wrap items-start justify-between gap-2">
@@ -138,16 +138,16 @@ function TransactionFileReview({
       {checkError && <p className="text-sm text-destructive" role="alert">{checkError} Recheck before saving.</p>}
       {stage === "failed" && <div role="alert" className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /><div><p className="font-semibold">Import paused{failedAt ? ` during ${transactionImportStageLabel(failedAt).toLowerCase()}` : ""}</p><p className="mt-0.5">{errorMessage}</p><p className="mt-1 text-xs">Your review is still here. Correct the issue or retry when ready.</p></div></div>}
 
-      <div className="max-h-[min(260px,45vh)] overflow-auto overscroll-contain rounded-xl border" aria-label="Editable transaction preview">
-        <table className="w-full min-w-[2000px] text-left text-xs">
+      <div className="min-h-0 flex-1 overflow-auto overscroll-contain rounded-xl border" aria-label="Editable transaction preview">
+        <table className="w-full min-w-[2000px] border-separate border-spacing-0 text-left text-xs">
           <caption className="sr-only">Editable preview of transactions from {fileName}</caption>
           <thead className="sticky top-0 z-10 bg-muted">
             <tr>
-              <th scope="col" className="sticky left-0 z-20 w-12 min-w-12 border-b bg-muted px-2 py-2 text-center font-medium">#</th>
-              <th scope="col" className="min-w-28 border-b px-2 py-2 font-medium">Save?</th>
-              <th scope="col" className="w-40 min-w-40 max-w-40 border-b px-2 py-2 font-medium">Match check</th>
-              <th scope="col" className="min-w-32 border-b px-2 py-2 font-medium">Date *</th>
-              <th scope="col" className="min-w-40 border-b px-2 py-2 font-medium">Description *</th>
+              <th scope="col" className="sticky left-0 z-30 w-12 min-w-12 max-w-12 border-b bg-muted px-2 py-2 text-center font-medium">#</th>
+              <th scope="col" className="sticky left-12 z-30 w-28 min-w-28 max-w-28 border-b bg-muted px-2 py-2 font-medium">Save?</th>
+              <th scope="col" className="sticky left-40 z-30 w-40 min-w-40 max-w-40 border-b bg-muted px-2 py-2 font-medium">Match check</th>
+              <th scope="col" className="sticky left-80 z-30 w-32 min-w-32 max-w-32 border-b bg-muted px-2 py-2 font-medium">Date *</th>
+              <th scope="col" className="sticky left-[28rem] z-30 w-40 min-w-40 max-w-40 border-b border-r-2 border-r-primary/20 bg-muted px-2 py-2 font-medium">Description *</th>
               <th scope="col" className="min-w-32 border-b px-2 py-2 font-medium">Merchant</th>
               <th scope="col" className="min-w-24 border-b px-2 py-2 font-medium">Amount *</th>
               <th scope="col" className="min-w-24 border-b px-2 py-2 font-medium">Type *</th>
@@ -169,7 +169,7 @@ function TransactionFileReview({
               const matchingCategories = allCategories.filter(item => item.type.toLowerCase() === entry.type);
               const selectedCategory = matchingCategories.find(item => item.category === entry.subcategory && item.parentCategory === entry.parentCategory);
               const input = (field: "date" | "description" | "merchant" | "amount" | "notes", placeholder = "") => (
-                <td className="border-b px-2 py-1.5 align-top">
+                <td className={`border-b px-2 py-1.5 align-top ${field === "date" ? "sticky left-80 z-10 w-32 min-w-32 max-w-32 bg-inherit" : field === "description" ? "sticky left-[28rem] z-10 w-40 min-w-40 max-w-40 border-r-2 border-r-primary/20 bg-inherit" : ""}`}>
                   <Input type="text" inputMode={field === "date" ? "text" : field === "amount" ? "decimal" : undefined}
                     value={entry[field]} onChange={event => onChange(entry.id, field, event.target.value)}
                     placeholder={placeholder} aria-label={`Transaction ${index + 1} ${field}`} aria-invalid={!!error[field]}
@@ -178,12 +178,12 @@ function TransactionFileReview({
                 </td>
               );
               return (
-                <tr key={entry.id} className={`${stable ? "bg-destructive/[0.035]" : included ? "" : "bg-muted/35"} ${Object.keys(error).length && included ? "bg-amber-50/40 dark:bg-amber-950/10" : ""}`}>
-                  <th scope="row" className="sticky left-0 z-[1] border-b bg-background px-2 py-1.5 text-center font-normal">
+                <tr key={entry.id} className={`${stable ? "bg-destructive/[0.035]" : included ? "bg-background" : "bg-muted/35"} ${Object.keys(error).length && included ? "bg-amber-50/40 dark:bg-amber-950/10" : ""}`}>
+                  <th scope="row" className="sticky left-0 z-10 w-12 min-w-12 max-w-12 border-b bg-inherit px-2 py-1.5 text-center font-normal">
                     <span className="block text-muted-foreground">{index + 1}</span>
                     {Object.keys(error).length > 0 && included && <AlertCircle className="mx-auto mt-1 h-3.5 w-3.5 text-amber-600" aria-label="Needs review" />}
                   </th>
-                  <td className="border-b px-2 py-2 align-top">
+                  <td className="sticky left-12 z-10 w-28 min-w-28 max-w-28 border-b bg-inherit px-2 py-2 align-top">
                     <label className={`flex items-start gap-2 ${stable ? "cursor-not-allowed opacity-70" : "cursor-pointer"}`}>
                       <input type="checkbox" checked={included} disabled={decisionDisabled || stable}
                         onChange={event => onChange(entry.id, "include", event.target.checked)}
@@ -198,9 +198,9 @@ function TransactionFileReview({
                         ) : null}
                       </span>
                     </label>
-                    {entry.sourceTransactionId && <p className="mt-1 max-w-32 truncate text-[10px] text-muted-foreground" title={`Source transaction ID: ${entry.sourceTransactionId}`}>Source ID: {entry.sourceTransactionId}</p>}
+                    {entry.sourceTransactionId && <p className="mt-1 max-w-24 truncate text-[10px] text-muted-foreground" title={`Source transaction ID: ${entry.sourceTransactionId}`}>Source ID: {entry.sourceTransactionId}</p>}
                   </td>
-                  <td className="w-40 min-w-40 max-w-40 border-b px-2 py-1.5 align-top">{entry.duplicate ? <DuplicateNotice entry={entry} /> : <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-1 font-medium text-primary"><CheckCircle2 className="h-3 w-3" /> No match found</span>}</td>
+                  <td className="sticky left-40 z-10 w-40 min-w-40 max-w-40 border-b bg-inherit px-2 py-1.5 align-top">{entry.duplicate ? <DuplicateNotice entry={entry} /> : <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-1 font-medium text-primary"><CheckCircle2 className="h-3 w-3" /> No match found</span>}</td>
                   {input("date", "YYYY-MM-DD")}
                   {input("description", "Description")}
                   {input("merchant", "Merchant")}
@@ -238,8 +238,8 @@ function TransactionFileReview({
           </tbody>
         </table>
       </div>
-      {!entries.length && <p className="rounded-lg border border-dashed p-5 text-center text-sm text-muted-foreground">No transactions remain. Add a row or discard this review.</p>}
-      <div className="space-y-2 border-t pt-3">
+      {!entries.length && <p className="shrink-0 rounded-lg border border-dashed p-5 text-center text-sm text-muted-foreground">No transactions remain. Add a row or discard this review.</p>}
+      <div className="shrink-0 space-y-2 border-t pt-3">
         <p className="max-w-lg text-xs text-muted-foreground">Category is optional. {excludedCount > 0 ? `${excludedCount} excluded ${excludedCount === 1 ? "row is" : "rows are"} ignored during validation and save.` : "Only selected, valid rows will be saved."}</p>
         {entries.length >= 500 && <p className="text-xs text-muted-foreground">Maximum of 500 transaction rows reached.</p>}
         <div className="flex flex-nowrap items-center gap-2 overflow-x-auto pb-1">
