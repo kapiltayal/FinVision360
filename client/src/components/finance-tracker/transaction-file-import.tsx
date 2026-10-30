@@ -141,24 +141,24 @@ function TransactionFileReview({
       <div className="min-h-0 flex-1 overflow-auto overscroll-contain rounded-xl border" aria-label="Editable transaction preview">
         <table className="w-full min-w-[2000px] border-separate border-spacing-0 text-left text-xs">
           <caption className="sr-only">Editable preview of transactions from {fileName}</caption>
-          <thead className="sticky top-0 z-10 bg-muted">
+          <thead className="bg-muted">
             <tr>
-              <th scope="col" className="sticky left-0 z-30 w-12 min-w-12 max-w-12 border-b bg-muted px-2 py-2 text-center font-medium">#</th>
-              <th scope="col" className="sticky left-12 z-30 w-28 min-w-28 max-w-28 border-b bg-muted px-2 py-2 font-medium">Save?</th>
-              <th scope="col" className="sticky left-40 z-30 w-40 min-w-40 max-w-40 border-b bg-muted px-2 py-2 font-medium">Match check</th>
-              <th scope="col" className="sticky left-80 z-30 w-32 min-w-32 max-w-32 border-b bg-muted px-2 py-2 font-medium">Date *</th>
-              <th scope="col" className="sticky left-[28rem] z-30 w-40 min-w-40 max-w-40 border-b border-r-2 border-r-primary/20 bg-muted px-2 py-2 font-medium">Description *</th>
-              <th scope="col" className="min-w-32 border-b px-2 py-2 font-medium">Merchant</th>
-              <th scope="col" className="min-w-24 border-b px-2 py-2 font-medium">Amount *</th>
-              <th scope="col" className="min-w-24 border-b px-2 py-2 font-medium">Type *</th>
-              <th scope="col" className="min-w-56 border-b px-2 py-2 font-medium">Category</th>
-              <th scope="col" className="min-w-28 border-b px-2 py-2 font-medium">Need / Want</th>
-              <th scope="col" className="min-w-28 border-b px-2 py-2 font-medium">Recurring</th>
-              <th scope="col" className="min-w-40 border-b px-2 py-2 font-medium">Recurring type</th>
-              <th scope="col" className="min-w-40 border-b px-2 py-2 font-medium">Recurring frequency</th>
-              <th scope="col" className="min-w-40 border-b px-2 py-2 font-medium">Notes</th>
-              <th scope="col" className="min-w-36 border-b px-2 py-2 font-medium">Source category</th>
-              <th scope="col" className="sticky right-0 z-20 w-10 min-w-10 border-b bg-muted px-1 py-2"><span className="sr-only">Remove</span></th>
+              <th scope="col" className="sticky left-0 top-0 z-40 w-12 min-w-12 max-w-12 border-b bg-muted px-2 py-2 text-center font-medium">#</th>
+              <th scope="col" className="sticky left-12 top-0 z-40 w-28 min-w-28 max-w-28 border-b bg-muted px-2 py-2 font-medium">Save?</th>
+              <th scope="col" className="sticky left-40 top-0 z-40 w-40 min-w-40 max-w-40 border-b bg-muted px-2 py-2 font-medium">Match check</th>
+              <th scope="col" className="sticky left-80 top-0 z-40 w-32 min-w-32 max-w-32 border-b bg-muted px-2 py-2 font-medium">Date *</th>
+              <th scope="col" className="sticky left-[28rem] top-0 z-40 w-40 min-w-40 max-w-40 border-b border-r-2 border-r-primary/20 bg-muted px-2 py-2 font-medium">Description *</th>
+              <th scope="col" className="sticky top-0 z-20 min-w-32 border-b bg-muted px-2 py-2 font-medium">Merchant</th>
+              <th scope="col" className="sticky top-0 z-20 min-w-24 border-b bg-muted px-2 py-2 font-medium">Amount *</th>
+              <th scope="col" className="sticky top-0 z-20 min-w-24 border-b bg-muted px-2 py-2 font-medium">Type *</th>
+              <th scope="col" className="sticky top-0 z-20 min-w-56 border-b bg-muted px-2 py-2 font-medium">Category</th>
+              <th scope="col" className="sticky top-0 z-20 min-w-28 border-b bg-muted px-2 py-2 font-medium">Need / Want</th>
+              <th scope="col" className="sticky top-0 z-20 min-w-28 border-b bg-muted px-2 py-2 font-medium">Recurring</th>
+              <th scope="col" className="sticky top-0 z-20 min-w-40 border-b bg-muted px-2 py-2 font-medium">Recurring type</th>
+              <th scope="col" className="sticky top-0 z-20 min-w-40 border-b bg-muted px-2 py-2 font-medium">Recurring frequency</th>
+              <th scope="col" className="sticky top-0 z-20 min-w-40 border-b bg-muted px-2 py-2 font-medium">Notes</th>
+              <th scope="col" className="sticky top-0 z-20 min-w-36 border-b bg-muted px-2 py-2 font-medium">Source category</th>
+              <th scope="col" className="sticky right-0 top-0 z-40 w-10 min-w-10 border-b bg-muted px-1 py-2"><span className="sr-only">Remove</span></th>
             </tr>
           </thead>
           <tbody>
