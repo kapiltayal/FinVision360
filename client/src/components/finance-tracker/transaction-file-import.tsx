@@ -168,11 +168,7 @@ function TransactionFileReview({
               const included = entry.include !== false && !stable;
               const matchingCategories = allCategories.filter(item => item.type.toLowerCase() === entry.type);
               const selectedCategory = matchingCategories.find(item => item.category === entry.subcategory && item.parentCategory === entry.parentCategory);
-              const rowBackground = stable
-                ? "bg-red-50 dark:bg-red-950"
-                : Object.keys(error).length > 0 && included
-                  ? "bg-amber-50 dark:bg-amber-950"
-                  : included ? "bg-background" : "bg-muted";
+              const rowBackground = "bg-background";
               const input = (field: "date" | "description" | "merchant" | "amount" | "notes", placeholder = "") => (
                 <td className={`border-b px-2 py-1.5 align-top ${field === "date" ? `sticky left-80 z-10 w-32 min-w-32 max-w-32 ${rowBackground}` : field === "description" ? `sticky left-[28rem] z-10 w-40 min-w-40 max-w-40 border-r-2 border-r-primary/20 ${rowBackground}` : ""}`}>
                   <Input type="text" inputMode={field === "date" ? "text" : field === "amount" ? "decimal" : undefined}
