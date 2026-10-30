@@ -42,5 +42,12 @@ export function formatSafeApiError(context: string, error: unknown): string {
   const errorCode = record && typeof record.code === "string" && /^[A-Z0-9_-]{1,32}$/.test(record.code)
     ? ` code=${record.code}`
     : "";
-  return `${safeContext}: type=${errorName}${errorCode}`;
+  const position = record && typeof record.position === "string" && /^[1-9][0-9]{0,5}$/.test(record.position)
+    ? ` position=${record.position}`
+    : "";
+  const internalPosition = record && typeof record.internalPosition === "string" &&
+      /^[1-9][0-9]{0,5}$/.test(record.internalPosition)
+    ? ` internal_position=${record.internalPosition}`
+    : "";
+  return `${safeContext}: type=${errorName}${errorCode}${position}${internalPosition}`;
 }

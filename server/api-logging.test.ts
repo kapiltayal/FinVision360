@@ -63,13 +63,24 @@ test("API error logs keep a safe failure context and omit error messages, values
       detail: "Sensitive transaction row",
       query: "SELECT * FROM transactions WHERE amount = 9876.54",
       parameters: ["Checking-123", "private-description"],
+      position: "47",
     },
   );
   const line = formatSafeApiError("PATCH /api/transactions/:id status=500", error);
 
-  assert.equal(line, "PATCH /api/transactions/:id status=500: type=Error code=23505");
+  assert.equal(line, "PATCH /api/transactions/:id status=500: type=Error code=23505 position=47");
   for (const privateValue of ["Checking-123", "9876.54", "private-description", "Sensitive transaction row", "SELECT"]) {
     assert.equal(line.includes(privateValue), false);
   }
+
+  const stagedLine = formatSafeApiError(
+    "PATCH /api/transactions/:id stage=update_merchant_transactions",
+    error,
+  );
+  assert.equal(
+    stagedLine,
+    "PATCH /api/transactions/:id stage=update_merchant_transactions: type=Error code=23505 position=47",
+  );
+  assert.equal(stagedLine.includes("Checking-123"), false);
 });
 

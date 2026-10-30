@@ -369,8 +369,15 @@ function normalizeMerchant(description: string): string {
 
 // ─── ROUTE REGISTRATION ───────────────────────────────────────────────────────
 export function registerFinanceTrackerRoutes(app: Express) {
-  const logRouteFailure = (req: any, error: unknown) => {
-    console.error(formatSafeApiError(getSafeApiRoutePath(req?.route?.path), error));
+  const logRouteFailure = (req: any, error: unknown, stage?: string) => {
+    const routePath = getSafeApiRoutePath(req?.route?.path);
+    const method = typeof req?.method === "string" && /^[A-Za-z]{1,12}$/.test(req.method)
+      ? req.method.toUpperCase()
+      : "API";
+    const context = stage
+      ? `${method} ${routePath} stage=${stage}`
+      : `${method} ${routePath}`;
+    console.error(formatSafeApiError(context, error));
   };
 
   // Canonical selectable categories.  Display labels remain DB-owned while the
@@ -1581,11 +1588,13 @@ export function registerFinanceTrackerRoutes(app: Express) {
   // PATCH /api/transactions/:id
   app.patch("/api/transactions/:id", requireAuth, async (req, res) => {
     let editClient: any;
+    let updateStage = "acquire_connection";
     try {
       const userId = (req.user as any).id;
       const id = parseInt(req.params.id);
       if (!Number.isInteger(id)) return res.status(400).json({ message: "Invalid transaction id" });
       editClient = await pool.connect();
+      updateStage = "begin_transaction";
       await editClient.query("BEGIN");
       const abortEdit = async (status: number, message: string) => {
         await editClient.query("ROLLBACK");
@@ -1598,12 +1607,14 @@ export function registerFinanceTrackerRoutes(app: Express) {
         date, description, amount, type, subcategory, category, parentCategory, needsWant, isRecurring, recurringType, recurringFreq, notes,
         applyToMerchant = false, merchantFields = [],
       } = req.body;
+      updateStage = "lock_target_transaction";
       const { rows: existingRows } = await editClient.query(
         `SELECT * FROM transactions WHERE id = $1 AND user_id = $2 FOR UPDATE`,
         [id, userId],
       );
       const existing = existingRows[0];
       if (!existing) return abortEdit(404, "Not found");
+      updateStage = "load_category_catalog";
       const categories = await canonicalTransactionCategories();
       if (type !== undefined && type !== "income" && type !== "expense") return abortEdit(400, "Invalid transaction type");
       const requestedType = type === "income" || type === "expense" ? type : existing.type;
@@ -1611,6 +1622,10 @@ export function registerFinanceTrackerRoutes(app: Express) {
       const selectedCategory = requestedCategory !== undefined
         ? categoryForInput(categories, requestedType, requestedCategory, parentCategory)
         : undefined;
+      const categoryChanged = Boolean(selectedCategory && (
+        selectedCategory.storedCategory !== existing.subcategory ||
+        selectedCategory.storedParentCategory !== existing.parent_category
+      ));
       if (requestedCategory !== undefined && !selectedCategory) return abortEdit(400, "Invalid category");
       if (type !== undefined && type !== existing.type && !selectedCategory) {
         return abortEdit(400, "A valid category is required when changing transaction type");
@@ -1645,14 +1660,14 @@ export function registerFinanceTrackerRoutes(app: Express) {
       }
       if (type !== undefined && type !== existing.type) {
         addUpdate("type", type);
-        addUpdate("category_source", "user_edit");
       }
       if (selectedCategory && selectedCategory.storedCategory !== existing.subcategory) {
         addUpdate("subcategory", selectedCategory.storedCategory);
-        addUpdate("category_source", "user_edit");
       }
       if (selectedCategory && selectedCategory.storedParentCategory !== existing.parent_category) {
         addUpdate("parent_category", selectedCategory.storedParentCategory);
+      }
+      if ((type !== undefined && type !== existing.type) || categoryChanged) {
         addUpdate("category_source", "user_edit");
       }
       if (selectedCategory && needsWant === undefined && (selectedCategory.needVsWant?.toLowerCase() || "na") !== existing.needs_want) addUpdate("needs_want", selectedCategory.needVsWant?.toLowerCase() || "na");
@@ -1680,6 +1695,7 @@ export function registerFinanceTrackerRoutes(app: Express) {
         );
         if (modifiesClassification) updates.push("is_user_modified = TRUE");
         params.push(id, userId);
+        updateStage = "update_target_transaction";
         const { rows } = await editClient.query(
           `UPDATE transactions
            SET ${updates.join(", ")}, updated_at = NOW()
@@ -1699,6 +1715,7 @@ export function registerFinanceTrackerRoutes(app: Express) {
           ["recurring_type", existing.recurring_type, transaction.recurring_type],
           ["recurring_freq", existing.recurring_freq, transaction.recurring_freq],
         ].filter(([, oldValue, newValue]) => String(oldValue ?? "") !== String(newValue ?? ""));
+        updateStage = "audit_target_transaction";
         for (const [field, oldValue, newValue] of audited) {
           await editClient.query(
             `INSERT INTO transaction_change_history (user_id, transaction_id, field, old_value, new_value) VALUES ($1,$2,$3,$4,$5)`,
@@ -1725,6 +1742,7 @@ export function registerFinanceTrackerRoutes(app: Express) {
         }
 
         const merchantKey = normalizeMerchant(existing.merchant || existing.description);
+        updateStage = "find_merchant_transactions";
         const { rows: candidateRows } = await editClient.query(
           `SELECT id, merchant, description, parent_category, subcategory, needs_want, is_recurring, recurring_type FROM transactions WHERE user_id = $1`,
           [userId],
@@ -1767,6 +1785,7 @@ export function registerFinanceTrackerRoutes(app: Express) {
 
           merchantUpdates.push("is_user_modified = TRUE");
           merchantParams.push(userId, matchingIds);
+          updateStage = "update_merchant_transactions";
           const { rowCount } = await editClient.query(
             `UPDATE transactions
              SET ${merchantUpdates.join(", ")}, updated_at = NOW()
@@ -1778,6 +1797,7 @@ export function registerFinanceTrackerRoutes(app: Express) {
           const fieldsToAudit = scopedFields.includes("subcategory")
             ? ["parent_category", "subcategory", "needs_want"] : scopedFields.includes("needsWant") ? ["needs_want"] : [];
           if (scopedFields.includes("recurring")) fieldsToAudit.push("is_recurring", "recurring_type");
+          updateStage = "audit_merchant_transactions";
           for (const row of matchingRows) {
             for (const auditField of fieldsToAudit) {
               const newValue = auditField === "subcategory" ? selectedCategory?.storedCategory
@@ -1792,6 +1812,7 @@ export function registerFinanceTrackerRoutes(app: Express) {
         }
       }
 
+      updateStage = "commit_transaction_update";
       await editClient.query("COMMIT");
       editClient.release();
       editClient = null;
@@ -1801,7 +1822,7 @@ export function registerFinanceTrackerRoutes(app: Express) {
         await editClient.query("ROLLBACK").catch(() => undefined);
         editClient.release();
       }
-      logRouteFailure(req, e);
+      logRouteFailure(req, e, updateStage);
       res.status(500).json({ message: "Failed to update transaction" });
     }
   });
