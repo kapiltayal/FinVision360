@@ -215,6 +215,10 @@ function transactionCategoryValue(category: TransactionCategoryOption) {
 }
 function transactionCategoryLabel(category: TransactionCategoryOption) {
   const name = catLabel(category.subcategory);
+  if (!category.parent_category && name.toLowerCase() === "unassigned") {
+    const type = category.type === "income" ? "Income" : "Expense";
+    return `${type} · ${name}`;
+  }
   return category.parent_category ? `${category.parent_category} · ${name}` : name;
 }
 function normalizeCategoryKey(value: string) {
