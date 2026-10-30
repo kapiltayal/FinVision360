@@ -151,7 +151,8 @@ export function ConnectedAccountsImportPanel({ onImported }: { onImported: () =>
   }
 
   return (
-    <div className="space-y-4">
+    <div className={result ? "" : "space-y-4"}>
+      {!result && <>
       <div>
         <p className="text-sm font-medium">Import from connected accounts</p>
         <p className="mt-1 max-w-2xl text-xs text-muted-foreground">
@@ -262,6 +263,7 @@ export function ConnectedAccountsImportPanel({ onImported }: { onImported: () =>
           Pending, transfer, credit-card payment, and non-USD transactions are skipped.
         </p>
       </div>
+      </>}
 
       {result && (
         <div className="rounded-lg border border-emerald-200 bg-emerald-50/60 p-4 dark:border-emerald-900 dark:bg-emerald-950/20">
