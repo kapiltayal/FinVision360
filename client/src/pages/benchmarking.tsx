@@ -116,10 +116,10 @@ export default function BenchmarkingPage() {
             <CircleDollarSign className="mx-auto mb-3 h-10 w-10 text-muted-foreground/40" />
             <h2 className="text-base font-semibold">No transaction history to compare yet</h2>
             <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
-              Add and categorize expenses in the Financial Tracker. Comparisons appear once completed-month transaction data is available.
+              Add and categorize expenses in Transactions. Comparisons appear once completed-month transaction data is available.
             </p>
             <Button asChild className="mt-5">
-              <a href="/income-expenses/finance-tracker">Open Financial Tracker</a>
+              <a href="/income-expenses/finance-tracker">Open Transactions</a>
             </Button>
           </CardContent>
         </Card>

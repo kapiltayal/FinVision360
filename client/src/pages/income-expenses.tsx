@@ -261,9 +261,9 @@ export default function IncomeExpensesPage() {
         <CardContent className="flex gap-3 p-4 text-sm">
           <Info className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
           <p className="text-muted-foreground">
-            This page is calculated from your Financial Tracker transactions. To add, edit, or categorize transactions, use the{" "}
+            This page is calculated from your Transactions. To add, edit, or categorize transactions, use the{" "}
             <a href="/finance-tracker" className="font-medium text-primary underline-offset-4 hover:underline">
-              Financial Tracker page
+              Transactions page
             </a>.
           </p>
         </CardContent>
@@ -282,7 +282,7 @@ export default function IncomeExpensesPage() {
             <CircleDollarSign className="mx-auto mb-3 h-10 w-10 text-muted-foreground/40" />
             <h2 className="text-base font-semibold">No completed months available yet</h2>
             <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
-              Add transactions in the Financial Tracker. Your average monthly cash flow will appear after the current calendar month is complete.
+              Add transactions in Transactions. Your average monthly cash flow will appear after the current calendar month is complete.
             </p>
           </CardContent>
         </Card>
