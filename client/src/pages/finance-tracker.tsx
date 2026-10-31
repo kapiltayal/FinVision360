@@ -28,7 +28,7 @@ import {
   HeartHandshake,
 } from "lucide-react";
 import {
-  ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
+  ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, PieChart, Pie, Cell,
 } from "recharts";
 
@@ -191,18 +191,33 @@ function fmtPeriod(s: string, groupBy: string) {
   if (groupBy === "year") return String(d.getFullYear());
   return d.toLocaleDateString("en-US", { month: "short", year: "2-digit" });
 }
-function TrendChartLegend({ payload }: { payload?: Array<{ value?: string; color?: string }> }) {
+type TrendSeries = "Income" | "Expenses";
+
+function TrendChartLegend({
+  visible,
+  onToggle,
+}: {
+  visible: Record<TrendSeries, boolean>;
+  onToggle: (series: TrendSeries) => void;
+}) {
   return (
     <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
-      {payload?.map((entry) => (
-        <span
-          key={entry.value}
-          className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold text-white shadow-sm"
-          style={{ backgroundColor: entry.color ?? "hsl(var(--primary))" }}
+      {([
+        { name: "Income", color: "#22c55e" },
+        { name: "Expenses", color: "#ef4444" },
+      ] as const).map(({ name, color }) => (
+        <button
+          key={name}
+          type="button"
+          aria-pressed={visible[name]}
+          aria-label={`${visible[name] ? "Hide" : "Show"} ${name.toLowerCase()} series`}
+          onClick={() => onToggle(name)}
+          className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold text-white shadow-sm transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${visible[name] ? "opacity-100" : "opacity-45"}`}
+          style={{ backgroundColor: color }}
         >
           <span className="h-2.5 w-2.5 rounded-sm bg-white/80" />
-          {entry.value}
-        </span>
+          {name}
+        </button>
       ))}
     </div>
   );
@@ -792,7 +807,15 @@ export default function FinanceTrackerPage() {
   const [pendingMerchantUpdate, setPendingMerchantUpdate] = useState<PendingMerchantUpdate | null>(null);
   const [groupBy, setGroupBy] = useState("month");
   const [trendChartType, setTrendChartType] = useState<"bar" | "line">("bar");
+  const [visibleTrendSeries, setVisibleTrendSeries] = useState<Record<TrendSeries, boolean>>({
+    Income: true,
+    Expenses: true,
+  });
   const [catChartType, setCatChartType] = useState<"income" | "expense">("expense");
+
+  function toggleTrendSeries(series: TrendSeries) {
+    setVisibleTrendSeries(current => ({ ...current, [series]: !current[series] }));
+  }
 
   const { start, end } = getDateRange(period, customStart, customEnd);
 
@@ -1293,21 +1316,21 @@ export default function FinanceTrackerPage() {
                     <XAxis dataKey="period" tick={{ fontSize: 11 }} />
                     <YAxis tick={{ fontSize: 11 }} tickFormatter={v => `$${(v/1000).toFixed(0)}k`} />
                     <Tooltip content={<FinancialChartTooltip />} />
-                    <Legend content={<TrendChartLegend />} />
                     {trendChartType === "bar" ? (
                       <>
-                        <Bar dataKey="Income" fill="#22c55e" radius={[3,3,0,0]} maxBarSize={40} />
-                        <Bar dataKey="Expenses" fill="#ef4444" radius={[3,3,0,0]} maxBarSize={40} />
+                        {visibleTrendSeries.Income && <Bar dataKey="Income" fill="#22c55e" radius={[3,3,0,0]} maxBarSize={40} />}
+                        {visibleTrendSeries.Expenses && <Bar dataKey="Expenses" fill="#ef4444" radius={[3,3,0,0]} maxBarSize={40} />}
                       </>
                     ) : (
                       <>
-                        <Line type="monotone" dataKey="Income" stroke="#22c55e" strokeWidth={2.5} dot={{ r: 3 }} activeDot={{ r: 5 }} />
-                        <Line type="monotone" dataKey="Expenses" stroke="#ef4444" strokeWidth={2.5} dot={{ r: 3 }} activeDot={{ r: 5 }} />
+                        {visibleTrendSeries.Income && <Line type="monotone" dataKey="Income" stroke="#22c55e" strokeWidth={2.5} dot={{ r: 3 }} activeDot={{ r: 5 }} />}
+                        {visibleTrendSeries.Expenses && <Line type="monotone" dataKey="Expenses" stroke="#ef4444" strokeWidth={2.5} dot={{ r: 3 }} activeDot={{ r: 5 }} />}
                       </>
                     )}
                   </ComposedChart>
                 </ResponsiveContainer>
               )}
+            <TrendChartLegend visible={visibleTrendSeries} onToggle={toggleTrendSeries} />
           </CardContent>
         </Card>
 
