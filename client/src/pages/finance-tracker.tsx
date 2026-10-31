@@ -1049,6 +1049,17 @@ export default function FinanceTrackerPage() {
   const totalPages = Math.max(1, Math.ceil(sortedTransactions.length / pageSize));
   const pageTxns = sortedTransactions.slice((page - 1) * pageSize, page * pageSize);
 
+  function handleDataIntakeOpenChange(open: boolean) {
+    if (!open && intakeBusy) return;
+    setDataIntakeOpen(open);
+    if (!open) {
+      setIntakeTab("manual");
+      setReviewingTransactions(false);
+      setIntakeBusy(false);
+      setTransactionImportPanelKey(key => key + 1);
+    }
+  }
+
   return (
     <div className="p-4 md:p-6 space-y-5 max-w-7xl mx-auto">
       {/* ── Header ── */}
@@ -1066,16 +1077,7 @@ export default function FinanceTrackerPage() {
       </div>
 
       {/* ── Data Intake ── */}
-      <Dialog open={dataIntakeOpen} onOpenChange={open => {
-        if (!open && intakeBusy) return;
-        setDataIntakeOpen(open);
-        if (!open) {
-          setIntakeTab("manual");
-          setReviewingTransactions(false);
-          setIntakeBusy(false);
-          setTransactionImportPanelKey(key => key + 1);
-        }
-      }}>
+      <Dialog open={dataIntakeOpen} onOpenChange={handleDataIntakeOpenChange}>
         <DialogContent className={reviewingTransactions
           ? "flex h-[90vh] max-h-[90vh] min-h-0 w-[calc(100vw-1rem)] max-w-[1500px] flex-col overflow-hidden"
           : "max-h-[90vh] w-[calc(100vw-2rem)] overflow-y-auto max-w-2xl"}>
@@ -1125,7 +1127,10 @@ export default function FinanceTrackerPage() {
                 />
               </TabsContent>
               <TabsContent value="import" className="mt-4">
-                <ConnectedAccountsImportPanel onImported={invalidateAll} />
+                <ConnectedAccountsImportPanel
+                  onImported={invalidateAll}
+                  onClose={() => handleDataIntakeOpenChange(false)}
+                />
               </TabsContent>
             </Tabs>
         </DialogContent>

@@ -61,7 +61,13 @@ function defaultStartDate() {
   return isoDate(date);
 }
 
-export function ConnectedAccountsImportPanel({ onImported }: { onImported: () => void }) {
+export function ConnectedAccountsImportPanel({
+  onImported,
+  onClose,
+}: {
+  onImported: () => void;
+  onClose: () => void;
+}) {
   const { toast } = useToast();
   const [selectedItem, setSelectedItem] = useState("all");
   const [selectedAccount, setSelectedAccount] = useState("all");
@@ -267,9 +273,14 @@ export function ConnectedAccountsImportPanel({ onImported }: { onImported: () =>
 
       {result && (
         <div className="rounded-lg border border-emerald-200 bg-emerald-50/60 p-4 dark:border-emerald-900 dark:bg-emerald-950/20">
-          <div className="flex items-center gap-2 text-sm font-medium text-emerald-800 dark:text-emerald-300">
-            <CheckCircle2 className="h-4 w-4" />
-            Import complete
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 text-sm font-medium text-emerald-800 dark:text-emerald-300">
+              <CheckCircle2 className="h-4 w-4" />
+              Import complete
+            </div>
+            <Button type="button" variant="outline" size="sm" className="shrink-0 border-emerald-300 bg-background/80 dark:border-emerald-800" onClick={onClose}>
+              Close
+            </Button>
           </div>
           <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
             {[
