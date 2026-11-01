@@ -470,6 +470,7 @@ export class DatabaseStorage implements IStorage {
          d.has_beneficiary AS "hasBeneficiary",
          d.beneficiary_name AS "beneficiaryName",
          d.notes,
+         d.last_updated_at AS "lastUpdatedAt",
          COALESCE(
            json_agg(
              json_build_object(
@@ -526,12 +527,14 @@ export class DatabaseStorage implements IStorage {
       }
 
       const designation = await client.query(
-        `INSERT INTO estate_beneficiaries (user_id, asset_id, has_beneficiary, beneficiary_name, notes)
-         VALUES ($1, $2, $3, NULL, NULL)
+        `INSERT INTO estate_beneficiaries (user_id, asset_id, has_beneficiary, beneficiary_name, notes, last_updated_at)
+         VALUES ($1, $2, $3, NULL, NULL, NOW())
          ON CONFLICT (user_id, asset_id) DO UPDATE
-           SET has_beneficiary = EXCLUDED.has_beneficiary
+           SET has_beneficiary = EXCLUDED.has_beneficiary,
+               last_updated_at = NOW()
          RETURNING id, user_id AS "userId", asset_id AS "assetId",
-           has_beneficiary AS "hasBeneficiary", beneficiary_name AS "beneficiaryName", notes`,
+           has_beneficiary AS "hasBeneficiary", beneficiary_name AS "beneficiaryName", notes,
+           last_updated_at AS "lastUpdatedAt"`,
         [data.userId, data.assetId, data.hasBeneficiary],
       );
       const designationRecord = designation.rows[0];

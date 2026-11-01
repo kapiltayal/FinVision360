@@ -157,8 +157,11 @@ app.use(createApiRequestLogger((message) => log(message)));
       asset_id INTEGER NOT NULL,
       has_beneficiary BOOLEAN NOT NULL DEFAULT false,
       beneficiary_name TEXT,
-      notes TEXT
+      notes TEXT,
+      last_updated_at TIMESTAMPTZ
     );
+    ALTER TABLE estate_beneficiaries
+      ADD COLUMN IF NOT EXISTS last_updated_at TIMESTAMPTZ;
     CREATE TABLE IF NOT EXISTS estate_documents (
       id SERIAL PRIMARY KEY,
       user_id VARCHAR NOT NULL,

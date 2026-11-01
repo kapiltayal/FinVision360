@@ -598,6 +598,7 @@ export const estateBeneficiaries = pgTable("estate_beneficiaries", {
   hasBeneficiary: boolean("has_beneficiary").default(false).notNull(),
   beneficiaryName: text("beneficiary_name"),
   notes: text("notes"),
+  lastUpdatedAt: timestamp("last_updated_at", { withTimezone: true }),
 });
 
 export const insertEstateBeneficiarySchema = createInsertSchema(estateBeneficiaries).omit({ id: true });

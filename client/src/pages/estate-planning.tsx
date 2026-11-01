@@ -31,6 +31,17 @@ type BeneficiaryDraft = {
   notes: string;
 };
 
+function formatBeneficiaryUpdatedAt(value: Date | string | null | undefined) {
+  if (!value) return "Not recorded";
+  const date = value instanceof Date ? value : new Date(value);
+  if (!Number.isFinite(date.getTime())) return "Not recorded";
+  return new Intl.DateTimeFormat(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  }).format(date);
+}
+
 type EstateTab = "beneficiaries" | "documents" | "contacts";
 
 const ESTATE_TABS: { key: EstateTab; label: string; icon: typeof UserCheck }[] = [
@@ -488,13 +499,14 @@ export default function EstatePlanningPage() {
                       </div>
                     </div>
                     <div className="overflow-x-auto">
-                      <table className="w-full min-w-[800px] text-sm" data-testid={`table-beneficiaries-${parentCategory}`}>
+                      <table className="w-full min-w-[960px] text-sm" data-testid={`table-beneficiaries-${parentCategory}`}>
                         <thead className="border-b bg-muted/50">
                           <tr className="text-left">
                             <th scope="col" className="px-5 py-3 font-medium">Category</th>
                             <th scope="col" className="px-5 py-3 font-medium">Account</th>
                             <th scope="col" className="px-5 py-3 font-medium">Account Value</th>
                             <th scope="col" className="px-5 py-3 font-medium">Beneficiary</th>
+                            <th scope="col" className="px-5 py-3 font-medium">Last Updated</th>
                             <th scope="col" className="px-5 py-3 font-medium">Status</th>
                             <th scope="col" className="px-5 py-3 text-center font-medium">Assign</th>
                             <th scope="col" className="w-12 px-3 py-3" />
@@ -533,6 +545,11 @@ export default function EstatePlanningPage() {
                                             : "Details needed"
                                           : "—"}
                                       </span>
+                                    </td>
+                                    <td className="whitespace-nowrap px-5 py-3 text-muted-foreground">
+                                      {ben
+                                        ? formatBeneficiaryUpdatedAt(ben.lastUpdatedAt)
+                                        : "—"}
                                     </td>
                                     <td className="px-5 py-3">
                                       <Badge variant={hasBen ? "default" : "secondary"} className="text-xs">
@@ -588,7 +605,7 @@ export default function EstatePlanningPage() {
 
                                   {isExpanded && (
                                     <tr>
-                                      <td colSpan={6} className="bg-muted/20 p-0">
+                                      <td colSpan={8} className="bg-muted/20 p-0">
                                         <div className="border-t px-5 py-3">
                                           <div className="rounded-lg bg-muted/30 p-3 space-y-3">
                                             <div className="flex items-center justify-between gap-3">
