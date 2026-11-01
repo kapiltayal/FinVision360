@@ -181,8 +181,8 @@ export default function LiabilityMapPage() {
                 <span className="text-lg font-semibold tracking-tight">{formatCurrency(totalInterestOwed)}</span>
               </p>
               <div className="ml-auto inline-flex shrink-0 rounded-lg border bg-background p-1" role="group" aria-label="Liability map view">
-                <Button type="button" size="sm" variant={mapView === "gantt" ? "secondary" : "ghost"} aria-pressed={mapView === "gantt"} onClick={() => setMapView("gantt")} className={`h-8 px-3 text-xs ${mapView === "gantt" ? "shadow-sm" : "text-muted-foreground"}`}>Gantt</Button>
-                <Button type="button" size="sm" variant={mapView === "bubbles" ? "secondary" : "ghost"} aria-pressed={mapView === "bubbles"} onClick={() => setMapView("bubbles")} className={`h-8 px-3 text-xs ${mapView === "bubbles" ? "shadow-sm" : "text-muted-foreground"}`}>Bubbles</Button>
+                <Button type="button" size="sm" variant={mapView === "gantt" ? "default" : "ghost"} aria-pressed={mapView === "gantt"} onClick={() => setMapView("gantt")} className={`h-8 px-3 text-xs ${mapView === "gantt" ? "shadow-sm" : "text-muted-foreground"}`}>Gantt</Button>
+                <Button type="button" size="sm" variant={mapView === "bubbles" ? "default" : "ghost"} aria-pressed={mapView === "bubbles"} onClick={() => setMapView("bubbles")} className={`h-8 px-3 text-xs ${mapView === "bubbles" ? "shadow-sm" : "text-muted-foreground"}`}>Bubbles</Button>
               </div>
               <p className="basis-full text-xs text-muted-foreground">
                 Estimated over the displayed duration at the current APR; excludes {excludedInterestCount} {excludedInterestCount === 1 ? "debt" : "debts"} without a usable APR or duration.
