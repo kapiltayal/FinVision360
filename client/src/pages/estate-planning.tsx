@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { useLocation, useSearch } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -24,6 +24,8 @@ import {
 } from "@shared/schema";
 import { type BookCategory, categoryLabel, groupedBookEntries } from "@/lib/book-categories";
 import { formatCurrency } from "@/lib/format";
+import { summarizeBeneficiaryAllocations } from "@/lib/estate-beneficiary-allocation";
+import { BeneficiaryAllocationView } from "@/components/estate/beneficiary-allocation-view";
 
 type BeneficiaryDraft = {
   name: string;
@@ -178,6 +180,7 @@ export default function EstatePlanningPage() {
   const [contactDialogOpen, setContactDialogOpen] = useState(false);
   const [editingContact, setEditingContact] = useState<EstateContact | undefined>();
   const [expandedAsset, setExpandedAsset] = useState<number | null>(null);
+  const [beneficiaryView, setBeneficiaryView] = useState<"account" | "beneficiary">("account");
   const [activeTab, setActiveTab] = useState<EstateTab>(() => {
     const tab = new URLSearchParams(window.location.search).get("tab");
     const validTabs: EstateTab[] = ["beneficiaries", "documents", "contacts"];
@@ -221,12 +224,14 @@ export default function EstatePlanningPage() {
 
   const docsComplete = ESTATE_DOCUMENT_TYPES.filter((d) => documentMap.get(d.key)?.isComplete).length;
   const assetsWithBeneficiary = beneficiaries.filter((b) => b.hasBeneficiary).length;
-  const totalAssetValue = assets.reduce((sum, asset) => sum + Number(asset.value || 0), 0);
-  const assignedBeneficiaryValue = assets.reduce((sum, asset) => {
-    return sum + (beneficiaryMap.get(asset.id)?.hasBeneficiary ? Number(asset.value || 0) : 0);
-  }, 0);
+  const allocationSummary = useMemo(
+    () => summarizeBeneficiaryAllocations(assets, beneficiaries),
+    [assets, beneficiaries],
+  );
+  const totalAssetValue = allocationSummary.totalAssetValue;
+  const assignedBeneficiaryValue = allocationSummary.totalAssignedValue;
   const beneficiaryValueCoverage = totalAssetValue > 0
-    ? Math.round((assignedBeneficiaryValue / totalAssetValue) * 100)
+    ? Math.min(100, Math.round((assignedBeneficiaryValue / totalAssetValue) * 100))
     : 0;
 
   // ── Beneficiary toggle (hasBeneficiary on/off) — optimistic ───────────────
@@ -250,6 +255,7 @@ export default function EstatePlanningPage() {
           hasBeneficiary: vars.hasBeneficiary,
           beneficiaryName: null,
           notes: null,
+          lastUpdatedAt: null,
           beneficiaries: [],
         }];
       });
@@ -468,19 +474,45 @@ export default function EstatePlanningPage() {
         </Card>
         <Card>
           <CardHeader className="pb-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2">
               <div className="h-8 w-8 rounded-md bg-blue-500/10 flex items-center justify-center">
                 <UserCheck className="h-4 w-4 text-blue-500" />
               </div>
               <div>
                 <CardTitle className="text-base">Beneficiary Designations</CardTitle>
-                <p className="text-xs text-muted-foreground mt-0.5">Mark which assets have a named beneficiary on file</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {beneficiaryView === "account"
+                    ? "Mark which assets have a named beneficiary on file"
+                    : "See each beneficiary’s share of your assets and what remains unassigned"}
+                </p>
               </div>
+            </div>
+            <div className="inline-flex rounded-lg border bg-muted/50 p-1" role="group" aria-label="Beneficiary view">
+              {(["account", "beneficiary"] as const).map(view => (
+                <button
+                  key={view}
+                  type="button"
+                  aria-pressed={beneficiaryView === view}
+                  onClick={() => setBeneficiaryView(view)}
+                  data-testid={`button-${view}-view`}
+                  className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
+                    beneficiaryView === view
+                      ? "bg-background text-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {view === "account" ? "Account view" : "Beneficiary view"}
+                </button>
+              ))}
+            </div>
             </div>
           </CardHeader>
           <CardContent className="pt-0">
           {assets.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-6">No assets found. Add assets first to track beneficiary designations.</p>
+          ) : beneficiaryView === "beneficiary" ? (
+            <BeneficiaryAllocationView summary={allocationSummary} />
           ) : (
             <div>
               {parentAssetGroups.map(([parentCategory, categoryGroups]) => {
