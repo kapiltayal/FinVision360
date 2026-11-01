@@ -110,65 +110,74 @@ export function BeneficiaryAllocationView({ summary }: BeneficiaryAllocationView
           <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">Add assets to see allocations here.</p>
         </section>
       ) : (
-        <section aria-labelledby="beneficiary-allocation-heading" className="overflow-hidden rounded-xl border bg-card shadow-sm">
-          <header className="border-b bg-muted/35 px-4 py-3 sm:px-5">
-            <h2 id="beneficiary-allocation-heading" className="font-semibold text-foreground">Beneficiary allocations</h2>
-            <p className="mt-0.5 text-xs text-muted-foreground">Same names grouped, ignoring case and extra spaces.</p>
-          </header>
+        <div className="space-y-3">
           {summary.overallocatedAccounts.length > 0 ? (
-            <div role="alert" className="flex items-center gap-2 border-b border-amber-200 bg-amber-50/80 px-4 py-2.5 text-xs text-amber-950 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100 sm:px-5">
+            <div role="alert" className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50/80 px-4 py-2.5 text-xs text-amber-950 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
               <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden="true" />
               <p>
                 Allocations exceed 100% for {summary.overallocatedAccounts.join(", ")}. Review them in Account view.
               </p>
             </div>
           ) : null}
-          <div className="divide-y">
-            {summary.beneficiaries.map((beneficiary) => (
-              <article key={beneficiary.key} className="min-w-0">
-                <div className="flex items-center justify-between gap-3 px-4 py-3 sm:px-5">
-                  <div className="flex min-w-0 items-center gap-3">
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-300">
-                      <Users className="h-4 w-4" aria-hidden="true" />
-                    </div>
-                    <div className="min-w-0">
-                      <h3 className="truncate font-semibold text-foreground">{beneficiary.name}</h3>
-                    </div>
+          {summary.beneficiaries.map((beneficiary) => (
+            <article
+              key={beneficiary.key}
+              data-testid={`beneficiary-allocation-card-${beneficiary.key}`}
+              className="min-w-0 overflow-hidden rounded-xl border bg-card shadow-sm"
+            >
+              <div className="flex items-center justify-between gap-3 px-4 py-3 sm:px-5">
+                <div className="flex min-w-0 items-center gap-3">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-300">
+                    <Users className="h-4 w-4" aria-hidden="true" />
                   </div>
-                  <p className="shrink-0 text-lg font-bold tabular-nums text-blue-700 dark:text-blue-300">
-                    {formatCurrency(beneficiary.totalAmount)}
-                  </p>
+                  <div className="min-w-0">
+                    <h3 className="truncate font-semibold text-foreground">{beneficiary.name}</h3>
+                    <p className="text-xs text-muted-foreground">
+                      {beneficiary.accounts.length} {beneficiary.accounts.length === 1 ? "account" : "accounts"}
+                    </p>
+                  </div>
                 </div>
-                <Breakdown label="Accounts" count={beneficiary.accounts.length}>
-                  {beneficiary.accounts.map((account) => (
-                    <AccountBreakdown key={account.assetId} account={account} />
-                  ))}
-                </Breakdown>
-              </article>
-            ))}
+                <p className="shrink-0 text-lg font-bold tabular-nums text-blue-700 dark:text-blue-300">
+                  {formatCurrency(beneficiary.totalAmount)}
+                </p>
+              </div>
+              <Breakdown label="Accounts" count={beneficiary.accounts.length}>
+                {beneficiary.accounts.map((account) => (
+                  <AccountBreakdown key={account.assetId} account={account} />
+                ))}
+              </Breakdown>
+            </article>
+          ))}
 
-            {summary.unassignedAccounts.length > 0 ? (
-              <article className="min-w-0">
-                <div className="flex items-center justify-between gap-3 px-4 py-3 sm:px-5">
-                  <div className="flex min-w-0 items-center gap-3">
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
-                      <Wallet className="h-4 w-4" aria-hidden="true" />
-                    </div>
-                    <h3 className="font-semibold text-foreground">Unassigned</h3>
+          {summary.unassignedAccounts.length > 0 ? (
+            <article
+              data-testid="unassigned-allocation-card"
+              className="min-w-0 overflow-hidden rounded-xl border bg-card shadow-sm"
+            >
+              <div className="flex items-center justify-between gap-3 px-4 py-3 sm:px-5">
+                <div className="flex min-w-0 items-center gap-3">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+                    <Wallet className="h-4 w-4" aria-hidden="true" />
                   </div>
-                  <p className="shrink-0 text-lg font-bold tabular-nums text-foreground">
-                    {formatCurrency(summary.totalUnassignedValue)}
-                  </p>
+                  <div>
+                    <h3 className="font-semibold text-foreground">Unassigned</h3>
+                    <p className="text-xs text-muted-foreground">
+                      {summary.unassignedAccounts.length} {summary.unassignedAccounts.length === 1 ? "account" : "accounts"}
+                    </p>
+                  </div>
                 </div>
-                <Breakdown label="Accounts" count={summary.unassignedAccounts.length}>
-                  {summary.unassignedAccounts.map((account) => (
-                    <AccountBreakdown key={account.assetId} account={account} showReason />
-                  ))}
-                </Breakdown>
-              </article>
-            ) : null}
-          </div>
-        </section>
+                <p className="shrink-0 text-lg font-bold tabular-nums text-foreground">
+                  {formatCurrency(summary.totalUnassignedValue)}
+                </p>
+              </div>
+              <Breakdown label="Accounts" count={summary.unassignedAccounts.length}>
+                {summary.unassignedAccounts.map((account) => (
+                  <AccountBreakdown key={account.assetId} account={account} showReason />
+                ))}
+              </Breakdown>
+            </article>
+          ) : null}
+        </div>
       )}
     </div>
   );
