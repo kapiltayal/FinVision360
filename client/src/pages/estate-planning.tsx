@@ -220,6 +220,7 @@ export default function EstatePlanningPage() {
   const beneficiaryMap = new Map(beneficiaries.map((b) => [b.assetId, b]));
   const documentMap = new Map(documents.map((d) => [d.documentType, d]));
   const docsComplete = ESTATE_DOCUMENT_TYPES.filter((d) => documentMap.get(d.key)?.isComplete).length;
+  const assetsWithBeneficiary = beneficiaries.filter((b) => b.hasBeneficiary).length;
   const groupedAssets = groupedBookEntries(assets, categories);
   const assetsByParent = new Map<string, typeof groupedAssets>();
   groupedAssets.forEach((group) => {
@@ -431,12 +432,22 @@ export default function EstatePlanningPage() {
   }
 
   return (
-    <div className="p-6 space-y-6 max-w-5xl mx-auto">
+    <div className="flex flex-col max-w-5xl mx-auto">
       {/* Section navigation */}
       <nav className="border-b bg-background shrink-0" aria-label="Estate planning sections">
-        <div className="flex items-center gap-1 overflow-x-auto">
+        <div className="flex items-center gap-1 px-4 overflow-x-auto">
           {ESTATE_TABS.map((tab) => {
             const Icon = tab.icon;
+            const count = tab.key === "beneficiaries"
+              ? assetsWithBeneficiary
+              : tab.key === "documents"
+                ? docsComplete
+                : contacts.length;
+            const countLabel = tab.key === "documents"
+              ? `${count}/${ESTATE_DOCUMENT_TYPES.length}`
+              : tab.key === "beneficiaries"
+                ? `${count}/${assets.length}`
+                : count;
 
             return (
               <button
@@ -445,7 +456,7 @@ export default function EstatePlanningPage() {
                 aria-current={activeTab === tab.key ? "page" : undefined}
                 onClick={() => selectEstateTab(tab.key)}
                 data-testid={`tab-estate-${tab.key}`}
-                className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
+                className={`relative flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
                   activeTab === tab.key
                     ? "border-primary text-primary"
                     : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
@@ -453,12 +464,18 @@ export default function EstatePlanningPage() {
               >
                 <Icon className="h-4 w-4" aria-hidden="true" />
                 {tab.label}
+                <span className={`ml-1 text-xs px-1.5 py-0.5 rounded-full ${
+                  activeTab === tab.key ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
+                }`}>
+                  {countLabel}
+                </span>
               </button>
             );
           })}
         </div>
       </nav>
 
+      <div className="p-6 space-y-6">
       {/* ── Section A: Beneficiary Designations ── */}
       {activeTab === "beneficiaries" && <>
         <Card className="mb-4 overflow-hidden border-border/70 bg-muted/15 shadow-none">
@@ -1069,6 +1086,7 @@ export default function EstatePlanningPage() {
           <ContactForm contact={editingContact} onClose={() => setContactDialogOpen(false)} />
         </DialogContent>
       </Dialog>
+      </div>
     </div>
   );
 }
