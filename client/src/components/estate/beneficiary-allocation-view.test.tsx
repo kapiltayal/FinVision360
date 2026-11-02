@@ -21,7 +21,7 @@ test("beneficiary cards offer an accessible Edit action for assigned and unused 
   assert.ok(html.includes('aria-label="Edit beneficiary Updated name"'));
   assert.ok(html.includes('data-testid="button-edit-beneficiary-10"'));
   assert.ok(html.includes('data-testid="button-edit-beneficiary-11"'));
-  assert.ok(html.indexOf('data-testid="button-edit-beneficiary-10"') < html.indexOf(">Updated name</h3>"));
+  assert.ok(html.indexOf(">Updated name</h3>") < html.indexOf('data-testid="button-edit-beneficiary-10"'));
   assert.ok(html.indexOf('data-testid="button-edit-beneficiary-10"') < html.indexOf("$50"));
   assert.ok(!html.includes("Old name"), "latest saved display name wins over stale snapshots");
   assert.equal((html.match(/title="Edit beneficiary"/g) ?? []).length, 2, "unassigned balance has no Edit action");

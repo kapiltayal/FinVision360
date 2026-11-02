@@ -135,6 +135,7 @@ export function BeneficiaryAllocationView({ summary, onEdit }: BeneficiaryAlloca
                   </div>
                   <div className="min-w-0">
                     <div className="flex min-w-0 items-center gap-1">
+                      <h3 className="truncate font-semibold text-foreground">{beneficiary.name}</h3>
                       {onEdit && beneficiary.beneficiaryId !== undefined && (
                         <Button
                           type="button"
@@ -149,7 +150,6 @@ export function BeneficiaryAllocationView({ summary, onEdit }: BeneficiaryAlloca
                           <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
                         </Button>
                       )}
-                      <h3 className="truncate font-semibold text-foreground">{beneficiary.name}</h3>
                     </div>
                     <p className="text-xs text-muted-foreground">
                       {beneficiary.accounts.length} {beneficiary.accounts.length === 1 ? "account" : "accounts"}
