@@ -456,7 +456,7 @@ export default function EstatePlanningPage() {
                 aria-current={activeTab === tab.key ? "page" : undefined}
                 onClick={() => selectEstateTab(tab.key)}
                 data-testid={`tab-estate-${tab.key}`}
-                className={`relative flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
+                className={`flex items-center gap-2 px-4 text-sm font-medium border-b-2 transition-colors whitespace-nowrap py-3 ${
                   activeTab === tab.key
                     ? "border-primary text-primary"
                     : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
