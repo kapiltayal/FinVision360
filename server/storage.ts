@@ -468,7 +468,6 @@ export class DatabaseStorage implements IStorage {
          d.user_id AS "userId",
          d.asset_id AS "assetId",
          d.has_beneficiary AS "hasBeneficiary",
-         d.beneficiary_name AS "beneficiaryName",
          d.notes,
          d.last_updated_at AS "lastUpdatedAt",
          COALESCE(
@@ -483,20 +482,8 @@ export class DatabaseStorage implements IStorage {
                'allocationPercentage', e.allocation_percentage,
                'notes', e.notes
              ) ORDER BY e.id
-           ) FILTER (WHERE e.id IS NOT NULL),
-           CASE
-             WHEN NULLIF(BTRIM(d.beneficiary_name), '') IS NOT NULL THEN
-               json_build_array(json_build_object(
-                 'id', -d.id,
-                 'designationId', d.id,
-                 'userId', d.user_id,
-                 'assetId', d.asset_id,
-                 'beneficiaryName', d.beneficiary_name,
-                 'allocationPercentage', '100.00',
-                 'notes', d.notes
-               ))
-             ELSE '[]'::json
-           END
+            ) FILTER (WHERE e.id IS NOT NULL),
+            '[]'::json
          ) AS beneficiaries
        FROM estate_beneficiaries d
        LEFT JOIN estate_beneficiary_entries e ON e.designation_id = d.id
@@ -529,14 +516,13 @@ export class DatabaseStorage implements IStorage {
       }
 
       const designation = await client.query(
-        `INSERT INTO estate_beneficiaries (user_id, asset_id, has_beneficiary, beneficiary_name, notes, last_updated_at)
-         VALUES ($1, $2, $3, NULL, NULL, NOW())
+        `INSERT INTO estate_beneficiaries (user_id, asset_id, has_beneficiary, notes, last_updated_at)
+         VALUES ($1, $2, $3, NULL, NOW())
          ON CONFLICT (user_id, asset_id) DO UPDATE
            SET has_beneficiary = EXCLUDED.has_beneficiary,
                last_updated_at = NOW()
          RETURNING id, user_id AS "userId", asset_id AS "assetId",
-           has_beneficiary AS "hasBeneficiary", beneficiary_name AS "beneficiaryName", notes,
-           last_updated_at AS "lastUpdatedAt"`,
+           has_beneficiary AS "hasBeneficiary", notes, last_updated_at AS "lastUpdatedAt"`,
         [data.userId, data.assetId, data.hasBeneficiary],
       );
       const designationRecord = designation.rows[0];
@@ -569,13 +555,13 @@ export class DatabaseStorage implements IStorage {
           );
         }
         await client.query(
-          "UPDATE estate_beneficiaries SET beneficiary_name = NULL, notes = NULL WHERE id = $1",
+          "UPDATE estate_beneficiaries SET notes = NULL WHERE id = $1",
           [designationRecord.id],
         );
       } else {
         await client.query("DELETE FROM estate_beneficiary_entries WHERE designation_id = $1", [designationRecord.id]);
         await client.query(
-          "UPDATE estate_beneficiaries SET beneficiary_name = NULL, notes = NULL WHERE id = $1",
+          "UPDATE estate_beneficiaries SET notes = NULL WHERE id = $1",
           [designationRecord.id],
         );
       }

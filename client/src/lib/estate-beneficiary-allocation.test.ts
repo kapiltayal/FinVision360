@@ -8,7 +8,6 @@ const asset = (id: number, value: string) => ({
 const designation = (assetId: number, shares: Array<[string, string]>, hasBeneficiary = true) => ({
   assetId,
   hasBeneficiary,
-  beneficiaryName: null,
   beneficiaries: shares.map(([beneficiaryName, allocationPercentage], index) => ({
     id: index + 1, designationId: assetId, userId: "test", assetId,
     beneficiaryName, allocationPercentage, notes: null,
@@ -72,13 +71,6 @@ test("partial and missing beneficiary details remain unassigned", () => {
   assert.deepEqual(new Set(result.unassignedAccounts.map(account => account.reason)), new Set([
     "Partially allocated", "Beneficiary details needed", "No beneficiary assigned",
   ]));
-});
-
-test("supports legacy single beneficiaries without multiplying allocation across entries", () => {
-  const legacy = { ...designation(1, []), beneficiaryName: "Alex" };
-  const result = summarizeBeneficiaryAllocations([asset(1, "1000")], [legacy]);
-  assert.equal(result.beneficiaries[0].totalAmount, 1000);
-  assert.equal(result.totalUnassignedValue, 0);
 });
 
 test("ignores stale designations and does not fuzzy-merge different personal names", () => {

@@ -394,14 +394,7 @@ export default function EstatePlanningPage() {
         percentage: String(beneficiary.allocationPercentage),
         notes: beneficiary.notes || "",
       })) || [];
-      const legacy = existing.length === 0 && ben?.beneficiaryName
-        ? [{
-            name: ben.beneficiaryName,
-            beneficiaryId: beneficiaryPeople.find(person => person.normalizedName === ben.beneficiaryName!.trim().replace(/\s+/g, " ").toLowerCase())?.id,
-            percentage: "100", notes: ben.notes || "",
-          }]
-        : existing;
-      return { ...prev, [assetId]: legacy.length > 0 ? legacy : [{ name: "", percentage: "100", notes: "" }] };
+      return { ...prev, [assetId]: existing.length > 0 ? existing : [{ name: "", percentage: "100", notes: "" }] };
     });
   };
 
@@ -616,9 +609,7 @@ export default function EstatePlanningPage() {
                             categoryAssets.map((asset) => {
                               const ben = beneficiaryMap.get(asset.id);
                               const hasBen = ben?.hasBeneficiary ?? false;
-                              const hasStoredBeneficiaryData = hasBen ||
-                                Boolean(ben?.beneficiaryName) ||
-                                Boolean(ben?.beneficiaries?.length);
+                              const hasStoredBeneficiaryData = hasBen || Boolean(ben?.beneficiaries?.length);
                               const isExpanded = expandedAsset === asset.id;
                               const localEdit = benEdits[asset.id];
                               const isRemovingAll = !(localEdit || []).length && hasStoredBeneficiaryData;

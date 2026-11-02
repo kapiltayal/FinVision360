@@ -596,7 +596,6 @@ export const estateBeneficiaries = pgTable("estate_beneficiaries", {
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   assetId: integer("asset_id").notNull().references(() => assets.id, { onDelete: "cascade" }),
   hasBeneficiary: boolean("has_beneficiary").default(false).notNull(),
-  beneficiaryName: text("beneficiary_name"),
   notes: text("notes"),
   lastUpdatedAt: timestamp("last_updated_at", { withTimezone: true }),
 });

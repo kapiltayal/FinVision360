@@ -38,8 +38,6 @@ export async function ensureBeneficiaryPeopleSchema(pool: Pool) {
         LOWER(BTRIM(regexp_replace(name, '\\s+', ' ', 'g')))
       FROM (
         SELECT user_id, beneficiary_name AS name FROM estate_beneficiary_entries
-        UNION ALL
-        SELECT user_id, beneficiary_name AS name FROM estate_beneficiaries
       ) names
       WHERE NULLIF(BTRIM(name), '') IS NOT NULL
       GROUP BY user_id, LOWER(BTRIM(regexp_replace(name, '\\s+', ' ', 'g')))
@@ -115,13 +113,9 @@ export function registerBeneficiaryPeopleRoutes(app: Express, pool: Pool) {
         );
         await client.query(
           `UPDATE estate_beneficiaries
-           SET beneficiary_name = CASE
-                 WHEN LOWER(BTRIM(regexp_replace(beneficiary_name, '\\s+', ' ', 'g'))) = $3 THEN $4
-                 ELSE beneficiary_name END,
-               last_updated_at = NOW()
-           WHERE user_id = $1 AND (id = ANY($2::integer[])
-             OR LOWER(BTRIM(regexp_replace(beneficiary_name, '\\s+', ' ', 'g'))) = $3)`,
-          [userId, entries.rows.map(row => row.designation_id), old.normalized_name, name],
+           SET last_updated_at = NOW()
+           WHERE user_id = $1 AND id = ANY($2::integer[])`,
+          [userId, entries.rows.map(row => row.designation_id)],
         );
       }
       await client.query("COMMIT");

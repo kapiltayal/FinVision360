@@ -157,7 +157,6 @@ app.use(createApiRequestLogger((message) => log(message)));
       user_id VARCHAR NOT NULL,
       asset_id INTEGER NOT NULL,
       has_beneficiary BOOLEAN NOT NULL DEFAULT false,
-      beneficiary_name TEXT,
       notes TEXT,
       last_updated_at TIMESTAMPTZ
     );

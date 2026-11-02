@@ -34,15 +34,21 @@ test("beneficiary list persists, reuses names, migrates safely and rejects forei
     await pool.query("INSERT INTO users(id) VALUES($1),($2)", [owner, other]);
     const { rows: [asset] } = await pool.query(
       "INSERT INTO assets(user_id,name,category,value) VALUES($1,'Beneficiary test','Checking Account',1000) RETURNING id", [owner]);
-    const { rows: [legacy] } = await pool.query(
-      `INSERT INTO estate_beneficiaries(user_id,asset_id,has_beneficiary,beneficiary_name,last_updated_at)
-       VALUES($1,$2,true,'Legacy Person','2026-01-01') RETURNING id`, [owner, asset.id]);
+    const { rows: [designation] } = await pool.query(
+      `INSERT INTO estate_beneficiaries(user_id,asset_id,has_beneficiary,last_updated_at)
+       VALUES($1,$2,true,'2026-01-01') RETURNING id`, [owner, asset.id]);
+    await pool.query(
+      `INSERT INTO estate_beneficiary_entries
+         (designation_id,user_id,asset_id,beneficiary_name,allocation_percentage,notes)
+       VALUES($1,$2,$3,'Existing Entry Person','100.00',NULL)`,
+      [designation.id, owner, asset.id],
+    );
     await ensureBeneficiaryPeopleSchema(pool);
     await ensureBeneficiaryPeopleSchema(pool);
     const migrated = (await call("GET", owner)).body;
     assert.equal(migrated.length, 1, "repeated migration does not duplicate names");
-    assert.equal(migrated[0].name, "Legacy Person");
-    const { rows: [unchanged] } = await pool.query("SELECT last_updated_at FROM estate_beneficiaries WHERE id=$1", [legacy.id]);
+    assert.equal(migrated[0].name, "Existing Entry Person");
+    const { rows: [unchanged] } = await pool.query("SELECT last_updated_at FROM estate_beneficiaries WHERE id=$1", [designation.id]);
     assert.equal(new Date(unchanged.last_updated_at).toISOString().slice(0, 10), "2026-01-01");
     assert.equal((await call("POST", owner, { name: "   " })).code, 400);
     assert.equal((await call("POST", owner, { name: "x".repeat(201) })).code, 400);
@@ -76,23 +82,18 @@ test("beneficiary list persists, reuses names, migrates safely and rejects forei
     assert.equal((await call("PATCH", owner, { name: "x".repeat(201) }, created.id)).code, 400);
     assert.equal((await call("PATCH", owner, { name: "New name" }, foreign.id)).code, 404);
     assert.equal((await call("PATCH", owner, { name: "New name" }, 2147483647)).code, 404);
-    assert.equal((await call("PATCH", owner, { name: "  LEGACY  PERSON " }, created.id)).code, 409);
+    assert.equal((await call("PATCH", owner, { name: "  EXISTING   ENTRY PERSON " }, created.id)).code, 409);
     assert.equal((await call("GET", owner)).body.find((person: any) => person.id === created.id).name, "Test Person", "conflicts do not merge identities");
 
     const { rows: [secondAsset] } = await pool.query(
       "INSERT INTO assets(user_id,name,category,value) VALUES($1,'Second account','Checking Account',2000) RETURNING id", [owner]);
-    const { rows: [legacyAsset] } = await pool.query(
-      "INSERT INTO assets(user_id,name,category,value) VALUES($1,'Legacy account','Checking Account',3000) RETURNING id", [owner]);
     await storage.saveEstateBeneficiary({
       userId: owner, assetId: secondAsset.id, hasBeneficiary: true,
       beneficiaries: [
         { name: "Test Person", beneficiaryId: created.id, percentage: 60, notes: "Preserve this note" },
-        { name: "Legacy Person", beneficiaryId: migrated[0].id, percentage: 40, notes: null },
+        { name: "Existing Entry Person", beneficiaryId: migrated[0].id, percentage: 40, notes: null },
       ],
     });
-    await pool.query(
-      `INSERT INTO estate_beneficiaries(user_id,asset_id,has_beneficiary,beneficiary_name,notes,last_updated_at)
-       VALUES($1,$2,true,'  TEST   Person ','Legacy notes','2026-01-01')`, [owner, legacyAsset.id]);
     await pool.query("UPDATE estate_beneficiary_entries SET beneficiary_id=NULL WHERE user_id=$1 AND asset_id=$2 AND beneficiary_id=$3", [owner, secondAsset.id, created.id]);
     await pool.query("UPDATE estate_beneficiaries SET last_updated_at='2026-01-01' WHERE user_id=$1", [owner]);
     const renamed = await call("PATCH", owner, { name: "  Updated   Person  " }, created.id);
@@ -102,18 +103,15 @@ test("beneficiary list persists, reuses names, migrates safely and rejects forei
     const renamedAccounts = await storage.getEstateBeneficiaries(owner);
     const firstAccount = renamedAccounts.find(account => account.assetId === asset.id)!;
     const secondAccount = renamedAccounts.find(account => account.assetId === secondAsset.id)!;
-    const legacyAccount = renamedAccounts.find(account => account.assetId === legacyAsset.id)!;
     assert.equal(firstAccount.beneficiaries[0].beneficiaryName, "Updated Person");
     assert.equal(secondAccount.beneficiaries[0].beneficiaryName, "Updated Person");
-    assert.equal(secondAccount.beneficiaries[0].beneficiaryId, created.id, "legacy unlinked entries are linked during rename");
+    assert.equal(secondAccount.beneficiaries[0].beneficiaryId, created.id, "unlinked entries are linked during rename");
     assert.equal(Number(secondAccount.beneficiaries[0].allocationPercentage), 60);
     assert.equal(secondAccount.beneficiaries[0].notes, "Preserve this note");
-    assert.equal(secondAccount.beneficiaries[1].beneficiaryName, "Legacy Person", "other beneficiary is unchanged");
+    assert.equal(secondAccount.beneficiaries[1].beneficiaryName, "Existing Entry Person", "other beneficiary is unchanged");
     assert.equal(Number(secondAccount.beneficiaries[1].allocationPercentage), 40);
-    assert.equal(legacyAccount.beneficiaryName, "Updated Person");
-    assert.equal(legacyAccount.notes, "Legacy notes");
-    assert.equal(Number(legacyAccount.beneficiaries[0].allocationPercentage), 100);
     assert.ok(new Date(firstAccount.lastUpdatedAt!).getTime() > new Date("2026-01-01").getTime());
+    assert.ok(new Date(secondAccount.lastUpdatedAt!).getTime() > new Date("2026-01-01").getTime());
     assert.equal((await call("GET", other)).body[0].name, "Test Person", "another user's matching name is untouched");
     const beforeNoop = firstAccount.lastUpdatedAt;
     await call("PATCH", owner, { name: "Updated Person" }, created.id);

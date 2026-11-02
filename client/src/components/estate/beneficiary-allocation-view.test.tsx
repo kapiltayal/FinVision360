@@ -9,7 +9,7 @@ test("beneficiary cards offer an accessible Edit action for assigned and unused 
   const summary = summarizeBeneficiaryAllocations(
     [{ id: 1, name: "Account", value: "100", institution: null }],
     [{
-      assetId: 1, hasBeneficiary: true, beneficiaryName: null,
+      assetId: 1, hasBeneficiary: true,
       beneficiaries: [{
         id: 1, designationId: 1, userId: "fixture", assetId: 1, beneficiaryId: 10,
         beneficiaryName: "Old name", allocationPercentage: "50", notes: null,

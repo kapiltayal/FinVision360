@@ -27,7 +27,7 @@ export type BeneficiaryAllocationSummary = {
 /** Group saved designations without changing or redistributing their allocations. */
 export function summarizeBeneficiaryAllocations(
   assets: Pick<Asset, "id" | "name" | "value" | "institution">[],
-  designations: Pick<EstateBeneficiaryWithEntries, "assetId" | "hasBeneficiary" | "beneficiaryName" | "beneficiaries">[],
+  designations: Pick<EstateBeneficiaryWithEntries, "assetId" | "hasBeneficiary" | "beneficiaries">[],
   people: Pick<EstateBeneficiaryPerson, "id" | "name" | "normalizedName">[] = [],
 ): BeneficiaryAllocationSummary {
   const peopleByName = new Map(people.map(person => [person.normalizedName, person]));
@@ -48,15 +48,13 @@ export function summarizeBeneficiaryAllocations(
     const accountValue = Number.isFinite(parsedValue) ? Math.max(0, parsedValue) : 0;
     summary.totalAssetValue += accountValue;
     const designation = byAsset.get(asset.id);
-    const entries = !designation?.hasBeneficiary ? [] : designation.beneficiaries.length
-      ? designation.beneficiaries.map(entry => ({
+    const entries = !designation?.hasBeneficiary
+      ? []
+      : designation.beneficiaries.map(entry => ({
           name: entry.beneficiaryName,
           beneficiaryId: entry.beneficiaryId,
           percentage: Number(entry.allocationPercentage),
-        }))
-      : designation.beneficiaryName?.trim()
-        ? [{ name: designation.beneficiaryName, percentage: 100, beneficiaryId: undefined }]
-        : [];
+        }));
     let assignedPercentage = 0;
     for (const entry of entries) {
       const name = entry.name.trim().replace(/\s+/g, " ");
