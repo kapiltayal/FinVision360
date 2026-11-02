@@ -134,31 +134,31 @@ export function BeneficiaryAllocationView({ summary, onEdit }: BeneficiaryAlloca
                     <Users className="h-4 w-4" aria-hidden="true" />
                   </div>
                   <div className="min-w-0">
-                    <h3 className="truncate font-semibold text-foreground">{beneficiary.name}</h3>
+                    <div className="flex min-w-0 items-center gap-1">
+                      {onEdit && beneficiary.beneficiaryId !== undefined && (
+                        <Button
+                          type="button"
+                          size="icon"
+                          variant="ghost"
+                          className="h-7 w-7 shrink-0 text-muted-foreground hover:text-primary"
+                          aria-label={`Edit beneficiary ${beneficiary.name}`}
+                          title="Edit beneficiary"
+                          data-testid={`button-edit-beneficiary-${beneficiary.beneficiaryId}`}
+                          onClick={() => onEdit(beneficiary.beneficiaryId!)}
+                        >
+                          <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
+                        </Button>
+                      )}
+                      <h3 className="truncate font-semibold text-foreground">{beneficiary.name}</h3>
+                    </div>
                     <p className="text-xs text-muted-foreground">
                       {beneficiary.accounts.length} {beneficiary.accounts.length === 1 ? "account" : "accounts"}
                     </p>
                   </div>
                 </div>
-                <div className="flex shrink-0 items-center gap-2">
-                  <p className="text-lg font-bold tabular-nums text-blue-700 dark:text-blue-300">
-                    {formatCurrency(beneficiary.totalAmount)}
-                  </p>
-                  {onEdit && beneficiary.beneficiaryId !== undefined && (
-                    <Button
-                      type="button"
-                      size="icon"
-                      variant="ghost"
-                      className="h-8 w-8 text-muted-foreground hover:text-primary"
-                      aria-label={`Edit beneficiary ${beneficiary.name}`}
-                      title="Edit beneficiary"
-                      data-testid={`button-edit-beneficiary-${beneficiary.beneficiaryId}`}
-                      onClick={() => onEdit(beneficiary.beneficiaryId!)}
-                    >
-                      <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
-                    </Button>
-                  )}
-                </div>
+                <p className="shrink-0 text-lg font-bold tabular-nums text-blue-700 dark:text-blue-300">
+                  {formatCurrency(beneficiary.totalAmount)}
+                </p>
               </div>
               {beneficiary.accounts.length > 0 && <Breakdown label="Accounts" count={beneficiary.accounts.length}>
                 {beneficiary.accounts.map((account) => (
