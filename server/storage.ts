@@ -99,7 +99,7 @@ export interface IStorage {
     userId: string;
     assetId: number;
     hasBeneficiary: boolean;
-    beneficiaries: Array<{ name: string; percentage: number; notes: string | null }>;
+    beneficiaries: Array<{ name: string; beneficiaryId?: number; percentage: number; notes: string | null }>;
   }): Promise<EstateBeneficiaryWithEntries>;
 
   getEstateDocuments(userId: string): Promise<EstateDocument[]>;
@@ -479,6 +479,7 @@ export class DatabaseStorage implements IStorage {
                'userId', e.user_id,
                'assetId', e.asset_id,
                'beneficiaryName', e.beneficiary_name,
+               'beneficiaryId', e.beneficiary_id,
                'allocationPercentage', e.allocation_percentage,
                'notes', e.notes
              ) ORDER BY e.id
@@ -511,7 +512,7 @@ export class DatabaseStorage implements IStorage {
     userId: string;
     assetId: number;
     hasBeneficiary: boolean;
-    beneficiaries: Array<{ name: string; percentage: number; notes: string | null }>;
+    beneficiaries: Array<{ name: string; beneficiaryId?: number; percentage: number; notes: string | null }>;
   }): Promise<EstateBeneficiaryWithEntries> {
     const client = await pool.connect();
     let committed = false;
@@ -542,17 +543,27 @@ export class DatabaseStorage implements IStorage {
       if (data.hasBeneficiary) {
         await client.query("DELETE FROM estate_beneficiary_entries WHERE designation_id = $1", [designationRecord.id]);
         for (const beneficiary of data.beneficiaries) {
+          const person = beneficiary.beneficiaryId
+            ? await client.query("SELECT id, name FROM estate_beneficiary_people WHERE id = $1 AND user_id = $2", [beneficiary.beneficiaryId, data.userId])
+            : await client.query(
+                `INSERT INTO estate_beneficiary_people (user_id, name, normalized_name) VALUES ($1, $2, $3)
+                 ON CONFLICT (user_id, normalized_name) DO UPDATE SET normalized_name = EXCLUDED.normalized_name
+                 RETURNING id, name`,
+                [data.userId, beneficiary.name.trim().replace(/\s+/g, " "), beneficiary.name.trim().replace(/\s+/g, " ").toLowerCase()],
+              );
+          if (!person.rows[0]) throw Object.assign(new Error("Beneficiary not found"), { statusCode: 404 });
           await client.query(
             `INSERT INTO estate_beneficiary_entries
-              (designation_id, user_id, asset_id, beneficiary_name, allocation_percentage, notes)
-             VALUES ($1, $2, $3, $4, $5, $6)`,
+              (designation_id, user_id, asset_id, beneficiary_name, allocation_percentage, notes, beneficiary_id)
+             VALUES ($1, $2, $3, $4, $5, $6, $7)`,
             [
               designationRecord.id,
               data.userId,
               data.assetId,
-              beneficiary.name,
+              person.rows[0].name,
               beneficiary.percentage.toFixed(2),
               beneficiary.notes,
+              person.rows[0].id,
             ],
           );
         }

@@ -8,6 +8,7 @@ import { ensureGoalAllocationSchema } from "./goal-allocation";
 import { ensureRetirementAccountInclusionSchema } from "./retirement-account-inclusion";
 import { ensureAIUsageSchema } from "./ai-usage-schema";
 import { ensureBudgetCategorySchema } from "./budget-category-schema";
+import { ensureBeneficiaryPeopleSchema } from "./estate-beneficiary-people";
 import { createApiRequestLogger, formatSafeApiError, getSafeApiRoutePath } from "./api-logging";
 
 const app = express();
@@ -205,6 +206,7 @@ app.use(createApiRequestLogger((message) => log(message)));
     await seedDatabase().catch((e) => console.error(formatSafeApiError("Development seed initialization", e)));
   }
   await ensureGoalAllocationSchema(pool);
+  await ensureBeneficiaryPeopleSchema(pool);
   await registerRoutes(httpServer, app);
 
   app.use((err: any, req: Request, res: Response, next: NextFunction) => {

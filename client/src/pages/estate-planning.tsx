@@ -19,7 +19,7 @@ import {
   ChevronDown, ChevronRight, Save, Layers3,
 } from "lucide-react";
 import {
-  type Asset, type EstateBeneficiaryWithEntries, type EstateDocument, type EstateContact,
+  type Asset, type EstateBeneficiaryWithEntries, type EstateBeneficiaryPerson, type EstateDocument, type EstateContact,
   ESTATE_DOCUMENT_TYPES, ESTATE_CONTACT_ROLES,
 } from "@shared/schema";
 import { type BookCategory, categoryLabel, groupedBookEntries } from "@/lib/book-categories";
@@ -29,6 +29,7 @@ import { BeneficiaryAllocationView } from "@/components/estate/beneficiary-alloc
 
 type BeneficiaryDraft = {
   name: string;
+  beneficiaryId?: number;
   percentage: string;
   notes: string;
 };
@@ -189,6 +190,9 @@ export default function EstatePlanningPage() {
   const [expandedDocuments, setExpandedDocuments] = useState<Record<string, boolean>>({});
   // Local beneficiary edits are only committed when the user clicks Save.
   const [benEdits, setBenEdits] = useState<Record<number, BeneficiaryDraft[]>>({});
+  const [newBeneficiaryOpen, setNewBeneficiaryOpen] = useState(false);
+  const [newBeneficiaryName, setNewBeneficiaryName] = useState("");
+  const [newBeneficiaryTarget, setNewBeneficiaryTarget] = useState<{ assetId: number; index: number } | null>(null);
 
   useEffect(() => {
     const tab = new URLSearchParams(search).get("tab");
@@ -206,6 +210,7 @@ export default function EstatePlanningPage() {
   const { data: assets = [], isLoading: aLoading } = useQuery<Asset[]>({ queryKey: ["/api/assets"] });
   const { data: categories = [], isLoading: categoriesLoading } = useQuery<BookCategory[]>({ queryKey: ["/api/assets/categories"] });
   const { data: beneficiaries = [], isLoading: bLoading } = useQuery<EstateBeneficiaryWithEntries[]>({ queryKey: ["/api/estate/beneficiaries"] });
+  const { data: beneficiaryPeople = [], isLoading: peopleLoading, isError: peopleError, refetch: reloadPeople } = useQuery<EstateBeneficiaryPerson[]>({ queryKey: ["/api/estate/beneficiary-people"] });
   const { data: documents = [], isLoading: dLoading } = useQuery<EstateDocument[]>({ queryKey: ["/api/estate/documents"] });
   const { data: contacts = [], isLoading: cLoading } = useQuery<EstateContact[]>({ queryKey: ["/api/estate/contacts"] });
 
@@ -225,8 +230,8 @@ export default function EstatePlanningPage() {
   const docsComplete = ESTATE_DOCUMENT_TYPES.filter((d) => documentMap.get(d.key)?.isComplete).length;
   const assetsWithBeneficiary = beneficiaries.filter((b) => b.hasBeneficiary).length;
   const allocationSummary = useMemo(
-    () => summarizeBeneficiaryAllocations(assets, beneficiaries),
-    [assets, beneficiaries],
+    () => summarizeBeneficiaryAllocations(assets, beneficiaries, beneficiaryPeople),
+    [assets, beneficiaries, beneficiaryPeople],
   );
   const totalAssetValue = allocationSummary.totalAssetValue;
   const assignedBeneficiaryValue = allocationSummary.totalAssignedValue;
@@ -269,6 +274,36 @@ export default function EstatePlanningPage() {
   });
 
   // ── Beneficiary list save ──────────────────────────────────────────────────
+  const addBeneficiaryMutation = useMutation({
+    mutationFn: async (name: string) => {
+      const response = await apiRequest("POST", "/api/estate/beneficiary-people", { name });
+      return response.json() as Promise<EstateBeneficiaryPerson>;
+    },
+    onSuccess: (person) => {
+      qc.setQueryData<EstateBeneficiaryPerson[]>(["/api/estate/beneficiary-people"], (old = []) =>
+        [...old.filter(item => item.id !== person.id), person].sort((a, b) => a.name.localeCompare(b.name)));
+      qc.invalidateQueries({ queryKey: ["/api/estate/beneficiary-people"] });
+      if (newBeneficiaryTarget) {
+        const { assetId, index } = newBeneficiaryTarget;
+        setBenEdits(prev => ({
+          ...prev,
+          [assetId]: (prev[assetId] || []).map((draft, i) => i === index ? { ...draft, name: person.name, beneficiaryId: person.id } : draft),
+        }));
+      }
+      setNewBeneficiaryOpen(false);
+      setNewBeneficiaryName("");
+      setNewBeneficiaryTarget(null);
+      toast({ title: "Beneficiary available for selection" });
+    },
+    onError: (error: Error) => toast({ title: "Could not add beneficiary", description: error.message, variant: "destructive" }),
+  });
+
+  const openNewBeneficiary = (target: { assetId: number; index: number } | null = null) => {
+    setNewBeneficiaryTarget(target);
+    setNewBeneficiaryName("");
+    setNewBeneficiaryOpen(true);
+  };
+
   const saveBenDetailsMutation = useMutation({
     mutationFn: (data: { assetId: number; hasBeneficiary: boolean; beneficiaries: Array<{ name: string; percentage: number; notes: string | null }> }) =>
       apiRequest("PUT", "/api/estate/beneficiaries", data),
@@ -323,6 +358,7 @@ export default function EstatePlanningPage() {
       if (prev[assetId]) return prev;
       const existing = ben?.beneficiaries?.map((beneficiary) => ({
         name: beneficiary.beneficiaryName,
+        beneficiaryId: beneficiary.beneficiaryId ?? undefined,
         percentage: String(beneficiary.allocationPercentage),
         notes: beneficiary.notes || "",
       })) || [];
@@ -345,6 +381,7 @@ export default function EstatePlanningPage() {
   const draftsToPayload = (drafts: BeneficiaryDraft[]) =>
     drafts.map((draft) => ({
       name: draft.name.trim(),
+      beneficiaryId: draft.beneficiaryId,
       percentage: Number(draft.percentage),
       notes: draft.notes.trim() || null,
     }));
@@ -488,6 +525,7 @@ export default function EstatePlanningPage() {
                 </p>
               </div>
             </div>
+            <div className="flex flex-wrap items-center gap-2">
             <div className="inline-flex rounded-lg border bg-muted/50 p-1" role="group" aria-label="Beneficiary view">
               {(["account", "beneficiary"] as const).map(view => (
                 <button
@@ -506,13 +544,24 @@ export default function EstatePlanningPage() {
                 </button>
               ))}
             </div>
+            {beneficiaryView === "beneficiary" && (
+              <Button size="sm" variant="outline" onClick={() => openNewBeneficiary()} data-testid="button-add-beneficiary">
+                <Plus className="mr-1.5 h-4 w-4" /> Add beneficiary
+              </Button>
+            )}
+            </div>
             </div>
           </CardHeader>
           <CardContent className="pt-0">
-          {assets.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-6">No assets found. Add assets first to track beneficiary designations.</p>
-          ) : beneficiaryView === "beneficiary" ? (
+          {peopleError && (
+            <p role="alert" className="mb-3 text-sm text-destructive">
+              Could not load your beneficiary list. <button type="button" className="underline" onClick={() => reloadPeople()}>Retry</button>
+            </p>
+          )}
+          {beneficiaryView === "beneficiary" ? (
             <BeneficiaryAllocationView summary={allocationSummary} />
+          ) : assets.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-6">No assets found. Add assets first to track beneficiary designations.</p>
           ) : (
             <div>
               {parentAssetGroups.map(([parentCategory, categoryGroups]) => {
@@ -640,7 +689,7 @@ export default function EstatePlanningPage() {
                                             <div className="flex items-center justify-between gap-3">
                                               <div>
                                                 <Label className="text-xs">Beneficiaries</Label>
-                                                <p className="text-[11px] text-muted-foreground">Add each person and their share of this asset.</p>
+                                                <p className="text-[11px] text-muted-foreground">Choose each beneficiary and their share of this asset.</p>
                                               </div>
                                               <span className={`text-xs font-medium ${
                                                 (localEdit || []).reduce((sum, draft) => sum + (Number(draft.percentage) || 0), 0) === 100
@@ -654,14 +703,28 @@ export default function EstatePlanningPage() {
                                               {(localEdit || []).map((draft, index) => (
                                                 <div key={index} className="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_7rem_auto] gap-2 items-end">
                                                   <div className="space-y-1">
-                                                    <Label className="text-[11px]">Name</Label>
-                                                    <Input
-                                                      data-testid={`input-beneficiary-name-${asset.id}${index ? `-${index}` : ""}`}
-                                                      value={draft.name}
-                                                      onChange={(e) => updateBeneficiaryDraft(asset.id, index, "name", e.target.value)}
-                                                      placeholder="e.g., John Doe"
-                                                      className="h-8 text-sm"
-                                                    />
+                                                    <Label className="text-[11px]">Beneficiary</Label>
+                                                    <Select
+                                                      value={String(draft.beneficiaryId ?? beneficiaryPeople.find(person => person.normalizedName === draft.name.trim().replace(/\s+/g, " ").toLowerCase())?.id ?? "")}
+                                                      disabled={peopleLoading || peopleError}
+                                                      onValueChange={(value) => {
+                                                        if (value === "add-new") return openNewBeneficiary({ assetId: asset.id, index });
+                                                        const person = beneficiaryPeople.find(item => item.id === Number(value));
+                                                        if (!person) return;
+                                                        setBenEdits(prev => ({
+                                                          ...prev,
+                                                          [asset.id]: (prev[asset.id] || []).map((item, i) => i === index ? { ...item, name: person.name, beneficiaryId: person.id } : item),
+                                                        }));
+                                                      }}
+                                                    >
+                                                      <SelectTrigger className="h-8 text-sm" aria-label="Select beneficiary" data-testid={`select-beneficiary-${asset.id}-${index}`}>
+                                                        <SelectValue placeholder={peopleLoading ? "Loading…" : "Select beneficiary"} />
+                                                      </SelectTrigger>
+                                                      <SelectContent>
+                                                        {beneficiaryPeople.map(person => <SelectItem key={person.id} value={String(person.id)}>{person.name}</SelectItem>)}
+                                                        <SelectItem value="add-new" className="border-t font-medium text-primary">+ Add new beneficiary</SelectItem>
+                                                      </SelectContent>
+                                                    </Select>
                                                   </div>
                                                   <div className="space-y-1">
                                                     <Label className="text-[11px]">Allocation (%)</Label>
@@ -961,6 +1024,22 @@ export default function EstatePlanningPage() {
           )}
         </CardContent>
       </Card>}
+
+      <Dialog open={newBeneficiaryOpen} onOpenChange={(open) => { if (!addBeneficiaryMutation.isPending) setNewBeneficiaryOpen(open); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle>Add beneficiary</DialogTitle></DialogHeader>
+          <form onSubmit={(event) => { event.preventDefault(); if (newBeneficiaryName.trim() && !addBeneficiaryMutation.isPending) addBeneficiaryMutation.mutate(newBeneficiaryName); }} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="new-beneficiary-name">Name</Label>
+              <Input id="new-beneficiary-name" value={newBeneficiaryName} onChange={event => setNewBeneficiaryName(event.target.value)} maxLength={200} autoFocus required disabled={addBeneficiaryMutation.isPending} />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setNewBeneficiaryOpen(false)} disabled={addBeneficiaryMutation.isPending}>Cancel</Button>
+              <Button type="submit" disabled={!newBeneficiaryName.trim() || addBeneficiaryMutation.isPending}>{addBeneficiaryMutation.isPending ? "Adding…" : "Add beneficiary"}</Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       {/* Contact dialog */}
       <Dialog open={contactDialogOpen} onOpenChange={setContactDialogOpen}>

@@ -1,4 +1,4 @@
-import type { Asset, EstateBeneficiaryWithEntries } from "@shared/schema";
+import type { Asset, EstateBeneficiaryWithEntries, EstateBeneficiaryPerson } from "@shared/schema";
 
 export type BeneficiaryAccountAllocation = {
   assetId: number;
@@ -27,7 +27,9 @@ export type BeneficiaryAllocationSummary = {
 export function summarizeBeneficiaryAllocations(
   assets: Pick<Asset, "id" | "name" | "value" | "institution">[],
   designations: Pick<EstateBeneficiaryWithEntries, "assetId" | "hasBeneficiary" | "beneficiaryName" | "beneficiaries">[],
+  people: Pick<EstateBeneficiaryPerson, "id" | "name" | "normalizedName">[] = [],
 ): BeneficiaryAllocationSummary {
+  const peopleByName = new Map(people.map(person => [person.normalizedName, person]));
   const byAsset = new Map(designations.map(designation => [designation.assetId, designation]));
   const byName = new Map<string, BeneficiaryAllocationSummary["beneficiaries"][number]>();
   const summary: BeneficiaryAllocationSummary = {
@@ -47,16 +49,19 @@ export function summarizeBeneficiaryAllocations(
     const entries = !designation?.hasBeneficiary ? [] : designation.beneficiaries.length
       ? designation.beneficiaries.map(entry => ({
           name: entry.beneficiaryName,
+          beneficiaryId: entry.beneficiaryId,
           percentage: Number(entry.allocationPercentage),
         }))
       : designation.beneficiaryName?.trim()
-        ? [{ name: designation.beneficiaryName, percentage: 100 }]
+        ? [{ name: designation.beneficiaryName, percentage: 100, beneficiaryId: undefined }]
         : [];
     let assignedPercentage = 0;
     for (const entry of entries) {
       const name = entry.name.trim().replace(/\s+/g, " ");
       if (!name || !Number.isFinite(entry.percentage) || entry.percentage <= 0) continue;
-      const key = name.toLocaleLowerCase("en-US");
+      const normalized = name.toLocaleLowerCase("en-US");
+      const personId = entry.beneficiaryId ?? peopleByName.get(normalized)?.id;
+      const key = personId ? `person:${personId}` : normalized;
       const beneficiary = byName.get(key) ?? { key, name, totalAmount: 0, accounts: [] };
       const amount = accountValue * entry.percentage / 100;
       const existingAccount = beneficiary.accounts.find(account => account.assetId === asset.id);
@@ -94,6 +99,10 @@ export function summarizeBeneficiaryAllocations(
           : assignedPercentage === 0 ? "Beneficiary details needed" : "Partially allocated",
       });
     }
+  }
+  for (const person of people) {
+    const key = `person:${person.id}`;
+    if (!byName.has(key)) byName.set(key, { key, name: person.name, totalAmount: 0, accounts: [] });
   }
   summary.beneficiaries = Array.from(byName.values())
     .sort((a, b) => b.totalAmount - a.totalAmount || a.name.localeCompare(b.name));

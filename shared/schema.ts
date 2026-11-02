@@ -605,12 +605,23 @@ export const insertEstateBeneficiarySchema = createInsertSchema(estateBeneficiar
 export type InsertEstateBeneficiary = z.infer<typeof insertEstateBeneficiarySchema>;
 export type EstateBeneficiary = typeof estateBeneficiaries.$inferSelect;
 
+export const estateBeneficiaryPeople = pgTable("estate_beneficiary_people", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  normalizedName: text("normalized_name").notNull(),
+}, (table) => ({
+  userNameUnique: uniqueIndex("estate_beneficiary_people_user_name_unique").on(table.userId, table.normalizedName),
+}));
+export type EstateBeneficiaryPerson = typeof estateBeneficiaryPeople.$inferSelect;
+
 export const estateBeneficiaryEntries = pgTable("estate_beneficiary_entries", {
   id: serial("id").primaryKey(),
   designationId: integer("designation_id").notNull().references(() => estateBeneficiaries.id, { onDelete: "cascade" }),
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   assetId: integer("asset_id").notNull().references(() => assets.id, { onDelete: "cascade" }),
   beneficiaryName: text("beneficiary_name").notNull(),
+  beneficiaryId: integer("beneficiary_id").references(() => estateBeneficiaryPeople.id),
   allocationPercentage: numeric("allocation_percentage", { precision: 5, scale: 2 }).notNull(),
   notes: text("notes"),
 }, (table) => ({
@@ -623,7 +634,7 @@ export const estateBeneficiaryEntries = pgTable("estate_beneficiary_entries", {
 
 export const insertEstateBeneficiaryEntrySchema = createInsertSchema(estateBeneficiaryEntries).omit({ id: true });
 export type InsertEstateBeneficiaryEntry = z.infer<typeof insertEstateBeneficiaryEntrySchema>;
-export type EstateBeneficiaryEntry = typeof estateBeneficiaryEntries.$inferSelect;
+export type EstateBeneficiaryEntry = Omit<typeof estateBeneficiaryEntries.$inferSelect, "beneficiaryId"> & { beneficiaryId?: number | null };
 export type EstateBeneficiaryWithEntries = EstateBeneficiary & {
   beneficiaries: EstateBeneficiaryEntry[];
 };

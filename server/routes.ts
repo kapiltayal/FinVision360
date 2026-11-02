@@ -2,6 +2,7 @@ import type { Express, Response } from "express";
 import { createServer, type Server } from "http";
 import { and, eq, sql } from "drizzle-orm";
 import { storage } from "./storage";
+import { registerBeneficiaryPeopleRoutes } from "./estate-beneficiary-people";
 import { createFeedbackHandler } from "./feedback";
 import { sendContactNotification, sendFeedbackNotification } from "./feedback-email";
 import { createContactHandler } from "./contact";
@@ -1427,6 +1428,8 @@ Include a year-by-year overview, useful milestones, a conservative/base/optimist
     res.json(await storage.getEstateBeneficiaries(userId));
   });
 
+  registerBeneficiaryPeopleRoutes(app, pool);
+
   app.put("/api/estate/beneficiaries", requireAuth, async (req, res) => {
     const userId = (req.user as any).id;
     const assetId = Number(req.body?.assetId);
@@ -1444,7 +1447,7 @@ Include a year-by-year overview, useful milestones, a conservative/base/optimist
       return res.status(400).json({ message: "Add at least one beneficiary before marking this asset assigned" });
     }
 
-    const beneficiaries: Array<{ name: string; percentage: number; notes: string | null }> = [];
+    const beneficiaries: Array<{ name: string; beneficiaryId?: number; percentage: number; notes: string | null }> = [];
     for (const beneficiary of rawBeneficiaries ?? []) {
       const name = typeof beneficiary?.name === "string"
         ? beneficiary.name.trim()
@@ -1462,7 +1465,11 @@ Include a year-by-year overview, useful milestones, a conservative/base/optimist
       if (Math.abs(percentage * 100 - percentageInHundredths) > 0.000001) {
         return res.status(400).json({ message: "Allocations can have no more than two decimal places" });
       }
-      beneficiaries.push({ name, percentage: percentageInHundredths / 100, notes: notes || null });
+      const beneficiaryId = beneficiary?.beneficiaryId;
+      if (beneficiaryId !== undefined && (!Number.isInteger(beneficiaryId) || beneficiaryId <= 0)) {
+        return res.status(400).json({ message: "Select a valid beneficiary" });
+      }
+      beneficiaries.push({ name, beneficiaryId, percentage: percentageInHundredths / 100, notes: notes || null });
     }
 
     const totalInHundredths = beneficiaries.reduce(
@@ -1478,7 +1485,7 @@ Include a year-by-year overview, useful milestones, a conservative/base/optimist
       const record = await storage.saveEstateBeneficiary({ userId, assetId, hasBeneficiary, beneficiaries });
       res.json(record);
     } catch (error: any) {
-      if (error?.statusCode === 404) return res.status(404).json({ message: "Asset not found" });
+      if (error?.statusCode === 404) return res.status(404).json({ message: error.message });
       throw error;
     }
   });

@@ -96,7 +96,7 @@ function Breakdown({
 
 export function BeneficiaryAllocationView({ summary }: BeneficiaryAllocationViewProps) {
   const hasAccounts =
-    summary.beneficiaries.some((beneficiary) => beneficiary.accounts.length > 0) ||
+    summary.beneficiaries.length > 0 ||
     summary.unassignedAccounts.length > 0;
 
   return (
@@ -141,11 +141,11 @@ export function BeneficiaryAllocationView({ summary }: BeneficiaryAllocationView
                   {formatCurrency(beneficiary.totalAmount)}
                 </p>
               </div>
-              <Breakdown label="Accounts" count={beneficiary.accounts.length}>
+              {beneficiary.accounts.length > 0 && <Breakdown label="Accounts" count={beneficiary.accounts.length}>
                 {beneficiary.accounts.map((account) => (
                   <AccountBreakdown key={account.assetId} account={account} />
                 ))}
-              </Breakdown>
+              </Breakdown>}
             </article>
           ))}
 

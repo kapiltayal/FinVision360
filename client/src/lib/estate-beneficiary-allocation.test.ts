@@ -15,6 +15,37 @@ const designation = (assetId: number, shares: Array<[string, string]>, hasBenefi
   })),
 });
 
+test("saved beneficiary identities drive grouping and unallocated people remain visible", () => {
+  const people = [
+    { id: 10, name: "Alex", normalizedName: "alex" },
+    { id: 11, name: "Sam", normalizedName: "sam" },
+  ];
+  const first = designation(1, [["Alex", "100"]]);
+  const second = designation(2, [["ALEX", "100"]]);
+  const result = summarizeBeneficiaryAllocations([asset(1, "100"), asset(2, "200")], [
+    { ...first, beneficiaries: first.beneficiaries.map(entry => ({ ...entry, beneficiaryId: 10 })) },
+    second, // Older data without an ID resolves through the same saved list.
+  ], people);
+  assert.equal(result.beneficiaries.length, 2);
+  assert.equal(result.beneficiaries[0].key, "person:10");
+  assert.equal(result.beneficiaries[0].totalAmount, 300);
+  assert.equal(result.beneficiaries[1].totalAmount, 0);
+  assert.deepEqual(result.beneficiaries[1].accounts, []);
+  assert.equal(result.totalAssignedValue, 300);
+  assert.equal(summarizeBeneficiaryAllocations([], [], people).beneficiaries.length, 2);
+});
+
+test("different saved IDs never merge just because display names match", () => {
+  const first = designation(1, [["Alex", "100"]]);
+  const second = designation(2, [["Alex", "100"]]);
+  const result = summarizeBeneficiaryAllocations([asset(1, "100"), asset(2, "200")], [
+    { ...first, beneficiaries: first.beneficiaries.map(entry => ({ ...entry, beneficiaryId: 10 })) },
+    { ...second, beneficiaries: second.beneficiaries.map(entry => ({ ...entry, beneficiaryId: 11 })) },
+  ]);
+  assert.equal(result.beneficiaries.length, 2);
+  assert.deepEqual(result.beneficiaries.map(person => person.totalAmount), [200, 100]);
+});
+
 test("splits account values by allocation and groups exact normalized names across accounts", () => {
   const result = summarizeBeneficiaryAllocations(
     [asset(1, "1000"), asset(2, "2000"), asset(3, "400")],

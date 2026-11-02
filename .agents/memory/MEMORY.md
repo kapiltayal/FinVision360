@@ -33,4 +33,4 @@
 - [React Query SSR errors](react-query-ssr-errors.md) — cached error-state fixtures need retryOnMount disabled to render errors rather than a fresh loading state.
 - [Liability Map views](liability-map-visualizations.md) — flat 2D bubbles use only two axes; pan/zoom and view changes never alter calculations.
 - [Documentation diagrams](documentation-diagrams.md) — ingestion flowcharts must render without Mermaid support; keep image, text steps and editable source aligned.
-- [Beneficiary grouping](beneficiary-grouping.md) — beneficiary names are a display-grouping key, not a verified identity; never fuzzy-merge personal names.
+- [Beneficiary grouping](beneficiary-grouping.md) — reuse private beneficiary identities; preserve legacy allocations and never fuzzy-merge names; keep the approved horizontal-card layout concise.
