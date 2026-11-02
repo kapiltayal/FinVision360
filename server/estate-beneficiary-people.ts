@@ -78,4 +78,62 @@ export function registerBeneficiaryPeopleRoutes(app: Express, pool: Pool) {
     );
     res.status(201).json(result.rows[0]);
   });
+
+  app.patch("/api/estate/beneficiary-people/:id", requireAuth, async (req, res) => {
+    const userId = (req.user as any).id;
+    const id = Number(req.params.id);
+    const name = typeof req.body?.name === "string" ? req.body.name.trim().replace(/\s+/g, " ") : "";
+    if (!Number.isSafeInteger(id) || id <= 0 || id > 2147483647) return res.status(400).json({ message: "Select a valid beneficiary" });
+    if (!name || name.length > 200) return res.status(400).json({ message: "Enter a beneficiary name (up to 200 characters)" });
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      // Use the same lock as account saves so a concurrent save cannot restore an old name.
+      await client.query("SELECT pg_advisory_xact_lock(hashtextextended($1, 116))", [userId]);
+      const existing = await client.query(
+        "SELECT id, name, normalized_name FROM estate_beneficiary_people WHERE id = $1 AND user_id = $2 FOR UPDATE",
+        [id, userId],
+      );
+      if (!existing.rows[0]) {
+        await client.query("ROLLBACK");
+        return res.status(404).json({ message: "Beneficiary not found" });
+      }
+      const old = existing.rows[0];
+      const updated = await client.query(
+        `UPDATE estate_beneficiary_people SET name = $3, normalized_name = $4
+         WHERE id = $1 AND user_id = $2
+         RETURNING id, user_id AS "userId", name, normalized_name AS "normalizedName"`,
+        [id, userId, name, normalizeBeneficiaryName(name)],
+      );
+      if (old.name !== name) {
+        const entries = await client.query(
+          `UPDATE estate_beneficiary_entries SET beneficiary_name = $3, beneficiary_id = $2
+           WHERE user_id = $1 AND (beneficiary_id = $2 OR
+             (beneficiary_id IS NULL AND LOWER(BTRIM(regexp_replace(beneficiary_name, '\\s+', ' ', 'g'))) = $4))
+           RETURNING designation_id`,
+          [userId, id, name, old.normalized_name],
+        );
+        await client.query(
+          `UPDATE estate_beneficiaries
+           SET beneficiary_name = CASE
+                 WHEN LOWER(BTRIM(regexp_replace(beneficiary_name, '\\s+', ' ', 'g'))) = $3 THEN $4
+                 ELSE beneficiary_name END,
+               last_updated_at = NOW()
+           WHERE user_id = $1 AND (id = ANY($2::integer[])
+             OR LOWER(BTRIM(regexp_replace(beneficiary_name, '\\s+', ' ', 'g'))) = $3)`,
+          [userId, entries.rows.map(row => row.designation_id), old.normalized_name, name],
+        );
+      }
+      await client.query("COMMIT");
+      res.json(updated.rows[0]);
+    } catch (error: any) {
+      await client.query("ROLLBACK");
+      if (error?.code === "23505") {
+        return res.status(409).json({ message: "A beneficiary with that name already exists. Choose a different name." });
+      }
+      throw error;
+    } finally {
+      client.release();
+    }
+  });
 }

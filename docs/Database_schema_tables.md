@@ -106,6 +106,8 @@ The exclusion notice lists excluded names. `POST /api/retirement/account-inclusi
 
 The existing pre-listen bootstrap runs the additive beneficiary-list migration under a transaction/advisory lock in development and production. It backfills legacy names into each user's list and links existing entry IDs without changing percentages, notes, designation status, or last-updated dates. Removing an account's allocation does not remove its reusable beneficiary. Account saves still require allocations to total exactly 100%; adding a beneficiary alone does not mark any account as covered.
 
+Beneficiary view supports editing a saved name through `PATCH /api/estate/beneficiary-people/:id`. The user-scoped transaction keeps the same beneficiary ID and updates the directory, linked entry name snapshots, legacy name-only designations, and affected accounts' last-updated dates. Percentages, notes, account values, and other beneficiaries remain unchanged. Name conflicts return `409` without merging people; unchanged names leave account timestamps untouched. Account saves and renames share a per-user transaction lock to prevent a concurrent save from restoring an outdated name.
+
 ### Feedback and audit/history snapshots
 
 | Table | Purpose | Columns (PostgreSQL name and type) | Keys and constraints |

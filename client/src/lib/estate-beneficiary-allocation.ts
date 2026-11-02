@@ -15,6 +15,7 @@ export type BeneficiaryAllocationSummary = {
   totalUnassignedValue: number;
   beneficiaries: Array<{
     key: string;
+    beneficiaryId?: number;
     name: string;
     totalAmount: number;
     accounts: BeneficiaryAccountAllocation[];
@@ -30,6 +31,7 @@ export function summarizeBeneficiaryAllocations(
   people: Pick<EstateBeneficiaryPerson, "id" | "name" | "normalizedName">[] = [],
 ): BeneficiaryAllocationSummary {
   const peopleByName = new Map(people.map(person => [person.normalizedName, person]));
+  const peopleById = new Map(people.map(person => [person.id, person]));
   const byAsset = new Map(designations.map(designation => [designation.assetId, designation]));
   const byName = new Map<string, BeneficiaryAllocationSummary["beneficiaries"][number]>();
   const summary: BeneficiaryAllocationSummary = {
@@ -62,7 +64,9 @@ export function summarizeBeneficiaryAllocations(
       const normalized = name.toLocaleLowerCase("en-US");
       const personId = entry.beneficiaryId ?? peopleByName.get(normalized)?.id;
       const key = personId ? `person:${personId}` : normalized;
-      const beneficiary = byName.get(key) ?? { key, name, totalAmount: 0, accounts: [] };
+      const beneficiary = byName.get(key) ?? {
+        key, beneficiaryId: personId, name: peopleById.get(personId!)?.name ?? name, totalAmount: 0, accounts: [],
+      };
       const amount = accountValue * entry.percentage / 100;
       const existingAccount = beneficiary.accounts.find(account => account.assetId === asset.id);
       if (existingAccount) {
@@ -102,7 +106,7 @@ export function summarizeBeneficiaryAllocations(
   }
   for (const person of people) {
     const key = `person:${person.id}`;
-    if (!byName.has(key)) byName.set(key, { key, name: person.name, totalAmount: 0, accounts: [] });
+    if (!byName.has(key)) byName.set(key, { key, beneficiaryId: person.id, name: person.name, totalAmount: 0, accounts: [] });
   }
   summary.beneficiaries = Array.from(byName.values())
     .sort((a, b) => b.totalAmount - a.totalAmount || a.name.localeCompare(b.name));

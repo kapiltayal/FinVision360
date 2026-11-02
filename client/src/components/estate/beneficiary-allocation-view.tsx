@@ -3,14 +3,17 @@ import {
   AlertTriangle,
   ChevronDown,
   Landmark,
+  Pencil,
   Users,
   Wallet,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/format";
+import { Button } from "@/components/ui/button";
 import type { BeneficiaryAllocationSummary } from "@/lib/estate-beneficiary-allocation";
 
 type BeneficiaryAllocationViewProps = {
   summary: BeneficiaryAllocationSummary;
+  onEdit?: (beneficiaryId: number) => void;
 };
 
 type AllocationAccount = BeneficiaryAllocationSummary["beneficiaries"][number]["accounts"][number];
@@ -94,7 +97,7 @@ function Breakdown({
   );
 }
 
-export function BeneficiaryAllocationView({ summary }: BeneficiaryAllocationViewProps) {
+export function BeneficiaryAllocationView({ summary, onEdit }: BeneficiaryAllocationViewProps) {
   const hasAccounts =
     summary.beneficiaries.length > 0 ||
     summary.unassignedAccounts.length > 0;
@@ -137,9 +140,25 @@ export function BeneficiaryAllocationView({ summary }: BeneficiaryAllocationView
                     </p>
                   </div>
                 </div>
-                <p className="shrink-0 text-lg font-bold tabular-nums text-blue-700 dark:text-blue-300">
-                  {formatCurrency(beneficiary.totalAmount)}
-                </p>
+                <div className="flex shrink-0 items-center gap-2">
+                  <p className="text-lg font-bold tabular-nums text-blue-700 dark:text-blue-300">
+                    {formatCurrency(beneficiary.totalAmount)}
+                  </p>
+                  {onEdit && beneficiary.beneficiaryId !== undefined && (
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="ghost"
+                      className="h-8 w-8 text-muted-foreground hover:text-primary"
+                      aria-label={`Edit beneficiary ${beneficiary.name}`}
+                      title="Edit beneficiary"
+                      data-testid={`button-edit-beneficiary-${beneficiary.beneficiaryId}`}
+                      onClick={() => onEdit(beneficiary.beneficiaryId!)}
+                    >
+                      <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
+                    </Button>
+                  )}
+                </div>
               </div>
               {beneficiary.accounts.length > 0 && <Breakdown label="Accounts" count={beneficiary.accounts.length}>
                 {beneficiary.accounts.map((account) => (

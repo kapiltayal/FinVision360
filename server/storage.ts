@@ -518,6 +518,7 @@ export class DatabaseStorage implements IStorage {
     let committed = false;
     try {
       await client.query("BEGIN");
+      await client.query("SELECT pg_advisory_xact_lock(hashtextextended($1, 116))", [data.userId]);
 
       const asset = await client.query(
         "SELECT id FROM assets WHERE id = $1 AND user_id = $2",

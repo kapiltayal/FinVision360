@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
@@ -192,6 +192,7 @@ export default function EstatePlanningPage() {
   const [benEdits, setBenEdits] = useState<Record<number, BeneficiaryDraft[]>>({});
   const [newBeneficiaryOpen, setNewBeneficiaryOpen] = useState(false);
   const [newBeneficiaryName, setNewBeneficiaryName] = useState("");
+  const [editingBeneficiary, setEditingBeneficiary] = useState<EstateBeneficiaryPerson | null>(null);
   const [newBeneficiaryTarget, setNewBeneficiaryTarget] = useState<{ assetId: number; index: number } | null>(null);
 
   useEffect(() => {
@@ -299,10 +300,40 @@ export default function EstatePlanningPage() {
   });
 
   const openNewBeneficiary = (target: { assetId: number; index: number } | null = null) => {
+    setEditingBeneficiary(null);
     setNewBeneficiaryTarget(target);
     setNewBeneficiaryName("");
     setNewBeneficiaryOpen(true);
   };
+
+  const updateBeneficiaryMutation = useMutation({
+    mutationFn: async ({ id, name }: { id: number; name: string }) => {
+      const response = await apiRequest("PATCH", `/api/estate/beneficiary-people/${id}`, { name });
+      return response.json() as Promise<EstateBeneficiaryPerson>;
+    },
+    onSuccess: async (person) => {
+      await Promise.all([
+        qc.cancelQueries({ queryKey: ["/api/estate/beneficiary-people"] }),
+        qc.cancelQueries({ queryKey: ["/api/estate/beneficiaries"] }),
+      ]);
+      qc.setQueryData<EstateBeneficiaryPerson[]>(["/api/estate/beneficiary-people"], (old = []) =>
+        [...old.filter(item => item.id !== person.id), person].sort((a, b) => a.name.localeCompare(b.name)));
+      // Keep unsaved account percentages/notes intact and update only the selected identity.
+      setBenEdits(prev => Object.fromEntries(Object.entries(prev).map(([assetId, drafts]) => [
+        assetId, drafts.map(draft => draft.beneficiaryId === person.id ||
+          (!draft.beneficiaryId && draft.name.trim().replace(/\s+/g, " ").toLowerCase() === editingBeneficiary?.normalizedName)
+          ? { ...draft, name: person.name, beneficiaryId: person.id } : draft),
+      ])));
+      qc.invalidateQueries({ queryKey: ["/api/estate/beneficiary-people"] });
+      qc.invalidateQueries({ queryKey: ["/api/estate/beneficiaries"] });
+      setNewBeneficiaryOpen(false);
+      setEditingBeneficiary(null);
+      setNewBeneficiaryName("");
+      toast({ title: "Beneficiary updated" });
+    },
+    onError: (error: Error) => toast({ title: "Could not update beneficiary", description: error.message, variant: "destructive" }),
+  });
+  const beneficiaryDialogPending = addBeneficiaryMutation.isPending || updateBeneficiaryMutation.isPending;
 
   const saveBenDetailsMutation = useMutation({
     mutationFn: (data: { assetId: number; hasBeneficiary: boolean; beneficiaries: Array<{ name: string; percentage: number; notes: string | null }> }) =>
@@ -358,12 +389,17 @@ export default function EstatePlanningPage() {
       if (prev[assetId]) return prev;
       const existing = ben?.beneficiaries?.map((beneficiary) => ({
         name: beneficiary.beneficiaryName,
-        beneficiaryId: beneficiary.beneficiaryId ?? undefined,
+        beneficiaryId: beneficiary.beneficiaryId ?? beneficiaryPeople.find(person =>
+          person.normalizedName === beneficiary.beneficiaryName.trim().replace(/\s+/g, " ").toLowerCase())?.id,
         percentage: String(beneficiary.allocationPercentage),
         notes: beneficiary.notes || "",
       })) || [];
       const legacy = existing.length === 0 && ben?.beneficiaryName
-        ? [{ name: ben.beneficiaryName, percentage: "100", notes: ben.notes || "" }]
+        ? [{
+            name: ben.beneficiaryName,
+            beneficiaryId: beneficiaryPeople.find(person => person.normalizedName === ben.beneficiaryName!.trim().replace(/\s+/g, " ").toLowerCase())?.id,
+            percentage: "100", notes: ben.notes || "",
+          }]
         : existing;
       return { ...prev, [assetId]: legacy.length > 0 ? legacy : [{ name: "", percentage: "100", notes: "" }] };
     });
@@ -559,7 +595,14 @@ export default function EstatePlanningPage() {
             </p>
           )}
           {beneficiaryView === "beneficiary" ? (
-            <BeneficiaryAllocationView summary={allocationSummary} />
+            <BeneficiaryAllocationView summary={allocationSummary} onEdit={peopleLoading || peopleError ? undefined : (id) => {
+              const person = beneficiaryPeople.find(item => item.id === id);
+              if (!person) return;
+              setEditingBeneficiary(person);
+              setNewBeneficiaryTarget(null);
+              setNewBeneficiaryName(person.name);
+              setNewBeneficiaryOpen(true);
+            }} />
           ) : assets.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-6">No assets found. Add assets first to track beneficiary designations.</p>
           ) : (
@@ -1025,17 +1068,27 @@ export default function EstatePlanningPage() {
         </CardContent>
       </Card>}
 
-      <Dialog open={newBeneficiaryOpen} onOpenChange={(open) => { if (!addBeneficiaryMutation.isPending) setNewBeneficiaryOpen(open); }}>
+      <Dialog open={newBeneficiaryOpen} onOpenChange={(open) => { if (!beneficiaryDialogPending) setNewBeneficiaryOpen(open); }}>
         <DialogContent className="max-w-sm">
-          <DialogHeader><DialogTitle>Add beneficiary</DialogTitle></DialogHeader>
-          <form onSubmit={(event) => { event.preventDefault(); if (newBeneficiaryName.trim() && !addBeneficiaryMutation.isPending) addBeneficiaryMutation.mutate(newBeneficiaryName); }} className="space-y-4">
+          <DialogHeader>
+            <DialogTitle>{editingBeneficiary ? "Edit beneficiary" : "Add beneficiary"}</DialogTitle>
+            <DialogDescription>
+              {editingBeneficiary ? "Updates this name on all assigned accounts. Allocation percentages stay the same." : "Save a name once to reuse across accounts."}
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={(event) => {
+            event.preventDefault();
+            if (!newBeneficiaryName.trim() || beneficiaryDialogPending) return;
+            if (editingBeneficiary) updateBeneficiaryMutation.mutate({ id: editingBeneficiary.id, name: newBeneficiaryName });
+            else addBeneficiaryMutation.mutate(newBeneficiaryName);
+          }} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="new-beneficiary-name">Name</Label>
-              <Input id="new-beneficiary-name" value={newBeneficiaryName} onChange={event => setNewBeneficiaryName(event.target.value)} maxLength={200} autoFocus required disabled={addBeneficiaryMutation.isPending} />
+              <Input id="new-beneficiary-name" value={newBeneficiaryName} onChange={event => setNewBeneficiaryName(event.target.value)} maxLength={200} autoFocus required disabled={beneficiaryDialogPending} />
             </div>
             <div className="flex justify-end gap-2">
-              <Button type="button" variant="outline" onClick={() => setNewBeneficiaryOpen(false)} disabled={addBeneficiaryMutation.isPending}>Cancel</Button>
-              <Button type="submit" disabled={!newBeneficiaryName.trim() || addBeneficiaryMutation.isPending}>{addBeneficiaryMutation.isPending ? "Adding…" : "Add beneficiary"}</Button>
+              <Button type="button" variant="outline" onClick={() => setNewBeneficiaryOpen(false)} disabled={beneficiaryDialogPending}>Cancel</Button>
+              <Button type="submit" disabled={!newBeneficiaryName.trim() || beneficiaryDialogPending}>{beneficiaryDialogPending ? "Saving…" : editingBeneficiary ? "Save changes" : "Add beneficiary"}</Button>
             </div>
           </form>
         </DialogContent>
