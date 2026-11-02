@@ -544,7 +544,6 @@ export default function EstatePlanningPage() {
                 </p>
               </div>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
             <div className="inline-flex rounded-lg border bg-muted/50 p-1" role="group" aria-label="Beneficiary view">
               {(["account", "beneficiary"] as const).map(view => (
                 <button
@@ -562,12 +561,6 @@ export default function EstatePlanningPage() {
                   {view === "account" ? "Account view" : "Beneficiary view"}
                 </button>
               ))}
-            </div>
-            {beneficiaryView === "beneficiary" && (
-              <Button size="sm" variant="outline" onClick={() => openNewBeneficiary()} data-testid="button-add-beneficiary">
-                <Plus className="mr-1.5 h-4 w-4" /> Add beneficiary
-              </Button>
-            )}
             </div>
             </div>
           </CardHeader>
@@ -870,6 +863,13 @@ export default function EstatePlanningPage() {
             </div>
           )}
         </CardContent>
+        {beneficiaryView === "beneficiary" && (
+          <div className="flex justify-end px-6 pb-6">
+            <Button size="sm" variant="outline" onClick={() => openNewBeneficiary()} data-testid="button-add-beneficiary">
+              <Plus className="mr-1.5 h-4 w-4" /> Add beneficiary
+            </Button>
+          </div>
+        )}
         </Card>
       </>}
 
