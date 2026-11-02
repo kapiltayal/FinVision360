@@ -219,6 +219,7 @@ export default function EstatePlanningPage() {
 
   const beneficiaryMap = new Map(beneficiaries.map((b) => [b.assetId, b]));
   const documentMap = new Map(documents.map((d) => [d.documentType, d]));
+  const docsComplete = ESTATE_DOCUMENT_TYPES.filter((d) => documentMap.get(d.key)?.isComplete).length;
   const groupedAssets = groupedBookEntries(assets, categories);
   const assetsByParent = new Map<string, typeof groupedAssets>();
   groupedAssets.forEach((group) => {
@@ -228,8 +229,6 @@ export default function EstatePlanningPage() {
   });
   const parentAssetGroups = Array.from(assetsByParent.entries());
 
-  const docsComplete = ESTATE_DOCUMENT_TYPES.filter((d) => documentMap.get(d.key)?.isComplete).length;
-  const assetsWithBeneficiary = beneficiaries.filter((b) => b.hasBeneficiary).length;
   const allocationSummary = useMemo(
     () => summarizeBeneficiaryAllocations(assets, beneficiaries, beneficiaryPeople),
     [assets, beneficiaries, beneficiaryPeople],
@@ -433,41 +432,17 @@ export default function EstatePlanningPage() {
 
   return (
     <div className="p-6 space-y-6 max-w-5xl mx-auto">
-      {/* Header */}
-      <div className="page-header-gradient">
-        <h1 className="text-2xl font-bold" data-testid="text-estate-title">Estate &amp; Legacy Planning</h1>
-        <p className="text-muted-foreground">Track key steps to protect and pass on your assets</p>
-        <div className="flex flex-wrap gap-4 mt-3">
-          <div className="flex items-center gap-1.5 text-sm">
-            <UserCheck className="h-4 w-4 text-blue-500" />
-            <span className="text-muted-foreground">Beneficiaries assigned: <span className="font-semibold text-foreground">{assetsWithBeneficiary}/{assets.length}</span></span>
-          </div>
-          <div className="flex items-center gap-1.5 text-sm">
-            <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-            <span className="text-muted-foreground">Documents: <span className="font-semibold text-foreground">{docsComplete}/{ESTATE_DOCUMENT_TYPES.length}</span></span>
-          </div>
-          <div className="flex items-center gap-1.5 text-sm">
-            <Users className="h-4 w-4 text-violet-500" />
-            <span className="text-muted-foreground">Contacts: <span className="font-semibold text-foreground">{contacts.length}</span></span>
-          </div>
-        </div>
-      </div>
-
       {/* Section navigation */}
-      <div className="border-b">
+      <nav className="border-b bg-background shrink-0" aria-label="Estate planning sections">
         <div className="flex items-center gap-1 overflow-x-auto">
           {ESTATE_TABS.map((tab) => {
-            const count = tab.key === "beneficiaries"
-              ? assetsWithBeneficiary
-              : tab.key === "documents"
-                ? docsComplete
-                : contacts.length;
             const Icon = tab.icon;
 
             return (
               <button
                 key={tab.key}
                 type="button"
+                aria-current={activeTab === tab.key ? "page" : undefined}
                 onClick={() => selectEstateTab(tab.key)}
                 data-testid={`tab-estate-${tab.key}`}
                 className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
@@ -476,22 +451,13 @@ export default function EstatePlanningPage() {
                     : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
                 }`}
               >
-                <Icon className="h-4 w-4" />
+                <Icon className="h-4 w-4" aria-hidden="true" />
                 {tab.label}
-                <span className={`ml-1 text-xs px-1.5 py-0.5 rounded-full ${
-                  activeTab === tab.key ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
-                }`}>
-                  {tab.key === "documents"
-                    ? `${count}/${ESTATE_DOCUMENT_TYPES.length}`
-                    : tab.key === "beneficiaries"
-                      ? `${count}/${assets.length}`
-                      : count}
-                </span>
               </button>
             );
           })}
         </div>
-      </div>
+      </nav>
 
       {/* ── Section A: Beneficiary Designations ── */}
       {activeTab === "beneficiaries" && <>
