@@ -432,7 +432,7 @@ export default function EstatePlanningPage() {
   }
 
   return (
-    <div className="flex flex-col max-w-5xl mx-auto">
+    <div className="flex w-full flex-col">
       {/* Section navigation */}
       <nav className="border-b bg-background shrink-0" aria-label="Estate planning sections">
         <div className="flex items-center gap-1 px-4 overflow-x-auto">
@@ -475,7 +475,7 @@ export default function EstatePlanningPage() {
         </div>
       </nav>
 
-      <div className="p-6 space-y-6">
+      <div className="w-full max-w-5xl mx-auto p-6 space-y-6">
       {/* ── Section A: Beneficiary Designations ── */}
       {activeTab === "beneficiaries" && <>
         <Card className="mb-4 overflow-hidden border-border/70 bg-muted/15 shadow-none">
