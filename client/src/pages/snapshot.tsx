@@ -89,6 +89,7 @@ type RetirementIncomeProjectionSummary = {
 function SnapshotCard({
   title,
   accent,
+  topLineColor,
   icon: Icon,
   href,
   children,
@@ -97,6 +98,7 @@ function SnapshotCard({
 }: {
   title: string;
   accent: string;
+  topLineColor?: string;
   icon: React.ElementType;
   href?: string;
   children: React.ReactNode;
@@ -114,7 +116,7 @@ function SnapshotCard({
       onMouseEnter={(e) => href && ((e.currentTarget as HTMLElement).style.boxShadow = CARD_SHADOW_HOVER)}
       onMouseLeave={(e) => href && ((e.currentTarget as HTMLElement).style.boxShadow = CARD_SHADOW)}
     >
-      <div className="absolute top-0 left-0 right-0 h-1 rounded-t-2xl" style={{ background: accent }} />
+      <div className="absolute top-0 left-0 right-0 h-1 rounded-t-2xl" style={{ background: topLineColor ?? accent }} />
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <div className="h-8 w-8 rounded-lg flex items-center justify-center" style={{ background: `${accent}18` }}>
@@ -456,7 +458,7 @@ export default function SnapshotPage() {
         </SnapshotCard>
 
         {/* ── Emergency Funds ── */}
-        <SnapshotCard title="Emergency Funds" accent="#0d9488" icon={Banknote} href="/assets" tooltip="Calculated as the total of your savings and cash assets. Months of coverage = savings & cash ÷ your total monthly expenses. A healthy fund covers 3–6 months of expenses.">
+        <SnapshotCard title="Emergency Funds" accent="#0d9488" topLineColor="#d6a12b" icon={Banknote} href="/assets" tooltip="Calculated as the total of your savings and cash assets. Months of coverage = savings & cash ÷ your total monthly expenses. A healthy fund covers 3–6 months of expenses.">
           <div className="mb-4">
             <p
               className="text-3xl font-bold tabular-nums leading-none mb-1"
