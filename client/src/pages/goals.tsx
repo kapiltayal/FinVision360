@@ -409,7 +409,7 @@ export default function GoalsPage() {
                               </div>
                               <div className="min-w-0">
                                 <p className="font-semibold truncate">{goal.title}</p>
-                                <Badge variant="outline" className={`text-xs mt-0.5 ${cat.border}`}>
+                                <Badge variant="outline" className={`text-xs mt-0.5 ${cat.bg} ${cat.color} ${cat.border}`}>
                                   {cat.label}
                                 </Badge>
                               </div>
@@ -516,7 +516,7 @@ export default function GoalsPage() {
                             <div className="min-w-0 flex-1">
                               <div className="flex items-center gap-2 flex-wrap">
                                 <p className="font-medium text-sm truncate">{goal.title}</p>
-                                <Badge variant="outline" className={`text-xs ${cat.border} hidden sm:inline-flex`}>
+                                <Badge variant="outline" className={`text-xs ${cat.bg} ${cat.color} ${cat.border} hidden sm:inline-flex`}>
                                   {cat.label}
                                 </Badge>
                               </div>
