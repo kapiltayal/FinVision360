@@ -23,6 +23,11 @@ test("beneficiary cards offer an accessible Edit action for assigned and unused 
   assert.ok(html.includes('data-testid="button-edit-beneficiary-11"'));
   assert.ok(html.indexOf(">Updated name</h3>") < html.indexOf('data-testid="button-edit-beneficiary-10"'));
   assert.ok(html.indexOf('data-testid="button-edit-beneficiary-10"') < html.indexOf("$50"));
+  assert.ok(html.includes('aria-label="Show accounts for Updated name"'));
+  assert.ok(html.indexOf("$50") < html.indexOf('aria-label="Show accounts for Updated name"'), "expand control sits beside the amount");
+  const cardStart = html.indexOf('data-testid="beneficiary-allocation-card-');
+  const cardEnd = html.indexOf("</article>", cardStart);
+  assert.ok(!html.slice(cardStart, cardEnd).includes("Accounts ·"), "the redundant expandable accounts row is removed from beneficiary cards");
   assert.ok(!html.includes("Old name"), "latest saved display name wins over stale snapshots");
   assert.equal((html.match(/title="Edit beneficiary"/g) ?? []).length, 2, "unassigned balance has no Edit action");
   assert.equal(summary.totalAssignedValue, 50);

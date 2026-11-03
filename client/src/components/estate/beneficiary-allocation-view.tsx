@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import React, { useState, type ReactNode } from "react";
 import {
   AlertTriangle,
   ChevronDown,
@@ -98,6 +98,7 @@ function Breakdown({
 }
 
 export function BeneficiaryAllocationView({ summary, onEdit }: BeneficiaryAllocationViewProps) {
+  const [expandedBeneficiaries, setExpandedBeneficiaries] = useState<Record<string, boolean>>({});
   const hasAccounts =
     summary.beneficiaries.length > 0 ||
     summary.unassignedAccounts.length > 0;
@@ -122,12 +123,14 @@ export function BeneficiaryAllocationView({ summary, onEdit }: BeneficiaryAlloca
               </p>
             </div>
           ) : null}
-          {summary.beneficiaries.map((beneficiary) => (
-            <article
-              key={beneficiary.key}
-              data-testid={`beneficiary-allocation-card-${beneficiary.key}`}
-              className="min-w-0 overflow-hidden rounded-xl border bg-card shadow-sm"
-            >
+          {summary.beneficiaries.map((beneficiary) => {
+            const isExpanded = expandedBeneficiaries[beneficiary.key] ?? false;
+            return (
+              <article
+                key={beneficiary.key}
+                data-testid={`beneficiary-allocation-card-${beneficiary.key}`}
+                className="min-w-0 overflow-hidden rounded-xl border bg-card shadow-sm"
+              >
               <div className="flex items-center justify-between gap-3 px-4 py-3 sm:px-5">
                 <div className="flex min-w-0 items-center gap-3">
                   <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-300">
@@ -156,17 +159,44 @@ export function BeneficiaryAllocationView({ summary, onEdit }: BeneficiaryAlloca
                     </p>
                   </div>
                 </div>
-                <p className="shrink-0 text-lg font-bold tabular-nums text-blue-700 dark:text-blue-300">
-                  {formatCurrency(beneficiary.totalAmount)}
-                </p>
+                <div className="flex shrink-0 items-center gap-1">
+                  <p className="text-lg font-bold tabular-nums text-blue-700 dark:text-blue-300">
+                    {formatCurrency(beneficiary.totalAmount)}
+                  </p>
+                  {beneficiary.accounts.length > 0 ? (
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="ghost"
+                      className="h-7 w-7 text-muted-foreground"
+                      aria-label={`${isExpanded ? "Hide" : "Show"} accounts for ${beneficiary.name}`}
+                      aria-expanded={isExpanded}
+                      data-testid={`button-toggle-beneficiary-accounts-${beneficiary.key}`}
+                      onClick={() =>
+                        setExpandedBeneficiaries((current) => ({
+                          ...current,
+                          [beneficiary.key]: !isExpanded,
+                        }))
+                      }
+                    >
+                      <ChevronDown
+                        className={`h-4 w-4 transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`}
+                        aria-hidden="true"
+                      />
+                    </Button>
+                  ) : null}
+                </div>
               </div>
-              {beneficiary.accounts.length > 0 && <Breakdown label="Accounts" count={beneficiary.accounts.length}>
-                {beneficiary.accounts.map((account) => (
+              {isExpanded ? (
+                <div className="divide-y divide-border/60 border-t border-border/70 bg-muted/20">
+                  {beneficiary.accounts.map((account) => (
                   <AccountBreakdown key={account.assetId} account={account} />
-                ))}
-              </Breakdown>}
-            </article>
-          ))}
+                  ))}
+                </div>
+              ) : null}
+              </article>
+            );
+          })}
 
           {summary.unassignedAccounts.length > 0 ? (
             <article
